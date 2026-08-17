@@ -98,7 +98,7 @@ Blockers:
 - None
 
 Current Checkpoint:
-21ed0f4 (T011-03 — IAM Lambda Execution Role + Least-Privilege Policy)
+a4061e0 (Provider 6.x Compatibility & Toolchain Verification)
 
 Next Step:
 T011-04 — Lambda (Zip-Build) + Permission (separater Prompt / Task)
@@ -207,7 +207,7 @@ Least Privilege
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: `21ed0f4` · Push: SUCCESS
+- Branch: `main` · Commit: `a4061e0` · Push: SUCCESS
 
 ## Next Step
 
