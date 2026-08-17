@@ -71,3 +71,4 @@
 ### Status
 - Keine AWS-Aktionen; Freigabepflichtige Aktionen unverändert (apply/destroy, Produktions-
   deployment, destruktive Operationen, kostenrelevante Ressourcen, Architekturänderungen).
+- Checkpoint `7f37340` gepusht; `docs/PROJECT_STATUS.md` auf aktuellen HEAD nachgezogen.

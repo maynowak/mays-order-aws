@@ -14,7 +14,7 @@ Current Phase:
 Week 1 — COMPLETE (Analyse & Architektur)
 
 Current Checkpoint:
-729ae73 (Statusnachzug Dokumentations-Transfer, nach 2a89e73)
+7f37340 (Persistent Feature Progress & Crash-Recovery-Regel)
 
 AWS Resources:
 NONE
@@ -51,6 +51,8 @@ NOT RUN (Woche 1, keine Implementierung)
 | W1-S1 | `4515029` | Woche-1-Analyse (Requirements, Architektur, Lifecycle, API, DB, Security, Cost, Strategien) + Merge `origin/main` (LICENSE) | SUCCESS | COMPLETE |
 | DOC-TRANSFER | `2a89e73` | Dokumentationsübernahme nach Mays-Jobsearch-Muster (Projektakte, Features, Weekly Reports) | SUCCESS | COMPLETE |
 | DOC-STATUS | `729ae73` | Statusnachzug Checkpoint `2a89e73` in Status/Changelog/Reports | SUCCESS | COMPLETE |
+| DOC-CORRECTION | `4a0a6e7` + `7c12fc0` | Korrektur Review-Inkonsistenzen (Checkpoint 729ae73 als aktuell, WEEK-1 COMPLETE, Commit-/Push-Regel vereinheitlicht) + Statusnachzug | SUCCESS | COMPLETE |
+| WORKFLOW-RULE | `7f37340` | Persistent Feature Progress & Crash-Recovery-Regel in Projektakte verankert | SUCCESS | COMPLETE |
 
 ## Phase-Level-Übersicht
 
