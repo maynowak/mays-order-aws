@@ -38,7 +38,7 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-03 — IAM-Rolle + Policy (COMPLETE)
+Provider 6.x Compatibility & Toolchain Verification (COMPLETE)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -46,7 +46,7 @@ Completed Tasks:
 - T011-03 IAM-Rolle + Policy            ✅
 
 In Progress:
-None (nächster Task T011-04 wird separat gestartet)
+None (Diagnose-Task abgeschlossen; T011-04 wird separat gestartet)
 
 Pending Tasks:
 - T011-04 Lambda (Zip-Build) + Permission
@@ -127,6 +127,51 @@ Query(gsi1, gsi1pk = :LIST, ScanIndexForward = false, Limit, ExclusiveStartKey)
   latenzstabil bei wachsender Datenmenge (ADR-002).
 
 Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung).
+
+## Provider 6.x Compatibility & Toolchain Verification (Diagnose-Task)
+
+```text
+Observation:
+CLI:  terraform validate = PASS (AWS Provider 6.60.0)
+VS Code: "Required attribute 'hash_key' not specified" + "Blocks of type 'key_schema' are not expected here" im GSI-Block
+→ CLI- und Editor-Schema weichen ab.
+
+Commands/Results:
+- terraform version            → Terraform v1.15.8, aws v6.60.0
+- terraform providers          → aws ~> 6.0
+- .terraform.lock.hcl          → version = 6.60.0, constraints = ~> 6.0
+- terraform providers schema -json (CLI, autoritativ):
+    aws_dynamodb_table top-level: hash_key optional (nicht deprecated), range_key optional
+    global_secondary_index: hash_key/range_key optional + deprecated=True,
+                            key_schema block unterstützt (attribute_name/key_type required)
+    aws_iam_role / aws_iam_role_policy / data.aws_iam_policy_document / provider region+default_tags: kompatibel
+- terraform-ls (VS-Code-Extension 2.40.0): v0.39.0 — unterstützt key_schema grundsätzlich
+- .terraform/providers enthielt ALTLIGEND 5.100.0 UND 6.60.0 (5.100.0 aus T011-01)
+
+Conclusion:
+Der Terraform-Code ist vollständig AWS-Provider-6.60.0-kompatibel — KEINE Code-Änderung nötig.
+Die VS-Code-Diagnostics entsprechen dem AWS-Provider-Schema < 6.29.0 (5.100.0), d. h. ein
+veraltetes Schema wurde vom Language Server/Editor-Cache bedient (lokale Altlast 5.100.0).
+
+Fix (minimal-invasiv, nur Cache, keine Projektdatei):
+- terraform/.terraform/providers/.../aws/5.100.0 entfernt
+- terraform init: PASS → nur noch 6.60.0 installiert
+- terraform validate: PASS
+- VS Code: Terraform: init current folder + Fenster neu laden / Language Server neu starten
+```
+
+Compatibility-Matrix (nur tatsächlich vorhandene Bausteine):
+
+| Bereich | Provider 6.x Status | Änderung nötig | Ergebnis |
+|---------|--------------------|----------------|----------|
+| Provider (`aws`, region, default_tags) | kompatibel | nein | OK |
+| DynamoDB Table (`hash_key`/`range_key` top-level) | kompatibel, nicht deprecated | nein | OK |
+| DynamoDB GSI1 (`key_schema`-Blocks) | kompatibel (≥ 6.29.0) | nein | OK |
+| IAM Role (`aws_iam_role` + Trust) | kompatibel | nein | OK |
+| IAM Policy (`aws_iam_role_policy` + `aws_iam_policy_document`) | kompatibel | nein | OK |
+| Policy Attachment | nicht vorhanden (inline) | – | n/a |
+| Outputs (`outputs.tf`) | kompatibel | nein | OK |
+| Tags (Default-Tags, merge) | kompatibel | nein | OK |
 
 ## IAM-Lernbezug (T011-03, wiederverwendbar für Vortrag/Zertifizierung)
 

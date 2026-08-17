@@ -2,6 +2,26 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Provider 6.x Compatibility & Toolchain Verification (F011, Diagnose)
+
+### Verifikation
+- `terraform version`: Terraform v1.15.8 + AWS Provider 6.60.0; Lockfile `6.60.0`, `~> 6.0`.
+- `terraform providers schema -json` (autoritativ): `aws_dynamodb_table` top-level
+  `hash_key`/`range_key` optional & **nicht** deprecated; GSI1 `key_schema`-Blocks unterstützt,
+  GSI-`hash_key`/`range_key` deprecated. IAM-/Provider-Argumente kompatibel.
+- Gesamter Terraform-Bestand ist AWS-Provider-6.60.0-kompatibel — **keine Code-Änderung nötig**.
+- VS-Code-Diagnostics (5.100.0-Schema: GSI `hash_key` required, kein `key_schema`) erklären sich
+  durch veraltetes Editor-/Language-Server-Schema; CLI und Editor werden getrennt bewertet.
+
+### Änderung
+- Nur lokaler Cache: veraltetes Plugin `terraform/.terraform/providers/.../aws/5.100.0` entfernt
+  (gitignoriert, keine Projektdatei); `terraform init` PASS → nur `6.60.0` installiert.
+- `terraform validate`: PASS · `git diff --check`: PASS · Secret-Audit: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…03 COMPLETE · T011-04 NEXT · AWS Resources: NONE.
+
 ## 2026-08-17 — Korrektur-Check aws_dynamodb_table.orders (F011, kein Code-Change)
 
 ### Verifikation
