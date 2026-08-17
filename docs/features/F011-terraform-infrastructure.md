@@ -20,7 +20,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 |----|------|--------|
 | T011-01 | Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | T011-02 | DynamoDB-Tabelle + GSI1 | ✅ COMPLETE |
-| T011-03 | IAM-Rolle + Policy | 🔵 IN PROGRESS |
+| T011-03 | IAM-Rolle + Policy | ✅ COMPLETE |
 | T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
 | T011-06 | HTTP API + Routen + Authorizer | ⏳ PLANNED |
@@ -94,10 +94,10 @@ Blockers:
 - None
 
 Current Checkpoint:
-offen (T011-03 wird als Nächstes committet und gepusht)
+21ed0f4 (T011-03 — IAM Lambda Execution Role + Least-Privilege Policy)
 
 Next Step:
-Git Checkpoint T011-03 → Abschlussbericht
+T011-04 — Lambda (Zip-Build) + Permission (separater Prompt / Task)
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -158,8 +158,8 @@ Least Privilege
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen (T011-03) · Push: offen
+- Branch: `main` · Commit: `21ed0f4` · Push: SUCCESS
 
 ## Next Step
 
-T011-03 — IAM-Rolle + Policy (nach Checkpoint T011-02).
+T011-04 — Lambda (Zip-Build) + Permission (nach Checkpoint T011-03).

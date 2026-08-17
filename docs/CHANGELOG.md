@@ -2,6 +2,27 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Checkpoint 21ed0f4 (F011 / T011-03 — IAM Lambda Execution Role)
+
+### Implementierung
+- `terraform/main.tf`: `data.aws_iam_policy_document.handler_trust` (Trust: `lambda.amazonaws.com`),
+  `data.aws_iam_policy_document.handler` (Least Privilege: `dynamodb:PutItem/GetItem/
+  UpdateItem/Query` auf Tabellen-ARN + `/index/gsi1`; `logs:CreateLogGroup/CreateLogStream/
+  PutLogEvents` auf `*`), `aws_iam_role.handler` (`${var.project_name}-handler-role`),
+  `aws_iam_role_policy.handler`. Fachquelle: `security/iam-design.md` §2.1.
+- `terraform/outputs.tf`: `iam_handler_role_name`, `iam_handler_role_arn`.
+- `terraform/README.md`: IAM-Design (T011-03) inkl. Least-Privilege-Permissions-Tabelle.
+- `docs/features/F011-terraform-infrastructure.md`: IAM-Lernbezug (Role, Policy, Trust Policy, Least Privilege).
+
+### Validation
+- `terraform validate`: PASS (ohne Warnungen, AWS-Provider 6.60.0).
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-03 COMPLETE · AWS Resources: NONE.
+- Keine AWS-Aktionen; keine Kosten.
+
 ## 2026-08-17 — AWS-Provider-Upgrade `~> 5.0` → `~> 6.0` (F011)
 
 ### Implementierung

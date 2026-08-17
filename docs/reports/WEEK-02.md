@@ -6,9 +6,9 @@
 
 ## 1. Gesamtstatus
 
-Woche 2 läuft. F011 (Terraform Infrastructure) in Arbeit; T011-01 (Terraform-Gerüst) und
-T011-02 (DynamoDB-Tabelle + GSI1) abgeschlossen und validiert. Noch keine AWS-Ressourcen
-erzeugt, kein `apply`.
+Woche 2 läuft. F011 (Terraform Infrastructure) in Arbeit; T011-01 (Terraform-Gerüst),
+T011-02 (DynamoDB + GSI1) und T011-03 (IAM) abgeschlossen und validiert. Noch keine
+AWS-Ressourcen erzeugt, kein `apply`.
 
 ## 2. Erledigte Features / Tasks
 
@@ -16,7 +16,8 @@ erzeugt, kein `apply`.
 |---------|------|--------|
 | F011 — Terraform Infrastructure | T011-01 Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-02 DynamoDB-Tabelle + GSI1 (mays-orders, PK pk/sk, GSI1, On-Demand) | ✅ COMPLETE |
-| F011 — Terraform Infrastructure | T011-03 IAM-Rolle + Policy | ⏳ PLANNED |
+| F011 — Terraform Infrastructure | T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB+GSI1, Logs) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-04 Lambda (Zip-Build) + Permission | ⏳ PLANNED |
 | F002 — Cognito Authentication | … | ⏳ PLANNED |
 | F003 — API Gateway | … | ⏳ PLANNED |
 | F004 — Order Creation | … | ⏳ PLANNED |
@@ -37,14 +38,14 @@ erzeugt, kein `apply`.
 
 ## 4. AWS-Ressourcen
 
-NONE — es wurden keine Ressourcen erzeugt (T011-02 ist reine Terraform-Konfiguration;
-`apply` erst in T011-08 nach Freigabe).
+NONE — es wurden keine Ressourcen erzeugt (T011-02/T011-03 sind reine Terraform-
+Konfiguration; `apply` erst in T011-08 nach Freigabe).
 
 ## 5. Probleme / Risiken / Blocker
 
-Keine. DynamoDB-Konfiguration folgt exakt `database/dynamodb-design.md` (PK, GSI1,
-Projection, On-Demand); kein Scan-Pattern (ADR-002). AWS-Provider auf `~> 6.0`
-(6.60.0) gehoben; GSI1 nutzt die neue `key_schema`-Syntax (≥ 6.29.0).
+Keine. DynamoDB- und IAM-Konfiguration folgen exakt `database/dynamodb-design.md` bzw.
+`security/iam-design.md`; Least Privilege: nur DynamoDB-Aktionen für Tabelle+GSI1 und
+Log-Rechte, kein Scan/DeleteItem/BatchWriteItem, keine s3/sqs/iam-Rechte.
 
 ## 6. Kosten
 
@@ -53,14 +54,14 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 7. Nächste Schritte
 
-- T011-03 — IAM-Rolle + Policy (separater Task)
+- T011-04 — Lambda (Zip-Build) + Permission (separater Task)
 
 ## 8. Zeitplan-Bewertung
 
-F011/T011-01 und T011-02 planmäßig; Terraform-Scope entspricht dem Vier-Wochen-Plan (Woche 2).
+F011/T011-01 bis T011-03 planmäßig; Terraform-Scope entspricht dem Vier-Wochen-Plan (Woche 2).
 
 ## 9. Git Checkpoint
 
 - Branch: `main`
-- Commit: `fc89aef` (F011 Provider-Upgrade `~> 6.0` / 6.60.0, GSI1 `key_schema`)
+- Commit: `21ed0f4` (F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy)
 - Push: SUCCESS

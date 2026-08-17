@@ -17,10 +17,10 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-03 — IAM (geplant, wird separat gestartet)
+T011-04 — Lambda (geplant, wird separat gestartet)
 
 Current Checkpoint:
-fc89aef (F011 Provider-Upgrade ~> 6.0 / 6.60.0, GSI1 key_schema; nach T011-02)
+21ed0f4 (F011 / T011-03 — IAM Lambda Execution Role + Least-Privilege Policy)
 
 AWS Resources:
 NONE
@@ -29,7 +29,7 @@ Application Code:
 NOT STARTED
 
 Terraform:
-DynamoDB-Table + GSI1 konfiguriert (T011-02); IAM/Lambda/Cognito/API GW ausstehend
+DynamoDB (T011-02) + IAM (T011-03) konfiguriert; Lambda/Cognito/API GW ausstehend
 
 Authentication:
 DESIGNED — NOT IMPLEMENTED
@@ -43,11 +43,14 @@ DESIGNED — NOT IMPLEMENTED
 DynamoDB:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
 
+IAM:
+CONFIGURED (Terraform) — NOT CREATED (kein apply)
+
 CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01, T011-02; AWS-Provider ~> 6.0 / 6.60.0)
+Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 ```
 
 ## Verlauf der Checkpoints
@@ -62,6 +65,7 @@ Terraform init/validate PASS (T011-01, T011-02; AWS-Provider ~> 6.0 / 6.60.0)
 | W2-T011-01 | `67f02a3` | F011/T011-01 Terraform-Grundgerüst (main/variables/outputs/README) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 | W2-T011-02 | `5d291bd` | F011/T011-02 DynamoDB-Tabelle + GSI1 (PK `pk`/`sk`, GSI1, On-Demand, Outputs) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 | W2-PROV-UPGRADE | `fc89aef` | AWS-Provider `~> 5.0` → `~> 6.0` (6.60.0), GSI1 auf `key_schema`-Syntax + `validate` PASS | SUCCESS | COMPLETE |
+| W2-T011-03 | `21ed0f4` | F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB Tabelle+GSI1, Logs) + `validate` PASS | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -71,10 +75,10 @@ Terraform init/validate PASS (T011-01, T011-02; AWS-Provider ~> 6.0 / 6.60.0)
 | API Design | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | DynamoDB | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-02, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | Cognito Authentication | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
-| IAM / Security | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
+| IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-02 DynamoDB konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-03 IAM konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -91,7 +95,7 @@ Terraform init/validate PASS (T011-01, T011-02; AWS-Provider ~> 6.0 / 6.60.0)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 
