@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-02): **DynamoDB-Tabelle + GSI1 umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-03): **DynamoDB-Tabelle + GSI1 und IAM (Execution Role) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,17 +16,18 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-02, DynamoDB + GSI1):**
+**Aktueller Stand (T011-03, IAM):**
 
 ```text
 terraform/
-├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags, DynamoDB-Tabelle + GSI1
+├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags,
+│                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy)
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (DynamoDB-Name/-ARN; weitere je Ressource in Folge-Tasks)
+├── outputs.tf      Outputs (DynamoDB-Name/-ARN, IAM-Rolle; weitere je Ressource)
 └── README.md       dieses Dokument
 ```
 
-**Geplante Erweiterung (ab T011-03):** Die übrigen Ressourcen (IAM, Lambda, API GW,
+**Geplante Erweiterung (ab T011-04):** Die übrigen Ressourcen (Lambda, API GW,
 Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
 
 ## 2.1 DynamoDB-Tabelle (T011-02)
@@ -52,13 +53,42 @@ AP3 (GET /orders)            → Query(gsi1, gsi1pk=LIST, absteigend) → GSI1
 
 Kein Scan für irgendein Pattern (ADR-002).
 
+## 2.2 IAM — Lambda Execution Role (T011-03)
+
+Fachliche Grundlage: `security/iam-design.md` §2.1. Least Privilege verpflichtend.
+
+| Komponente | Wert | Quelle |
+|------------|------|--------|
+| Role | `aws_iam_role.handler`, Name `${var.project_name}-handler-role` | `security/iam-design.md` §2.1 |
+| Trust Policy | `lambda.amazonaws.com` (`sts:AssumeRole`) | `security/iam-design.md` §2.1 |
+| Inline Policy | `aws_iam_role_policy.handler` | `terraform/README.md` Ressourcentabelle |
+
+Permissions (nur, was die Lambda für die Access Patterns braucht):
+
+```text
+Permission                     Purpose                 Resource
+─────────────                   ───────                 ────────
+dynamodb:PutItem      → AP1 Create (POST /orders)      Tabelle (ARN)
+dynamodb:GetItem      → AP2 Get by ID (GET /orders/{id}) Tabelle (ARN)
+dynamodb:UpdateItem   → AP4 Status-Update (Conditional) Tabelle (ARN)
+dynamodb:Query        → AP3 Listing (GET /orders, GSI1) Tabelle + /index/gsi1
+logs:CreateLogGroup   → Lambda-Logging                  "*" (Logs entstehen zur Laufzeit)
+logs:CreateLogStream  → Lambda-Logging                  "*"
+logs:PutLogEvents     → Lambda-Logging                  "*"
+```
+
+Bewusst **nicht** erlaubt: `dynamodb:Scan`, `dynamodb:DeleteItem`, `dynamodb:BatchWriteItem`,
+`dynamodb:CreateTable`, `s3:*`, `sqs:*`, `iam:*` (`security/iam-design.md` §2.1).
+
+Kein IAM-User, keine Access Keys — Benutzer-Auth läuft über Cognito (ADR-003).
+
 ## 3. Geplante Ressourcen
 
 | Ressource | Terraform-Typ (Vorschlag) |
 |-----------|---------------------------|
-| DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) |
+| DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) ✅ |
+| IAM-Rolle | `aws_iam_role` + `aws_iam_role_policy` ✅ |
 | Lambda | `aws_lambda_function` (Zip aus Build) |
-| IAM-Rolle | `aws_iam_role` + `aws_iam_role_policy` |
 | Lambda-Permission | `aws_lambda_permission` (API GW invoke) |
 | HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` |
 | Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_pool_domain` (falls nötig) |
