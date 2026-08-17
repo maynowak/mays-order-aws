@@ -8,12 +8,20 @@
 aws-credentials.json
 
 # Terraform
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/.terraform.lock.hcl
-terraform/crash.log
+.terraform/
+*.tfstate
+*.tfstate.*
 *.tfvars
+*.tfvars.json
+.terraform.tfstate.lock.info
+.terraformrc
+terraform.rc
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 !terraform/terraform.example.tfvars
 
 # Build / Dependencies

@@ -1,5 +1,7 @@
 # May's Orders — AWS Serverless Order Management System
 
+> mays-order-aws — Design and implement a serverless backend for managing the complete lifecycle of customer orders.
+
 Serverless Order-Management-System für den fiktiven Händler **OrderFlow GmbH**.
 
 ## Ziel
