@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-01): **Grundgerüst angelegt.** Noch keine Ressourcen erzeugt, kein `apply`.
+> Stand Woche 2 (T011-02): **DynamoDB-Tabelle + GSI1 umgesetzt.** Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,18 +16,40 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-01, Grundgerüst):**
+**Aktueller Stand (T011-02, DynamoDB + GSI1):**
 
 ```text
 terraform/
-├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags
+├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags, DynamoDB-Tabelle + GSI1
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (werden ab T011-02 je Ressource ergänzt)
+├── outputs.tf      Outputs (DynamoDB-Name/-ARN; weitere je Ressource in Folge-Tasks)
 └── README.md       dieses Dokument
 ```
 
-**Geplante Erweiterung (ab T011-02):** Die Ressourcen (DynamoDB, IAM, Lambda, API GW,
+**Geplante Erweiterung (ab T011-03):** Die übrigen Ressourcen (IAM, Lambda, API GW,
 Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
+
+## 2.1 DynamoDB-Tabelle (T011-02)
+
+Fachliche Grundlage: `database/dynamodb-design.md` (Item-Modell, Index-Struktur),
+`database/access-patterns.md` (AP2/AP3), ADR-002, ADR-007.
+
+| Eigenschaft | Wert | Quelle |
+|-------------|------|--------|
+| Tabellen-Name | `var.project_name` (= `mays-orders`) | Single-Table-Design |
+| Capacity | On-Demand (`PAY_PER_REQUEST`) | ADR-007 |
+| Primary Key | `pk` (S) = `ORDER#<orderId>`, `sk` (S) = `#ORDER` | `database/dynamodb-design.md` §2 |
+| GSI1 | `gsi1pk` (S) = `LIST`, `gsi1sk` (S) = `createdAt` | ADR-002, `database/access-patterns.md` §2.3 |
+| GSI1-Projection | `INCLUDE`: `orderId, status, customer, totalAmount, createdAt, updatedAt` | `database/dynamodb-design.md` §3 |
+
+Access-Pattern-Abbildung:
+
+```text
+AP2 (GET /orders/{orderId})  → GetItem(pk=ORDER#<id>, sk=#ORDER)   → Primary Key
+AP3 (GET /orders)            → Query(gsi1, gsi1pk=LIST, absteigend) → GSI1
+```
+
+Kein Scan für irgendein Pattern (ADR-002).
 
 ## 3. Geplante Ressourcen
 

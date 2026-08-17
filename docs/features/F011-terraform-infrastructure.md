@@ -19,7 +19,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | ID | Task | Status |
 |----|------|--------|
 | T011-01 | Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
-| T011-02 | DynamoDB-Tabelle + GSI1 | ⏳ PLANNED |
+| T011-02 | DynamoDB-Tabelle + GSI1 | 🔵 IN PROGRESS |
 | T011-03 | IAM-Rolle + Policy | ⏳ PLANNED |
 | T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
@@ -38,16 +38,15 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-02 — DynamoDB-Tabelle + GSI1 (PLANNED — wird separat gestartet)
+T011-02 — DynamoDB-Tabelle + GSI1 (IN PROGRESS)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
 
 In Progress:
-None (T011-01 abgeschlossen; nächster Task wird separat gestartet)
+- T011-02 DynamoDB-Tabelle + GSI1       🔵
 
 Pending Tasks:
-- T011-02 DynamoDB-Tabelle + GSI1
 - T011-03 IAM-Rolle + Policy
 - T011-04 Lambda (Zip-Build) + Permission
 - T011-05 Cognito (Pool, Client, Gruppe)
@@ -57,18 +56,23 @@ Pending Tasks:
 - T011-09 (Optional) S3-Backend-Entscheidung
 
 Changes Made:
-- terraform/main.tf erstellt (terraform-Block, AWS-Provider, Region, Default-Tags)
-- terraform/variables.tf erstellt (project_name, aws_region, tags)
-- terraform/outputs.tf erstellt (leer; Outputs folgen je Ressource ab T011-02)
-- terraform/README.md aktualisiert (Struktur auf T011-01-Stand)
-- terraform/.terraform.lock.hcl committet
+- (T011-01) terraform/main.tf erstellt (terraform-Block, AWS-Provider, Region, Default-Tags)
+- (T011-01) terraform/variables.tf erstellt (project_name, aws_region, tags)
+- (T011-01) terraform/outputs.tf erstellt (leer; Outputs folgen je Ressource ab T011-02)
+- (T011-01) terraform/README.md aktualisiert (Struktur auf T011-01-Stand)
+- (T011-01) terraform/.terraform.lock.hcl committet
+- (T011-02) terraform/main.tf: `aws_dynamodb_table.orders` ergänzt (Name, On-Demand,
+  PK `pk`/`sk`, GSI1 `gsi1pk`/`gsi1sk` mit INCLUDE-Projection)
+- (T011-02) terraform/outputs.tf: `dynamodb_table_name`, `dynamodb_table_arn` ergänzt
+- (T011-02) terraform/README.md: DynamoDB-Design (T011-02) dokumentiert
 
 Tests:
 - Terraform init: PASS (aws provider v5.100.0)
 - Terraform validate: PASS
+- Terraform plan: NOT RUN (gehört zu T011-07)
 
 Validation:
-- Terraform plan: NOT RUN (gehört zu T011-07; keine Ressourcen im Gerüst)
+- Terraform plan: NOT RUN (gehört zu T011-07)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
 - git diff --check: PASS
 - Secret-Audit: PASS
@@ -80,11 +84,35 @@ Blockers:
 - None
 
 Current Checkpoint:
-67f02a3
+offen (T011-02 wird als Nächstes committet und gepusht)
 
 Next Step:
-T011-02 — DynamoDB-Tabelle + GSI1 (separater Prompt / Task)
+Git Checkpoint T011-02 → Abschlussbericht
 ```
+
+## GSI1 — Begründung (T011-02)
+
+```text
+Access Pattern AP3 (GET /orders, Listing)
+       ↓
+Key Structure: gsi1pk = LIST (konstant), gsi1sk = createdAt (ISO-8601)
+       ↓
+Global Secondary Index "gsi1" (Projection INCLUDE: orderId, status, customer,
+totalAmount, createdAt, updatedAt)
+       ↓
+Query(gsi1, gsi1pk = :LIST, ScanIndexForward = false, Limit, ExclusiveStartKey)
+```
+
+- **Warum GSI1 vorhanden:** Ohne Index wäre `GET /orders` ein `Scan` der gesamten
+  Tabelle — linear wachsend mit der Datenmenge (siehe `database/dynamodb-design.md` §5).
+- **Welches Access Pattern:** AP3 (Order Listing, paginiert, neueste zuerst).
+- **Key-Struktur:** konstanter PK `LIST`, SK `createdAt` → alle Orders in einer
+  GSI-Partition, sortiert nach Erstellzeit, lexikografisch korrekt absteigend.
+- **Warum kein Scan:** Der Index liefert exakt die gewünschten Items als partitionierten
+  `Query` mit nativem `LastEvaluatedKey`-Pagination — kein Scan, kosten- und
+  latenzstabil bei wachsender Datenmenge (ADR-002).
+
+Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung).
 
 ## Testnachweise
 
@@ -100,8 +128,9 @@ T011-02 — DynamoDB-Tabelle + GSI1 (separater Prompt / Task)
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: `67f02a3` · Push: SUCCESS
+- Branch: `main` · Commit: offen (T011-02) · Push: offen
 
 ## Next Step
 
-T011-02 — DynamoDB-Tabelle + GSI1 (nach Checkpoint T011-01).
+T011-02 — DynamoDB-Tabelle + GSI1 (IN PROGRESS; Analyse des DB-Designs abgeschlossen,
+Terraform-Ressource wird umgesetzt).
