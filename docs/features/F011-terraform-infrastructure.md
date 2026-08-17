@@ -110,7 +110,7 @@ Blockers:
 - None
 
 Current Checkpoint:
-a4061e0 (Provider 6.x Compatibility & Toolchain Verification)
+e1fd58b (Final Diagnostic — VS Code/terraform-ls stale 5.100.0-Schema)
 
 Next Step:
 T011-04 — Lambda (Zip-Build) + Permission (separater Prompt / Task)
@@ -272,7 +272,7 @@ Least Privilege
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: `a4061e0` · Push: SUCCESS
+- Branch: `main` · Commit: `e1fd58b` · Push: SUCCESS
 
 ## Next Step
 

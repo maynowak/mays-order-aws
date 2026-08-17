@@ -20,7 +20,7 @@ Current Task:
 T011-04 — Lambda (geplant, wird separat gestartet)
 
 Current Checkpoint:
-a4061e0 (F011 — Provider 6.x Compatibility & Toolchain Verification)
+e1fd58b (F011 — Final Diagnostic: VS Code/terraform-ls stale AWS-Provider-Schema 5.100.0)
 
 AWS Resources:
 NONE
@@ -67,6 +67,7 @@ Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 | W2-PROV-UPGRADE | `fc89aef` | AWS-Provider `~> 5.0` → `~> 6.0` (6.60.0), GSI1 auf `key_schema`-Syntax + `validate` PASS | SUCCESS | COMPLETE |
 | W2-T011-03 | `21ed0f4` | F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB Tabelle+GSI1, Logs) + `validate` PASS | SUCCESS | COMPLETE |
 | W2-DIAG-COMPAT | `a4061e0` (+`6976bd0`) | Provider 6.x Compatibility & Toolchain Verification: Schema autoritativ (CLI 6.60.0), 5.100.0-Altlast bereinigt, `validate` PASS, Checkpoint-Nachzug | SUCCESS | COMPLETE |
+| W2-DIAG-FINAL | `e1fd58b` | Final Diagnostic: VS Code/terraform-ls stale 5.100.0-Schema belegt (LSP-Test: SchemaModuleValidation/ReferenceValidation err=nil, `key_schema` in Completion; Root Cause: GSI-`key_schema` ab Provider 6.29.0) | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
