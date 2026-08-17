@@ -2,6 +2,24 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — AWS-Provider-Upgrade `~> 5.0` → `~> 6.0` (F011)
+
+### Implementierung
+- `terraform/main.tf`: `required_providers.aws` von `~> 5.0` auf `~> 6.0` angehoben.
+- `terraform/main.tf`: GSI1 von deprecated `hash_key`/`range_key` auf `key_schema`-Blocks
+  (HASH `gsi1pk`, RANGE `gsi1sk`) umgestellt — Provider ≥ 6.29.0.
+- `terraform/.terraform.lock.hcl`: aws provider `5.100.0` → `6.60.0` (`init -upgrade`).
+- `terraform/README.md`: Provider- und GSI-Syntax-Hinweis aktualisiert.
+
+### Validation
+- `terraform init -upgrade`: PASS (aws provider v6.60.0) · `terraform validate`: PASS (ohne Warnungen).
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-02 COMPLETE · AWS Resources: NONE.
+- Keine AWS-Aktionen; keine Kosten.
+
 ## 2026-08-17 — Checkpoint 5d291bd (F011 / T011-02 — DynamoDB-Tabelle + GSI1)
 
 ### Implementierung

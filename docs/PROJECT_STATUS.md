@@ -20,7 +20,7 @@ Current Task:
 T011-03 — IAM (geplant, wird separat gestartet)
 
 Current Checkpoint:
-5d291bd (F011 / T011-02 — DynamoDB-Tabelle + GSI1)
+fc89aef (F011 Provider-Upgrade ~> 6.0 / 6.60.0, GSI1 key_schema; nach T011-02)
 
 AWS Resources:
 NONE
@@ -47,7 +47,7 @@ CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01, T011-02, Woche 2)
+Terraform init/validate PASS (T011-01, T011-02; AWS-Provider ~> 6.0 / 6.60.0)
 ```
 
 ## Verlauf der Checkpoints
@@ -61,7 +61,7 @@ Terraform init/validate PASS (T011-01, T011-02, Woche 2)
 | WORKFLOW-RULE | `7f37340` | Persistent Feature Progress & Crash-Recovery-Regel in Projektakte verankert | SUCCESS | COMPLETE |
 | W2-T011-01 | `67f02a3` | F011/T011-01 Terraform-Grundgerüst (main/variables/outputs/README) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 | W2-T011-02 | `5d291bd` | F011/T011-02 DynamoDB-Tabelle + GSI1 (PK `pk`/`sk`, GSI1, On-Demand, Outputs) + `init`/`validate` PASS | SUCCESS | COMPLETE |
-
+| W2-PROV-UPGRADE | `fc89aef` | AWS-Provider `~> 5.0` → `~> 6.0` (6.60.0), GSI1 auf `key_schema`-Syntax + `validate` PASS | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |

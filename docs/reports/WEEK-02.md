@@ -29,8 +29,8 @@ erzeugt, kein `apply`.
 |---------|--------|
 | TypeScript-Build | NOT APPLICABLE (kein App-Code) |
 | Unit-Tests | NOT RUN |
-| Terraform init | PASS (aws provider v5.100.0) |
-| Terraform validate | PASS |
+| Terraform init | PASS (aws provider v6.60.0) |
+| Terraform validate | PASS (ohne Warnungen) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
@@ -43,7 +43,8 @@ NONE — es wurden keine Ressourcen erzeugt (T011-02 ist reine Terraform-Konfigu
 ## 5. Probleme / Risiken / Blocker
 
 Keine. DynamoDB-Konfiguration folgt exakt `database/dynamodb-design.md` (PK, GSI1,
-Projection, On-Demand); kein Scan-Pattern (ADR-002).
+Projection, On-Demand); kein Scan-Pattern (ADR-002). AWS-Provider auf `~> 6.0`
+(6.60.0) gehoben; GSI1 nutzt die neue `key_schema`-Syntax (≥ 6.29.0).
 
 ## 6. Kosten
 
@@ -61,5 +62,5 @@ F011/T011-01 und T011-02 planmäßig; Terraform-Scope entspricht dem Vier-Wochen
 ## 9. Git Checkpoint
 
 - Branch: `main`
-- Commit: `5d291bd` (F011/T011-02 DynamoDB-Tabelle + GSI1)
+- Commit: `fc89aef` (F011 Provider-Upgrade `~> 6.0` / 6.60.0, GSI1 `key_schema`)
 - Push: SUCCESS

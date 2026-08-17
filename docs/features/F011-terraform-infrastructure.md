@@ -89,7 +89,7 @@ Blockers:
 - None
 
 Current Checkpoint:
-5d291bd (T011-02 — DynamoDB-Tabelle + GSI1)
+fc89aef (AWS-Provider-Upgrade ~> 6.0, GSI1 key_schema)
 
 Next Step:
 T011-03 — IAM-Rolle + Policy (separater Prompt / Task)
@@ -133,7 +133,7 @@ Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung)
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen (Provider-Upgrade) · Push: offen
+- Branch: `main` · Commit: `fc89aef` (Provider-Upgrade) · Push: SUCCESS
 
 ## Next Step
 
