@@ -18,7 +18,7 @@
 | [F008](F008-concurrent-update-protection.md) | Concurrent Update Protection | 3 | 🟡 DESIGNED |
 | [F009](F009-iam-security.md) | IAM / Security | 2–3 | 🟡 DESIGNED |
 | [F010](F010-cloudwatch-monitoring.md) | CloudWatch Monitoring | 3–4 | ⏳ PLANNED |
-| [F011](F011-terraform-infrastructure.md) | Terraform Infrastructure | 2 | 🟡 DESIGNED |
+| [F011](F011-terraform-infrastructure.md) | Terraform Infrastructure | 2 | 🔵 IN PROGRESS |
 
 ## Abhängigkeiten
 

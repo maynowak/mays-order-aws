@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 1: **Planung.** Noch keine Ressourcen erzeugt, kein `apply`.
+> Stand Woche 2 (T011-01): **Grundgerüst angelegt.** Noch keine Ressourcen erzeugt, kein `apply`.
 
 ## 1. Ziel
 
@@ -14,16 +14,20 @@ Die AWS-Infrastruktur wird vollständig als Infrastructure as Code abgebildet:
 
 Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
-## 2. Geplante Struktur
+## 2. Struktur
+
+**Aktueller Stand (T011-01, Grundgerüst):**
 
 ```text
 terraform/
-├── main.tf         Ressourcen (DynamoDB, IAM, Lambda, API GW, Cognito)
+├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Invoke-URL, Cognito-IDs, Table-ARN
-├── providers.tf    Provider + Region (anfangs lokal, S3-Backend offen)
+├── outputs.tf      Outputs (werden ab T011-02 je Ressource ergänzt)
 └── README.md       dieses Dokument
 ```
+
+**Geplante Erweiterung (ab T011-02):** Die Ressourcen (DynamoDB, IAM, Lambda, API GW,
+Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
 
 ## 3. Geplante Ressourcen
 

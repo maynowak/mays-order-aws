@@ -4,7 +4,7 @@
 |------|------|
 | **ID** | F011 |
 | **Name** | Terraform Infrastructure |
-| **Status** | 🟡 DESIGNED — NOT IMPLEMENTED |
+| **Status** | 🔵 IN PROGRESS |
 | **Week** | 2 |
 | **Abhängigkeiten** | F001 |
 | **Fachquelle** | `terraform/README.md`, `architecture/architecture-decisions.md` |
@@ -18,7 +18,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 
 | ID | Task | Status |
 |----|------|--------|
-| T011-01 | Terraform-Gerüst (main/variables/outputs/providers) | ⏳ PLANNED |
+| T011-01 | Terraform-Gerüst (main/variables/outputs/README) | 🔵 IN PROGRESS |
 | T011-02 | DynamoDB-Tabelle + GSI1 | ⏳ PLANNED |
 | T011-03 | IAM-Rolle + Policy | ⏳ PLANNED |
 | T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
@@ -28,19 +28,77 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
 
+## Progress — laufender Arbeitsstand (Persistent Feature Progress)
+
+```text
+Feature:
+F011 — Terraform Infrastructure
+
+Status:
+🔵 IN PROGRESS
+
+Current Task:
+T011-01 — Terraform-Gerüst
+
+Completed Tasks:
+None
+
+In Progress:
+- T011-01 Terraform-Gerüst              🔄
+
+Pending Tasks:
+- T011-02 DynamoDB-Tabelle + GSI1
+- T011-03 IAM-Rolle + Policy
+- T011-04 Lambda (Zip-Build) + Permission
+- T011-05 Cognito (Pool, Client, Gruppe)
+- T011-06 HTTP API + Routen + Authorizer
+- T011-07 terraform validate + plan (Review)
+- T011-08 terraform apply (nach Freigabe)
+- T011-09 (Optional) S3-Backend-Entscheidung
+
+Changes Made:
+- terraform/main.tf erstellt (terraform-Block, AWS-Provider, Region, Default-Tags)
+- terraform/variables.tf erstellt (project_name, aws_region, tags)
+- terraform/outputs.tf erstellt (leer; Outputs folgen je Ressource ab T011-02)
+- terraform/README.md aktualisiert (Struktur auf T011-01-Stand)
+
+Tests:
+- Terraform init: PASS (aws provider v5.100.0, .terraform.lock.hcl erzeugt)
+- Terraform validate: PASS
+
+Validation:
+- Terraform plan: NOT RUN (gehört zu T011-07; keine Ressourcen im Gerüst)
+- Terraform apply: NOT RUN (Freigabe erforderlich)
+
+Known Issues:
+- None
+
+Blockers:
+- None
+
+Current Checkpoint:
+7f37340
+
+Next Step:
+git diff --check, Secret-Audit, Checkpoint-Commit + Push, Status-/Report-Update
+```
+
 ## Testnachweise
 
 | Prüfung | Status |
 |---------|--------|
-| Terraform validate | NOT RUN |
-| Terraform plan | NOT RUN |
+| Terraform init | PASS (aws provider v5.100.0) |
+| Terraform validate | PASS |
+| Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |
+| `git diff --check` | PENDING |
+| Secret-Audit | PENDING |
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen · Push: offen
+- Branch: `main` · Commit: offen (Checkpoint folgt) · Push: offen
 
 ## Next Step
 
-T011-01 (Terraform-Gerüst) — nach Freigabe. Erster konkreter Woche-2-Schritt.
+T011-02 — DynamoDB-Tabelle + GSI1 (nach Checkpoint T011-01).
