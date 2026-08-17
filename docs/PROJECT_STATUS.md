@@ -11,10 +11,10 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Week 1 — COMPLETE (Analyse & Architektur)
+Week 2 — IN PROGRESS (Terraform)
 
 Current Checkpoint:
-7f37340 (Persistent Feature Progress & Crash-Recovery-Regel)
+67f02a3 (F011 / T011-01 — Terraform-Grundgerüst)
 
 AWS Resources:
 NONE
@@ -23,7 +23,7 @@ Application Code:
 NOT STARTED
 
 Terraform:
-DESIGN ONLY
+PARTIAL (Grundgerüst T011-01; Ressourcen ausstehend)
 
 Authentication:
 DESIGNED — NOT IMPLEMENTED
@@ -41,7 +41,7 @@ CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-NOT RUN (Woche 1, keine Implementierung)
+Terraform init/validate PASS (T011-01, Woche 2)
 ```
 
 ## Verlauf der Checkpoints
@@ -53,6 +53,7 @@ NOT RUN (Woche 1, keine Implementierung)
 | DOC-STATUS | `729ae73` | Statusnachzug Checkpoint `2a89e73` in Status/Changelog/Reports | SUCCESS | COMPLETE |
 | DOC-CORRECTION | `4a0a6e7` + `7c12fc0` | Korrektur Review-Inkonsistenzen (Checkpoint 729ae73 als aktuell, WEEK-1 COMPLETE, Commit-/Push-Regel vereinheitlicht) + Statusnachzug | SUCCESS | COMPLETE |
 | WORKFLOW-RULE | `7f37340` | Persistent Feature Progress & Crash-Recovery-Regel in Projektakte verankert | SUCCESS | COMPLETE |
+| W2-T011-01 | `67f02a3` | F011/T011-01 Terraform-Grundgerüst (main/variables/outputs/README) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 
 ## Phase-Level-Übersicht
 
@@ -66,7 +67,7 @@ NOT RUN (Woche 1, keine Implementierung)
 | IAM / Security | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-01 Gerüst) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -83,7 +84,7 @@ NOT RUN (Woche 1, keine Implementierung)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | ⏳ PLANNED | Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 COMPLETE · T011-02 PLANNED. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

@@ -1,18 +1,20 @@
 # Weekly Report — Woche 2
 
-**Datum:** offen
+**Datum:** 2026-08-17 (laufend)
 **Projekt:** May's Orders — AWS Serverless Order Management
-**Status:** ⏳ NOT STARTED
+**Status:** 🔵 IN PROGRESS
 
 ## 1. Gesamtstatus
 
-*(auszufüllen bei Abschluss)*
+Woche 2 gestartet. F011 (Terraform Infrastructure) in Arbeit; T011-01 (Terraform-Gerüst)
+abgeschlossen und validiert. Noch keine AWS-Ressourcen erzeugt, kein `apply`.
 
 ## 2. Erledigte Features / Tasks
 
 | Feature | Task | Status |
 |---------|------|--------|
-| F011 — Terraform Infrastructure | … | ⏳ PLANNED |
+| F011 — Terraform Infrastructure | T011-01 Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-02 DynamoDB + GSI1 | ⏳ PLANNED |
 | F002 — Cognito Authentication | … | ⏳ PLANNED |
 | F003 — API Gateway | … | ⏳ PLANNED |
 | F004 — Order Creation | … | ⏳ PLANNED |
@@ -23,35 +25,37 @@
 
 | Prüfung | Status |
 |---------|--------|
-| TypeScript-Build | NOT RUN |
+| TypeScript-Build | NOT APPLICABLE (kein App-Code) |
 | Unit-Tests | NOT RUN |
-| Terraform validate | NOT RUN |
-| Terraform plan | NOT RUN |
+| Terraform init | PASS (aws provider v5.100.0) |
+| Terraform validate | PASS |
+| Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
 
 ## 4. AWS-Ressourcen
 
-*(nach Freigabe zu dokumentieren — nur tatsächlich erzeugte)*
+NONE — es wurden keine Ressourcen erzeugt (T011-01 ist ein reines Datei-Gerüst).
 
 ## 5. Probleme / Risiken / Blocker
 
-*(auszufüllen)*
+Keine.
 
 ## 6. Kosten
 
-*(auszufüllen; Billing-/Metered-Werte)*
+Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
+(`cost/cost-analysis.md`).
 
 ## 7. Nächste Schritte
 
-*(auszufüllen)*
+- T011-02 — DynamoDB-Tabelle + GSI1
 
 ## 8. Zeitplan-Bewertung
 
-*(auszufüllen)*
+F011/T011-01 planmäßig gestartet; Terraform-Scope entspricht dem Vier-Wochen-Plan (Woche 2).
 
 ## 9. Git Checkpoint
 
 - Branch: `main`
-- Commit: offen
-- Push: offen
+- Commit: `67f02a3` (F011/T011-01 Terraform-Grundgerüst)
+- Push: SUCCESS

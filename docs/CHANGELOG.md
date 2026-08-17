@@ -2,6 +2,25 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Checkpoint 67f02a3 (F011 / T011-01 — Terraform-Gerüst)
+
+### Implementierung
+- `terraform/main.tf`: `terraform`-Block (`required_version`, AWS-Provider `~> 5.0`),
+  `provider "aws"` mit Region (Variable) und Default-Tags.
+- `terraform/variables.tf`: `project_name`, `aws_region`, `tags`.
+- `terraform/outputs.tf`: leer — Outputs werden je Ressource ab T011-02 ergänzt.
+- `terraform/README.md`: Struktur auf aktuellen T011-01-Stand aktualisiert.
+- `.terraform.lock.hcl` committet (Reproduzierbarkeit).
+
+### Validation
+- `terraform init`: PASS (aws provider v5.100.0) · `terraform validate`: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01 COMPLETE · AWS Resources: NONE.
+- Keine AWS-Aktionen; keine Kosten.
+
 ## 2026-08-17 — Checkpoint 4515029 (Woche 1)
 
 ### Foundation

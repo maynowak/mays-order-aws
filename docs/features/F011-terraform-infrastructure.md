@@ -18,7 +18,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 
 | ID | Task | Status |
 |----|------|--------|
-| T011-01 | Terraform-Gerüst (main/variables/outputs/README) | 🔵 IN PROGRESS |
+| T011-01 | Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | T011-02 | DynamoDB-Tabelle + GSI1 | ⏳ PLANNED |
 | T011-03 | IAM-Rolle + Policy | ⏳ PLANNED |
 | T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
@@ -38,13 +38,13 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-01 — Terraform-Gerüst
+T011-02 — DynamoDB-Tabelle + GSI1 (PLANNED — wird separat gestartet)
 
 Completed Tasks:
-None
+- T011-01 Terraform-Gerüst             ✅
 
 In Progress:
-- T011-01 Terraform-Gerüst              🔄
+None (T011-01 abgeschlossen; nächster Task wird separat gestartet)
 
 Pending Tasks:
 - T011-02 DynamoDB-Tabelle + GSI1
@@ -61,14 +61,17 @@ Changes Made:
 - terraform/variables.tf erstellt (project_name, aws_region, tags)
 - terraform/outputs.tf erstellt (leer; Outputs folgen je Ressource ab T011-02)
 - terraform/README.md aktualisiert (Struktur auf T011-01-Stand)
+- terraform/.terraform.lock.hcl committet
 
 Tests:
-- Terraform init: PASS (aws provider v5.100.0, .terraform.lock.hcl erzeugt)
+- Terraform init: PASS (aws provider v5.100.0)
 - Terraform validate: PASS
 
 Validation:
 - Terraform plan: NOT RUN (gehört zu T011-07; keine Ressourcen im Gerüst)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
+- git diff --check: PASS
+- Secret-Audit: PASS
 
 Known Issues:
 - None
@@ -77,10 +80,10 @@ Blockers:
 - None
 
 Current Checkpoint:
-7f37340
+67f02a3
 
 Next Step:
-git diff --check, Secret-Audit, Checkpoint-Commit + Push, Status-/Report-Update
+T011-02 — DynamoDB-Tabelle + GSI1 (separater Prompt / Task)
 ```
 
 ## Testnachweise
@@ -92,12 +95,12 @@ git diff --check, Secret-Audit, Checkpoint-Commit + Push, Status-/Report-Update
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |
-| `git diff --check` | PENDING |
-| Secret-Audit | PENDING |
+| `git diff --check` | PASS |
+| Secret-Audit | PASS |
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen (Checkpoint folgt) · Push: offen
+- Branch: `main` · Commit: `67f02a3` · Push: SUCCESS
 
 ## Next Step
 
