@@ -88,6 +88,52 @@ Abschlussformat siehe unten. Keine vagen Zusammenfassungen.
 
 ---
 
+## Persistent Feature Progress & Crash-Recovery
+
+### Fortschritt nicht erst am Ende dokumentieren
+
+Bei längeren Prompts/Feature-Tasks wird der Arbeitsstand **während der Bearbeitung**
+fortlaufend in der zugehörigen Feature-Dokumentation aktualisiert
+(`docs/features/FXXX-*.md`, Template: `docs/features/_progress-template.md`).
+
+Der Chatverlauf ist **keine** Recovery-Quelle.
+
+### Pflichtfelder des laufenden Feature-Stands
+
+```text
+Feature · Status · Current Task · Completed Tasks · In Progress · Pending Tasks
+Changes Made · Tests · Validation · Known Issues · Blockers
+Current Checkpoint · Next Step
+```
+
+### Update-Maßstab
+
+Spätestens nach jedem sinnvollen Arbeitsschritt:
+
+```text
+Analyse abgeschlossen · Datei geändert · Teilfeature implementiert · Testgruppe abgeschlossen
+Fehler identifiziert · Fehler behoben · Architekturentscheidung getroffen
+AWS-Konfiguration vorbereitet · Dokumentation aktualisiert
+```
+
+> **Kann ein anderer Agent nach einem Absturz erkennen, was erledigt ist und wo weitergearbeitet
+> wird?** Wenn nein → Status aktualisieren.
+
+### Status-Disziplin
+
+- Feature in Bearbeitung → `🔄 IN PROGRESS` (nie künstlich COMPLETE).
+- Einzelner Task fertig → `Task: COMPLETE`, `Feature: IN PROGRESS`.
+- Feature erst `✅ COMPLETE`, wenn: Implementation ✅, relevante Tests ✅, Validation ✅,
+  Doku aktualisiert ✅, bekannte Probleme dokumentiert ✅, Git-Checkpoint ✅, Push ✅.
+
+### Absturz-Recovery
+
+Nach Absturz: Git-Status → HEAD → Remote → `docs/PROJECT_STATUS.md` → aktiven Feature-Report →
+aktiven Task → letzten dokumentierten Schritt → Tests/Validation → dann weiterarbeiten.
+Nicht aus dem Gedächtnis raten. Wenn unklar: `UNKNOWN / NEEDS VERIFICATION` dokumentieren.
+
+---
+
 ## Standard Prompt-Struktur
 
 ```text

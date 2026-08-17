@@ -34,6 +34,10 @@ AI unterstützt die Entwicklung. Es ersetzt nicht:
   Bestandteil des Task-Checkpoints nach erfolgreicher Validierung selbstständig aus.
 - `terraform apply` / `terraform destroy` sowie kostenpflichtige Ressourcen, Produktions-
   deployment, destruktive Operationen und Architekturänderungen nur nach menschlicher Freigabe.
+- **Persistent Feature Progress:** Laufenden Arbeitsstand während der Bearbeitung in der
+  Feature-Doku (`docs/features/FXXX-*.md`) aktualisieren — nicht erst am Ende. Der Chatverlauf
+  ist keine Recovery-Quelle. Nach jedem Prompt (auch bei Abbruch) Zwischenstand hinterlassen
+  (siehe `docs/features/_progress-template.md`).
 
 ## Validation commands
 

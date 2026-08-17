@@ -44,3 +44,37 @@ Analyse → Plan → Implementation → Test → Build/Validation → Live Verif
 
 Ein Task ist erst abgeschlossen, wenn die Prüfungen tatsächlich durchgeführt und der
 Checkpoint gepusht wurde. Testnachweise in `tests/test-results.md`.
+
+## Persistent Feature Progress (verbindlich)
+
+Während der Bearbeitung wird der Arbeitsstand **fortlaufend** in der Feature-Dokumentation
+aktualisiert — nicht erst am Ende. Der Chatverlauf ist keine Recovery-Quelle.
+
+Für jedes **aktive** Feature muss die Feature-Dokumentation erkennen lassen:
+
+```text
+Feature
+├── Status
+├── Current Task
+├── Completed Tasks
+├── In Progress
+├── Pending Tasks
+├── Changes Made
+├── Tests
+├── Validation
+├── Known Issues
+├── Blockers
+├── Current Checkpoint
+└── Next Step
+```
+
+- **Zwischenstände:** spätestens nach jedem sinnvollen Arbeitsschritt (Analyse, Änderung,
+  Teilfeature, Testgruppe, Fehler gefunden/behoben, Entscheidung, Doku-Update).
+- **Status:** aktive Features → `🔄 IN PROGRESS`; einzelner fertiger Task → `Task: COMPLETE`,
+  `Feature: IN PROGRESS`. Ein Feature wird erst `✅ COMPLETE`, wenn Implementation, Tests,
+  Validation, Doku, bekannte Probleme, Git-Checkpoint und Push abgeschlossen sind.
+- **Absturz-Recovery:** Zustand muss aus der Feature-Doku ableitbar sein
+  (aktives Feature → aktiver Task → Änderungen → Tests → offene Punkte → nächster Schritt).
+  Wenn unklar: `UNKNOWN / NEEDS VERIFICATION` dokumentieren, nicht raten.
+
+Standard-Template: [`_progress-template.md`](_progress-template.md).

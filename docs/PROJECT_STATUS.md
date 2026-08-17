@@ -101,13 +101,16 @@ Detaillierte Feature-Dokumentation: `docs/features/`.
 ```
 git HEAD
    ↓
-docs/PROJECT_STATUS.md      (dieses Dokument — aktueller Stand)
+docs/PROJECT_STATUS.md      (dieses Dokument — aktueller Gesamtstand)
    ↓
-docs/reports/WEEK-01.md     (Wochenreport)
+docs/reports/WEEK-NN.md     (Wochenreport)
    ↓
 docs/features/README.md     (Feature-Index)
    ↓
-Feature-Report / Task-Status
-   ↓
+Aktive Feature-Doku         (docs/features/FXXX-*.md — laufender Arbeitsstand,
+   ↓                         Current Task, Changes, Tests, Next Step)
 docs/reports/recovery-checkpoint-strategy.md
 ```
+
+> Der semantische Arbeitsstand eines aktiven Features steht in der Feature-Dokumentation —
+> nicht im Chatverlauf. Template: `docs/features/_progress-template.md`.

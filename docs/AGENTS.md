@@ -66,6 +66,12 @@ mays-orders/
   (PLANNED / IMPLEMENTED / TESTED / VERIFIED / COMPLETE / BLOCKED / NOT TESTED / NOT APPLICABLE).
 - **Kostenbewusst:** Free-Tier beachten, keine dauerhaft laufenden Ressourcen ohne Begründung.
 - **Checkpoint-Regel:** Report → Tests → Build → `git status` → `git diff --check` → Secret-Audit → Commit → Push.
+- **Persistent Feature Progress:** Während der Bearbeitung wird der Arbeitsstand **fortlaufend**
+  in der Feature-Dokumentation (`docs/features/FXXX-*.md`) aktualisiert — nicht erst am Ende.
+  Aktive Features → `IN PROGRESS`; Feature erst `COMPLETE`, wenn Implementation, Tests,
+  Validation, Doku, bekannte Probleme, Git-Checkpoint und Push abgeschlossen sind.
+  Der Chatverlauf ist keine Recovery-Quelle; der semantische Stand steht in der Feature-Doku
+  (siehe `docs/features/_progress-template.md`).
 
 ## Git Workflow
 

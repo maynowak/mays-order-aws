@@ -50,3 +50,24 @@
 ### Status
 - Week 1 COMPLETE · Documentation COMPLETE · AWS NO RESOURCES · Application NOT STARTED ·
   Terraform Apply NOT RUN · Live API NOT RUN.
+
+## 2026-08-17 — Persistent Feature Progress & Crash-Recovery-Regel
+
+### Workflow
+- Verbindliche Regel eingeführt: Arbeitsstand wird während der Bearbeitung **fortlaufend**
+  in der Feature-Dokumentation aktualisiert (`docs/features/_progress-template.md`).
+- Feature-Doku (FXXX) führt künftig: Status, Current Task, Completed/In Progress/Pending Tasks,
+  Changes Made, Tests, Validation, Known Issues, Blockers, Current Checkpoint, Next Step.
+- Status-Disziplin: aktive Features `IN PROGRESS`; Feature erst `COMPLETE` nach Implementation,
+  Tests, Validation, Doku, bekannte Probleme, Git-Checkpoint und Push.
+- Recovery-Regel erweitert: semantischer Stand aus Feature-Doku ist die maßgebliche
+  Recovery-Quelle; bei Unsicherheit `UNKNOWN / NEEDS VERIFICATION`, nicht raten.
+
+### Geänderte Dateien
+- `docs/AI_AGENT_PLAYBOOK.md` (neue Sektion), `docs/AGENTS.md`, `docs/AI_DEVELOPMENT_GUIDE.md`
+- `docs/features/README.md`, `docs/features/_progress-template.md` (neu)
+- `docs/reports/recovery-checkpoint-strategy.md`, `docs/PROJECT_STATUS.md`
+
+### Status
+- Keine AWS-Aktionen; Freigabepflichtige Aktionen unverändert (apply/destroy, Produktions-
+  deployment, destruktive Operationen, kostenrelevante Ressourcen, Architekturänderungen).
