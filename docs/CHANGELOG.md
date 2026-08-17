@@ -22,7 +22,7 @@
 - Woche 1 — COMPLETE. Keine AWS-Ressourcen. Keine Implementierung.
 - Build: NOT APPLICABLE · Live-API: NOT RUN (kein Code) · Secret-Audit: PASS · `git diff --check`: PASS.
 
-## 2026-08-17 — Dokumentations-Transfer (neuer Checkpoint, offen)
+## 2026-08-17 — Dokumentations-Transfer (Checkpoint 2a89e73)
 
 ### Dokumentation
 - Zentrales Statusdokument `docs/PROJECT_STATUS.md`.
@@ -31,3 +31,7 @@
 - Feature-Dokumentation `docs/features/` (F001–F011).
 - Weekly-Reports strukturiert als `docs/reports/WEEK-01…04.md`.
 - `docs/BUILD.md`, `docs/DEPLOYMENT.md` (Planung, Status offen).
+
+### Status
+- Woche 1 weiterhin COMPLETE; kein Code, keine AWS-Ressourcen.
+- Checkpoint `2a89e73` gepusht.
