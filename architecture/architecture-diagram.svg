@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="640" viewBox="0 0 720 640" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .box { fill:#ffffff; stroke:#232f3e; stroke-width:1.5; rx:6; }
+      .fill-blue { fill:#dbe7fb; }
+      .fill-green { fill:#d5f0e0; }
+      .fill-orange { fill:#fde7d0; }
+      .fill-purple { fill:#e8def7; }
+      .fill-grey { fill:#ececec; }
+      .lbl { font-size:12px; fill:#111; text-anchor:middle; }
+      .lbl-sm { font-size:10px; fill:#555; text-anchor:middle; }
+      .arrow { stroke:#232f3e; stroke-width:1.6; fill:none; marker-end:url(#arw); }
+      .dashed { stroke:#232f3e; stroke-width:1.4; stroke-dasharray:6 4; fill:none; }
+      .title { font-size:15px; font-weight:bold; fill:#232f3e; }
+    </style>
+    <marker id="arw" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#232f3e"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="360" y="24" class="title" text-anchor="middle">May's Orders — Serverless Architecture (Woche 1)</text>
+
+  <!-- Client -->
+  <rect x="260" y="42" width="200" height="46" class="box fill-grey"/>
+  <text x="360" y="62" class="lbl">Client (Backoffice / HTTP)</text>
+  <text x="360" y="78" class="lbl-sm">Bearer JWT</text>
+
+  <!-- Cognito -->
+  <rect x="520" y="42" width="160" height="46" class="box fill-purple"/>
+  <text x="600" y="62" class="lbl">Cognito User Pool</text>
+  <text x="600" y="78" class="lbl-sm">Authentication · JWT</text>
+  <path class="arrow" d="M520,65 H470"/>
+  <text x="495" y="58" class="lbl-sm">login / tokens</text>
+  <path class="dashed" d="M360,88 V104" />
+
+  <!-- API Gateway -->
+  <rect x="210" y="104" width="300" height="52" class="box fill-blue"/>
+  <text x="360" y="126" class="lbl">API Gateway (HTTP API V2)</text>
+  <text x="360" y="144" class="lbl-sm">JWT-Autorisator (COGNITO_USER_POOLS) · CORS</text>
+
+  <path class="arrow" d="M360,46 V104"/>
+
+  <!-- Lambda -->
+  <rect x="210" y="220" width="300" height="52" class="box fill-orange"/>
+  <text x="360" y="242" class="lbl">Lambda — Order Handler (TypeScript)</text>
+  <text x="360" y="260" class="lbl-sm">Validierung · State Machine · Conditional Writes</text>
+
+  <path class="arrow" d="M360,156 V220"/>
+
+  <!-- DynamoDB -->
+  <rect x="210" y="336" width="300" height="52" class="box fill-green"/>
+  <text x="360" y="358" class="lbl">DynamoDB — mays-orders</text>
+  <text x="360" y="376" class="lbl-sm">pk=ORDER#&lt;id&gt; · GSI1 (LIST → createdAt)</text>
+
+  <path class="arrow" d="M360,272 V336"/>
+
+  <!-- IAM on the side -->
+  <rect x="520" y="220" width="160" height="80" class="box fill-purple"/>
+  <text x="600" y="242" class="lbl">IAM</text>
+  <text x="600" y="258" class="lbl-sm">Lambda Execution Role</text>
+  <text x="600" y="272" class="lbl-sm">Least Privilege</text>
+  <text x="600" y="288" class="lbl-sm">→ DynamoDB, Logs</text>
+  <path class="dashed" d="M510,268 H440"/>
+
+  <!-- CloudWatch -->
+  <rect x="210" y="452" width="300" height="52" class="box fill-grey"/>
+  <text x="360" y="474" class="lbl">CloudWatch</text>
+  <text x="360" y="492" class="lbl-sm">Logs · Metriken (Errors, Duration) · Alarme</text>
+  <path class="arrow" d="M360,388 V452"/>
+  <path class="dashed" d="M600,300 V470 H510"/>
+  <text x="600" y="492" class="lbl-sm">Logs</text>
+
+  <!-- Notes -->
+  <text x="30" y="560" class="lbl-sm" text-anchor="start">Authentication (Cognito/JWT) und IAM sind strikt getrennt.</text>
+  <text x="30" y="578" class="lbl-sm" text-anchor="start">Keine VPC / Subnets / NAT / SQS / RDS / EC2 (siehe ADR-006).</text>
+  <text x="30" y="596" class="lbl-sm" text-anchor="start">IaC: Terraform (API Gateway, Lambda, DynamoDB, IAM, Cognito).</text>
+  <text x="30" y="614" class="lbl-sm" text-anchor="start">State Machine im Domain-Layer (kein Step Functions, ADR-005).</text>
+</svg>

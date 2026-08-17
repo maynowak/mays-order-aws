@@ -1,0 +1,30 @@
+# Secrets & Credentials
+*.pem
+*.key
+*.pfx
+.env
+.env.*
+.aws/
+aws-credentials.json
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/crash.log
+*.tfvars
+!terraform/terraform.example.tfvars
+
+# Build / Dependencies
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
