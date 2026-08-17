@@ -91,3 +91,13 @@ Die Woche-1-Dokumentation liegt in den jeweiligen Unterordnern. Einstieg:
 - [DynamoDB Access Patterns](database/access-patterns.md)
 - [Architecture Decisions](architecture/architecture-decisions.md)
 - [Vier-Wochen-Plan](docs/reports/four-week-plan.md)
+
+## Projektakte (`docs/`)
+
+- [Project Status](docs/PROJECT_STATUS.md) — zentraler Entwicklungsstand (Single Source of Truth)
+- [Project Portfolio](docs/PROJECT_PORTFOLIO.md) — vollständiger Projektweg
+- [Changelog](docs/CHANGELOG.md)
+- [AGENTS](docs/AGENTS.md) — Projektübersicht & Regeln für AI-/menschliche Mitarbeit
+- [Features](docs/features/README.md) — Feature-/Task-Dokumentation (F001–F011)
+- [Weekly Reports](docs/reports/) — `WEEK-01…04.md`
+- [Documentation Transfer Report](docs/reports/documentation-transfer-report.md)

@@ -1,0 +1,95 @@
+# AGENTS.md — May's Orders
+
+## Project Overview
+
+May's Orders ist ein serverloses Order-Management-System für den fiktiven Händler
+**OrderFlow GmbH**. Es bildet den vollständigen Lebenszyklus einer Bestellung ab:
+
+```text
+PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED
+```
+
+inkl. definierter Cancellation-Pfade und Ablehnung ungültiger Statusübergänge.
+
+Architektur: **Client → (Cognito JWT) → API Gateway (HTTP API) → Lambda → DynamoDB → CloudWatch**.
+Infrastruktur vollständig per **Terraform**.
+
+## Tech Stack
+
+- Node.js / TypeScript (Lambda-Handler) — Details Entscheidung offen, Woche 2
+- API Gateway HTTP API (V2) mit Cognito-JWT-Autorisator
+- AWS Lambda (Order Handler)
+- DynamoDB (Single-Table, GSI1)
+- Cognito User Pool (Authentication)
+- CloudWatch (Logs, Metriken, Alarme)
+- Terraform (IaC)
+- Git / GitHub
+
+## Folder Structure
+
+```text
+mays-orders/
+├── README.md
+├── requirements/     Business-/Technical-Requirements, Assumptions
+├── architecture/     ADR, Request-Flow, Diagramm
+├── api/              Endpoint-Design, API-Doku, Test-Cases
+├── order-lifecycle/  State Machine, Transition Rules
+├── database/         DynamoDB-Design, Access Patterns
+├── security/         Auth-Entscheidung, IAM-Design
+├── monitoring/       Monitoring-Design
+├── reliability/      Konsistenz & Failure Handling
+├── cost/             Kostenanalyse
+├── terraform/        Infrastructure as Code (geplant, W2)
+├── tests/            Test-Ergebnisse
+├── docs/             Projektakte (Status, Portfolio, Features, Reports)
+└── docs/features/    Feature-Dokumentation F001–F011
+```
+
+## Fachliche Single Source of Truth
+
+| Thema | Quelle |
+|-------|--------|
+| State Machine / Transitions | `order-lifecycle/` |
+| API-Vertrag | `api/endpoints.md` |
+| Datenmodell | `database/` |
+| Auth / IAM | `security/` |
+| ADR | `architecture/architecture-decisions.md` |
+| Entwicklungsstand | `docs/PROJECT_STATUS.md` |
+
+## Regeln
+
+- **Authentication ≠ IAM:** Cognito für Benutzer, IAM nur für Service-Berechtigungen (Least Privilege).
+- **Keine IAM Access Keys als Benutzer-Login.**
+- **Keine Secrets** in Code, Logs, README, Reports. Keys nur über AWS-Services (Cognito/Secrets Manager).
+- **Keine unnötigen AWS-Services.** Jede Erweiterung braucht eine Architecture Decision (ADR-006).
+- **Evidenzbasiert:** keine erfundenen Tests/Ergebnisse/Ressourcen. Testnachweise mit Zuständen
+  (PLANNED / IMPLEMENTED / TESTED / VERIFIED / COMPLETE / BLOCKED / NOT TESTED / NOT APPLICABLE).
+- **Kostenbewusst:** Free-Tier beachten, keine dauerhaft laufenden Ressourcen ohne Begründung.
+- **Checkpoint-Regel:** Report → Tests → Build → `git status` → `git diff --check` → Secret-Audit → Commit → Push.
+
+## Git Workflow
+
+- Branch: `main` (aktuell). Feature-Arbeit optional auf Branches (`feature/...`).
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test:`, `chore:`.
+- **Kein Commit/Push ohne ausdrückliche Freigabe** (menschliche Prüfung).
+
+## Validation
+
+- TypeScript: `tsc --noEmit` bzw. Build-Skript (Woche 2).
+- Terraform: `terraform init` → `terraform validate` → `terraform plan` (→ `apply` nur nach Freigabe).
+- Live-API: `curl` gegen deployed Gateway nach Deployment (Woche 2).
+- Klare Trennung: `Build: PASS` ≠ `Live API: PASS`. Nie unbelegte Behauptungen.
+
+## AI Instructions
+
+- Vor Änderungen: `docs/PROJECT_STATUS.md` und relevante Fachquelle lesen.
+- Minimal-invasiv arbeiten; Architektur und dokumentierte Entscheidungen erhalten.
+- Nur Dateien ändern, die für die Aufgabe nötig sind.
+- Nach Änderungen: Validation ausführen, Report aktualisieren, Checkpoint folgen.
+- Wiederholte Prompts nutzen `docs/AI_AGENT_PLAYBOOK.md`.
+
+## Future Roadmap
+
+- Woche 2: Core Implementation (Terraform, Cognito, API GW, Lambda, DynamoDB) — ⏳ PLANNED
+- Woche 3: State Machine, Reliability, Security, Monitoring — ⏳ PLANNED
+- Woche 4: Skalierung, Kosten, Well-Architected, Präsentation — ⏳ PLANNED

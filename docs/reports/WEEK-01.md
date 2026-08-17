@@ -43,12 +43,34 @@ menschlichen Prüfung. Noch keine AWS-Ressourcen erzeugt, kein Terraform-Apply.
 
 **Blocker:** keine.
 
-## 5. Zeitplan-Einschätzung
+## 5. Tests / Build / Validation
+
+| Prüfung | Status |
+|---------|--------|
+| Build | NOT APPLICABLE (kein Code, Woche 1) |
+| Unit-Tests | NOT RUN |
+| Terraform validate/plan | NOT RUN |
+| Live-API | NOT RUN |
+| `git diff --check` | PASS |
+| Secret-Audit | PASS |
+
+## 6. AWS-Ressourcen
+
+NONE — keine Ressourcen erzeugt (bewusst, laut Vorgabe).
+
+## 7. Zeitplan-Einschätzung
 
 Im Zeitplan. Vier-Wochen-Struktur (siehe `docs/reports/four-week-plan.md`) ist definiert;
 Woche 2 kann nach Freigabe starten.
 
-## 6. Organisatorische Punkte
+## 8. Git Checkpoint
+
+- Branch: `main`
+- Commit: `4515029` (Woche-1 + Merge origin/main)
+- Push: SUCCESS
+- Folge-Commits (Dokumentations-Transfer): werden in `docs/CHANGELOG.md` ergänzt
+
+## 9. Organisatorische Punkte
 
 - **Freigabe erforderlich:** Terraform-Apply und jede kostenrelevante Ressourcen-Anlage
   in Woche 2 nur nach expliziter menschlicher Freigabe.

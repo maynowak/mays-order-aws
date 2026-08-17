@@ -1,0 +1,112 @@
+# Project Status — May's Orders
+
+> **Single Source of Truth für den Entwicklungsstand.**
+> Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
+> jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
+
+## Aktueller Stand (zuletzt aktualisiert: 2026-08-17)
+
+```text
+May's Orders — AWS Serverless Order Management System
+──────────────────────────────────────────────────────
+
+Current Phase:
+Week 1 — COMPLETE (Analyse & Architektur)
+
+Current Checkpoint:
+4515029 (Woche-1-Checkpoint + Merge origin/main)
+
+AWS Resources:
+NONE
+
+Application Code:
+NOT STARTED
+
+Terraform:
+DESIGN ONLY
+
+Authentication:
+DESIGNED — NOT IMPLEMENTED
+
+API Gateway:
+DESIGNED — NOT IMPLEMENTED
+
+Lambda:
+DESIGNED — NOT IMPLEMENTED
+
+DynamoDB:
+DESIGNED — NOT IMPLEMENTED
+
+CloudWatch Monitoring:
+DESIGNED — NOT IMPLEMENTED
+
+Tests:
+NOT RUN (Woche 1, keine Implementierung)
+```
+
+## Verlauf der Checkpoints
+
+| Checkpoint | Commit | Inhalt | Push | Status |
+|------------|--------|--------|------|--------|
+| W1-S1 | `4515029` | Woche-1-Analyse (Requirements, Architektur, Lifecycle, API, DB, Security, Cost, Strategien) + Merge `origin/main` (LICENSE) | SUCCESS | COMPLETE |
+| DOC-TRANSFER | offen | Dokumentationsübernahme nach Mays-Jobsearch-Muster | offen | IN PROGRESS |
+
+## Phase-Level-Übersicht
+
+| Bereich | Design | Implementierung | Tests | Live-Verifizierung |
+|---------|--------|-----------------|-------|--------------------|
+| Requirements | ✅ COMPLETE | – | – | – |
+| Order Lifecycle / State Machine | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
+| API Design | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| DynamoDB | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| Cognito Authentication | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| IAM / Security | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
+| API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
+
+## Feature-Status
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| F001 — Project Foundation | ✅ COMPLETE | Woche-1-Analyse, Docs, Git-Setup |
+| F002 — Cognito Authentication | ⏳ PLANNED | Design: `security/authentication-decision.md` |
+| F003 — API Gateway | ⏳ PLANNED | Design: `architecture/architecture-decisions.md` (ADR-004) |
+| F004 — Order Creation | ⏳ PLANNED | Design: `api/endpoints.md`, `database/access-patterns.md` |
+| F005 — Order Retrieval | ⏳ PLANNED | Design: `api/endpoints.md` |
+| F006 — Order Listing | ⏳ PLANNED | Design: `database/access-patterns.md` (GSI1) |
+| F007 — Status Transition | ⏳ PLANNED | Design: `order-lifecycle/transition-rules.md` |
+| F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
+| F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
+| F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
+| F011 — Terraform Infrastructure | ⏳ PLANNED | Design: `terraform/README.md` |
+
+Detaillierte Feature-Dokumentation: `docs/features/`.
+
+## Status-Konvention
+
+| Status | Bedeutung |
+|--------|-----------|
+| ✅ COMPLETE | Design/Implementierung abgeschlossen, gepusht |
+| ⏳ PLANNED | Geplant, noch nicht begonnen |
+| 🔵 IN PROGRESS | Begonnen, Checkpoint offen |
+| 🟡 DESIGNED | Design dokumentiert, Implementierung offen |
+| 🚧 BLOCKED | Hindernis, Ursache im Report dokumentiert |
+| ⚪ NOT VERIFIED | Implementiert, nicht (live) geprüft |
+
+## Recovery-Einstieg
+
+```
+git HEAD
+   ↓
+docs/PROJECT_STATUS.md      (dieses Dokument — aktueller Stand)
+   ↓
+docs/reports/WEEK-01.md     (Wochenreport)
+   ↓
+docs/features/README.md     (Feature-Index)
+   ↓
+Feature-Report / Task-Status
+   ↓
+docs/reports/recovery-checkpoint-strategy.md
+```

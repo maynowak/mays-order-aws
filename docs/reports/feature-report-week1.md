@@ -20,7 +20,8 @@ Analyse liefern und stoppt zur menschlichen Prüfung.
 ## Implementation
 
 Dokumentationsstruktur gemäß §9 aufgebaut; alle Woche-1-Deliverables erstellt (siehe
-`docs/reports/four-week-plan.md` Woche 1).
+`docs/reports/four-week-plan.md` Woche 1). Feature-Dokumentation: `docs/features/`
+(F001 — Project Foundation).
 
 ## Validation
 
@@ -57,8 +58,8 @@ Keine Kosten angefallen. Geplante Kostenbudgetierung: `cost/cost-analysis.md`
 ## Git Checkpoint
 
 - Branch: `main`
-- Commit: Woche-1-Checkpoint
-- Push: nach Freigabe der menschengeprüften Inhalte
+- Commit: `4515029` (Woche-1 + Merge origin/main)
+- Push: SUCCESS
 
 ## Next Step
 
