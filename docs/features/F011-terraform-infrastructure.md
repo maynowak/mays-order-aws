@@ -66,10 +66,14 @@ Changes Made:
   PK `pk`/`sk`, GSI1 `gsi1pk`/`gsi1sk` mit INCLUDE-Projection)
 - (T011-02) terraform/outputs.tf: `dynamodb_table_name`, `dynamodb_table_arn` ergänzt
 - (T011-02) terraform/README.md: DynamoDB-Design (T011-02) dokumentiert
+- (PROVIDER-UPGRADE) terraform/main.tf: AWS-Provider `~> 5.0` → `~> 6.0`
+- (PROVIDER-UPGRADE) terraform/main.tf: GSI1 von `hash_key`/`range_key` auf `key_schema`-Blocks umgestellt
+- (PROVIDER-UPGRADE) terraform/.terraform.lock.hcl: aws provider 5.100.0 → 6.60.0
+- (PROVIDER-UPGRADE) terraform/README.md: Provider-Hinweis aktualisiert
 
 Tests:
-- Terraform init: PASS (aws provider v5.100.0)
-- Terraform validate: PASS
+- Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
+- Terraform validate: PASS (ohne Warnungen)
 - Terraform plan: NOT RUN (gehört zu T011-07)
 
 Validation:
@@ -119,8 +123,8 @@ Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung)
 
 | Prüfung | Status |
 |---------|--------|
-| Terraform init | PASS (aws provider v5.100.0) |
-| Terraform validate | PASS |
+| Terraform init | PASS (aws provider v6.60.0) |
+| Terraform validate | PASS (ohne Warnungen) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |
@@ -129,7 +133,7 @@ Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung)
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: `5d291bd` · Push: SUCCESS
+- Branch: `main` · Commit: offen (Provider-Upgrade) · Push: offen
 
 ## Next Step
 

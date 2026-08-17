@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-02): **DynamoDB-Tabelle + GSI1 umgesetzt.** Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-02): **DynamoDB-Tabelle + GSI1 umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -41,6 +41,7 @@ Fachliche Grundlage: `database/dynamodb-design.md` (Item-Modell, Index-Struktur)
 | Primary Key | `pk` (S) = `ORDER#<orderId>`, `sk` (S) = `#ORDER` | `database/dynamodb-design.md` §2 |
 | GSI1 | `gsi1pk` (S) = `LIST`, `gsi1sk` (S) = `createdAt` | ADR-002, `database/access-patterns.md` §2.3 |
 | GSI1-Projection | `INCLUDE`: `orderId, status, customer, totalAmount, createdAt, updatedAt` | `database/dynamodb-design.md` §3 |
+| GSI1-Key-Syntax | `key_schema`-Blocks (HASH/RANGE), Provider `~> 6.0` | AWS-Provider ≥ 6.29.0 |
 
 Access-Pattern-Abbildung:
 

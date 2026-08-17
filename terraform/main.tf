@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
   }
 }
@@ -47,9 +47,17 @@ resource "aws_dynamodb_table" "orders" {
 
   global_secondary_index {
     name               = "gsi1"
-    hash_key           = "gsi1pk"
-    range_key          = "gsi1sk"
     projection_type    = "INCLUDE"
     non_key_attributes = ["orderId", "status", "customer", "totalAmount", "createdAt", "updatedAt"]
+
+    key_schema {
+      attribute_name = "gsi1pk"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "gsi1sk"
+      key_type       = "RANGE"
+    }
   }
 }
