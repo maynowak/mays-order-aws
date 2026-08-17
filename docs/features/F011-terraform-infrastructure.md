@@ -19,7 +19,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | ID | Task | Status |
 |----|------|--------|
 | T011-01 | Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
-| T011-02 | DynamoDB-Tabelle + GSI1 | 🔵 IN PROGRESS |
+| T011-02 | DynamoDB-Tabelle + GSI1 | ✅ COMPLETE |
 | T011-03 | IAM-Rolle + Policy | ⏳ PLANNED |
 | T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
@@ -38,13 +38,14 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-02 — DynamoDB-Tabelle + GSI1 (IN PROGRESS)
+T011-02 — DynamoDB-Tabelle + GSI1 (COMPLETE)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
+- T011-02 DynamoDB-Tabelle + GSI1       ✅
 
 In Progress:
-- T011-02 DynamoDB-Tabelle + GSI1       🔵
+None (nächster Task T011-03 wird separat gestartet)
 
 Pending Tasks:
 - T011-03 IAM-Rolle + Policy
@@ -84,10 +85,10 @@ Blockers:
 - None
 
 Current Checkpoint:
-offen (T011-02 wird als Nächstes committet und gepusht)
+5d291bd (T011-02 — DynamoDB-Tabelle + GSI1)
 
 Next Step:
-Git Checkpoint T011-02 → Abschlussbericht
+T011-03 — IAM-Rolle + Policy (separater Prompt / Task)
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -128,9 +129,8 @@ Keine weiteren GSIs; keine weitere Index-Struktur (keine Architekturerweiterung)
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen (T011-02) · Push: offen
+- Branch: `main` · Commit: `5d291bd` · Push: SUCCESS
 
 ## Next Step
 
-T011-02 — DynamoDB-Tabelle + GSI1 (IN PROGRESS; Analyse des DB-Designs abgeschlossen,
-Terraform-Ressource wird umgesetzt).
+T011-03 — IAM-Rolle + Policy (nach Checkpoint T011-02).

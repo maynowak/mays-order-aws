@@ -2,6 +2,26 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Checkpoint 5d291bd (F011 / T011-02 — DynamoDB-Tabelle + GSI1)
+
+### Implementierung
+- `terraform/main.tf`: `aws_dynamodb_table.orders` ergänzt — Tabellen-Name `var.project_name`
+  (`mays-orders`), On-Demand (`PAY_PER_REQUEST`, ADR-007), Primary Key `pk`/`sk` (S),
+  GSI1 `gsi1pk`/`gsi1sk` (S) mit `INCLUDE`-Projection (`orderId, status, customer,
+  totalAmount, createdAt, updatedAt`). Fachquelle: `database/dynamodb-design.md`, ADR-002.
+- `terraform/outputs.tf`: `dynamodb_table_name`, `dynamodb_table_arn` (Outputs ab T011-02).
+- `terraform/README.md`: DynamoDB-Design (T011-02) inkl. Access-Pattern-Abbildung dokumentiert.
+- `docs/features/F011-terraform-infrastructure.md`: GSI1-Begründung (AP3 → Query statt Scan).
+
+### Validation
+- `terraform init`: PASS (aws provider v5.100.0) · `terraform validate`: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-02 COMPLETE · AWS Resources: NONE.
+- Keine AWS-Aktionen; keine Kosten.
+
 ## 2026-08-17 — Checkpoint 67f02a3 (F011 / T011-01 — Terraform-Gerüst)
 
 ### Implementierung

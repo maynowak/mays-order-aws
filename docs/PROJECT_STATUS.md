@@ -13,8 +13,14 @@ May's Orders — AWS Serverless Order Management System
 Current Phase:
 Week 2 — IN PROGRESS (Terraform)
 
+Current Feature:
+F011 — Terraform Infrastructure
+
+Current Task:
+T011-03 — IAM (geplant, wird separat gestartet)
+
 Current Checkpoint:
-67f02a3 (F011 / T011-01 — Terraform-Grundgerüst)
+5d291bd (F011 / T011-02 — DynamoDB-Tabelle + GSI1)
 
 AWS Resources:
 NONE
@@ -23,7 +29,7 @@ Application Code:
 NOT STARTED
 
 Terraform:
-PARTIAL (Grundgerüst T011-01; Ressourcen ausstehend)
+DynamoDB-Table + GSI1 konfiguriert (T011-02); IAM/Lambda/Cognito/API GW ausstehend
 
 Authentication:
 DESIGNED — NOT IMPLEMENTED
@@ -35,13 +41,13 @@ Lambda:
 DESIGNED — NOT IMPLEMENTED
 
 DynamoDB:
-DESIGNED — NOT IMPLEMENTED
+CONFIGURED (Terraform) — NOT CREATED (kein apply)
 
 CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01, Woche 2)
+Terraform init/validate PASS (T011-01, T011-02, Woche 2)
 ```
 
 ## Verlauf der Checkpoints
@@ -54,6 +60,7 @@ Terraform init/validate PASS (T011-01, Woche 2)
 | DOC-CORRECTION | `4a0a6e7` + `7c12fc0` | Korrektur Review-Inkonsistenzen (Checkpoint 729ae73 als aktuell, WEEK-1 COMPLETE, Commit-/Push-Regel vereinheitlicht) + Statusnachzug | SUCCESS | COMPLETE |
 | WORKFLOW-RULE | `7f37340` | Persistent Feature Progress & Crash-Recovery-Regel in Projektakte verankert | SUCCESS | COMPLETE |
 | W2-T011-01 | `67f02a3` | F011/T011-01 Terraform-Grundgerüst (main/variables/outputs/README) + `init`/`validate` PASS | SUCCESS | COMPLETE |
+| W2-T011-02 | `5d291bd` | F011/T011-02 DynamoDB-Tabelle + GSI1 (PK `pk`/`sk`, GSI1, On-Demand, Outputs) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 
 ## Phase-Level-Übersicht
 
@@ -62,12 +69,12 @@ Terraform init/validate PASS (T011-01, Woche 2)
 | Requirements | ✅ COMPLETE | – | – | – |
 | Order Lifecycle / State Machine | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
 | API Design | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
-| DynamoDB | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| DynamoDB | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-02, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | Cognito Authentication | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | IAM / Security | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-01 Gerüst) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-02 DynamoDB konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -84,7 +91,7 @@ Terraform init/validate PASS (T011-01, Woche 2)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 COMPLETE · T011-02 PLANNED. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 
