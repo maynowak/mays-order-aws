@@ -75,6 +75,10 @@ Changes Made:
   + `aws_iam_role.handler` (${var.project_name}-handler-role) + `aws_iam_role_policy.handler`
 - (T011-03) terraform/outputs.tf: `iam_handler_role_name`, `iam_handler_role_arn` ergänzt
 - (T011-03) terraform/README.md: IAM-Design (T011-03) mit Least-Privilege-Tabelle dokumentiert
+- (KORREKTUR-CHECK) Gemeldeter Fehler `Required attribute "hash_key" not specified` auf
+  `aws_dynamodb_table.orders` verifiziert: Tabelle hat `hash_key = "pk"` + `range_key = "sk"`,
+  GSI1 nutzt weiterhin `key_schema`-Blocks (nicht deprecated), `terraform validate` PASS →
+  keine Code-Änderung erforderlich
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)

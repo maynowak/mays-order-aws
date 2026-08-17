@@ -2,6 +2,19 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Korrektur-Check aws_dynamodb_table.orders (F011, kein Code-Change)
+
+### Verifikation
+- Gemeldeter Fehler `Required attribute "hash_key" not specified` wurde geprüft.
+- Aktueller Stand: Tabelle enthält `hash_key = "pk"` und `range_key = "sk"`; GSI1 nutzt
+  `key_schema`-Blocks (Provider ≥ 6.29.0), nicht die deprecated `hash_key`/`range_key`-Syntax.
+- `terraform validate`: PASS (AWS-Provider 6.60.0) · `git diff --check`: PASS · Secret-Audit: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- **Keine Code-Änderung erforderlich**; Arbeitsbaum == Commit `48a236c`.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-03 COMPLETE · AWS Resources: NONE.
+
 ## 2026-08-17 — Checkpoint 21ed0f4 (F011 / T011-03 — IAM Lambda Execution Role)
 
 ### Implementierung
