@@ -2,7 +2,7 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
-## 2026-08-17 — Checkpoint T011-04 (F011 / Lambda Order Handler + Zip-Build)
+## 2026-08-17 — Checkpoint `449cdd7` (F011 / T011-04 — Lambda Order Handler + Zip-Build)
 
 ### Implementierung
 - `lambda/` (neu): TypeScript-Handler für die vier Order-Operationen (AP1 Create, AP2 Get by ID,

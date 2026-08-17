@@ -136,7 +136,7 @@ Blockers:
 - None
 
 Current Checkpoint:
-T011-04 Commit (Hash siehe Git Checkpoint / CHANGELOG)
+449cdd7 (T011-04 — Lambda Order Handler + Zip-Build)
 
 Next Step:
 T011-05 — Cognito (Pool, Client, Gruppe) (separater Prompt / Task)
@@ -400,7 +400,7 @@ Deployment Package / ZIP
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: T011-04 (Hash siehe CHANGELOG) · Push: SUCCESS
+- Branch: `main` · Commit: `449cdd7` · Push: SUCCESS
 
 ## Next Step
 

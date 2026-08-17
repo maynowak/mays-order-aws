@@ -66,5 +66,5 @@ F011/T011-01 bis T011-03 planmäßig; Terraform-Scope entspricht dem Vier-Wochen
 ## 9. Git Checkpoint
 
 - Branch: `main`
-- Commit: T011-04 Lambda (Hash siehe CHANGELOG)
+- Commit: `449cdd7` (F011/T011-04 Lambda Order Handler + Zip-Build)
 - Push: SUCCESS
