@@ -71,7 +71,22 @@ mays-orders/
 
 - Branch: `main` (aktuell). Feature-Arbeit optional auf Branches (`feature/...`).
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test:`, `chore:`.
-- **Kein Commit/Push ohne ausdrückliche Freigabe** (menschliche Prüfung).
+
+### Commit-/Push-Regel
+
+- **Normale Engineering-Tasks:** Wenn ein Task zur eigenständigen Bearbeitung freigegeben
+  wurde, führt der Agent nach erfolgreicher Validierung den Checkpoint selbstständig aus:
+  `git status` → `git diff --check` → Secret-Audit → Tests → Build/Validation → Commit → Push.
+  Commit/Push ist Bestandteil des kontrollierten Task-Checkpoints.
+- **Menschliche Freigabe erforderlich** (der Agent leitet daraus KEINE automatische
+  Deployment-Berechtigung ab):
+  - `terraform apply` / `terraform destroy`
+  - Erzeugen kostenpflichtiger oder potenziell kostenpflichtiger AWS-Ressourcen
+  - Produktionsdeployment
+  - Destruktive AWS-Operationen
+  - Änderungen an der freigegebenen Zielarchitektur
+  - Hinzufügen wesentlicher neuer AWS-Services
+  - Änderungen mit erheblicher Kosten- oder Sicherheitsauswirkung
 
 ## Validation
 

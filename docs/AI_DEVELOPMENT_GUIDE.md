@@ -30,7 +30,10 @@ AI unterstützt die Entwicklung. Es ersetzt nicht:
 - Keys nur über AWS-Services (Cognito/Secrets Manager), nie im Code/Repo.
 - Evidenzbasiert: Build ≠ Live-API.
 - Nach relevanten Features: `docs/CHANGELOG.md`, `docs/PROJECT_STATUS.md`, Weekly-Report aktualisieren.
-- `terraform apply` nur nach menschlicher Freigabe.
+- **Commit/Push:** Bei freigegebenen Engineering-Tasks führt der Agent Commit/Push als
+  Bestandteil des Task-Checkpoints nach erfolgreicher Validierung selbstständig aus.
+- `terraform apply` / `terraform destroy` sowie kostenpflichtige Ressourcen, Produktions-
+  deployment, destruktive Operationen und Architekturänderungen nur nach menschlicher Freigabe.
 
 ## Validation commands
 

@@ -14,7 +14,7 @@ Current Phase:
 Week 1 — COMPLETE (Analyse & Architektur)
 
 Current Checkpoint:
-2a89e73 (Dokumentations-Transfer, nach W1-S1/4515029)
+729ae73 (Statusnachzug Dokumentations-Transfer, nach 2a89e73)
 
 AWS Resources:
 NONE
@@ -50,6 +50,7 @@ NOT RUN (Woche 1, keine Implementierung)
 |------------|--------|--------|------|--------|
 | W1-S1 | `4515029` | Woche-1-Analyse (Requirements, Architektur, Lifecycle, API, DB, Security, Cost, Strategien) + Merge `origin/main` (LICENSE) | SUCCESS | COMPLETE |
 | DOC-TRANSFER | `2a89e73` | Dokumentationsübernahme nach Mays-Jobsearch-Muster (Projektakte, Features, Weekly Reports) | SUCCESS | COMPLETE |
+| DOC-STATUS | `729ae73` | Statusnachzug Checkpoint `2a89e73` in Status/Changelog/Reports | SUCCESS | COMPLETE |
 
 ## Phase-Level-Übersicht
 

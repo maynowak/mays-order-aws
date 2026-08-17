@@ -3,7 +3,7 @@
 > Master-Dokument für die Schrittfolge der vier Projektwochen.
 > Jedes Feature folgt dem Workflow aus Abschnitt §5 (Step 1–7 inkl. Checkpoint).
 
-## Woche 1 — Analyse, Requirements, API & Architektur  ✅ (in Arbeit)
+## Woche 1 — Analyse, Requirements, API & Architektur  ✅ COMPLETE
 
 | # | Deliverable | Datei | Status |
 |---|-------------|-------|--------|

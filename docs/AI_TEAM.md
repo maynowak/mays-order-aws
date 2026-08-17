@@ -24,7 +24,11 @@
 
 - AI-Beiträge sind Vorschläge.
 - Der Mensch verifiziert alles gegen die reale Umgebung (Build, Tests, Live-API, Terraform-Plan/Apply).
-- AI committet/pusht nur mit ausdrücklicher Freigabe.
+- Für freigegebene Engineering-Tasks führt der Agent Commit/Push als Bestandteil des
+  kontrollierten Task-Checkpoints selbstständig aus (nach erfolgreicher Validierung).
+- Aktionen mit Kosten-/Sicherheits-/Architektur-Auswirkung (`terraform apply`/`destroy`,
+  kostenpflichtige Ressourcen, Produktionsdeployment, Architekturänderungen) benötigen
+  ausdrückliche menschliche Freigabe.
 - AI legt nie Secrets offen oder loggt sie.
 - AI erfindet keine Tests, Ergebnisse, AWS-Ressourcen oder Commit-IDs.
 

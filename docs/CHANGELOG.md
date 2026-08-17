@@ -35,3 +35,4 @@
 ### Status
 - Woche 1 weiterhin COMPLETE; kein Code, keine AWS-Ressourcen.
 - Checkpoint `2a89e73` gepusht.
+- Statusnachzug Checkpoint `729ae73` gepusht (Checkpoint-Historie aktualisiert).

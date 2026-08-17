@@ -68,7 +68,7 @@ mays-orders/
 | `WEEK 3` | Business Rules, Reliability, Security |
 | `WEEK 4` | Professionalization (Skalierung, Kosten, Well-Architected) |
 
-Aktueller Status: **WEEK 1 — in Arbeit** (Architektur-/Checkpoint-Phase, noch keine Implementierung).
+Aktueller Status: **WEEK 1 — COMPLETE** (Analyse & Architektur abgeschlossen; noch keine Implementierung).
 
 ## Workflow-Garantien
 

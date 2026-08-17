@@ -157,6 +157,36 @@ Keine Annahmen als Fakten ausgeben.
 
 ---
 
+## Git Checkpoint & Freigabe-Regel
+
+### Normale Engineering-Tasks
+
+Wenn ein Task zur eigenständigen Bearbeitung freigegeben wurde, darf der Agent nach
+erfolgreicher Validierung den Checkpoint selbstständig durchführen:
+
+```text
+git status → git diff --check → Secret-Audit → Tests → Build/Validation → Commit → Push
+```
+
+Commit/Push ist Bestandteil des kontrollierten Task-Checkpoints.
+
+### Menschliche Freigabe erforderlich
+
+Folgende Aktionen benötigen eine ausdrückliche menschliche Freigabe — die normale
+Commit-/Push-Berechtigung berechtigt NICHT zu automatischen Deployment-Operationen:
+
+```text
+terraform apply / terraform destroy
+Erzeugen kostenpflichtiger oder potenziell kostenpflichtiger AWS-Ressourcen
+Produktionsdeployment
+Destruktive AWS-Operationen
+Änderungen an der freigegebenen Zielarchitektur
+Hinzufügen wesentlicher neuer AWS-Services
+Änderungen mit erheblicher Kosten- oder Sicherheitsauswirkung
+```
+
+---
+
 ## Completion Format
 
 ### Summary
