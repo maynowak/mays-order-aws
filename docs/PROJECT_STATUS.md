@@ -17,19 +17,19 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-04 — Lambda (geplant, wird separat gestartet)
+T011-04 — Lambda (Zip-Build) + Permission (COMPLETE) · Next: T011-05 (Cognito, separat)
 
 Current Checkpoint:
-e1fd58b (F011 — Final Diagnostic: VS Code/terraform-ls stale AWS-Provider-Schema 5.100.0)
+T011-04 (Lambda Order Handler + Zip-Build; Hash siehe CHANGELOG)
 
 AWS Resources:
 NONE
 
 Application Code:
-NOT STARTED
+IMPLEMENTED (Lambda-Handler TypeScript, `lambda/`) — NICHT deployed (kein apply)
 
 Terraform:
-DynamoDB (T011-02) + IAM (T011-03) konfiguriert; Lambda/Cognito/API GW ausstehend
+DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04) konfiguriert; Cognito/API GW ausstehend
 
 Authentication:
 DESIGNED — NOT IMPLEMENTED
@@ -38,7 +38,7 @@ API Gateway:
 DESIGNED — NOT IMPLEMENTED
 
 Lambda:
-DESIGNED — NOT IMPLEMENTED
+CONFIGURED (Terraform + TypeScript-Code T011-04) — NOT CREATED (kein apply)
 
 DynamoDB:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
@@ -50,7 +50,8 @@ CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
+Terraform init/validate PASS (T011-01…T011-04; AWS-Provider ~> 6.0 / 6.60.0);
+Vitest 45/45 PASS · Build/Package PASS · npm audit 0 (Lambda T011-04)
 ```
 
 ## Verlauf der Checkpoints
@@ -68,6 +69,7 @@ Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 | W2-T011-03 | `21ed0f4` | F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB Tabelle+GSI1, Logs) + `validate` PASS | SUCCESS | COMPLETE |
 | W2-DIAG-COMPAT | `a4061e0` (+`6976bd0`) | Provider 6.x Compatibility & Toolchain Verification: Schema autoritativ (CLI 6.60.0), 5.100.0-Altlast bereinigt, `validate` PASS, Checkpoint-Nachzug | SUCCESS | COMPLETE |
 | W2-DIAG-FINAL | `e1fd58b` | Final Diagnostic: VS Code/terraform-ls stale 5.100.0-Schema belegt (LSP-Test: SchemaModuleValidation/ReferenceValidation err=nil, `key_schema` in Completion; Root Cause: GSI-`key_schema` ab Provider 6.29.0) | SUCCESS | COMPLETE |
+| W2-T011-04 | `…` (siehe CHANGELOG) | F011/T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build `dist/lambda.zip`, Execution Role T011-03, AP1..AP4) + Vitest 45/45 + init/validate PASS | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -80,7 +82,7 @@ Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-03 IAM konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-04 Lambda konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -97,7 +99,7 @@ Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

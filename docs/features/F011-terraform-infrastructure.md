@@ -21,7 +21,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-01 | Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | T011-02 | DynamoDB-Tabelle + GSI1 | ✅ COMPLETE |
 | T011-03 | IAM-Rolle + Policy | ✅ COMPLETE |
-| T011-04 | Lambda (Zip-Build) + Permission | ⏳ PLANNED |
+| T011-04 | Lambda (Zip-Build) + Permission | ✅ COMPLETE |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
 | T011-06 | HTTP API + Routen + Authorizer | ⏳ PLANNED |
 | T011-07 | `terraform validate` + `plan` (Review) | ⏳ PLANNED |
@@ -38,18 +38,18 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-Final Diagnostic — VS Code/terraform-ls stale Provider-Schema 5.100.0 (COMPLETE)
+T011-04 — Lambda (Zip-Build) + Permission (COMPLETE)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
 - T011-02 DynamoDB-Tabelle + GSI1       ✅
 - T011-03 IAM-Rolle + Policy            ✅
+- T011-04 Lambda (Zip-Build) + Permission ✅
 
 In Progress:
-None (Final Diagnostic abgeschlossen; T011-04 wird separat gestartet)
+None (T011-04 abgeschlossen; T011-05 wird separat gestartet)
 
 Pending Tasks:
-- T011-04 Lambda (Zip-Build) + Permission
 - T011-05 Cognito (Pool, Client, Gruppe)
 - T011-06 HTTP API + Routen + Authorizer
 - T011-07 terraform validate + plan (Review)
@@ -88,10 +88,30 @@ Changes Made:
   existiert erst ab Provider 6.29.0, PR #46602)
 - (FINAL-DIAGNOSTIC) Altlast `/tmp/terraform-provider1730277575` identifiziert
   (Distributions-Zip aws 5.100.0, 149 MB, T011-01-Ära) — optional löschbar
+- (T011-04) lambda/ neu: TypeScript-Source (`src/index.ts` Handler, `src/orderService.ts`,
+  `src/stateMachine.ts`, `src/validation.ts`, `src/errors.ts`, `src/types.ts`) + Unit-Tests
+  (`tests/stateMachine.test.ts`, `tests/validation.test.ts`, `tests/orderService.test.ts`)
+- (T011-04) lambda/package.json: `npm run build` (tsc --noEmit + esbuild-Bundle) /
+  `npm run package` (bestzip → `dist/lambda.zip`) / `npm test` (Vitest)
+- (T011-04) lambda/package-lock.json committet (Reproduzierbarkeit des Zip-Builds)
+- (T011-04) terraform/main.tf: `aws_lambda_function.handler` ergänzt (nodejs22.x,
+  `index.handler`, Timeout 10, `ORDERS_TABLE`-Env, `source_code_hash`, Execution Role
+  `aws_iam_role.handler` aus T011-03)
+- (T011-04) terraform/outputs.tf: `lambda_function_name`, `lambda_function_arn` ergänzt
+- (T011-04) terraform/README.md: Lambda-Abschnitt (§2.3) + Ressourcentabelle aktualisiert
+- (T011-04) Order-Operationen umgesetzt: AP1 Create (PutItem, totalAmount server-seitig),
+  AP2 Get by ID (GetItem), AP3 Listing (Query GSI1, absteigend, paginiert), AP4 Status-Update
+  (UpdateItem + Conditional Write, Race-Schutz). Beträge als ganze Cent (Integer).
+- (T011-04) API-GW→Lambda Invoke-Permission bewusst NICHT in T011-04 — folgt in T011-06
+  (HTTP API existiert noch nicht; nur dann Teil, wenn ausdrücklich dokumentiert)
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
 - Terraform validate: PASS (ohne Warnungen)
+- Vitest `npm test`: PASS (45 Tests — stateMachine 14, validation 19, orderService 12)
+- Build `npm run build` (tsc --noEmit + esbuild): PASS
+- Package `npm run package` (bestzip → `dist/lambda.zip`): PASS (nur `dist/index.js`, ~156 KB)
+- `npm audit`: PASS (0 vulnerabilities)
 - LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): Root-Erkennung `terraform/` PASS;
   Provider nur 6.60.0; ObtainSchema/SchemaModuleValidation/ReferenceValidation err=nil;
   keine Diagnostics; Completion im GSI-Block schlägt `key_schema` vor → PASS
@@ -100,20 +120,26 @@ Tests:
 Validation:
 - Terraform plan: NOT RUN (gehört zu T011-07)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
+- Live-API: NOT RUN (kein apply; Lambda-Bundle nicht deployed)
 - git diff --check: PASS
-- Secret-Audit: PASS
+- Secret-Audit: PASS (inkl. lambda/-Quelltext, package.json, terraform/)
 
 Known Issues:
-- None
+- API-GW→Lambda Invoke-Permission (`aws_lambda_permission`) fehlt bewusst bis T011-06
+  (HTTP API existiert noch nicht; keine API-GW-Implementierung in T011-04).
+- Beträge als ganze Cent finalisiert (Vorab-Definition `database/dynamodb-design.md` §7;
+  `api/api-documentation.md` §3 ist die maßgebliche Schemadarstellung). Die float-Beispiele
+  in `api/endpoints.md` (§2.1) sind inkonsistent und bewusst NICHT geändert (keine
+  Architekturänderung in T011-04).
 
 Blockers:
 - None
 
 Current Checkpoint:
-e1fd58b (Final Diagnostic — VS Code/terraform-ls stale 5.100.0-Schema)
+T011-04 Commit (Hash siehe Git Checkpoint / CHANGELOG)
 
 Next Step:
-T011-04 — Lambda (Zip-Build) + Permission (separater Prompt / Task)
+T011-05 — Cognito (Pool, Client, Gruppe) (separater Prompt / Task)
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -257,23 +283,125 @@ Least Privilege
 → Lambda erhält nur DynamoDB-Aktionen für Tabelle+GSI1 und Log-Rechte — kein Scan/DeleteItem, keine s3/sqs/iam-Rechte
 ```
 
+## T011-04 — Lambda Order Handler (Zip-Build)
+
+### Summary
+
+Die in der Architektur vorgesehene Lambda-Funktion (`mays-orders-handler`) wurde als
+TypeScript-Handler mit reproduzierbarem ZIP-Build umgesetzt. Sie implementiert die vier
+Order-Operationen (AP1 Create, AP2 Get by ID, AP3 Listing, AP4 Status-Update) exakt nach
+`api/endpoints.md` und `database/access-patterns.md` und nutzt die IAM Execution Role aus
+T011-03 (`aws_iam_role.handler`). Kein `apply`, keine AWS-Ressourcen.
+
+### Lambda Design
+
+```text
+Client (später: API Gateway HTTP API)
+  ↓  Event (routeKey / httpMethod + rawPath, body, queryStringParameters, pathParameters)
+index.ts (Handler, Routing, Fehler-Mapping → HTTP)
+  ↓
+orderService.ts (AP1..AP4: PutItem / GetItem / Query GSI1 / UpdateItem conditional)
+  ↓                       ↓
+validation.ts           stateMachine.ts (Transition-Matrix, pure Funktion)
+  ↓
+DynamoDB (mays-orders, GSI1)
+```
+
+- Handler akzeptiert das API-Gateway-HTTP-API-v2-Eventformat (`routeKey`, `rawPath`,
+  `pathParameters`, `queryStringParameters`, `body`, `isBase64Encoded`) und gibt
+  v2-Proxy-Responses zurück (kein API-Gateway-/Cognito-Feature in T011-04).
+- AP1: Server berechnet `lineTotal` und `totalAmount` (nie der Client); Status `PENDING`;
+  `gsi1pk=LIST`, `gsi1sk=createdAt`, `version=1`.
+- AP2: `GetItem` auf `pk=ORDER#<id>`, `sk=#ORDER`; fehlt → 404 `ORDER_NOT_FOUND`.
+- AP3: `Query` auf GSI1 (`gsi1pk=LIST`, `ScanIndexForward=false`, `Limit`, `ExclusiveStartKey`);
+  `nextToken` = Base64-kodierter `LastEvaluatedKey`; kompakte Order-Darstellung.
+- AP4: `GetItem` → Transition via State Machine prüfen (ungültig → 409 `INVALID_TRANSITION`
+  mit `currentStatus`/`requestedStatus`) → `UpdateItem` mit Conditional Write
+  (`attribute_exists(pk) AND #status = :current`, `version = version + 1`);
+  `ConditionalCheckFailedException` → 409 `CONFLICTED_UPDATE` (Race-Schutz, R-01).
+- Fehlerformat einheitlich `{ error: { code, message, details? } }` (api/endpoints.md §3).
+
+### Runtime / Handler
+
+| Eigenschaft | Wert |
+|-------------|------|
+| Runtime | `nodejs22.x` (AWS Lambda) |
+| Handler | `index.handler` (CommonJS-Bundle, `lambda/dist/index.js`) |
+| Env-Variable | `ORDERS_TABLE` (Tabellenname aus Terraform) |
+| Timeout | 10 s (Cold-Start + DynamoDB-Latenz) |
+
+### Packaging / ZIP
+
+- `cd lambda && npm install && npm run package`
+- `npm run package` = `tsc --noEmit` (Typecheck) + esbuild-Bundle (ein File, minified)
+  + `bestzip` → `dist/lambda.zip` (nur `dist/index.js`, ~156 KB; keine Secrets,
+  keine node_modules im Zip).
+- Reproduzierbar: `package-lock.json` committet, Versionen fixiert, `npm audit` 0.
+- Terraform referenziert `../lambda/dist/lambda.zip` + `source_code_hash`
+  (`filebase64sha256`) → Update-Erkennung beim `apply`.
+
+### IAM Execution Role
+
+- Verwendet: `aws_iam_role.handler` aus T011-03 (Trust: `lambda.amazonaws.com`).
+- Keine zweite Execution Role, keine neuen Permissions, keine Access Keys.
+- API-GW→Lambda Invoke-Permission (`aws_lambda_permission`): bewusst **nicht** in T011-04,
+  folgt in T011-06 (HTTP API + Routen + Authorizer), da nur dort der API-GW-ARN bekannt ist.
+
+### DynamoDB Integration
+
+- `@aws-sdk/lib-dynamodb` (DocumentClient) gegen `mays-orders` (Tabelle + GSI1).
+- Operations exakt gemäß `database/access-patterns.md` §2 (PutItem/GetItem/Query/UpdateItem),
+  kein `Scan`, kein `DeleteItem` — konsistent mit der Least-Privilege-Policy (T011-03).
+- Beträge als ganze Cent (Integer) — Vorab-Definition `database/dynamodb-design.md` §7
+  finalisiert; maßgebliches Schema: `api/api-documentation.md` §3.
+
+## Lambda-Lernbezug (T011-04, wiederverwendbar für Vortrag/Zertifizierung)
+
+```text
+Lambda
+→ Serverless Compute
+→ Ausführung von Code auf Anfrage ohne Server-Verwaltung; nur für die Laufzeit der
+  Invocation bezahlt; skaliert automatisch (ADR-001)
+
+Execution Role
+→ IAM-Rolle, die die Lambda-Funktion zur Laufzeit übernimmt
+→ bestimmt, welche AWS-Services die Funktion aufrufen darf (hier: DynamoDB + Logs, Least Privilege)
+
+Handler
+→ Einstiegspunkt der Lambda-Funktion
+→ "index.handler" = exportierte async-Funktion, die das Event empfängt und eine Antwort liefert
+
+Runtime
+→ Ausführungsumgebung der Lambda-Funktion
+→ hier: Node.js 22 (nodejs22.x); steuert Sprach- und Laufzeit-Verhalten
+
+Deployment Package / ZIP
+→ verpackter Lambda-Code
+→ hier: dist/lambda.zip (ein gebündeltes JS-File); Terraform lädt es per filename/source_code_hash
+```
+
 ## Testnachweise
 
 | Prüfung | Status |
 |---------|--------|
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen) |
+| Vitest `npm test` | PASS (45 Tests: stateMachine 14, validation 19, orderService 12) |
+| Build `npm run build` (tsc --noEmit + esbuild) | PASS |
+| Package `npm run package` (bestzip → `dist/lambda.zip`) | PASS |
+| `npm audit` | PASS (0 vulnerabilities) |
 | LSP-Test terraform-ls 0.39.0 (serve, Root = Repo) | PASS (keine Diagnostics, `key_schema` in Completion) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |
+| Live-API / Lambda-Invocation | NOT RUN (kein apply) |
 | `git diff --check` | PASS |
 | Secret-Audit | PASS |
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: `e1fd58b` · Push: SUCCESS
+- Branch: `main` · Commit: T011-04 (Hash siehe CHANGELOG) · Push: SUCCESS
 
 ## Next Step
 
-T011-04 — Lambda (Zip-Build) + Permission (nach Checkpoint T011-03).
+T011-05 — Cognito (Pool, Client, Gruppe) (separater Task nach Checkpoint T011-04).

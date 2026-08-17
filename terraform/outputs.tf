@@ -19,3 +19,14 @@ output "iam_handler_role_arn" {
   description = "ARN der Lambda Execution Role fuer den Order Handler."
   value       = aws_iam_role.handler.arn
 }
+
+# T011-04 — Lambda-Outputs
+output "lambda_function_name" {
+  description = "Name der Lambda-Funktion fuer den Order Handler."
+  value       = aws_lambda_function.handler.function_name
+}
+
+output "lambda_function_arn" {
+  description = "ARN der Lambda-Funktion fuer den Order Handler."
+  value       = aws_lambda_function.handler.arn
+}

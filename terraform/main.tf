@@ -116,3 +116,23 @@ resource "aws_iam_role_policy" "handler" {
   role   = aws_iam_role.handler.name
   policy = data.aws_iam_policy_document.handler.json
 }
+
+# T011-04 — Lambda: Order Handler (Zip-Build)
+# Fachquelle: ADR-001 (Serverless), api/endpoints.md, database/access-patterns.md (AP1..AP4)
+# Execution Role: aws_iam_role.handler (T011-03). Zip-Build reproduzierbar via lambda/ (npm run package).
+# API-GW→Lambda Invoke-Permission folgt in T011-06 (HTTP API + Routen + Authorizer).
+resource "aws_lambda_function" "handler" {
+  function_name    = "${var.project_name}-handler"
+  role             = aws_iam_role.handler.arn
+  handler          = "index.handler"
+  runtime          = "nodejs22.x"
+  timeout          = 10 # Cold-Start + DynamoDB-Latenz (default 3s zu knapp)
+  filename         = "${path.module}/../lambda/dist/lambda.zip"
+  source_code_hash = filebase64sha256("${path.module}/../lambda/dist/lambda.zip")
+
+  environment {
+    variables = {
+      ORDERS_TABLE = aws_dynamodb_table.orders.name
+    }
+  }
+}

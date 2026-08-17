@@ -7,8 +7,8 @@
 ## 1. Gesamtstatus
 
 Woche 2 läuft. F011 (Terraform Infrastructure) in Arbeit; T011-01 (Terraform-Gerüst),
-T011-02 (DynamoDB + GSI1) und T011-03 (IAM) abgeschlossen und validiert. Noch keine
-AWS-Ressourcen erzeugt, kein `apply`.
+T011-02 (DynamoDB + GSI1), T011-03 (IAM) und T011-04 (Lambda Order Handler + Zip-Build)
+abgeschlossen und validiert. Noch keine AWS-Ressourcen erzeugt, kein `apply`.
 
 ## 2. Erledigte Features / Tasks
 
@@ -17,7 +17,8 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | T011-01 Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-02 DynamoDB-Tabelle + GSI1 (mays-orders, PK pk/sk, GSI1, On-Demand) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB+GSI1, Logs) | ✅ COMPLETE |
-| F011 — Terraform Infrastructure | T011-04 Lambda (Zip-Build) + Permission | ⏳ PLANNED |
+| F011 — Terraform Infrastructure | T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build, Execution Role T011-03, AP1..AP4) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-05 Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
 | F002 — Cognito Authentication | … | ⏳ PLANNED |
 | F003 — API Gateway | … | ⏳ PLANNED |
 | F004 — Order Creation | … | ⏳ PLANNED |
@@ -28,8 +29,10 @@ AWS-Ressourcen erzeugt, kein `apply`.
 
 | Prüfung | Status |
 |---------|--------|
-| TypeScript-Build | NOT APPLICABLE (kein App-Code) |
-| Unit-Tests | NOT RUN |
+| TypeScript-Build (`npm run build`, tsc --noEmit + esbuild) | PASS (Lambda T011-04) |
+| Unit-Tests (Vitest `npm test`) | PASS (45/45: stateMachine 14, validation 19, orderService 12) |
+| Lambda-Zip (`npm run package`) | PASS (dist/lambda.zip, nur index.js, ~156 KB) |
+| npm audit | PASS (0 vulnerabilities) |
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen) |
 | Terraform plan | NOT RUN (zu T011-07) |
@@ -54,7 +57,7 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 7. Nächste Schritte
 
-- T011-04 — Lambda (Zip-Build) + Permission (separater Task)
+- T011-05 — Cognito (Pool, Client, Gruppe) (separater Task)
 
 ## 8. Zeitplan-Bewertung
 
@@ -63,5 +66,5 @@ F011/T011-01 bis T011-03 planmäßig; Terraform-Scope entspricht dem Vier-Wochen
 ## 9. Git Checkpoint
 
 - Branch: `main`
-- Commit: `21ed0f4` (F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy)
+- Commit: T011-04 Lambda (Hash siehe CHANGELOG)
 - Push: SUCCESS

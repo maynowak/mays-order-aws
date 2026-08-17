@@ -2,6 +2,37 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Checkpoint T011-04 (F011 / Lambda Order Handler + Zip-Build)
+
+### Implementierung
+- `lambda/` (neu): TypeScript-Handler für die vier Order-Operationen (AP1 Create, AP2 Get by ID,
+  AP3 Listing über GSI1-Query, AP4 Status-Update mit Conditional Write) gemäß `api/endpoints.md`
+  und `database/access-patterns.md`. Module: `src/index.ts` (Handler, API-GW-v2-Eventformat,
+  Fehler→HTTP-Mapping), `src/orderService.ts`, `src/stateMachine.ts`, `src/validation.ts`,
+  `src/errors.ts`, `src/types.ts`; Unit-Tests unter `tests/`.
+- `lambda/package.json` + `package-lock.json`: `npm run build` (tsc --noEmit + esbuild-Bundle),
+  `npm run package` (bestzip → `dist/lambda.zip`), `npm test` (Vitest). Runtime `nodejs22.x`.
+- `terraform/main.tf`: `aws_lambda_function.handler` ergänzt (Runtime nodejs22.x,
+  Handler `index.handler`, Timeout 10, Env `ORDERS_TABLE`, `source_code_hash` auf
+  `../lambda/dist/lambda.zip`); Execution Role `aws_iam_role.handler` aus T011-03 verwendet.
+- `terraform/outputs.tf`: `lambda_function_name`, `lambda_function_arn`.
+- `terraform/README.md`: Lambda-Abschnitt (§2.3) + Ressourcentabelle aktualisiert.
+- Beträge als ganze Cent (Integer) — Vorab-Definition `database/dynamodb-design.md` §7 finalisiert
+  (maßgebliches Schema: `api/api-documentation.md` §3; float-Beispiele in `api/endpoints.md`
+  bewusst unverändert).
+- API-GW→Lambda Invoke-Permission (`aws_lambda_permission`) bewusst NICHT in T011-04 — folgt
+  in T011-06 (HTTP API + Routen + Authorizer).
+
+### Validation
+- Vitest `npm test`: PASS (45/45 — stateMachine 14, validation 19, orderService 12).
+- `npm run build`: PASS · `npm run package`: PASS (dist/lambda.zip, ~156 KB) · `npm audit`: 0.
+- `terraform init`: PASS (aws provider v6.60.0) · `terraform validate`: PASS (ohne Warnungen).
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…04 COMPLETE · T011-05 NEXT · AWS Resources: NONE.
+
 ## 2026-08-17 — Final Diagnostic: VS Code / terraform-ls stale AWS-Provider-Schema 5.100.0 (F011)
 
 ### Verifikation (kein Code-Change)

@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-03): **DynamoDB-Tabelle + GSI1 und IAM (Execution Role) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-04): **DynamoDB-Tabelle + GSI1, IAM (Execution Role) und Lambda (Order Handler) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,16 +16,19 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-03, IAM):**
+**Aktueller Stand (T011-04, Lambda):**
 
 ```text
 terraform/
 ├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags,
-│                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy)
+│                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy),
+│                   Lambda (Order Handler)
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (DynamoDB-Name/-ARN, IAM-Rolle; weitere je Ressource)
+├── outputs.tf      Outputs (DynamoDB, IAM, Lambda; weitere je Ressource)
 └── README.md       dieses Dokument
 ```
+
+**Quellcode der Lambda:** `lambda/` (TypeScript, Node.js 22) — siehe §2.3.
 
 **Geplante Erweiterung (ab T011-04):** Die übrigen Ressourcen (Lambda, API GW,
 Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
@@ -82,14 +85,41 @@ Bewusst **nicht** erlaubt: `dynamodb:Scan`, `dynamodb:DeleteItem`, `dynamodb:Bat
 
 Kein IAM-User, keine Access Keys — Benutzer-Auth läuft über Cognito (ADR-003).
 
+## 2.3 Lambda — Order Handler (T011-04)
+
+Fachliche Grundlage: `api/endpoints.md`, `api/api-documentation.md`,
+`database/access-patterns.md` (AP1…AP4), ADR-001.
+
+| Eigenschaft | Wert |
+|-------------|------|
+| Funktion | `aws_lambda_function.handler`, Name `${var.project_name}-handler` |
+| Runtime / Handler | `nodejs22.x` · `index.handler` |
+| Execution Role | `aws_iam_role.handler` aus T011-03 (Least Privilege) |
+| Deployment Package | `lambda/dist/lambda.zip` (reproduzierbar: `npm run package` in `lambda/`) |
+| Env-Variable | `ORDERS_TABLE` = DynamoDB-Tabellenname (`aws_dynamodb_table.orders.name`) |
+| Timeout | 10 s (Cold-Start + DynamoDB-Latenz; Default 3 s zu knapp) |
+| API-GW Invoke-Permission | **offen → T011-06** (`aws_lambda_permission`, wenn HTTP API existiert) |
+
+Umgesetzte Order-Operationen (Lambda-Business-Logik, `lambda/src/orderService.ts`):
+
+| Access Pattern | Endpoint | DynamoDB-Zugriff |
+|----------------|----------|------------------|
+| AP1 Create | `POST /orders` | `PutItem` (PENDING, `totalAmount` server-seitig, GSI1-Eintrag) |
+| AP2 Get by ID | `GET /orders/{orderId}` | `GetItem` |
+| AP3 Listing | `GET /orders` | `Query` auf GSI1 (absteigend, paginiert) |
+| AP4 Status-Update | `PATCH /orders/{orderId}/status` | `UpdateItem` + Conditional Write (Race-Schutz) |
+
+Beträge werden als **ganze Cent** (Integer) verarbeitet (Vorab-Definition
+`database/dynamodb-design.md` §7; finale Darstellung gemäß `api/api-documentation.md` §3).
+
 ## 3. Geplante Ressourcen
 
 | Ressource | Terraform-Typ (Vorschlag) |
 |-----------|---------------------------|
 | DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) ✅ |
 | IAM-Rolle | `aws_iam_role` + `aws_iam_role_policy` ✅ |
-| Lambda | `aws_lambda_function` (Zip aus Build) |
-| Lambda-Permission | `aws_lambda_permission` (API GW invoke) |
+| Lambda | `aws_lambda_function` (Zip aus Build) ✅ |
+| Lambda-Permission | `aws_lambda_permission` (API GW invoke) ⏳ T011-06 |
 | HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` |
 | Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_pool_domain` (falls nötig) |
 
@@ -116,5 +146,5 @@ terraform apply     → nur nach Freigabe
 
 ## 7. Abhängigkeiten
 
-- Lambda-Zip muss vor `apply` gebaut sein (Build-Step im Feature-Workflow).
-- API-GW-Route → Integration → Lambda-Permission → Lambda-Deployment.
+- Lambda-Zip muss vor `plan`/`apply` gebaut sein (`cd lambda && npm run package`).
+- API-GW-Route → Integration → Lambda-Permission (T011-06) → Lambda-Deployment.
