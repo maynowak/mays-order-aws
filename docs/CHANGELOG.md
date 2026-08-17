@@ -2,6 +2,32 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-17 — Final Diagnostic: VS Code / terraform-ls stale AWS-Provider-Schema 5.100.0 (F011)
+
+### Verifikation (kein Code-Change)
+- terraform-ls 0.39.0 direkt per LSP (serve, Root = Repo) getrieben:
+  Root-Modul `terraform/` erkannt; Provider-Erkennung sieht nur noch 6.60.0.
+- `ObtainSchema`/`SchemaModuleValidation`/`ReferenceValidation` → alle err = nil,
+  **keine Diagnostics** → main.tf ist im aktuellen Zustand fehlerfrei.
+- `textDocument/completion` im GSI-Block schlägt `key_schema` vor → modernes
+  AWS-Provider-Schema (≥ 6.29.0) aktiv; legacy `hash_key`/`range_key` nur noch deprecated.
+- Root Cause belegt: GSI-`key_schema` existiert erst ab AWS-Provider v6.29.0 (PR #46602);
+  5.100.0 (Altstand T011-01) erzeugt exakt die gemeldeten Fehler
+  (`hash_key` required + `key_schema` not expected). terraform-ls hält das Schema
+  in-memory pro Session (kein Disk-Cache) und übernimmt Lockfile-Änderungen erst
+  nach Neustart des Language Servers (Initialize-Log: "dynamic watched files … may
+  not be reflected at runtime").
+- Optionale Altlast: `/tmp/terraform-provider1730277575` = Distributions-Zip aws 5.100.0
+  (149 MB) — löschbar. `.terraform/providers` enthält nur noch 6.60.0.
+
+### Abschluss
+- `terraform validate`: PASS · `git diff --check`: PASS · Secret-Audit: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe erforderlich).
+- VS Code: "Developer: Reload Window" bzw. "Terraform: Restart Language Server".
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…03 COMPLETE · T011-04 NEXT · AWS Resources: NONE.
+
 ## 2026-08-17 — Provider 6.x Compatibility & Toolchain Verification (F011, Diagnose)
 
 ### Verifikation

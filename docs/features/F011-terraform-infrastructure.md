@@ -38,7 +38,7 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-Provider 6.x Compatibility & Toolchain Verification (COMPLETE)
+Final Diagnostic — VS Code/terraform-ls stale Provider-Schema 5.100.0 (COMPLETE)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -46,7 +46,7 @@ Completed Tasks:
 - T011-03 IAM-Rolle + Policy            ✅
 
 In Progress:
-None (Diagnose-Task abgeschlossen; T011-04 wird separat gestartet)
+None (Final Diagnostic abgeschlossen; T011-04 wird separat gestartet)
 
 Pending Tasks:
 - T011-04 Lambda (Zip-Build) + Permission
@@ -79,10 +79,22 @@ Changes Made:
   `aws_dynamodb_table.orders` verifiziert: Tabelle hat `hash_key = "pk"` + `range_key = "sk"`,
   GSI1 nutzt weiterhin `key_schema`-Blocks (nicht deprecated), `terraform validate` PASS →
   keine Code-Änderung erforderlich
+- (FINAL-DIAGNOSTIC) terraform-ls 0.39.0 direkt per LSP (serve, Root = Repo) getrieben:
+  Root-Modul `terraform/` korrekt erkannt; Provider-Erkennung sieht nur noch 6.60.0;
+  `ObtainSchema`/`SchemaModuleValidation`/`ReferenceValidation` → err = nil (keine Diagnostics)
+- (FINAL-DIAGNOSTIC) `textDocument/completion` IM GSI-Block → schlägt `key_schema` vor
+  (modernes Schema aktiv) ⇒ main.tf mit 6.60.0 valide; Fehlerursache = veraltetes
+  In-Memory-Schema 5.100.0 eines laufenden Language-Server-Sessions (GSI-`key_schema`
+  existiert erst ab Provider 6.29.0, PR #46602)
+- (FINAL-DIAGNOSTIC) Altlast `/tmp/terraform-provider1730277575` identifiziert
+  (Distributions-Zip aws 5.100.0, 149 MB, T011-01-Ära) — optional löschbar
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
 - Terraform validate: PASS (ohne Warnungen)
+- LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): Root-Erkennung `terraform/` PASS;
+  Provider nur 6.60.0; ObtainSchema/SchemaModuleValidation/ReferenceValidation err=nil;
+  keine Diagnostics; Completion im GSI-Block schlägt `key_schema` vor → PASS
 - Terraform plan: NOT RUN (gehört zu T011-07)
 
 Validation:
@@ -173,6 +185,58 @@ Compatibility-Matrix (nur tatsächlich vorhandene Bausteine):
 | Outputs (`outputs.tf`) | kompatibel | nein | OK |
 | Tags (Default-Tags, merge) | kompatibel | nein | OK |
 
+## Final Diagnostic — VS Code / terraform-ls zeigt veraltetes AWS-Provider-Schema (5.100.0)
+
+```text
+Observation:
+VS Code zeigte trotz AWS-Provider-6.60.0-Code weiterhin:
+  "Required attribute 'hash_key' not specified" (GSI-Ebene) +
+  "Blocks of type 'key_schema' are not expected here" (Zeile 48/53/58)
+Terraform CLI (v1.15.8 + AWS 6.60.0) validierte dagegen ohne Fehler.
+
+Root Cause (belegt):
+- GSI-`key_schema` in aws_dynamodb_table existiert erst seit AWS-Provider v6.29.0
+  (PR #46602; vor 6.29.0 sind für GSI nur `hash_key`/`range_key` erlaubt → exakt die
+  gemeldeten Fehler). Die Altversion 5.100.0 (T011-01-Stand) kennt kein GSI-`key_schema`.
+- terraform-ls (Extension 2.40.0 / LS 0.39.0) bezieht das Provider-Schema aus der
+  LOKALEN Provider-Installation (.terraform/providers), ausgewählt über das Lockfile.
+  Mit installiertem 5.100.0 wurde das alte Schema bedient.
+- Der Language Server übernimmt Provider-/Lockfile-Änderungen NICHT zur Laufzeit
+  (Initialize-Log: "Client doesn't support dynamic watched files registration, provider
+  and module changes may not be reflected at runtime"); das Schema wird in-memory pro
+  Session gehalten (kein Disk-Cache nachweisbar). ⇒ Nach dem Upgrade blieben die
+  Fehler bestehen, bis der Language Server neu gestartet wird.
+
+LSP-Verifikation (terraform-ls serve, LSP over stdio, Root = Repo):
+- Root-Modul korrekt erkannt: /home/dci-student/projects/Mays-Orders-AWS/terraform
+- Provider-Erkennung: .terraform/providers/.../hashicorp/aws/6.60.0 (nur noch 6.60.0)
+- Jobs: GetTerraformVersion / ParseProviderVersions / ObtainSchema / SchemaModuleValidation
+  / ReferenceValidation → alle err = nil → KEINE Diagnostics
+- textDocument/completion IM GSI-Block → schlägt `key_schema` (sowie deprecated
+  hash_key/range_key) vor ⇒ modernes 6.60.0-Schema aktiv, Datei valide
+- textDocument/hover / workspace/executeCommand validate: kein Fehler
+
+Befund:
+- terraform-ls 0.39.0 validiert main.tf im aktuellen Zustand FEHLERFREI.
+- Die gemeldeten VS-Code-Fehler stammen vom veralteten 5.100.0-Schema eines noch
+  laufenden/gecachten Language-Server-Sessions — kein Code-Problem.
+
+Abschluss:
+- Altes Plugin 5.100.0 entfernt (Cache-Cleanup, erledigt); init → nur 6.60.0; validate PASS
+- Optionale Altlast: /tmp/terraform-provider1730277575 (149 MB, Distributions-Zip
+  aws 5.100.0 aus der T011-01-Ära) — kann gelöscht werden
+- VS Code: Fenster neu laden (Developer: Reload Window) bzw. "Terraform: Restart
+  Language Server" → stale Diagnostics verschwinden (CLI- und LSP-seitig belegt)
+```
+
+### Warum CLI vs. Editor unterschiedlich urteilten
+
+| Quelle | Schema-Quelle | Ergebnis |
+|--------|---------------|----------|
+| Terraform CLI `validate` | lokale Provider-Installation (6.60.0, Lockfile) | PASS |
+| terraform-ls 0.39.0 (frischer LSP-Session) | lokale Provider-Installation (6.60.0) | PASS (keine Diagnostics, `key_schema` in Completion) |
+| VS-Code-Diagnostics (vor Reload) | veraltetes In-Memory-Schema 5.100.0 (< 6.29.0) | 2 Fehler (GSI `key_schema`/`hash_key`) |
+
 ## IAM-Lernbezug (T011-03, wiederverwendbar für Vortrag/Zertifizierung)
 
 ```text
@@ -199,6 +263,7 @@ Least Privilege
 |---------|--------|
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen) |
+| LSP-Test terraform-ls 0.39.0 (serve, Root = Repo) | PASS (keine Diagnostics, `key_schema` in Completion) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |

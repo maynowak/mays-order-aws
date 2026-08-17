@@ -20,7 +20,7 @@ Current Task:
 T011-04 — Lambda (geplant, wird separat gestartet)
 
 Current Checkpoint:
-21ed0f4 (F011 / T011-03 — IAM Lambda Execution Role + Least-Privilege Policy)
+a4061e0 (F011 — Provider 6.x Compatibility & Toolchain Verification)
 
 AWS Resources:
 NONE
@@ -66,6 +66,7 @@ Terraform init/validate PASS (T011-01…T011-03; AWS-Provider ~> 6.0 / 6.60.0)
 | W2-T011-02 | `5d291bd` | F011/T011-02 DynamoDB-Tabelle + GSI1 (PK `pk`/`sk`, GSI1, On-Demand, Outputs) + `init`/`validate` PASS | SUCCESS | COMPLETE |
 | W2-PROV-UPGRADE | `fc89aef` | AWS-Provider `~> 5.0` → `~> 6.0` (6.60.0), GSI1 auf `key_schema`-Syntax + `validate` PASS | SUCCESS | COMPLETE |
 | W2-T011-03 | `21ed0f4` | F011/T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB Tabelle+GSI1, Logs) + `validate` PASS | SUCCESS | COMPLETE |
+| W2-DIAG-COMPAT | `a4061e0` (+`6976bd0`) | Provider 6.x Compatibility & Toolchain Verification: Schema autoritativ (CLI 6.60.0), 5.100.0-Altlast bereinigt, `validate` PASS, Checkpoint-Nachzug | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
