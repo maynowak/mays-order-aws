@@ -55,7 +55,7 @@
 
 ## Git
 
-- Commit: Korrektur-Commit (nach diesem Report, reale Commit-ID)
+- Commit: `4a0a6e7` (Korrektur-Commit, reale Commit-ID)
 - Branch: `main`
 - Push: SUCCESS
 - Aktueller HEAD: siehe `git log` / `docs/PROJECT_STATUS.md`

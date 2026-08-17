@@ -36,3 +36,17 @@
 - Woche 1 weiterhin COMPLETE; kein Code, keine AWS-Ressourcen.
 - Checkpoint `2a89e73` gepusht.
 - Statusnachzug Checkpoint `729ae73` gepusht (Checkpoint-Historie aktualisiert).
+
+## 2026-08-17 — Korrektur Review-Inkonsistenzen (Checkpoint 4a0a6e7)
+
+### Dokumentation
+- `docs/PROJECT_STATUS.md`: `729ae73` als aktueller letzter Checkpoint (Historie: `4515029 → 2a89e73 → 729ae73`).
+- `README.md` + `docs/reports/four-week-plan.md`: Woche-1-Status eindeutig **COMPLETE** (kein „in Arbeit").
+- Commit-/Push-Regel vereinheitlicht (normale Tasks: Checkpoint-Commit/-Push selbstständig;
+  kosten-/sicherheitsrelevante AWS-Aktionen weiterhin nur mit menschlicher Freigabe):
+  `docs/AGENTS.md`, `docs/AI_TEAM.md`, `docs/AI_AGENT_PLAYBOOK.md`, `docs/AI_DEVELOPMENT_GUIDE.md`.
+- Konsistenz-Nachzug in `docs/features/F001-project-foundation.md`, `docs/reports/documentation-transfer-report.md`.
+
+### Status
+- Week 1 COMPLETE · Documentation COMPLETE · AWS NO RESOURCES · Application NOT STARTED ·
+  Terraform Apply NOT RUN · Live API NOT RUN.
