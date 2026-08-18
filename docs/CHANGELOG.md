@@ -21,7 +21,8 @@
 - Bewusst NICHT in T011-05: `user_pool_domain` (kein Hosted-UI nötig), API-GW/JWT-Authorizer/
   Lambda-Invoke-Permission (T011-06), Testbenutzer (T002-04).
 - Integration: `feature/lambda-python-314` → `main` gemerged (Commit `20bfb05`,
-  Pflicht-Voraussetzung); Feature-Branches bleiben erhalten.
+  Pflicht-Voraussetzung); `feature/cognito` → `main` gemerged (Commit `dd9bb58`).
+  Feature-Branches bleiben erhalten.
 
 ### Validation
 - Terraform `fmt`/`init`/`validate`: PASS (AWS-Provider 6.60.0, ohne Warnungen).

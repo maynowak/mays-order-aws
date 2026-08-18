@@ -77,7 +77,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | W2-T011-04 | `449cdd7` | F011/T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build `dist/lambda.zip`, Execution Role T011-03, AP1..AP4) + Vitest 45/45 + init/validate PASS | SUCCESS | COMPLETE |
 | W2-LAMBDA-PY-314 | `64130a9` (Branch `feature/lambda-python-314`) | Lambda-Migration auf Python 3.14: Handler funktional portiert (AP1..AP4), boto3 (Runtime), ZIP-Build `build_zip.py`, unittest 49/49, `runtime = "python3.14"`, Terraform fmt/init/validate PASS; Node-Baseline bleibt | SUCCESS | COMPLETE |
 | W2-PY314-INTEGRATION | `20bfb05` | Python-3.14-Migration nach `main` integriert (`merge --no-ff` von `feature/lambda-python-314`) — Pflicht-Voraussetzung für T011-05; Branch bleibt erhalten | SUCCESS | COMPLETE |
-| W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS | SUCCESS | COMPLETE |
+| W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`dd9bb58`) | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |

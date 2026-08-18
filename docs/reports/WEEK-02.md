@@ -90,3 +90,4 @@ dem Vier-Wochen-Plan (Woche 2).
 - Branch: `feature/cognito` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` beide gepusht)
 - Merge: `feature/lambda-python-314` → `main` (Commit `20bfb05`) — SUCCESS
 - Commit: `be79c5f` (T011-05-Checkpoint) · Push: SUCCESS (`origin/feature/cognito`)
+- Merge: `feature/cognito` → `main` (Commit `dd9bb58`) · Push main: SUCCESS

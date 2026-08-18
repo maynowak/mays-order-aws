@@ -177,7 +177,8 @@ Blockers:
 - None
 
 Current Checkpoint:
-`be79c5f` (Branch `feature/cognito` — T011-05 Cognito; Push SUCCESS auf origin/feature/cognito)
+`be79c5f` (Branch `feature/cognito` — T011-05 Cognito; Push SUCCESS auf origin/feature/cognito;
+gemerged nach main via `dd9bb58`)
 
 Next Step:
 T011-06 — HTTP API + Routen + Authorizer (separater Prompt / Task)
