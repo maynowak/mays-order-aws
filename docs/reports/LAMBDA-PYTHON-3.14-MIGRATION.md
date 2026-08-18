@@ -2,15 +2,21 @@
 
 > Migrationsbericht: Lambda-Order-Handler von Node.js/TypeScript (`nodejs22.x`)
 > auf Python 3.14 (`python3.14`) portiert. Git bleibt Source of Truth.
+>
+> **Stand nach Cleanup (T011-04-PYTHON-CLEANUP):** Die Node.js/TypeScript-Baseline
+> wurde aus dem aktiven Lambda-Projekt entfernt. Dieser Bericht beschreibt den
+> Migrationsverlauf; die Baseline ist über Git-Historie (Commit `449cdd7`) und den
+> Cleanup-Report (`docs/reports/T011-04-PYTHON-CLEANUP.md`) nachvollziehbar.
 
 ## Summary
 
 Der in F011/T011-04 implementierte Lambda-Order-Handler (`mays-orders-handler`,
 AP1 Create / AP2 Get by ID / AP3 Listing / AP4 Status-Update) wurde vollständig
 und funktional identisch von Node.js/TypeScript auf Python 3.14 portiert. Die
-Node.js/TypeScript-Implementierung (T011-04, `nodejs22.x`) bleibt als
-**historische Baseline** vollständig im Repository erhalten (Sources, Tests,
-`package.json`/`tsconfig.json`, Vitest 45/45 weiterhin grün). Die aktive Lambda
+Node.js/TypeScript-Implementierung (T011-04, `nodejs22.x`) diente als
+**historische Baseline**; nach der Migration wurde sie im Cleanup aus dem aktiven
+Lambda-Projekt entfernt (siehe `docs/reports/T011-04-PYTHON-CLEANUP.md`; Baseline
+weiterhin über Git-Historie `449cdd7` nachvollziehbar). Die aktive Lambda
 verwendet jetzt die Python-3.14-Runtime mit boto3 (von der Lambda-Runtime
 bereitgestellt) und einem reproduzierbaren ZIP-Build (`lambda/build_zip.py` →
 `dist/lambda.zip`).
@@ -52,8 +58,9 @@ einzig `runtime` wurde von `nodejs22.x` auf `python3.14` umgestellt. Kein
 | — (kein Handler-Test in Node) | `lambda/tests/test_index.py` | **neu:** Handler-Verhalten (Routing, Body-Parsing, Fehler-Mapping, `ORDERS_TABLE`-Check) — gefordert in der Migrations-Vorgabe |
 | `lambda/package.json` (`build`/`package`) | `lambda/build_zip.py` | Python-ZIP-Build (Stdlib `zipfile`, reproduzierbar) |
 
-Keine Datei ohne realen Bezug erzeugt. Die Node-Vorgänger-Dateien bleiben
-unverändert als Baseline bestehen.
+Keine Datei ohne realen Bezug erzeugt. Die Node-Vorgänger-Dateien blieben bis zum
+Cleanup als Baseline bestehen und wurden danach aus dem aktiven Projekt entfernt
+(siehe `docs/reports/T011-04-PYTHON-CLEANUP.md`).
 
 ## Changed Files
 
@@ -179,8 +186,9 @@ cd lambda && PYTHONPATH=src python3 -m unittest discover -s tests -v
 Hinweis zur Zählweise: Vitest (Node-Baseline) zählt jedes `it()` = 45 Tests.
 Python-`unittest` zählt Test-Methoden; parametrisierte Fälle (SubTests) sind
 Teil der Methoden. Sämtliche fachlichen Fälle der Baseline sind abgedeckt.
-`python3 -m compileall` (Syntax-Check) PASS. Node-Baseline unverändert:
-Vitest 45/45 PASS, `tsc --noEmit` PASS.
+`python3 -m compileall` (Syntax-Check) PASS. Die Node-Baseline (Vitest 45/45,
+`tsc --noEmit`) war zum Migrationszeitpunkt grün und ist nach dem Cleanup
+nicht mehr im Repo (siehe `docs/reports/T011-04-PYTHON-CLEANUP.md`).
 
 ## Terraform Validation
 
@@ -219,10 +227,11 @@ AP1..AP4-Arbeitslast, gleicher `timeout`). Der Messplan ist in
 
 ## Known Limitations
 
-- `dist/lambda.zip` wird jetzt vom Python-Build erzeugt; der Node-Baseline-Build
-  (`npm run package`) würde denselben Pfad überschreiben. Beide Builds sind
-  reproduzierbar; für den aktiven Python-Runtime-Stand gilt
-  `python3 build_zip.py`. `dist/` ist gitignored.
+- Die Node.js/TypeScript-Baseline (T011-04) ist nach dem Cleanup nicht mehr im
+  aktiven Repo; nachvollziehbar über Git-Historie (`449cdd7`) und den
+  Migrations-/Cleanup-Report. `npm`-Befehle sind nicht mehr verfügbar.
+- `dist/lambda.zip` wird ausschließlich vom Python-Build erzeugt
+  (`python3 build_zip.py`). `dist/` ist gitignored.
 - Tests laufen lokal unter Python 3.12.3 (System-Python); die Lambda-Ziel-
   Runtime ist `python3.14`. Ein echter 3.14-Runtime-Test ist erst nach `apply`
   möglich (nicht durchgeführt).
@@ -246,10 +255,10 @@ AP1..AP4-Arbeitslast, gleicher `timeout`). Der Messplan ist in
 
 - Lambda Runtime: **Python 3.14** (Terraform `runtime = "python3.14"`)
 - Migration: **COMPLETE** (Code, Tests, Packaging, Terraform, Doku validiert)
-- Node.js/TypeScript T011-04: historische Baseline, weiterhin im Repo, 45/45
-  Tests grün
+- Node.js/TypeScript T011-04: historische Baseline, entfernt (Cleanup
+  `docs/reports/T011-04-PYTHON-CLEANUP.md`), nachvollziehbar via Git `449cdd7`
 - AWS Resources: NONE (kein apply)
-- Week 2 IN PROGRESS · F011 IN PROGRESS (T011-01…04 COMPLETE · T011-05 NEXT)
+- Week 2 IN PROGRESS · F011 IN PROGRESS (T011-01…06 COMPLETE · T011-07 NEXT)
 
 ## Next Step
 

@@ -2,6 +2,30 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — T011-04 Python Cleanup (F011, Branch `feature/lambda-python-cleanup`)
+
+### Implementierung
+- Node.js/TypeScript-Baseline (T011-04) aus dem aktiven Lambda-Projekt entfernt:
+  `lambda/src/index.ts`, `orderService.ts`, `stateMachine.ts`, `validation.ts`,
+  `errors.ts`, `types.ts` sowie `lambda/tests/orderService.test.ts`,
+  `stateMachine.test.ts`, `validation.test.ts`, `lambda/package.json`,
+  `lambda/package-lock.json`, `lambda/tsconfig.json`, `lambda/vitest.config.ts`.
+- Lokal entfernt (gitignored): `lambda/node_modules/`, `lambda/dist/index.js`.
+- Keine Python-Codeänderung; `python3.14` bleibt aktive Lambda-Runtime
+  (`terraform/main.tf` unverändert). Baseline via Git-Historie `449cdd7`.
+- Kein `plan`, kein `apply`; T011-05/T011-06 (Cognito, HTTP API) unverändert.
+
+### Validation
+- `python3 -m compileall -q src tests` PASS · Python unittest 49/49 PASS.
+- `python3 build_zip.py` PASS (6 Module) · `unzip -t dist/lambda.zip` PASS.
+- Terraform `fmt -check` / `init` / `validate` PASS · `git diff --check` PASS ·
+  Secret-Audit PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe).
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…06 + T011-04-CLEANUP COMPLETE ·
+  T011-07 NEXT · AWS Resources: NONE.
+
 ## 2026-08-18 — HTTP API T011-06 (F011 / F003, Branch `feature/http-api`)
 
 ### Implementierung

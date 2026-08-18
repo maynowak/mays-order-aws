@@ -40,7 +40,7 @@ Tests:
 - Unit tests: NOT RUN YET
 
 Validation:
-- TypeScript check: PENDING
+- Python check (compileall/unittest/build_zip.py): PENDING
 
 Known Issues:
 - None

@@ -11,7 +11,9 @@ T011-02 (DynamoDB + GSI1), T011-03 (IAM), T011-04 (Lambda Order Handler + Zip-Bu
 und T011-05 (Cognito: User Pool, Client, Gruppe `staff`) abgeschlossen und validiert.
 Zusätzlich wurde der Lambda-Handler auf **Python 3.14** portiert (Branch
 `feature/lambda-python-314`) und per `merge --no-ff` nach `main` integriert (Commit
-`20bfb05`); die Node.js/TypeScript-Variante bleibt als historische Baseline. Noch keine
+`20bfb05`); die Node.js/TypeScript-Baseline (T011-04) wurde nach der Migration im
+Cleanup (T011-04-CLEANUP, Branch `feature/lambda-python-cleanup`) aus dem aktiven
+Lambda-Projekt entfernt und ist über Git-Historie (`449cdd7`) nachvollziehbar. Noch keine
 AWS-Ressourcen erzeugt, kein `apply`.
 
 ## 2. Erledigte Features / Tasks
@@ -22,6 +24,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | T011-02 DynamoDB-Tabelle + GSI1 (mays-orders, PK pk/sk, GSI1, On-Demand) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB+GSI1, Logs) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build, Execution Role T011-03, AP1..AP4) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-04-CLEANUP Node.js/TypeScript-Baseline entfernt (Python 3.14 aktiv) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert (boto3, build_zip.py, unittest 49/49, runtime python3.14) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
@@ -35,22 +38,19 @@ AWS-Ressourcen erzeugt, kein `apply`.
 
 | Prüfung | Status |
 |---------|--------|
-| TypeScript-Build (`npm run build`, tsc --noEmit + esbuild) | PASS (Baseline T011-04) |
-| Unit-Tests Baseline (Vitest `npm test`) | PASS (45/45: stateMachine 14, validation 19, orderService 12) |
 | Python-Syntax (`python3 -m compileall`) | PASS |
 | Python-Tests (unittest, 49 Test-Methoden) | PASS (state_machine 4, validation 19, orderService 12, index 14) |
 | Python-ZIP-Build (`python3 build_zip.py`) | PASS (dist/lambda.zip, 6 Module, ~6,6 KB) |
 | ZIP-Integrität + Handler-Import-Smoke | PASS |
-| npm audit | PASS (0 vulnerabilities, Baseline) |
 | Terraform fmt | PASS |
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen; inkl. Cognito T011-05) |
 | Recovery T011-06 (2026-08-18): `terraform fmt -check` / `terraform validate` / `git diff --check` / Secret-Audit | PASS (read-only, kein plan/apply) |
+| Cleanup T011-04 (2026-08-18): `python3 build_zip.py` / `unzip -t` / `compileall` / unittest / `terraform fmt -check` / `init` / `validate` / `git diff --check` / Secret-Audit | PASS (kein plan/apply) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
-| `git diff --check` | PASS (T011-05) |
-| Secret-Audit | PASS (T011-05) |
+| Node-Baseline (Vitest/tsc/npm) | REMOVED — Cleanup T011-04-CLEANUP; historisch via Git `449cdd7` |
 
 ## 4. AWS-Ressourcen
 
@@ -93,3 +93,4 @@ dem Vier-Wochen-Plan (Woche 2).
 - Merge: `feature/cognito` → `main` (Commit `dd9bb58`) · Push main: SUCCESS
 - Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Merge: `feature/http-api` → `main` (Commit `8a85b5e`) · Push main: SUCCESS
+- Cleanup: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP) · Merge → `main` · Push: SUCCESS

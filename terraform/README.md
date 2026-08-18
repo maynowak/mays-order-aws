@@ -31,7 +31,7 @@ terraform/
 ```
 
 **Quellcode der Lambda:** `lambda/` (Python 3.14, aktiv; Node.js/TypeScript-
-Baseline T011-04 bleibt als historischer Stand erhalten) — siehe §2.3.
+Baseline T011-04 entfernt, historisch via Git `449cdd7`) — siehe §2.3.
 
 **Geplante Erweiterung (ab T011-04):** Die übrigen Ressourcen (Lambda, API GW,
 Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.

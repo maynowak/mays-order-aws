@@ -1,22 +1,27 @@
 # Build & Validation — May's Orders
 
-> Stand: Woche 1 — Planung. Keine Code-Builds bisher (keine Implementierung).
+> Stand: Woche 2 — aktiver Lambda-Bestand: Python 3.14. Die historische
+> Node.js/TypeScript-Baseline (T011-04) wurde im Cleanup entfernt und ist über
+> Git-Historie (Commit `449cdd7`) nachvollziehbar.
 
-## Lokale Entwicklung (Woche 2, geplant)
+## Lokale Entwicklung (aktiv, Python)
 
 ```bash
-npm install
-npm run build        # tsc --noEmit + ggf. Bundle (TypeScript-Lambda-Handler)
-npm test             # Unit-Tests (Vitest/Jest, State Machine + Validierung)
+cd lambda
+python3 -m compileall -q src tests      # Syntax-Check
+PYTHONPATH=src python3 -m unittest discover -s tests -v   # Unit-Tests (unittest)
+python3 build_zip.py                    # → dist/lambda.zip (6 Module, ~6,6 KB)
+unzip -t dist/lambda.zip                # ZIP-Integrität
 ```
 
 ## Infrastruktur-Validierung
 
 ```bash
+cd terraform
 terraform init
 terraform validate
-terraform plan       # Review — kein blindes Apply
-terraform apply      # NUR nach expliziter menschlicher Freigabe
+terraform plan       # Review — kein blindes Apply (T011-07)
+terraform apply      # NUR nach expliziter menschlicher Freigabe (T011-08)
 terraform destroy    # nur nach Freigabe (Cleanup)
 ```
 
@@ -34,16 +39,17 @@ curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/js
 
 | Prüfung | Status |
 |---------|--------|
-| TypeScript-Build | NOT APPLICABLE (kein Code, Woche 1) |
-| Unit-Tests | NOT RUN |
-| Terraform validate | NOT RUN (Woche 2) |
-| Terraform plan | NOT RUN |
+| Python compileall | PASS |
+| Python unittest | PASS (49/49) |
+| ZIP-Build + Integrität | PASS |
+| Terraform validate | PASS (T011-01…06; Provider 6.60.0) |
+| Terraform plan | NOT RUN (T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
 | `git diff --check` | PASS (letzter Checkpoint) |
 
 ## Erwartete Artefakte
 
-- `dist/` bzw. Lambda-Bundle (Zip) — Woche 2
-- Terraform-Plan/Apply-Output — Woche 2
+- `lambda/dist/lambda.zip` (Python-Bundle) — erzeugt durch `python3 build_zip.py`
+- Terraform-Plan/Apply-Output — Woche 2 (T011-07/08)
 - `tests/test-results.md` — laufend ab Woche 2
