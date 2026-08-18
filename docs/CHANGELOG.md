@@ -2,6 +2,25 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — Presentation Technical Q&A (Dokumentations-Nachzug)
+
+### Dokumentation
+- `docs/reports/PRESENTATION-TECHNICAL-QA.md` (neu): Vorbereitung für die
+  Projektbesprechung/Präsentation — Project Context (schulische Vorgabe vs.
+  technische Umsetzung vs. technische Alternative), Current Architecture,
+  Node.js vs Python 3.14, FastAPI vs API Gateway (Alternative, nicht
+  implementiert), HTTP/JSON API, Cognito + JWT, Lambda, Error Handling
+  (400/404/409/500), DynamoDB + GSI, IAM, Terraform, Terraform State (≠ Order
+  State), S3 Backend (T011-09 optional), validate/plan/apply, Fragen + kurze +
+  vertiefte Antworten, Open Questions.
+- Reiner Dokumentationsnachzug auf Basis von `main` `6933680`. Keine Code-,
+  Architektur- oder Feature-Änderung; kein `terraform plan`/`apply`; keine
+  AWS-Ressourcen.
+
+### Status
+- Unverändert: T011-01…T011-07 COMPLETE · T011-08 PLANNED (Freigabe
+  erforderlich) · T011-09 OPTIONAL · AWS Resources: NONE.
+
 ## 2026-08-18 — Terraform Validate + Plan Review T011-07 (F011, Branch `feature/t011-07-plan-review`)
 
 ### Verifikation (read-only, kein Code-Change)
