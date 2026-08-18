@@ -25,7 +25,7 @@ def _get_dynamodb_resource():
     """
     global _dynamodb_resource
     if _dynamodb_resource is None:
-        import boto3
+        import boto3  # type: ignore[reportMissingImports]  # von der Lambda-Runtime bereitgestellt, lokal nicht installiert
 
         _dynamodb_resource = boto3.resource(
             "dynamodb", region_name=os.environ.get("AWS_REGION", "eu-central-1")
