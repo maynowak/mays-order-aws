@@ -81,13 +81,13 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 8. Zeitplan-Bewertung
 
-F011/T011-01 bis T011-05 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
+F011/T011-01 bis T011-06 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
 Migrationsschritt abgeschlossen und nach `main` integriert. Terraform-Scope entspricht
 dem Vier-Wochen-Plan (Woche 2).
 
 ## 9. Git Checkpoint
 
-- Branch: `feature/cognito` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` beide gepusht)
+- Branch: `feature/http-api` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` + `feature/http-api` gepusht)
 - Merge: `feature/lambda-python-314` → `main` (Commit `20bfb05`) — SUCCESS
-- Commit: `be79c5f` (T011-05-Checkpoint) · Push: SUCCESS (`origin/feature/cognito`)
+- Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Merge: `feature/cognito` → `main` (Commit `dd9bb58`) · Push main: SUCCESS

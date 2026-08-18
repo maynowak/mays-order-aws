@@ -196,7 +196,8 @@ Blockers:
 - None
 
 Current Checkpoint:
-`TBD` (Branch `feature/http-api` — T011-06 HTTP API + Routen + Authorizer)
+`9a332bf` (Branch `feature/http-api` — T011-06 HTTP API + Routen + Authorizer;
+Push SUCCESS auf origin/feature/http-api)
 
 Next Step:
 T011-07 — terraform validate + plan (Review) (separater Prompt / Task)

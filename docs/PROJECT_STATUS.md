@@ -17,7 +17,7 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-06 — HTTP API + Routen + Authorizer (IN PROGRESS) · Next: T011-07
+T011-06 — HTTP API + Routen + Authorizer (COMPLETE) · Next: T011-07 (plan + validate Review)
 
 Current Checkpoint:
 feature/http-api (T011-06 — HTTP API V2, vier Routen, JWT Authorizer, Lambda-Integration)
@@ -36,7 +36,7 @@ Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
 
 API Gateway:
-IN PROGRESS (Terraform T011-06 — HTTP API V2, vier Routen, JWT Authorizer)
+CONFIGURED (Terraform T011-06 — HTTP API V2, vier Routen, JWT Authorizer) — NOT CREATED (kein apply)
 
 Lambda:
 CONFIGURED (Terraform + Python-3.14-Code) — NOT CREATED (kein apply)
@@ -54,7 +54,7 @@ CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01…T011-05; AWS-Provider ~> 6.0 / 6.60.0);
+Terraform init/validate PASS (T011-01…T011-06; AWS-Provider ~> 6.0 / 6.60.0);
 Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
 Node-Baseline: Vitest 45/45 PASS (unverändert)
 ```
@@ -78,6 +78,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | W2-LAMBDA-PY-314 | `64130a9` (Branch `feature/lambda-python-314`) | Lambda-Migration auf Python 3.14: Handler funktional portiert (AP1..AP4), boto3 (Runtime), ZIP-Build `build_zip.py`, unittest 49/49, `runtime = "python3.14"`, Terraform fmt/init/validate PASS; Node-Baseline bleibt | SUCCESS | COMPLETE |
 | W2-PY314-INTEGRATION | `20bfb05` | Python-3.14-Migration nach `main` integriert (`merge --no-ff` von `feature/lambda-python-314`) — Pflicht-Voraussetzung für T011-05; Branch bleibt erhalten | SUCCESS | COMPLETE |
 | W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`dd9bb58`) | SUCCESS | COMPLETE |
+| W2-T011-06 | `9a332bf` (Branch `feature/http-api`) | F011/T011-06 HTTP API V2 (`mays-orders-api`) + `$default`-Stage (auto_deploy) + JWT-Authorizer (Cognito: Issuer aus `users.endpoint`, Audience = Client-ID) + Integration (AWS_PROXY, Payload 2.0) + 4 Routen (alle JWT) + Invoke-Permission (nur API GW); `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -88,7 +89,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | DynamoDB | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-02, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | Cognito Authentication | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-05, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
-| API Gateway (HTTP API) | ✅ COMPLETE | 🔵 IN PROGRESS (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
+| API Gateway (HTTP API) | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
 | Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-05 Cognito konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
@@ -99,7 +100,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 |---------|--------|---------|
 | F001 — Project Foundation | ✅ COMPLETE | Woche-1-Analyse, Docs, Git-Setup |
 | F002 — Cognito Authentication | 🟡 DESIGNED | T002-01…03 COMPLETE (Terraform, via F011/T011-05); Design: `security/authentication-decision.md` |
-| F003 — API Gateway | ⏳ PLANNED | Design: `architecture/architecture-decisions.md` (ADR-004) |
+| F003 — API Gateway | 🟡 DESIGNED | T003-01…06 COMPLETE (Terraform, via F011/T011-06); Design: `architecture/architecture-decisions.md` (ADR-004) |
 | F004 — Order Creation | ⏳ PLANNED | Design: `api/endpoints.md`, `database/access-patterns.md` |
 | F005 — Order Retrieval | ⏳ PLANNED | Design: `api/endpoints.md` |
 | F006 — Order Listing | ⏳ PLANNED | Design: `database/access-patterns.md` (GSI1) |
@@ -107,7 +108,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 🔵 · T011-07 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 ✅ · T011-07 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

@@ -169,7 +169,7 @@ NONE — reine Terraform-Konfiguration; nichts erzeugt, keine Kosten.
 
 - Branch: `feature/http-api` (Feature-Branches werden **nicht** gelöscht)
 - Baseline: `main` = `9c1a7b6` (Merge-Nachzug T011-05)
-- Commit: TBD · Push: offen (Checkpoint-Task)
+- Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Danach: `git merge --no-ff feature/http-api` nach `main` + Push
 
 ## Feature Branch
@@ -184,7 +184,7 @@ Nach erfolgreicher Validation und Feature-Push: `git checkout main` →
 
 ## Push Status
 
-Wird nach tatsächlichem Push dokumentiert (nur reale Ergebnisse).
+Push feature/http-api: SUCCESS (Commits `9a332bf` + Docs-Nachzug, `origin/feature/http-api`).
 
 ## Current Project Status
 
