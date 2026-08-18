@@ -23,7 +23,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-03 | IAM-Rolle + Policy | ✅ COMPLETE |
 | T011-04 | Lambda (Zip-Build) + Permission | ✅ COMPLETE |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ✅ COMPLETE |
-| T011-06 | HTTP API + Routen + Authorizer | ⏳ PLANNED |
+| T011-06 | HTTP API + Routen + Authorizer | ✅ COMPLETE |
 | T011-07 | `terraform validate` + `plan` (Review) | ⏳ PLANNED |
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
@@ -38,7 +38,7 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-06 — HTTP API + Routen + Authorizer (IN PROGRESS, Branch feature/http-api)
+T011-07 — terraform validate + plan (Review) (separater Prompt / Task)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -47,9 +47,10 @@ Completed Tasks:
 - T011-04 Lambda (Zip-Build) + Permission ✅ (Node.js/TypeScript-Baseline)
 - LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert ✅
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
+- T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
 
 In Progress:
-- T011-06 HTTP API + Routen + Authorizer 🔵
+- (keine — T011-07 beginnt mit separatem Task)
 
 Pending Tasks:
 - T011-07 terraform validate + plan (Review)
@@ -150,6 +151,10 @@ Changes Made:
 - (T011-06) terraform/README.md: §2.5 HTTP API (Ressourcentabelle, Routen, Entscheidungen),
   Ressourcentabelle §3 aktualisiert
 - (T011-06) docs/features/F003-api-gateway.md: T003-01…06 COMPLETE (Terraform) nachgezogen
+- (T011-06-RECOVERY) Nach VS-Code-/Agent-Absturz: T011-06-Stand evidenzbasiert verifiziert
+  (Git: 9a332bf + 8a85b5e existieren, 9a332bf ancestor von main; Code: HTTP API/Routen/
+  Authorizer/Integration/Permission in main; fmt/validate/diff-check/Secret-Audit PASS).
+  Task-Tabelle + Progress-Block auf COMPLETE korrigiert; Report: docs/reports/T011-06-RECOVERY.md
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)

@@ -26,7 +26,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
 | F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
-| F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | 🔵 IN PROGRESS |
+| F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | ✅ COMPLETE |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
@@ -45,6 +45,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | Terraform fmt | PASS |
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen; inkl. Cognito T011-05) |
+| Recovery T011-06 (2026-08-18): `terraform fmt -check` / `terraform validate` / `git diff --check` / Secret-Audit | PASS (read-only, kein plan/apply) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
@@ -77,7 +78,7 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 7. Nächste Schritte
 
-- T011-06 — HTTP API + Routen + Authorizer (separater Task)
+- T011-07 — terraform validate + plan (Review) (separater Task)
 
 ## 8. Zeitplan-Bewertung
 

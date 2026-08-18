@@ -4,7 +4,7 @@
 |------|------|
 | **ID** | F003 |
 | **Name** | API Gateway (HTTP API) |
-| **Status** | 🟡 DESIGNED — NOT IMPLEMENTED |
+| **Status** | 🟡 DESIGNED — Terraform konfiguriert (T003-01…06 COMPLETE), Live-Test offen |
 | **Week** | 2 |
 | **Abhängigkeiten** | F001 |
 | **Fachquelle** | `architecture/architecture-decisions.md` (ADR-004), `api/endpoints.md` |
@@ -43,7 +43,7 @@ Endpunkte `POST /orders`, `GET /orders/{orderId}`, `GET /orders`, `PATCH /orders
 
 ## Git Checkpoint
 
-- Branch: `feature/http-api` · Commit: offen · Push: offen (Checkpoint-Task)
+- Branch: `feature/http-api` · Commit: `9a332bf` (+ Docs-Nachzug `44ef829`) · Push: SUCCESS (`origin/feature/http-api`) · Merge nach `main`: `8a85b5e` · Push main: SUCCESS
 
 ## Next Step
 

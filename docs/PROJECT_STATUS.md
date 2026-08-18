@@ -21,6 +21,7 @@ T011-06 — HTTP API + Routen + Authorizer (COMPLETE) · Next: T011-07 (plan + v
 
 Current Checkpoint:
 feature/http-api (T011-06 — HTTP API V2, vier Routen, JWT Authorizer, Lambda-Integration)
+→ Recovery-Verifikation 2026-08-18: T011-06 COMPLETE bestätigt (docs/reports/T011-06-RECOVERY.md)
 
 AWS Resources:
 NONE
@@ -30,7 +31,7 @@ IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (
 Node.js/TypeScript T011-04 bleibt als historische Baseline (45/45 Tests grün)
 
 Terraform:
-DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) konfiguriert; API GW (T011-06) in Arbeit
+DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) + API GW (T011-06) konfiguriert
 
 Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
@@ -91,7 +92,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-05 Cognito konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert, T011-07 next) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
