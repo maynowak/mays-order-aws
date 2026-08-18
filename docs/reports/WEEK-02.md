@@ -23,7 +23,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | T011-01 Terraform-Gerüst (main/variables/outputs/README) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-02 DynamoDB-Tabelle + GSI1 (mays-orders, PK pk/sk, GSI1, On-Demand) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB+GSI1, Logs) | ✅ COMPLETE |
-| F011 — Terraform Infrastructure | T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build, Execution Role T011-03, AP1..AP4) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-04 Lambda Order Handler — **historischer Stand:** TypeScript/nodejs22.x (Zip-Build, Execution Role T011-03, AP1..AP4); inzwischen durch Python 3.14 ersetzt (LAMBDA-PY-314) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-04-CLEANUP Node.js/TypeScript-Baseline entfernt (Python 3.14 aktiv) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert (boto3, build_zip.py, unittest 49/49, runtime python3.14) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
