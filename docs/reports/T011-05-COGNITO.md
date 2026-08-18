@@ -115,7 +115,7 @@ cognito_user_pool_group_name  → aws_cognito_user_group.staff.name
 
 - Branch: `feature/cognito` (Feature-Branches werden **nicht** gelöscht)
 - Vorher: `main` = `20bfb05` (Merge Python-3.14-Migration)
-- Commit: TBD · Push: offen (nach menschlicher Freigabe)
+- Commit: `be79c5f` (T011-05-Checkpoint) · Push: SUCCESS (`origin/feature/cognito`)
 - Danach: `git merge --no-ff feature/cognito` nach `main` + Push
 
 ## Current Project State
