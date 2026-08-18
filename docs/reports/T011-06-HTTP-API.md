@@ -179,12 +179,12 @@ NONE — reine Terraform-Konfiguration; nichts erzeugt, keine Kosten.
 
 ## Merge to main
 
-Nach erfolgreicher Validation und Feature-Push: `git checkout main` →
-`git pull --ff-only origin main` → `git merge --no-ff feature/http-api` → Push main.
+`feature/http-api` → `main` per `git merge --no-ff` (Commit `8a85b5e`) · Push main: SUCCESS.
 
 ## Push Status
 
-Push feature/http-api: SUCCESS (Commits `9a332bf` + Docs-Nachzug, `origin/feature/http-api`).
+Push feature/http-api: SUCCESS (Commits `9a332bf` + Docs-Nachzug `44ef829`,
+`origin/feature/http-api`).
 
 ## Current Project Status
 

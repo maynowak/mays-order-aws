@@ -89,5 +89,6 @@ dem Vier-Wochen-Plan (Woche 2).
 
 - Branch: `feature/http-api` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` + `feature/http-api` gepusht)
 - Merge: `feature/lambda-python-314` → `main` (Commit `20bfb05`) — SUCCESS
-- Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Merge: `feature/cognito` → `main` (Commit `dd9bb58`) · Push main: SUCCESS
+- Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
+- Merge: `feature/http-api` → `main` (Commit `8a85b5e`) · Push main: SUCCESS
