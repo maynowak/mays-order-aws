@@ -38,16 +38,17 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-04 — Lambda (Zip-Build) + Permission (COMPLETE)
+T011-04 — Lambda (COMPLETE) + Python-3.14-Migration des Handlers (COMPLETE, Branch feature/lambda-python-314)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
 - T011-02 DynamoDB-Tabelle + GSI1       ✅
 - T011-03 IAM-Rolle + Policy            ✅
-- T011-04 Lambda (Zip-Build) + Permission ✅
+- T011-04 Lambda (Zip-Build) + Permission ✅ (Node.js/TypeScript-Baseline)
+- LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert ✅
 
 In Progress:
-None (T011-04 abgeschlossen; T011-05 wird separat gestartet)
+None (T011-05 wird separat gestartet)
 
 Pending Tasks:
 - T011-05 Cognito (Pool, Client, Gruppe)
@@ -104,17 +105,31 @@ Changes Made:
   (UpdateItem + Conditional Write, Race-Schutz). Beträge als ganze Cent (Integer).
 - (T011-04) API-GW→Lambda Invoke-Permission bewusst NICHT in T011-04 — folgt in T011-06
   (HTTP API existiert noch nicht; nur dann Teil, wenn ausdrücklich dokumentiert)
+- (LAMBDA-PY-314) lambda/src/*.py neu (Python-Port des Handlers): index.py, order_service.py,
+  state_machine.py, validation.py, errors.py, order_types.py (bewusst NICHT types.py —
+  Stdlib-`types`-Kollision im Lambda-ZIP)
+- (LAMBDA-PY-314) lambda/tests/test_*.py neu (unittest): state_machine, validation,
+  order_service, index (Handler-Verhalten)
+- (LAMBDA-PY-314) lambda/build_zip.py neu: reproduzierbarer Python-ZIP-Build → dist/lambda.zip
+  (6 Module, ~6,6 KB; boto3 von der Runtime, kein requirements.txt)
+- (LAMBDA-PY-314) lambda/README.md neu (Build-/Test-Anleitung Python + Node-Baseline)
+- (LAMBDA-PY-314) terraform/main.tf: `runtime = "nodejs22.x"` → `"python3.14"` (einzige
+  Terraform-Änderung; DynamoDB/IAM unverändert)
+- (LAMBDA-PY-314) .gitignore: `__pycache__/`, `*.pyc` ergänzt
+- (LAMBDA-PY-314) docs/architecture/LAMBDA_RUNTIME_COMPARISON.md neu
+- (LAMBDA-PY-314) docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md neu
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
 - Terraform validate: PASS (ohne Warnungen)
-- Vitest `npm test`: PASS (45 Tests — stateMachine 14, validation 19, orderService 12)
-- Build `npm run build` (tsc --noEmit + esbuild): PASS
-- Package `npm run package` (bestzip → `dist/lambda.zip`): PASS (nur `dist/index.js`, ~156 KB)
-- `npm audit`: PASS (0 vulnerabilities)
-- LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): Root-Erkennung `terraform/` PASS;
-  Provider nur 6.60.0; ObtainSchema/SchemaModuleValidation/ReferenceValidation err=nil;
-  keine Diagnostics; Completion im GSI-Block schlägt `key_schema` vor → PASS
+- Terraform fmt: PASS
+- Python unittest (49 Test-Methoden): PASS (state_machine 4, validation 19,
+  orderService 12, index 14) — lokal Python 3.12.3, Ziel `python3.14`
+- Python compileall (Syntax): PASS
+- Python ZIP-Build (`python3 build_zip.py`): PASS (~6,6 KB, 6 Module)
+- ZIP-Integrität (`unzip -t`) + Handler-Import-Smoke aus ZIP-Root: PASS
+- Node-Baseline unverändert: Vitest `npm test` PASS (45/45) · `tsc --noEmit` PASS
+- LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): PASS (keine Diagnostics, `key_schema` in Completion)
 - Terraform plan: NOT RUN (gehört zu T011-07)
 
 Validation:
@@ -122,7 +137,7 @@ Validation:
 - Terraform apply: NOT RUN (Freigabe erforderlich)
 - Live-API: NOT RUN (kein apply; Lambda-Bundle nicht deployed)
 - git diff --check: PASS
-- Secret-Audit: PASS (inkl. lambda/-Quelltext, package.json, terraform/)
+- Secret-Audit: PASS (inkl. lambda/ Python-Quelltext, build_zip.py, terraform/)
 
 Known Issues:
 - API-GW→Lambda Invoke-Permission (`aws_lambda_permission`) fehlt bewusst bis T011-06
@@ -130,13 +145,17 @@ Known Issues:
 - Beträge als ganze Cent finalisiert (Vorab-Definition `database/dynamodb-design.md` §7;
   `api/api-documentation.md` §3 ist die maßgebliche Schemadarstellung). Die float-Beispiele
   in `api/endpoints.md` (§2.1) sind inkonsistent und bewusst NICHT geändert (keine
-  Architekturänderung in T011-04).
+  Architekturänderung).
+- `dist/lambda.zip` wird vom Python-Build erzeugt; `npm run package` würde den Pfad
+  überschreiben (gitignored; beide Builds reproduzierbar). Aktiver Stand: `python3 build_zip.py`.
+- Python-Tests laufen lokal unter 3.12.3 (System-Python); Ziel-Runtime `python3.14`.
+  Ein echter 3.14-Runtime-Test ist erst nach `apply` möglich.
 
 Blockers:
 - None
 
 Current Checkpoint:
-449cdd7 (T011-04 — Lambda Order Handler + Zip-Build)
+Branch `feature/lambda-python-314` — Lambda-Python-3.14-Migration (Commit folgt; Baseline `449cdd7`)
 
 Next Step:
 T011-05 — Cognito (Pool, Client, Gruppe) (separater Prompt / Task)
@@ -283,7 +302,7 @@ Least Privilege
 → Lambda erhält nur DynamoDB-Aktionen für Tabelle+GSI1 und Log-Rechte — kein Scan/DeleteItem, keine s3/sqs/iam-Rechte
 ```
 
-## T011-04 — Lambda Order Handler (Zip-Build)
+## T011-04 — Lambda Order Handler (Zip-Build, Node.js/TypeScript — historische Baseline)
 
 ### Summary
 
@@ -379,6 +398,62 @@ Deployment Package / ZIP
 → verpackter Lambda-Code
 → hier: dist/lambda.zip (ein gebündeltes JS-File); Terraform lädt es per filename/source_code_hash
 ```
+
+## Lambda Python-3.14-Migration (Branch `feature/lambda-python-314`)
+
+### Summary
+
+Der in T011-04 gebaute Lambda-Order-Handler (AP1..AP4) wurde funktional
+identisch auf Python 3.14 portiert. Die Node.js/TypeScript-Implementierung
+bleibt als **historische Baseline** vollständig im Repo (Sources, Tests,
+Vitest 45/45 grün, `tsc --noEmit` PASS). Die aktive Lambda nutzt jetzt
+`runtime = "python3.14"` mit boto3 (von der Runtime bereitgestellt).
+DynamoDB-Architektur und IAM unverändert (Least Privilege). Kein `apply`.
+
+### Mapping (Auswahl; vollständige Tabelle in `docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md`)
+
+| Node.js/TypeScript | Python | Funktion |
+|---|---|---|
+| `lambda/src/index.ts` | `lambda/src/index.py` | Handler + Routing + Fehler→HTTP |
+| `lambda/src/orderService.ts` | `lambda/src/order_service.py` | Order-Service AP1..AP4 (boto3) |
+| `lambda/src/stateMachine.ts` | `lambda/src/state_machine.py` | Transition-Matrix |
+| `lambda/src/validation.ts` | `lambda/src/validation.py` | Validierung |
+| `lambda/src/errors.ts` | `lambda/src/errors.py` | OrderError + Factorys |
+| `lambda/src/types.ts` | `lambda/src/order_types.py` | Konstanten + Typen (kein `types.py` — Stdlib-Kollision) |
+
+### Terraform / Handler
+
+- `terraform/main.tf` `aws_lambda_function.handler`: `runtime = "python3.14"`
+  (einzige Terraform-Änderung; `handler = "index.handler"`, `timeout = 10`,
+  `ORDERS_TABLE`, `source_code_hash`, Role T011-03 unverändert).
+- Python-Handler `index.handler` = `from index import handler`; `index.py` am
+  ZIP-Root.
+
+### DynamoDB / IAM
+
+- DynamoDB: exakt dieselben Operationen (PutItem/GetItem/Query GSI1/UpdateItem
+  conditional); `ConditionalCheckFailedException` → 409 `CONFLICTED_UPDATE`,
+  `ValidationException` → 400. Kein Scan/DeleteItem.
+- IAM: `aws_iam_role.handler` unverändert; keine zweite Role, keine neuen
+  Permissions (boto3 braucht keine zusätzlichen Rechte).
+
+### Packaging
+
+- `lambda/build_zip.py` (Stdlib `zipfile`) → `dist/lambda.zip` (6 Module,
+  ~6,6 KB; sha256 `0af0c4d2…`). Boto3 von der Runtime → kein
+  `requirements.txt`, kein Boto3-Bundling. Keine Secrets.
+
+### Tests / Validation
+
+- Python unittest 49/49 PASS (state_machine 4, validation 19, orderService 12,
+  index 14) — lokal Python 3.12.3; Ziel-Runtime `python3.14`.
+- `compileall` PASS · ZIP-Integrität + Handler-Import-Smoke PASS ·
+  Node-Baseline Vitest 45/45 PASS.
+- Terraform `fmt`/`init`/`validate` PASS · `plan` NOT RUN (T011-07) · `apply`
+  NOT RUN · `git diff --check` PASS · Secret-Audit PASS.
+
+Detaillierter Bericht: `docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md` ·
+Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 
 ## Testnachweise
 

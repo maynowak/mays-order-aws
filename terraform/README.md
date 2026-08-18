@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-04): **DynamoDB-Tabelle + GSI1, IAM (Execution Role) und Lambda (Order Handler) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-04 + Python-3.14-Migration): **DynamoDB-Tabelle + GSI1, IAM (Execution Role) und Lambda (Order Handler, Python 3.14) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -28,7 +28,8 @@ terraform/
 └── README.md       dieses Dokument
 ```
 
-**Quellcode der Lambda:** `lambda/` (TypeScript, Node.js 22) — siehe §2.3.
+**Quellcode der Lambda:** `lambda/` (Python 3.14, aktiv; Node.js/TypeScript-
+Baseline T011-04 bleibt als historischer Stand erhalten) — siehe §2.3.
 
 **Geplante Erweiterung (ab T011-04):** Die übrigen Ressourcen (Lambda, API GW,
 Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
@@ -93,14 +94,14 @@ Fachliche Grundlage: `api/endpoints.md`, `api/api-documentation.md`,
 | Eigenschaft | Wert |
 |-------------|------|
 | Funktion | `aws_lambda_function.handler`, Name `${var.project_name}-handler` |
-| Runtime / Handler | `nodejs22.x` · `index.handler` |
+| Runtime / Handler | `python3.14` · `index.handler` (Migration von `nodejs22.x` → `python3.14`) |
 | Execution Role | `aws_iam_role.handler` aus T011-03 (Least Privilege) |
-| Deployment Package | `lambda/dist/lambda.zip` (reproduzierbar: `npm run package` in `lambda/`) |
+| Deployment Package | `lambda/dist/lambda.zip` (reproduzierbar: `cd lambda && python3 build_zip.py`; boto3 von der Runtime, kein requirements.txt) |
 | Env-Variable | `ORDERS_TABLE` = DynamoDB-Tabellenname (`aws_dynamodb_table.orders.name`) |
 | Timeout | 10 s (Cold-Start + DynamoDB-Latenz; Default 3 s zu knapp) |
 | API-GW Invoke-Permission | **offen → T011-06** (`aws_lambda_permission`, wenn HTTP API existiert) |
 
-Umgesetzte Order-Operationen (Lambda-Business-Logik, `lambda/src/orderService.ts`):
+Umgesetzte Order-Operationen (Lambda-Business-Logik, `lambda/src/order_service.py`):
 
 | Access Pattern | Endpoint | DynamoDB-Zugriff |
 |----------------|----------|------------------|
@@ -146,5 +147,5 @@ terraform apply     → nur nach Freigabe
 
 ## 7. Abhängigkeiten
 
-- Lambda-Zip muss vor `plan`/`apply` gebaut sein (`cd lambda && npm run package`).
+- Lambda-Zip muss vor `plan`/`apply` gebaut sein (`cd lambda && python3 build_zip.py`).
 - API-GW-Route → Integration → Lambda-Permission (T011-06) → Lambda-Deployment.

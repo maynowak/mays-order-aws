@@ -30,6 +30,8 @@ dist/
 build/
 coverage/
 *.log
+__pycache__/
+*.pyc
 
 # OS / Editor
 .DS_Store
