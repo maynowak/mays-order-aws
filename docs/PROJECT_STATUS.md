@@ -17,10 +17,10 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-04 — Lambda (COMPLETE; Node.js-Baseline) + Python-3.14-Migration (COMPLETE) · Next: T011-05 (Cognito, separat)
+T011-05 — Cognito (COMPLETE) · Next: T011-06 (HTTP API + Routen + Authorizer)
 
 Current Checkpoint:
-feature/lambda-python-314 (Python-3.14-Migration des Lambda-Handlers)
+feature/cognito (T011-05 — Cognito User Pool + Client + Gruppe `staff`)
 
 AWS Resources:
 NONE
@@ -30,10 +30,10 @@ IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (
 Node.js/TypeScript T011-04 bleibt als historische Baseline (45/45 Tests grün)
 
 Terraform:
-DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) konfiguriert; Cognito/API GW ausstehend
+DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) konfiguriert; API GW ausstehend
 
 Authentication:
-DESIGNED — NOT IMPLEMENTED
+CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
 
 API Gateway:
 DESIGNED — NOT IMPLEMENTED
@@ -47,11 +47,14 @@ CONFIGURED (Terraform) — NOT CREATED (kein apply)
 IAM:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
 
+Cognito Authentication:
+CONFIGURED (Terraform T011-05) — NOT CREATED (kein apply)
+
 CloudWatch Monitoring:
 DESIGNED — NOT IMPLEMENTED
 
 Tests:
-Terraform init/validate PASS (T011-01…T011-04; AWS-Provider ~> 6.0 / 6.60.0);
+Terraform init/validate PASS (T011-01…T011-05; AWS-Provider ~> 6.0 / 6.60.0);
 Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
 Node-Baseline: Vitest 45/45 PASS (unverändert)
 ```
@@ -73,6 +76,8 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | W2-DIAG-FINAL | `e1fd58b` | Final Diagnostic: VS Code/terraform-ls stale 5.100.0-Schema belegt (LSP-Test: SchemaModuleValidation/ReferenceValidation err=nil, `key_schema` in Completion; Root Cause: GSI-`key_schema` ab Provider 6.29.0) | SUCCESS | COMPLETE |
 | W2-T011-04 | `449cdd7` | F011/T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build `dist/lambda.zip`, Execution Role T011-03, AP1..AP4) + Vitest 45/45 + init/validate PASS | SUCCESS | COMPLETE |
 | W2-LAMBDA-PY-314 | `64130a9` (Branch `feature/lambda-python-314`) | Lambda-Migration auf Python 3.14: Handler funktional portiert (AP1..AP4), boto3 (Runtime), ZIP-Build `build_zip.py`, unittest 49/49, `runtime = "python3.14"`, Terraform fmt/init/validate PASS; Node-Baseline bleibt | SUCCESS | COMPLETE |
+| W2-PY314-INTEGRATION | `20bfb05` | Python-3.14-Migration nach `main` integriert (`merge --no-ff` von `feature/lambda-python-314`) — Pflicht-Voraussetzung für T011-05; Branch bleibt erhalten | SUCCESS | COMPLETE |
+| W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -81,11 +86,11 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | Order Lifecycle / State Machine | ✅ COMPLETE | ⏳ PLANNED (W2/3) | ⏳ PLANNED | ⏳ PLANNED |
 | API Design | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | DynamoDB | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-02, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
-| Cognito Authentication | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| Cognito Authentication | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-05, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-04 Lambda konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-05 Cognito konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -93,7 +98,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | Feature | Status | Details |
 |---------|--------|---------|
 | F001 — Project Foundation | ✅ COMPLETE | Woche-1-Analyse, Docs, Git-Setup |
-| F002 — Cognito Authentication | ⏳ PLANNED | Design: `security/authentication-decision.md` |
+| F002 — Cognito Authentication | 🟡 DESIGNED | T002-01…03 COMPLETE (Terraform, via F011/T011-05); Design: `security/authentication-decision.md` |
 | F003 — API Gateway | ⏳ PLANNED | Design: `architecture/architecture-decisions.md` (ADR-004) |
 | F004 — Order Creation | ⏳ PLANNED | Design: `api/endpoints.md`, `database/access-patterns.md` |
 | F005 — Order Retrieval | ⏳ PLANNED | Design: `api/endpoints.md` |
@@ -102,7 +107,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

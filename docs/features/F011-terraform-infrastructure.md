@@ -22,7 +22,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-02 | DynamoDB-Tabelle + GSI1 | ✅ COMPLETE |
 | T011-03 | IAM-Rolle + Policy | ✅ COMPLETE |
 | T011-04 | Lambda (Zip-Build) + Permission | ✅ COMPLETE |
-| T011-05 | Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
+| T011-05 | Cognito (Pool, Client, Gruppe) | ✅ COMPLETE |
 | T011-06 | HTTP API + Routen + Authorizer | ⏳ PLANNED |
 | T011-07 | `terraform validate` + `plan` (Review) | ⏳ PLANNED |
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
@@ -38,7 +38,7 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-04 — Lambda (COMPLETE) + Python-3.14-Migration des Handlers (COMPLETE, Branch feature/lambda-python-314)
+T011-05 — Cognito (Pool, Client, Gruppe) (COMPLETE, Branch feature/cognito)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -46,12 +46,12 @@ Completed Tasks:
 - T011-03 IAM-Rolle + Policy            ✅
 - T011-04 Lambda (Zip-Build) + Permission ✅ (Node.js/TypeScript-Baseline)
 - LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert ✅
+- T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 
 In Progress:
-None (T011-05 wird separat gestartet)
+None (T011-06 wird separat gestartet)
 
 Pending Tasks:
-- T011-05 Cognito (Pool, Client, Gruppe)
 - T011-06 HTTP API + Routen + Authorizer
 - T011-07 terraform validate + plan (Review)
 - T011-08 terraform apply (nach Freigabe)
@@ -118,10 +118,26 @@ Changes Made:
 - (LAMBDA-PY-314) .gitignore: `__pycache__/`, `*.pyc` ergänzt
 - (LAMBDA-PY-314) docs/architecture/LAMBDA_RUNTIME_COMPARISON.md neu
 - (LAMBDA-PY-314) docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md neu
+- (PY314-INTEGRATION) `feature/lambda-python-314` nach `main` integriert
+  (`git merge --no-ff`, Commit `20bfb05`, Push SUCCESS) — Pflicht-Voraussetzung für T011-05;
+  Feature-Branch bleibt erhalten
+- (T011-05) terraform/main.tf: `aws_cognito_user_pool.users` ergänzt
+  (`${var.project_name}-users`, admin_create_user_config.allow_admin_create_user_only = true,
+  Passwortrichtlinie Standardwerte, MFA OFF)
+- (T011-05) terraform/main.tf: `aws_cognito_user_pool_client.app` ergänzt
+  (`${var.project_name}-client`, explicit_auth_flows ALLOW_USER_PASSWORD_AUTH +
+  ALLOW_REFRESH_TOKEN_AUTH, generate_secret = false — Public Client wegen USER_PASSWORD_AUTH)
+- (T011-05) terraform/main.tf: `aws_cognito_user_group.staff` ergänzt (Gruppe `staff` →
+  Claim `cognito:groups`; Ressourcenname `aws_cognito_user_group` in Provider 6.60.0,
+  nicht `aws_cognito_user_pool_group`)
+- (T011-05) terraform/outputs.tf: `cognito_user_pool_id`, `cognito_user_pool_arn`,
+  `cognito_user_pool_client_id`, `cognito_user_pool_group_name` ergänzt
+- (T011-05) terraform/README.md: Cognito-Abschnitt (§2.4) + Ressourcentabelle aktualisiert
+- (T011-05) docs/features/F002-cognito-authentication.md: T002-01…03 COMPLETE (Terraform) nachgezogen
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
-- Terraform validate: PASS (ohne Warnungen)
+- Terraform validate: PASS (ohne Warnungen) — inkl. Cognito-Ressourcen T011-05
 - Terraform fmt: PASS
 - Python unittest (49 Test-Methoden): PASS (state_machine 4, validation 19,
   orderService 12, index 14) — lokal Python 3.12.3, Ziel `python3.14`
@@ -142,6 +158,12 @@ Validation:
 Known Issues:
 - API-GW→Lambda Invoke-Permission (`aws_lambda_permission`) fehlt bewusst bis T011-06
   (HTTP API existiert noch nicht; keine API-GW-Implementierung in T011-04).
+- Kein `aws_cognito_user_pool_domain` in T011-05: Login via USER_PASSWORD_AUTH benötigt
+  kein Hosted-UI/OAuth-Redirect (terraform/README.md — Domain nur "falls nötig").
+- Keine offene Selbst-Registrierung: `admin_create_user_config.allow_admin_create_user_only = true`
+  (Staff-Benutzer werden administrativ angelegt, T002-04; keine Signup-Anforderung dokumentiert).
+- Terraform-Provider 6.60.0 nutzt `aws_cognito_user_group` (nicht `aws_cognito_user_pool_group`)
+  — Ressourcen-Renaming im Provider; dokumentiert in terraform/README.md.
 - Beträge als ganze Cent finalisiert (Vorab-Definition `database/dynamodb-design.md` §7;
   `api/api-documentation.md` §3 ist die maßgebliche Schemadarstellung). Die float-Beispiele
   in `api/endpoints.md` (§2.1) sind inkonsistent und bewusst NICHT geändert (keine
@@ -155,10 +177,10 @@ Blockers:
 - None
 
 Current Checkpoint:
-`64130a9` (Branch `feature/lambda-python-314` — Lambda-Python-3.14-Migration; Baseline `449cdd7`)
+`be79c5f` (Branch `feature/cognito` — T011-05 Cognito; Push SUCCESS auf origin/feature/cognito)
 
 Next Step:
-T011-05 — Cognito (Pool, Client, Gruppe) (separater Prompt / Task)
+T011-06 — HTTP API + Routen + Authorizer (separater Prompt / Task)
 ```
 
 ## GSI1 — Begründung (T011-02)

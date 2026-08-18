@@ -2,6 +2,37 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — Cognito T011-05 (F011 / F002, Branch `feature/cognito`)
+
+### Implementierung
+- `terraform/main.tf`: `aws_cognito_user_pool.users` (${var.project_name}-users) —
+  `admin_create_user_config.allow_admin_create_user_only = true` (Staff-Admin-Anlage,
+  keine offene Registrierung), Passwortrichtlinie Standardwerte (min. 8,
+  Upper/Lower/Number/Symbol), `mfa_configuration = "OFF"`.
+- `terraform/main.tf`: `aws_cognito_user_pool_client.app` (${var.project_name}-client) —
+  `explicit_auth_flows = [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]`,
+  `generate_secret = false` (Public Client, Voraussetzung für USER_PASSWORD_AUTH).
+- `terraform/main.tf`: `aws_cognito_user_group.staff` (Gruppe `staff` → Claim
+  `cognito:groups`, Basis der Authorization A-09). Ressourcen-Typ `aws_cognito_user_group`
+  (Provider 6.60.0; nicht `aws_cognito_user_pool_group`).
+- `terraform/outputs.tf`: `cognito_user_pool_id`, `cognito_user_pool_arn`,
+  `cognito_user_pool_client_id`, `cognito_user_pool_group_name`.
+- `terraform/README.md`: §2.4 Cognito (Ressourcentabelle, JWT-Flow, bewusste Nicht-Features).
+- Bewusst NICHT in T011-05: `user_pool_domain` (kein Hosted-UI nötig), API-GW/JWT-Authorizer/
+  Lambda-Invoke-Permission (T011-06), Testbenutzer (T002-04).
+- Integration: `feature/lambda-python-314` → `main` gemerged (Commit `20bfb05`,
+  Pflicht-Voraussetzung); Feature-Branches bleiben erhalten.
+
+### Validation
+- Terraform `fmt`/`init`/`validate`: PASS (AWS-Provider 6.60.0, ohne Warnungen).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe).
+- Live/Login: NOT RUN (kein apply).
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…05 COMPLETE · T011-06 NEXT ·
+  F002 T002-01…03 COMPLETE (Terraform) · AWS Resources: NONE.
+
 ## 2026-08-18 — Lambda-Migration auf Python 3.14 (F011 / T011-04, Checkpoint `64130a9`, Branch `feature/lambda-python-314`)
 
 ### Implementierung

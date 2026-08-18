@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-04 + Python-3.14-Migration): **DynamoDB-Tabelle + GSI1, IAM (Execution Role) und Lambda (Order Handler, Python 3.14) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-05): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14) und Cognito (User Pool + Client + Gruppe `staff`) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,15 +16,15 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-04, Lambda):**
+**Aktueller Stand (T011-05, Cognito):**
 
 ```text
 terraform/
 ├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags,
 │                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy),
-│                   Lambda (Order Handler)
+│                   Lambda (Order Handler), Cognito (User Pool, Client, Gruppe)
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (DynamoDB, IAM, Lambda; weitere je Ressource)
+├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito; weitere je Ressource)
 └── README.md       dieses Dokument
 ```
 
@@ -113,6 +113,34 @@ Umgesetzte Order-Operationen (Lambda-Business-Logik, `lambda/src/order_service.p
 Beträge werden als **ganze Cent** (Integer) verarbeitet (Vorab-Definition
 `database/dynamodb-design.md` §7; finale Darstellung gemäß `api/api-documentation.md` §3).
 
+## 2.4 Cognito — User Pool + Client + Gruppe (T011-05)
+
+Fachliche Grundlage: `security/authentication-decision.md` (ADR-003, JWT-Flow §3),
+`security/iam-design.md` (Auth ≠ IAM), F002 (T002-01…03).
+
+| Ressource | Terraform-Typ | Name | Konfiguration |
+|-----------|---------------|------|---------------|
+| User Pool | `aws_cognito_user_pool.users` | `${var.project_name}-users` | Admin-Create-User (keine offene Selbst-Registrierung), Passwortrichtlinie Standardwerte (min. 8, Upper/Lower/Number/Symbol), MFA `OFF` |
+| App Client | `aws_cognito_user_pool_client.app` | `${var.project_name}-client` | `explicit_auth_flows`: `ALLOW_USER_PASSWORD_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH`; `generate_secret = false` (Public Client, Voraussetzung für USER_PASSWORD_AUTH) |
+| Gruppe | `aws_cognito_user_group.staff` | `staff` | Claim `cognito:groups` → Basis der Authorization (A-09) |
+
+> Hinweis: Provider 6.60.0 nutzt den Ressourcen-Typ `aws_cognito_user_group`
+> (nicht `aws_cognito_user_pool_group`).
+
+**Bewusst NICHT in T011-05:**
+- Kein `aws_cognito_user_pool_domain` — Login via `USER_PASSWORD_AUTH` benötigt kein
+  Hosted-UI/OAuth-Redirect (Domain nur "falls nötig").
+- Keine API-GW-Anbindung / kein JWT-Authorizer / keine Lambda-Invoke-Permission — folgen in T011-06.
+- Keine offene Registrierung, keine IAM Access Keys für Benutzer (TR-15).
+
+JWT-Flow (aus `security/authentication-decision.md` §3):
+
+```text
+Benutzer → login (USER_PASSWORD_AUTH) → Cognito User Pool
+Benutzer ← Access Token (JWT, ~1 h)  ← Cognito
+Benutzer → API-Request "Authorization: Bearer <JWT>" (ab T011-06)
+```
+
 ## 3. Geplante Ressourcen
 
 | Ressource | Terraform-Typ (Vorschlag) |
@@ -122,7 +150,7 @@ Beträge werden als **ganze Cent** (Integer) verarbeitet (Vorab-Definition
 | Lambda | `aws_lambda_function` (Zip aus Build) ✅ |
 | Lambda-Permission | `aws_lambda_permission` (API GW invoke) ⏳ T011-06 |
 | HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` |
-| Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_pool_domain` (falls nötig) |
+| Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_group` ✅ |
 
 ## 4. Workflow
 
