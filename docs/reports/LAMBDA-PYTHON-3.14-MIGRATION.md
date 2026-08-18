@@ -239,7 +239,8 @@ AP1..AP4-Arbeitslast, gleicher `timeout`). Der Messplan ist in
 
 ## Push Status
 
-- PENDING (Push wird nach dem Docs-Nachzug ausgeführt und hier dokumentiert)
+- Push: SUCCESS — `feature/lambda-python-314` auf `origin` (Commits `64130a9`
+  + Docs-Nachzug `f1115bc`); Branch bleibt erhalten, kein Merge/Delete
 
 ## Current Project State
 

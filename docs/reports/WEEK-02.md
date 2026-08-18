@@ -77,5 +77,5 @@ Migrationsschritt abgeschlossen. Terraform-Scope entspricht dem Vier-Wochen-Plan
 ## 9. Git Checkpoint
 
 - Branch: `feature/lambda-python-314` (Feature-Branch bleibt erhalten)
-- Commit: `64130a9` (F011 — Lambda-Handler auf Python 3.14 portiert)
-- Push: wird nach dem Docs-Nachzug ausgeführt
+- Commit: `64130a9` (feat) + `f1115bc` (docs-Nachzug)
+- Push: SUCCESS (`origin/feature/lambda-python-314`)
