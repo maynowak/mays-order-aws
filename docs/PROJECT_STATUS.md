@@ -17,10 +17,10 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-06 — HTTP API + Routen + Authorizer (COMPLETE) · Next: T011-07 (plan + validate Review)
+T011-07 — terraform validate + plan (Review) (COMPLETE: T011-01…06 + Cleanup)
 
 Current Checkpoint:
-feature/http-api (T011-06 — HTTP API V2, vier Routen, JWT Authorizer, Lambda-Integration)
+feature/lambda-python-cleanup (T011-04-CLEANUP — Node/TS-Baseline entfernt, Python 3.14 aktiv)
 → Recovery-Verifikation 2026-08-18: T011-06 COMPLETE bestätigt (docs/reports/T011-06-RECOVERY.md)
 
 AWS Resources:
@@ -28,7 +28,7 @@ NONE
 
 Application Code:
 IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (kein apply)
-Node.js/TypeScript T011-04 bleibt als historische Baseline (45/45 Tests grün)
+Node.js/TypeScript T011-04: historische Baseline, aus aktivem Repo entfernt (Cleanup T011-04-CLEANUP; via Git `449cdd7` nachvollziehbar)
 
 Terraform:
 DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) + API GW (T011-06) konfiguriert
@@ -57,7 +57,7 @@ DESIGNED — NOT IMPLEMENTED
 Tests:
 Terraform init/validate PASS (T011-01…T011-06; AWS-Provider ~> 6.0 / 6.60.0);
 Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
-Node-Baseline: Vitest 45/45 PASS (unverändert)
+Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 ```
 
 ## Verlauf der Checkpoints
@@ -80,6 +80,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | W2-PY314-INTEGRATION | `20bfb05` | Python-3.14-Migration nach `main` integriert (`merge --no-ff` von `feature/lambda-python-314`) — Pflicht-Voraussetzung für T011-05; Branch bleibt erhalten | SUCCESS | COMPLETE |
 | W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`dd9bb58`) | SUCCESS | COMPLETE |
 | W2-T011-06 | `9a332bf` (Branch `feature/http-api`) | F011/T011-06 HTTP API V2 (`mays-orders-api`) + `$default`-Stage (auto_deploy) + JWT-Authorizer (Cognito: Issuer aus `users.endpoint`, Audience = Client-ID) + Integration (AWS_PROXY, Payload 2.0) + 4 Routen (alle JWT) + Invoke-Permission (nur API GW); `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`8a85b5e`) | SUCCESS | COMPLETE |
+| W2-T011-04-CLEANUP | Cleanup (Branch `feature/lambda-python-cleanup`) | Node.js/TypeScript-Baseline (T011-04) aus aktivem Lambda-Projekt entfernt (`lambda/src/*.ts`, `tests/*.test.ts`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`; lokal `node_modules/`, `dist/index.js`); Python 3.14 bleibt aktiv; Baseline via Git `449cdd7`; Tests/Build/Terraform-Validation PASS; gemerged nach main | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -109,7 +110,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 ✅ · T011-07 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

@@ -16,7 +16,7 @@ Infrastruktur vollständig per **Terraform**.
 
 ## Tech Stack
 
-- Node.js / TypeScript (Lambda-Handler) — Details Entscheidung offen, Woche 2
+- Python 3.14 (Lambda-Handler) — aktiv (boto3, `python3.14`); Node.js/TypeScript historisch (Baseline, via Git `449cdd7`)
 - API Gateway HTTP API (V2) mit Cognito-JWT-Autorisator
 - AWS Lambda (Order Handler)
 - DynamoDB (Single-Table, GSI1)
@@ -96,7 +96,7 @@ mays-orders/
 
 ## Validation
 
-- TypeScript: `tsc --noEmit` bzw. Build-Skript (Woche 2).
+- Python: `python3 -m compileall -q src tests` + `PYTHONPATH=src python3 -m unittest discover -s tests -v` (Lambda, aktiv).
 - Terraform: `terraform init` → `terraform validate` → `terraform plan` (→ `apply` nur nach Freigabe).
 - Live-API: `curl` gegen deployed Gateway nach Deployment (Woche 2).
 - Klare Trennung: `Build: PASS` ≠ `Live API: PASS`. Nie unbelegte Behauptungen.

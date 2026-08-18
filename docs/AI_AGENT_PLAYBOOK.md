@@ -76,8 +76,8 @@ Minimum, das die bestätigte Ursache behebt. Bestehende Abstraktionen bevorzugen
 
 Schmalste sinnvolle Validierung:
 
-1. TypeScript/Build (`tsc --noEmit` / Build-Skript, sobald vorhanden)
-2. Unit-Tests (State Machine, Validierung) — Woche 2+
+1. Python-Syntax/Build (`python3 -m compileall -q src tests` / `python3 build_zip.py`, Lambda)
+2. Unit-Tests (`PYTHONPATH=src python3 -m unittest discover -s tests -v`) — Woche 2+
 3. `terraform validate` + `terraform plan` (Infrastruktur)
 4. Live-API-Verifikation mit `curl` (nur nach Deployment)
 5. `git diff --check`
@@ -167,8 +167,8 @@ Output
 Nach Quellcode-Änderungen:
 
 ```bash
-npm run build        # bzw. tsc --noEmit (Woche 2)
-npm test             # Unit-Tests
+python3 -m compileall -q src tests      # Python-Syntax (Lambda, aktiv)
+PYTHONPATH=src python3 -m unittest discover -s tests -v   # Python-Unit-Tests
 ```
 
 ### Infrastruktur-Validierung

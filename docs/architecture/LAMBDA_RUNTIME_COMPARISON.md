@@ -1,8 +1,13 @@
 # LAMBDA Runtime Comparison — Node.js/TypeScript vs Python 3.14
 
-> Tatsächlich vorhandener Stand im Repository:
+> Tatsächlich vorhandener Stand im Repository (zum Zeitpunkt der Migration):
 > **Baseline T011-04** (Node.js/TypeScript, `nodejs22.x`) und
 > **Migration** (`feature/lambda-python-314`, `python3.14`).
+>
+> **Stand nach Cleanup (T011-04-PYTHON-CLEANUP):** Der aktive Lambda-Bestand ist
+> ausschließlich Python 3.14. Die Node.js/TypeScript-Baseline wurde aus dem
+> aktiven Projekt entfernt und ist über Git-Historie (`449cdd7`) nachvollziehbar.
+> Die nachfolgende Vergleichstabelle dokumentiert den Migrationsvergleich.
 >
 > Keine Performance-/Kostenbehauptungen ohne echte Messwerte. Werte, die nicht
 > aus einer tatsächlichen Ausführung/AWS-Invocation stammen, sind explizit als

@@ -1,26 +1,31 @@
 # Test Results — May's Orders
 
-> Zentrale Ergebnis-Datei. **Stand Woche 2 (T011-04):** Lambda-Unit-Tests ausgeführt.
-> Keine erfundenen Ergebnisse; Live-Tests erst nach Deployment.
+> Zentrale Ergebnis-Datei. **Stand Woche 2:** Lambda-Unit-Tests (Python 3.14)
+> ausgeführt. Keine erfundenen Ergebnisse; Live-Tests erst nach Deployment.
 
 | Ebene | Status | Datum | Hinweis |
 |-------|--------|-------|---------|
-| Build / Type-Check | ✅ PASS | 2026-08-17 | `lambda/` · `npm run build` (tsc --noEmit + esbuild) |
-| Unit-Tests | ✅ PASS (45/45) | 2026-08-17 | Vitest: stateMachine 14, validation 19, orderService 12 |
+| Python-Tests (unittest) | ✅ PASS (49/49) | 2026-08-18 | `lambda/` · `PYTHONPATH=src python3 -m unittest discover -s tests -v` |
+| Python-Syntax (`compileall`) | ✅ PASS | 2026-08-18 | `python3 -m compileall -q src tests` |
+| ZIP-Build + Integrität | ✅ PASS | 2026-08-18 | `python3 build_zip.py` → `dist/lambda.zip` (6 Module) · `unzip -t` PASS |
 | Integration-Tests | NOT RUN | – | Lambda gegen echte DynamoDB erst nach apply |
-| Terraform validate/plan | validate ✅ / plan NOT RUN | 2026-08-17 | plan zu T011-07 |
+| Terraform validate | validate ✅ | 2026-08-18 | plan zu T011-07 |
 | Live-API-Tests | NOT RUN | – | Keine Ressourcen deployed |
+
+> Historische Node.js/TypeScript-Baseline (T011-04, Vitest 45/45, `npm run build`):
+> aus dem aktiven Repo entfernt (Cleanup T011-04-CLEANUP); nachvollziehbar über
+> Git-Historie (Commit `449cdd7`) und `docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md`.
 
 ## Detaillierte Einzelprüfungen
 
 Ergebnisse werden ab Woche 2 hier tabellarisch eingetragen (IDs gemäß `api/test-cases.md`).
 
-### State-Machine-Unit-Tests (`lambda/tests/stateMachine.test.ts`) — 14 PASS
+### State-Machine-Unit-Tests (`lambda/tests/test_state_machine.py`) — 4 PASS
 
-- SM-01…SM-06 (gültige Übergänge): PASS
-- SM-07…SM-18 (ungültige Übergänge inkl. Endzustände + Idempotenz → 409): PASS
+- Erlaubte Übergänge (6), verbotene Übergänge (6), Endzustand (12), Idempotenz (6) —
+  parametrisiert über `can_transition`.
 
-### Validierungs-Unit-Tests (`lambda/tests/validation.test.ts`) — 19 PASS
+### Validierungs-Unit-Tests (`lambda/tests/test_validation.py`) — 19 PASS
 
 - POST /orders: gültiger Body; fehlendes `customer.name` (T-02); ungültige E-Mail (T-03);
   leere `items` (T-04); `quantity=0` (T-05); unbekannte Felder (T-06, strikt);
@@ -29,7 +34,7 @@ Ergebnisse werden ab Woche 2 hier tabellarisch eingetragen (IDs gemäß `api/tes
 - PATCH status: gültiger/ungültiger Status (T-15), strikte Body-Prüfung.
 - GET /orders: `limit`-Bereich 1..100, Default 20, `nextToken`-Durchreichung.
 
-### Order-Service-Unit-Tests (`lambda/tests/orderService.test.ts`) — 12 PASS
+### Order-Service-Unit-Tests (`lambda/tests/test_order_service.py`) — 12 PASS
 
 - AP1 Create: `totalAmount`/`lineTotal` server-seitig (T-01), Status PENDING, GSI1-/version-Felder,
   Validierung vor Write.
@@ -39,3 +44,8 @@ Ergebnisse werden ab Woche 2 hier tabellarisch eingetragen (IDs gemäß `api/tes
 - AP4 Status: gültiger Übergang mit Conditional Write (T-13); ungültiger Übergang →
   INVALID_TRANSITION mit Details (T-14); fehlende ID → ORDER_NOT_FOUND (T-16);
   ConditionalCheckFailed → CONFLICTED_UPDATE (R-01).
+
+### Handler-Verhalten (`lambda/tests/test_index.py`) — 14 PASS
+
+- Routing über `routeKey` für alle vier Routen, Body-Parsing inkl. Base64, Fehler-Mapping,
+  `ORDERS_TABLE`-Check, unbekannte Route → 400.

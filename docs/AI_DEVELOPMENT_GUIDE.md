@@ -42,8 +42,9 @@ AI unterstützt die Entwicklung. Es ersetzt nicht:
 ## Validation commands
 
 ```bash
-npm run build          # TypeScript-Build (Woche 2)
-npm test               # Unit-Tests (Woche 2)
+python3 -m compileall -q src tests      # Python-Syntax (Lambda, aktiv)
+PYTHONPATH=src python3 -m unittest discover -s tests -v   # Python-Unit-Tests
+python3 build_zip.py                     # Lambda-ZIP-Build
 terraform init && terraform validate && terraform plan
 ```
 

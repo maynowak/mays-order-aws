@@ -22,6 +22,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-02 | DynamoDB-Tabelle + GSI1 | ✅ COMPLETE |
 | T011-03 | IAM-Rolle + Policy | ✅ COMPLETE |
 | T011-04 | Lambda (Zip-Build) + Permission | ✅ COMPLETE |
+| T011-04-CLEANUP | Node.js/TypeScript-Baseline entfernt (Python 3.14 aktiv) | ✅ COMPLETE |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ✅ COMPLETE |
 | T011-06 | HTTP API + Routen + Authorizer | ✅ COMPLETE |
 | T011-07 | `terraform validate` + `plan` (Review) | ⏳ PLANNED |
@@ -44,7 +45,7 @@ Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
 - T011-02 DynamoDB-Tabelle + GSI1       ✅
 - T011-03 IAM-Rolle + Policy            ✅
-- T011-04 Lambda (Zip-Build) + Permission ✅ (Node.js/TypeScript-Baseline)
+- T011-04 Lambda (Zip-Build) + Permission ✅ (Python 3.14; Node.js/TS-Baseline via Cleanup entfernt)
 - LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert ✅
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 - T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
@@ -155,6 +156,11 @@ Changes Made:
   (Git: 9a332bf + 8a85b5e existieren, 9a332bf ancestor von main; Code: HTTP API/Routen/
   Authorizer/Integration/Permission in main; fmt/validate/diff-check/Secret-Audit PASS).
   Task-Tabelle + Progress-Block auf COMPLETE korrigiert; Report: docs/reports/T011-06-RECOVERY.md
+- (T011-04-CLEANUP) Node.js/TypeScript-Baseline aus dem aktiven Lambda-Projekt entfernt:
+  `lambda/src/*.ts` (6), `lambda/tests/*.test.ts` (3), `package.json`, `package-lock.json`,
+  `tsconfig.json`, `vitest.config.ts` entfernt; lokal `node_modules/` + `dist/index.js`
+  gelöscht. Baseline nachvollziehbar via Git-Historie (Commit 449cdd7). Python 3.14 bleibt
+  aktiv; Report: docs/reports/T011-04-PYTHON-CLEANUP.md
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
@@ -165,7 +171,7 @@ Tests:
 - Python compileall (Syntax): PASS
 - Python ZIP-Build (`python3 build_zip.py`): PASS (~6,6 KB, 6 Module)
 - ZIP-Integrität (`unzip -t`) + Handler-Import-Smoke aus ZIP-Root: PASS
-- Node-Baseline unverändert: Vitest `npm test` PASS (45/45) · `tsc --noEmit` PASS
+- Node-Baseline (Vitest/tsc): entfernt — historisch via Git `449cdd7` (Cleanup T011-04-CLEANUP)
 - LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): PASS (keine Diagnostics, `key_schema` in Completion)
 - Terraform plan: NOT RUN (gehört zu T011-07)
 
@@ -192,8 +198,8 @@ Known Issues:
   `api/api-documentation.md` §3 ist die maßgebliche Schemadarstellung). Die float-Beispiele
   in `api/endpoints.md` (§2.1) sind inkonsistent und bewusst NICHT geändert (keine
   Architekturänderung).
-- `dist/lambda.zip` wird vom Python-Build erzeugt; `npm run package` würde den Pfad
-  überschreiben (gitignored; beide Builds reproduzierbar). Aktiver Stand: `python3 build_zip.py`.
+- `dist/lambda.zip` wird vom Python-Build erzeugt (`python3 build_zip.py`; gitignored).
+  Node-Baseline-Build (`npm run package`) ist nach dem Cleanup nicht mehr vorhanden.
 - Python-Tests laufen lokal unter 3.12.3 (System-Python); Ziel-Runtime `python3.14`.
   Ein echter 3.14-Runtime-Test ist erst nach `apply` möglich.
 
@@ -508,10 +514,9 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 |---------|--------|
 | Terraform init | PASS (aws provider v6.60.0) |
 | Terraform validate | PASS (ohne Warnungen) |
-| Vitest `npm test` | PASS (45 Tests: stateMachine 14, validation 19, orderService 12) |
-| Build `npm run build` (tsc --noEmit + esbuild) | PASS |
-| Package `npm run package` (bestzip → `dist/lambda.zip`) | PASS |
-| `npm audit` | PASS (0 vulnerabilities) |
+| Python unittest | PASS (49 Test-Methoden: stateMachine 4, validation 19, orderService 12, index 14) |
+| Python compileall | PASS |
+| Python ZIP-Build (`python3 build_zip.py`) + `unzip -t` | PASS |
 | LSP-Test terraform-ls 0.39.0 (serve, Root = Repo) | PASS (keine Diagnostics, `key_schema` in Completion) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
@@ -523,7 +528,8 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 ## Git Checkpoint
 
 - Branch: `main` · Commit: `449cdd7` · Push: SUCCESS
+- Cleanup-Stand: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP)
 
 ## Next Step
 
-T011-05 — Cognito (Pool, Client, Gruppe) (separater Task nach Checkpoint T011-04).
+T011-07 — `terraform validate` + `plan` (Review) (separater Task / Prompt). STOP.
