@@ -25,7 +25,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-04-CLEANUP | Node.js/TypeScript-Baseline entfernt (Python 3.14 aktiv) | ✅ COMPLETE |
 | T011-05 | Cognito (Pool, Client, Gruppe) | ✅ COMPLETE |
 | T011-06 | HTTP API + Routen + Authorizer | ✅ COMPLETE |
-| T011-07 | `terraform validate` + `plan` (Review) | ⏳ PLANNED |
+| T011-07 | `terraform validate` + `plan` (Review) | ✅ COMPLETE |
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
 
@@ -39,7 +39,12 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-07 — terraform validate + plan (Review) (separater Prompt / Task)
+T011-07 — terraform validate + plan (Review) ✅ COMPLETE
+  · fmt -check / init / validate PASS
+  · plan RUN (read-only): 16 to add, 0 to change, 0 to destroy
+  · Klassifikation: A) EXPECTED/CLEAN — keine unexpected changes, kein REPLACE, keine Discrepancies
+  · kein apply; AWS Resources weiterhin NONE
+  · Report: docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -49,12 +54,12 @@ Completed Tasks:
 - LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert ✅
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 - T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
+- T011-07 terraform validate + plan (Review) ✅ (Branch feature/t011-07-plan-review)
 
 In Progress:
-- (keine — T011-07 beginnt mit separatem Task)
+- (keine)
 
 Pending Tasks:
-- T011-07 terraform validate + plan (Review)
 - T011-08 terraform apply (nach Freigabe)
 - T011-09 (Optional) S3-Backend-Entscheidung
 
@@ -161,6 +166,11 @@ Changes Made:
   `tsconfig.json`, `vitest.config.ts` entfernt; lokal `node_modules/` + `dist/index.js`
   gelöscht. Baseline nachvollziehbar via Git-Historie (Commit 449cdd7). Python 3.14 bleibt
   aktiv; Report: docs/reports/T011-04-PYTHON-CLEANUP.md
+- (T011-07) Read-only Review: `terraform version` (v1.15.8), `terraform providers`
+  (aws ~> 6.0 → 6.60.0), `fmt -check` PASS, `init` PASS, `validate` PASS,
+  `plan` RUN — 16 to add, 0 to change, 0 to destroy (alle dokumentierten Ressourcen,
+  Klassifikation A). Kein Code-/Architektur-Change; kein apply.
+  Report: docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
@@ -173,10 +183,10 @@ Tests:
 - ZIP-Integrität (`unzip -t`) + Handler-Import-Smoke aus ZIP-Root: PASS
 - Node-Baseline (Vitest/tsc): entfernt — historisch via Git `449cdd7` (Cleanup T011-04-CLEANUP)
 - LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): PASS (keine Diagnostics, `key_schema` in Completion)
-- Terraform plan: NOT RUN (gehört zu T011-07)
+- Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; T011-07)
 
 Validation:
-- Terraform plan: NOT RUN (gehört zu T011-07)
+- Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; Klassifikation A)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
 - Live-API: NOT RUN (kein apply; Lambda-Bundle nicht deployed)
 - git diff --check: PASS
@@ -207,11 +217,11 @@ Blockers:
 - None
 
 Current Checkpoint:
-`9a332bf` (Branch `feature/http-api` — T011-06 HTTP API + Routen + Authorizer;
-Push SUCCESS auf origin/feature/http-api; gemerged nach main via `8a85b5e`)
+`feature/t011-07-plan-review` (T011-07 — Terraform validate + plan, read-only;
+Merge → main nach Push; Report docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md)
 
 Next Step:
-T011-07 — terraform validate + plan (Review) (separater Prompt / Task)
+T011-08 — terraform apply (nach menschlicher Freigabe) + Outputs dokumentieren
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -518,7 +528,7 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 | Python compileall | PASS |
 | Python ZIP-Build (`python3 build_zip.py`) + `unzip -t` | PASS |
 | LSP-Test terraform-ls 0.39.0 (serve, Root = Repo) | PASS (keine Diagnostics, `key_schema` in Completion) |
-| Terraform plan | NOT RUN (zu T011-07) |
+| Terraform plan | PASS (T011-07 — 16 to add, 0 to change, 0 to destroy) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Terraform destroy (Cleanup) | NOT RUN |
 | Live-API / Lambda-Invocation | NOT RUN (kein apply) |
@@ -529,7 +539,8 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 
 - Branch: `main` · Commit: `449cdd7` · Push: SUCCESS
 - Cleanup-Stand: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP)
+- T011-07-Stand: Branch `feature/t011-07-plan-review` (T011-07 Review)
 
 ## Next Step
 
-T011-07 — `terraform validate` + `plan` (Review) (separater Task / Prompt). STOP.
+T011-08 — `terraform apply` (nach menschlicher Freigabe) + Outputs dokumentieren. STOP.

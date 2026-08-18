@@ -2,6 +2,25 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — Terraform Validate + Plan Review T011-07 (F011, Branch `feature/t011-07-plan-review`)
+
+### Verifikation (read-only, kein Code-Change)
+- `terraform version`: v1.15.8 · `terraform providers`: aws `~> 6.0` (6.60.0).
+- `terraform fmt -check`: PASS · `terraform init`: PASS (Lockfile wiederverwendet) ·
+  `terraform validate`: PASS.
+- `terraform plan`: RUN — **16 to add, 0 to change, 0 to destroy**; ausschließlich
+  Neu-Erstellungen der dokumentierten Ressourcen (DynamoDB, IAM, Lambda python3.14,
+  Cognito, HTTP API + 4 Routen + JWT-Authorizer + Permission); keine unexpected
+  changes, kein REPLACE, keine Discrepancies.
+- Plan-Klassifikation: **A) EXPECTED/CLEAN**.
+- `git diff --check`: PASS · Secret-Audit: PASS.
+- `terraform apply`: NOT RUN — Freigabe erforderlich (T011-08).
+- Report: `docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md`.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…07 + T011-04-CLEANUP COMPLETE ·
+  T011-08 NEXT · AWS Resources: NONE.
+
 ## 2026-08-18 — T011-04 Python Cleanup (F011, Branch `feature/lambda-python-cleanup`)
 
 ### Implementierung

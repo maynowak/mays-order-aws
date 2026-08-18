@@ -17,11 +17,11 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-07 — terraform validate + plan (Review) (COMPLETE: T011-01…06 + Cleanup)
+T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
 
 Current Checkpoint:
-feature/lambda-python-cleanup (T011-04-CLEANUP — Node/TS-Baseline entfernt, Python 3.14 aktiv)
-→ Recovery-Verifikation 2026-08-18: T011-06 COMPLETE bestätigt (docs/reports/T011-06-RECOVERY.md)
+feature/t011-07-plan-review (T011-07 — Terraform validate + plan, read-only; kein apply)
+→ Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review
 
 AWS Resources:
 NONE
@@ -56,6 +56,7 @@ DESIGNED — NOT IMPLEMENTED
 
 Tests:
 Terraform init/validate PASS (T011-01…T011-06; AWS-Provider ~> 6.0 / 6.60.0);
+terraform plan RUN (T011-07): 16 to add, 0 to change, 0 to destroy — EXPECTED/CLEAN;
 Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
 Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 ```
@@ -81,6 +82,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | W2-T011-05 | `be79c5f` (Branch `feature/cognito`) | F011/T011-05 Cognito: User Pool (`mays-orders-users`), App Client (`mays-orders-client`, USER_PASSWORD_AUTH + Refresh, Public Client), Gruppe `staff` (`aws_cognito_user_group`) + Outputs; `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`dd9bb58`) | SUCCESS | COMPLETE |
 | W2-T011-06 | `9a332bf` (Branch `feature/http-api`) | F011/T011-06 HTTP API V2 (`mays-orders-api`) + `$default`-Stage (auto_deploy) + JWT-Authorizer (Cognito: Issuer aus `users.endpoint`, Audience = Client-ID) + Integration (AWS_PROXY, Payload 2.0) + 4 Routen (alle JWT) + Invoke-Permission (nur API GW); `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`8a85b5e`) | SUCCESS | COMPLETE |
 | W2-T011-04-CLEANUP | Cleanup (Branch `feature/lambda-python-cleanup`) | Node.js/TypeScript-Baseline (T011-04) aus aktivem Lambda-Projekt entfernt (`lambda/src/*.ts`, `tests/*.test.ts`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`; lokal `node_modules/`, `dist/index.js`); Python 3.14 bleibt aktiv; Baseline via Git `449cdd7`; Tests/Build/Terraform-Validation PASS; gemerged nach main | SUCCESS | COMPLETE |
+| W2-T011-07 | `…` (Branch `feature/t011-07-plan-review`) | F011/T011-07 Terraform validate + plan (Review, read-only): `fmt -check`/`init`/`validate` PASS; `plan` RUN — **16 to add, 0 to change, 0 to destroy**, exakt die dokumentierten Ressourcen, Klassifikation **A) EXPECTED/CLEAN**, keine unexpected changes/REPLACE, keine Discrepancies; Secret-Audit PASS; **kein apply**; Report `T011-07-TERRAFORM-PLAN-REVIEW.md`; gemerged nach main | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -93,7 +95,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert, T011-07 next) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert; T011-07 plan-validiert — 16 Ressourcen, apply ausstehend) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -110,7 +112,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ✅ (plan: 16 add, 0 change, 0 destroy). Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 
