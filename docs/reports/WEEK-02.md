@@ -7,10 +7,12 @@
 ## 1. Gesamtstatus
 
 Woche 2 läuft. F011 (Terraform Infrastructure) in Arbeit; T011-01 (Terraform-Gerüst),
-T011-02 (DynamoDB + GSI1), T011-03 (IAM) und T011-04 (Lambda Order Handler + Zip-Build)
-abgeschlossen und validiert. Zusätzlich wurde der Lambda-Handler auf **Python 3.14**
-portiert (Branch `feature/lambda-python-314`); die Node.js/TypeScript-Variante bleibt
-als historische Baseline. Noch keine AWS-Ressourcen erzeugt, kein `apply`.
+T011-02 (DynamoDB + GSI1), T011-03 (IAM), T011-04 (Lambda Order Handler + Zip-Build)
+und T011-05 (Cognito: User Pool, Client, Gruppe `staff`) abgeschlossen und validiert.
+Zusätzlich wurde der Lambda-Handler auf **Python 3.14** portiert (Branch
+`feature/lambda-python-314`) und per `merge --no-ff` nach `main` integriert (Commit
+`20bfb05`); die Node.js/TypeScript-Variante bleibt als historische Baseline. Noch keine
+AWS-Ressourcen erzeugt, kein `apply`.
 
 ## 2. Erledigte Features / Tasks
 
@@ -21,8 +23,9 @@ als historische Baseline. Noch keine AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | T011-03 IAM Lambda Execution Role + Least-Privilege Policy (DynamoDB+GSI1, Logs) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build, Execution Role T011-03, AP1..AP4) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | LAMBDA-PY-314 Lambda-Handler auf Python 3.14 portiert (boto3, build_zip.py, unittest 49/49, runtime python3.14) | ✅ COMPLETE |
-| F011 — Terraform Infrastructure | T011-05 Cognito (Pool, Client, Gruppe) | ⏳ PLANNED |
-| F002 — Cognito Authentication | … | ⏳ PLANNED |
+| F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
+| F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
 | F003 — API Gateway | … | ⏳ PLANNED |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
@@ -41,10 +44,12 @@ als historische Baseline. Noch keine AWS-Ressourcen erzeugt, kein `apply`.
 | npm audit | PASS (0 vulnerabilities, Baseline) |
 | Terraform fmt | PASS |
 | Terraform init | PASS (aws provider v6.60.0) |
-| Terraform validate | PASS (ohne Warnungen) |
+| Terraform validate | PASS (ohne Warnungen; inkl. Cognito T011-05) |
 | Terraform plan | NOT RUN (zu T011-07) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
+| `git diff --check` | PASS (T011-05) |
+| Secret-Audit | PASS (T011-05) |
 
 ## 4. AWS-Ressourcen
 
@@ -53,12 +58,17 @@ Terraform-Konfiguration; `apply` erst in T011-08 nach Freigabe).
 
 ## 5. Probleme / Risiken / Blocker
 
-Keine. DynamoDB- und IAM-Konfiguration folgen exakt `database/dynamodb-design.md` bzw.
-`security/iam-design.md`; Least Privilege: nur DynamoDB-Aktionen für Tabelle+GSI1 und
-Log-Rechte, kein Scan/DeleteItem/BatchWriteItem, keine s3/sqs/iam-Rechte.
+Keine. DynamoDB-, IAM- und Cognito-Konfiguration folgen exakt `database/dynamodb-design.md`,
+`security/iam-design.md` bzw. `security/authentication-decision.md`; Least Privilege: nur
+DynamoDB-Aktionen für Tabelle+GSI1 und Log-Rechte, kein Scan/DeleteItem/BatchWriteItem,
+keine s3/sqs/iam-Rechte. Cognito: keine offene Registrierung (Admin-Create-User),
+kein Secrets/App-Client-Secret, keine Access Keys.
 Bekannte Randnotiz: `lambda/src/types.py` wurde bewusst als `order_types.py` benannt
 (Stdlib-`types`-Kollision im Lambda-ZIP). Python-Tests laufen lokal unter 3.12.3
 (System-Python); Ziel-Runtime `python3.14`.
+T011-05-Technik-Hinweis: Provider 6.60.0 nutzt `aws_cognito_user_group` (Ressourcen-
+Renaming, nicht `aws_cognito_user_pool_group`); `user_pool_domain` bewusst nicht umgesetzt
+(USER_PASSWORD_AUTH braucht kein Hosted-UI).
 
 ## 6. Kosten
 
@@ -67,15 +77,16 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 7. Nächste Schritte
 
-- T011-05 — Cognito (Pool, Client, Gruppe) (separater Task)
+- T011-06 — HTTP API + Routen + Authorizer (separater Task)
 
 ## 8. Zeitplan-Bewertung
 
-F011/T011-01 bis T011-04 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
-Migrationsschritt abgeschlossen. Terraform-Scope entspricht dem Vier-Wochen-Plan (Woche 2).
+F011/T011-01 bis T011-05 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
+Migrationsschritt abgeschlossen und nach `main` integriert. Terraform-Scope entspricht
+dem Vier-Wochen-Plan (Woche 2).
 
 ## 9. Git Checkpoint
 
-- Branch: `feature/lambda-python-314` (Feature-Branch bleibt erhalten)
-- Commit: `64130a9` (feat) + `f1115bc` (docs-Nachzug)
-- Push: SUCCESS (`origin/feature/lambda-python-314`)
+- Branch: `feature/cognito` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` beide gepusht)
+- Merge: `feature/lambda-python-314` → `main` (Commit `20bfb05`) — SUCCESS
+- Commit: TBD (T011-05-Checkpoint) · Push: offen (nach menschlicher Freigabe)
