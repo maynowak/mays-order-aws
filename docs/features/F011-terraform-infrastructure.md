@@ -155,7 +155,7 @@ Blockers:
 - None
 
 Current Checkpoint:
-Branch `feature/lambda-python-314` — Lambda-Python-3.14-Migration (Commit folgt; Baseline `449cdd7`)
+`64130a9` (Branch `feature/lambda-python-314` — Lambda-Python-3.14-Migration; Baseline `449cdd7`)
 
 Next Step:
 T011-05 — Cognito (Pool, Client, Gruppe) (separater Prompt / Task)

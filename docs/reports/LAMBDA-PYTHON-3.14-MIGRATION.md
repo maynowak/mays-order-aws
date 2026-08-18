@@ -233,13 +233,13 @@ AP1..AP4-Arbeitslast, gleicher `timeout`). Der Messplan ist in
 ## Git Checkpoint
 
 - Branch: `feature/lambda-python-314` (Feature-Branch wird **nicht** gelöscht)
-- Commit: wird nach Abschluss der Dokumentation erzeugt (siehe Abschnitt unten)
+- Commit: `64130a9` (feat: F011 Lambda-Handler auf Python 3.14 portieren) +
+  Docs-Nachzug (Status/Changelog/WEEK-02)
 - Baseline-Commits: `449cdd7` (T011-04 Node-Code), `ce4b62e` (Docs-Nachzug)
 
 ## Push Status
 
-Wird nach dem Commit ausgeführt und im Abschlussbericht dokumentiert. Bei
-Fehlern: `PUSH FAILED / PENDING` mit echter Fehlermeldung.
+- PENDING (Push wird nach dem Docs-Nachzug ausgeführt und hier dokumentiert)
 
 ## Current Project State
 

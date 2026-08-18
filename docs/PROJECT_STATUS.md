@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-08-17)
+## Aktueller Stand (zuletzt aktualisiert: 2026-08-18)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -17,19 +17,20 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-04 — Lambda (Zip-Build) + Permission (COMPLETE) · Next: T011-05 (Cognito, separat)
+T011-04 — Lambda (COMPLETE; Node.js-Baseline) + Python-3.14-Migration (COMPLETE) · Next: T011-05 (Cognito, separat)
 
 Current Checkpoint:
-449cdd7 (T011-04 — Lambda Order Handler + Zip-Build)
+feature/lambda-python-314 (Python-3.14-Migration des Lambda-Handlers)
 
 AWS Resources:
 NONE
 
 Application Code:
-IMPLEMENTED (Lambda-Handler TypeScript, `lambda/`) — NICHT deployed (kein apply)
+IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (kein apply)
+Node.js/TypeScript T011-04 bleibt als historische Baseline (45/45 Tests grün)
 
 Terraform:
-DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04) konfiguriert; Cognito/API GW ausstehend
+DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) konfiguriert; Cognito/API GW ausstehend
 
 Authentication:
 DESIGNED — NOT IMPLEMENTED
@@ -38,7 +39,7 @@ API Gateway:
 DESIGNED — NOT IMPLEMENTED
 
 Lambda:
-CONFIGURED (Terraform + TypeScript-Code T011-04) — NOT CREATED (kein apply)
+CONFIGURED (Terraform + Python-3.14-Code) — NOT CREATED (kein apply)
 
 DynamoDB:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
@@ -51,7 +52,8 @@ DESIGNED — NOT IMPLEMENTED
 
 Tests:
 Terraform init/validate PASS (T011-01…T011-04; AWS-Provider ~> 6.0 / 6.60.0);
-Vitest 45/45 PASS · Build/Package PASS · npm audit 0 (Lambda T011-04)
+Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
+Node-Baseline: Vitest 45/45 PASS (unverändert)
 ```
 
 ## Verlauf der Checkpoints
@@ -70,6 +72,7 @@ Vitest 45/45 PASS · Build/Package PASS · npm audit 0 (Lambda T011-04)
 | W2-DIAG-COMPAT | `a4061e0` (+`6976bd0`) | Provider 6.x Compatibility & Toolchain Verification: Schema autoritativ (CLI 6.60.0), 5.100.0-Altlast bereinigt, `validate` PASS, Checkpoint-Nachzug | SUCCESS | COMPLETE |
 | W2-DIAG-FINAL | `e1fd58b` | Final Diagnostic: VS Code/terraform-ls stale 5.100.0-Schema belegt (LSP-Test: SchemaModuleValidation/ReferenceValidation err=nil, `key_schema` in Completion; Root Cause: GSI-`key_schema` ab Provider 6.29.0) | SUCCESS | COMPLETE |
 | W2-T011-04 | `449cdd7` | F011/T011-04 Lambda Order Handler (TypeScript, nodejs22.x, Zip-Build `dist/lambda.zip`, Execution Role T011-03, AP1..AP4) + Vitest 45/45 + init/validate PASS | SUCCESS | COMPLETE |
+| W2-LAMBDA-PY-314 | `64130a9` (Branch `feature/lambda-python-314`) | Lambda-Migration auf Python 3.14: Handler funktional portiert (AP1..AP4), boto3 (Runtime), ZIP-Build `build_zip.py`, unittest 49/49, `runtime = "python3.14"`, Terraform fmt/init/validate PASS; Node-Baseline bleibt | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
