@@ -27,7 +27,7 @@ Authentication (Cognito, Entscheidung dokumentiert)
 API Gateway (HTTP vs. REST, Entscheidung dokumentiert)
   │
   ▼
-Lambda
+Lambda (Python 3.14, Handler: index.handler)
   │
   ▼
 DynamoDB

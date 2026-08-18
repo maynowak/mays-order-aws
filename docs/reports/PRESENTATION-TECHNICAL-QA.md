@@ -51,28 +51,44 @@ Klassifikation A) EXPECTED/CLEAN. `terraform apply` **nicht** ausgeführt.
 
 ## Node.js vs Python 3.14
 
-**Verlauf im Projekt:**
+### Historischer Stand
 
-1. **T011-04 (ursprünglich):** Lambda-Handler als **Node.js/TypeScript**
-   (`nodejs22.x`, esbuild-Bundle, `dist/lambda.zip` ~156 KB, Vitest 45/45).
-2. **Migration (Branch `feature/lambda-python-314`):** Funktional identischer
-   Port auf **Python 3.14** (`python3.14`, boto3, `build_zip.py`,
-   `dist/lambda.zip` ~6,6 KB, unittest 49/49). Grund laut Migrationsbericht:
-   Umstellung des aktiven Lambda-Stands auf die Python-3.14-Runtime mit boto3
-   (von der Lambda-Runtime bereitgestellt), reproduzierbarem ZIP-Build und
-   einheitlicher Python-Codebasis. Terraform-Änderung war **ausschließlich**
-   `runtime = "nodejs22.x" → "python3.14"`.
-3. **Cleanup (T011-04-CLEANUP, Branch `feature/lambda-python-cleanup`):**
-   Node.js/TypeScript-Baseline (Sources, Tests, `package.json`, `tsconfig.json`,
-   `vitest.config.ts`) aus dem aktiven Lambda-Projekt entfernt.
-4. **Nachvollziehbarkeit:** Die Baseline bleibt über Git-Historie (Commit
-   `449cdd7`, Branch `feature/lambda-python-314`) und die Reports
-   (`LAMBDA-PYTHON-3.14-MIGRATION.md`, `T011-04-PYTHON-CLEANUP.md`) erhalten.
+Die **ursprüngliche** Lambda-Implementierung (T011-04) verwendete
+**Node.js/TypeScript** (`nodejs22.x`, esbuild-Bundle, `dist/lambda.zip`
+~156 KB, Vitest 45/45).
+
+### Migration
+
+Die Lambda-Implementierung wurde **funktional identisch** auf **Python 3.14**
+migriert (Branch `feature/lambda-python-314`): `python3.14`, boto3,
+`build_zip.py`, `dist/lambda.zip` ~6,6 KB, unittest 49/49. Grund laut
+Migrationsbericht: Umstellung des aktiven Lambda-Stands auf die
+Python-3.14-Runtime mit boto3 (von der Lambda-Runtime bereitgestellt),
+reproduzierbarem ZIP-Build und einheitlicher Python-Codebasis. Terraform-
+Änderung war **ausschließlich** `runtime = "nodejs22.x" → "python3.14"`.
+
+Im Cleanup (T011-04-CLEANUP) wurde die Node.js/TypeScript-Baseline (Sources,
+Tests, `package.json`, `tsconfig.json`, `vitest.config.ts`) aus dem aktiven
+Lambda-Projekt entfernt.
+
+### Aktueller Stand
+
+AWS Lambda verwendet aktuell:
+
+- **Runtime:** `python3.14`
+- **Handler:** `index.handler` (`index.py` am ZIP-Root)
+- **Package:** `lambda/dist/lambda.zip` (6 Python-Module, `python3 build_zip.py`)
+
+**Node.js/TypeScript ist kein Bestandteil des aktuellen Lambda-Deployments.**
+
+Die historische Baseline bleibt über Git-Historie (Commit `449cdd7`, Branch
+`feature/lambda-python-314`) und die Reports (`LAMBDA-PYTHON-3.14-MIGRATION.md`,
+`T011-04-PYTHON-CLEANUP.md`) vollständig nachvollziehbar.
 
 **Wichtiger Hinweis:** Keine unbelegten Aussagen (z. B. „Python ist schneller",
 „Python ist immer billiger"). Tatsächlich gemessene/belegte Werte:
 
-| Metrik | Node-Baseline | Python 3.14 | Beleg |
+| Metrik | Node-Baseline (historisch) | Python 3.14 (aktuell) | Beleg |
 |--------|---------------|-------------|-------|
 | ZIP-Größe | ~156 KB | ~6,6 KB (6.779 Bytes) | gemessen |
 | Unit-Tests | 45/45 (Vitest) | 49/49 (unittest) | ausgeführt |

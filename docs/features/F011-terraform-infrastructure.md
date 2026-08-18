@@ -403,12 +403,12 @@ DynamoDB (mays-orders, GSI1)
   `ConditionalCheckFailedException` → 409 `CONFLICTED_UPDATE` (Race-Schutz, R-01).
 - Fehlerformat einheitlich `{ error: { code, message, details? } }` (api/endpoints.md §3).
 
-### Runtime / Handler
+### Runtime / Handler (historischer T011-04-Stand)
 
 | Eigenschaft | Wert |
 |-------------|------|
-| Runtime | `nodejs22.x` (AWS Lambda) |
-| Handler | `index.handler` (CommonJS-Bundle, `lambda/dist/index.js`) |
+| Runtime | `nodejs22.x` (AWS Lambda) — **historisch**, inzwischen `python3.14` |
+| Handler | `index.handler` (CommonJS-Bundle, `lambda/dist/index.js`) — **historisch**, inzwischen Python `index.handler` (`index.py` am ZIP-Root) |
 | Env-Variable | `ORDERS_TABLE` (Tabellenname aus Terraform) |
 | Timeout | 10 s (Cold-Start + DynamoDB-Latenz) |
 
@@ -455,11 +455,14 @@ Handler
 
 Runtime
 → Ausführungsumgebung der Lambda-Funktion
-→ hier: Node.js 22 (nodejs22.x); steuert Sprach- und Laufzeit-Verhalten
+→ hier (historische T011-04-Baseline): Node.js 22 (nodejs22.x); aktueller Stand:
+  Python 3.14 (python3.14) — steuert Sprach- und Laufzeit-Verhalten
 
 Deployment Package / ZIP
 → verpackter Lambda-Code
-→ hier: dist/lambda.zip (ein gebündeltes JS-File); Terraform lädt es per filename/source_code_hash
+→ hier (historische T011-04-Baseline): dist/lambda.zip (ein gebündeltes JS-File);
+  aktueller Stand: dist/lambda.zip (Python-Module, python3 build_zip.py);
+  Terraform lädt es per filename/source_code_hash
 ```
 
 ## Lambda Python-3.14-Migration (Branch `feature/lambda-python-314`)

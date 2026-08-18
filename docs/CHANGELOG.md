@@ -2,6 +2,30 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — Lambda Runtime Documentation Cleanup (Doku-Cleanup)
+
+### Dokumentation
+- `docs/reports/T011-04-LAMBDA-RUNTIME-DOC-CLEANUP.md` (neu): Cleanup-Report —
+  verifizierter Runtime-Stand (`python3.14`, `index.handler`), historische
+  Node.js/TypeScript-Erwähnungen eindeutig als historisch/Migrationsstand
+  gekennzeichnet.
+- `README.md`: Architektur-Zielbild ergänzt — `Lambda (Python 3.14, Handler:
+  index.handler)`.
+- `docs/reports/WEEK-02.md`: T011-04-Zeile als historischer Stand markiert
+  (ersetzt durch Python 3.14).
+- `docs/features/F011-terraform-infrastructure.md`: Runtime/Handler-Tabelle und
+  Lambda-Lernbezug (T011-04) als „historischer Stand" gekennzeichnet; aktueller
+  Python-Stand genannt.
+- `docs/reports/PRESENTATION-TECHNICAL-QA.md`: Abschnitt „Node.js vs Python
+  3.14" in Historischer Stand / Migration / Aktueller Stand strukturiert;
+  „Node.js/TypeScript ist kein Bestandteil des aktuellen Lambda-Deployments."
+- Keine Codeänderung, kein `plan`, kein `apply`; historische Node-Baseline
+  bleibt via Git (`449cdd7`) und Reports nachvollziehbar.
+
+### Status
+- Unverändert: T011-01…T011-07 COMPLETE · T011-08 PLANNED (Freigabe
+  erforderlich) · T011-09 OPTIONAL · AWS Resources: NONE.
+
 ## 2026-08-18 — Presentation Technical Q&A (Dokumentations-Nachzug)
 
 ### Dokumentation
