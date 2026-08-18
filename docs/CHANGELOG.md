@@ -2,6 +2,43 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — Lambda-Migration auf Python 3.14 (F011 / T011-04, Checkpoint `64130a9`, Branch `feature/lambda-python-314`)
+
+### Implementierung
+- `lambda/src/*.py` (neu): Python-Port des Lambda-Order-Handlers — `index.py`
+  (Handler, API-GW-v2-Event, Routing, Fehler→HTTP), `order_service.py` (AP1..AP4,
+  boto3), `state_machine.py` (Transition-Matrix), `validation.py`, `errors.py`,
+  `order_types.py` (bewusst NICHT `types.py` — kollidiert mit Stdlib-`types` im
+  Lambda-ZIP). Node.js/TypeScript-Baseline (T011-04) bleibt vollständig erhalten.
+- `lambda/tests/test_*.py` (neu, unittest): `test_state_machine.py`,
+  `test_validation.py`, `test_order_service.py` (portierte Fälle) sowie
+  `test_index.py` (Handler-Verhalten).
+- `lambda/build_zip.py` (neu): reproduzierbarer Python-ZIP-Build →
+  `dist/lambda.zip` (6 Module, ~6,6 KB). Boto3 von der Lambda-Runtime →
+  kein `requirements.txt`, kein Boto3-Bundling. Keine Secrets.
+- `lambda/README.md` (neu): Build-/Test-Anleitung (Python aktiv + Node-Baseline).
+- `terraform/main.tf`: `aws_lambda_function.handler` `runtime = "nodejs22.x"` →
+  `"python3.14"` (einzige Terraform-Änderung; Handler `index.handler`, Env, Role,
+  DynamoDB unverändert).
+- `.gitignore`: `__pycache__/`, `*.pyc` ergänzt.
+- `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md` (neu),
+  `docs/reports/LAMBDA-PYTHON-3.14-MIGRATION.md` (neu).
+
+### Validation
+- Python `compileall` (Syntax): PASS.
+- Python-Tests (unittest): PASS — 49 Test-Methoden (state_machine 4,
+  validation 19, orderService 12, index 14), lokal Python 3.12.3.
+- Python-ZIP-Build + `unzip -t` (Integrität) + Handler-Import-Smoke aus
+  ZIP-Root-Layout: PASS.
+- Node-Baseline unverändert: Vitest 45/45 PASS · `tsc --noEmit` PASS.
+- Terraform `fmt`/`init`/`validate`: PASS (AWS-Provider 6.60.0).
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…04 + Lambda-Python-3.14-Migration
+  COMPLETE · T011-05 NEXT · AWS Resources: NONE.
+
 ## 2026-08-17 — Checkpoint `449cdd7` (F011 / T011-04 — Lambda Order Handler + Zip-Build)
 
 ### Implementierung
