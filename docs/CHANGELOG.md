@@ -2,6 +2,39 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-18 — HTTP API T011-06 (F011 / F003, Branch `feature/http-api`)
+
+### Implementierung
+- `terraform/main.tf`: `aws_apigatewayv2_api.orders` (`mays-orders-api`, HTTP/ADR-004) +
+  `aws_apigatewayv2_stage.default` (`$default`, auto_deploy).
+- `terraform/main.tf`: `aws_apigatewayv2_authorizer.jwt` (JWT, identity_sources
+  `$request.header.Authorization`; issuer = `https://<cognito-endpoint>` aus
+  `aws_cognito_user_pool.users.endpoint`, audience = `aws_cognito_user_pool_client.app.id`
+  — keine hardcodierten IDs).
+- `terraform/main.tf`: `aws_apigatewayv2_integration.lambda` (AWS_PROXY, Payload 2.0,
+  URI = `aws_lambda_function.handler.invoke_arn` — bestehende Python-3.14-Lambda).
+- `terraform/main.tf`: vier `aws_apigatewayv2_route.*` — `POST /orders`,
+  `GET /orders/{orderId}`, `GET /orders`, `PATCH /orders/{orderId}/status` — alle
+  `authorization_type = "JWT"` + `authorizer_id`.
+- `terraform/main.tf`: `aws_lambda_permission.api_gateway` (principal
+  `apigateway.amazonaws.com`, `source_arn = ${execution_arn}/*/*`).
+- `terraform/outputs.tf`: `api_gateway_endpoint`, `api_gateway_id`,
+  `api_gateway_authorizer_id`.
+- `terraform/README.md`: §2.5 HTTP API + Ressourcentabelle.
+- `lambda/src/index.py`: **unverändert** — Event-Contract (v2) passt exakt (verifiziert).
+- Bewusst NICHT in T011-06: REST API, öffentliche Routen, `cognito:groups`-Auswertung
+  im Lambda (Woche 3), plan (T011-07), apply (T011-08).
+
+### Validation
+- Terraform `fmt`/`init`/`validate`: PASS (AWS-Provider 6.60.0, ohne Warnungen).
+- `git diff --check`: PASS · Secret-Audit: PASS.
+- Python-Validierung: NOT RUN — `index.py` unverändert (bestehender Nachweis gültig).
+- `terraform plan`: NOT RUN (zu T011-07) · `terraform apply`: NOT RUN (Freigabe).
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…06 COMPLETE · T011-07 NEXT ·
+  F003 T003-01…06 COMPLETE (Terraform) · AWS Resources: NONE.
+
 ## 2026-08-18 — Cognito T011-05 (F011 / F002, Branch `feature/cognito`)
 
 ### Implementierung

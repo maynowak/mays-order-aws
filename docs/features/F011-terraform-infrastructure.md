@@ -38,7 +38,7 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-05 — Cognito (Pool, Client, Gruppe) (COMPLETE, Branch feature/cognito)
+T011-06 — HTTP API + Routen + Authorizer (IN PROGRESS, Branch feature/http-api)
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -49,10 +49,9 @@ Completed Tasks:
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 
 In Progress:
-None (T011-06 wird separat gestartet)
+- T011-06 HTTP API + Routen + Authorizer 🔵
 
 Pending Tasks:
-- T011-06 HTTP API + Routen + Authorizer
 - T011-07 terraform validate + plan (Review)
 - T011-08 terraform apply (nach Freigabe)
 - T011-09 (Optional) S3-Backend-Entscheidung
@@ -134,10 +133,27 @@ Changes Made:
   `cognito_user_pool_client_id`, `cognito_user_pool_group_name` ergänzt
 - (T011-05) terraform/README.md: Cognito-Abschnitt (§2.4) + Ressourcentabelle aktualisiert
 - (T011-05) docs/features/F002-cognito-authentication.md: T002-01…03 COMPLETE (Terraform) nachgezogen
+- (T011-06) terraform/main.tf: `aws_apigatewayv2_api.orders` (${var.project_name}-api,
+  protocol_type HTTP) + `aws_apigatewayv2_stage.default` ($default, auto_deploy = true)
+- (T011-06) terraform/main.tf: `aws_apigatewayv2_authorizer.jwt` (JWT, identity_sources
+  `$request.header.Authorization`, jwt_configuration issuer = https://<cognito-endpoint>
+  aus `aws_cognito_user_pool.users.endpoint`, audience = `aws_cognito_user_pool_client.app.id`)
+- (T011-06) terraform/main.tf: `aws_apigatewayv2_integration.lambda` (AWS_PROXY,
+  payload_format_version "2.0", integration_uri = aws_lambda_function.handler.invoke_arn)
+- (T011-06) terraform/main.tf: vier `aws_apigatewayv2_route.*` (POST /orders,
+  GET /orders/{orderId}, GET /orders, PATCH /orders/{orderId}/status), alle
+  authorization_type JWT + authorizer_id
+- (T011-06) terraform/main.tf: `aws_lambda_permission.api_gateway`
+  (principal apigateway.amazonaws.com, source_arn ${execution_arn}/*/*)
+- (T011-06) terraform/outputs.tf: `api_gateway_endpoint`, `api_gateway_id`,
+  `api_gateway_authorizer_id` ergänzt
+- (T011-06) terraform/README.md: §2.5 HTTP API (Ressourcentabelle, Routen, Entscheidungen),
+  Ressourcentabelle §3 aktualisiert
+- (T011-06) docs/features/F003-api-gateway.md: T003-01…06 COMPLETE (Terraform) nachgezogen
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
-- Terraform validate: PASS (ohne Warnungen) — inkl. Cognito-Ressourcen T011-05
+- Terraform validate: PASS (ohne Warnungen) — inkl. Cognito T011-05 + HTTP API T011-06
 - Terraform fmt: PASS
 - Python unittest (49 Test-Methoden): PASS (state_machine 4, validation 19,
   orderService 12, index 14) — lokal Python 3.12.3, Ziel `python3.14`
@@ -156,14 +172,17 @@ Validation:
 - Secret-Audit: PASS (inkl. lambda/ Python-Quelltext, build_zip.py, terraform/)
 
 Known Issues:
-- API-GW→Lambda Invoke-Permission (`aws_lambda_permission`) fehlt bewusst bis T011-06
-  (HTTP API existiert noch nicht; keine API-GW-Implementierung in T011-04).
+- `index.py` unverändert: Der Handler routet bereits exakt über den HTTP-API-v2-Contract
+  (`routeKey`, `pathParameters`, `queryStringParameters`, v2-Proxy-Response) — keine
+  Anpassung für T011-06 erforderlich.
 - Kein `aws_cognito_user_pool_domain` in T011-05: Login via USER_PASSWORD_AUTH benötigt
   kein Hosted-UI/OAuth-Redirect (terraform/README.md — Domain nur "falls nötig").
 - Keine offene Selbst-Registrierung: `admin_create_user_config.allow_admin_create_user_only = true`
   (Staff-Benutzer werden administrativ angelegt, T002-04; keine Signup-Anforderung dokumentiert).
 - Terraform-Provider 6.60.0 nutzt `aws_cognito_user_group` (nicht `aws_cognito_user_pool_group`)
   — Ressourcen-Renaming im Provider; dokumentiert in terraform/README.md.
+- `cognito:groups`-Authorization (A-09) wird in T011-06 NICHT im Lambda ausgewertet:
+  JWT-Authorizer validiert Issuer+Audience; Gruppenscoping bleibt für Woche 3 (Security) offen.
 - Beträge als ganze Cent finalisiert (Vorab-Definition `database/dynamodb-design.md` §7;
   `api/api-documentation.md` §3 ist die maßgebliche Schemadarstellung). Die float-Beispiele
   in `api/endpoints.md` (§2.1) sind inkonsistent und bewusst NICHT geändert (keine
@@ -177,11 +196,11 @@ Blockers:
 - None
 
 Current Checkpoint:
-`be79c5f` (Branch `feature/cognito` — T011-05 Cognito; Push SUCCESS auf origin/feature/cognito;
-gemerged nach main via `dd9bb58`)
+`9a332bf` (Branch `feature/http-api` — T011-06 HTTP API + Routen + Authorizer;
+Push SUCCESS auf origin/feature/http-api)
 
 Next Step:
-T011-06 — HTTP API + Routen + Authorizer (separater Prompt / Task)
+T011-07 — terraform validate + plan (Review) (separater Prompt / Task)
 ```
 
 ## GSI1 — Begründung (T011-02)

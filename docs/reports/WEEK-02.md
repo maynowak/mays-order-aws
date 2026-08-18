@@ -26,7 +26,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
 | F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
-| F003 — API Gateway | … | ⏳ PLANNED |
+| F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | 🔵 IN PROGRESS |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
@@ -81,13 +81,13 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 8. Zeitplan-Bewertung
 
-F011/T011-01 bis T011-05 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
+F011/T011-01 bis T011-06 planmäßig; Lambda-Python-3.14-Migration als dokumentierter
 Migrationsschritt abgeschlossen und nach `main` integriert. Terraform-Scope entspricht
 dem Vier-Wochen-Plan (Woche 2).
 
 ## 9. Git Checkpoint
 
-- Branch: `feature/cognito` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` beide gepusht)
+- Branch: `feature/http-api` (Feature-Branches bleiben erhalten; `feature/lambda-python-314` + `feature/cognito` + `feature/http-api` gepusht)
 - Merge: `feature/lambda-python-314` → `main` (Commit `20bfb05`) — SUCCESS
-- Commit: `be79c5f` (T011-05-Checkpoint) · Push: SUCCESS (`origin/feature/cognito`)
+- Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Merge: `feature/cognito` → `main` (Commit `dd9bb58`) · Push main: SUCCESS
