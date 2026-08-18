@@ -30,6 +30,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
 | F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
 | F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-07 terraform validate + plan (Review, read-only) | ✅ COMPLETE |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
@@ -47,7 +48,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | Terraform validate | PASS (ohne Warnungen; inkl. Cognito T011-05) |
 | Recovery T011-06 (2026-08-18): `terraform fmt -check` / `terraform validate` / `git diff --check` / Secret-Audit | PASS (read-only, kein plan/apply) |
 | Cleanup T011-04 (2026-08-18): `python3 build_zip.py` / `unzip -t` / `compileall` / unittest / `terraform fmt -check` / `init` / `validate` / `git diff --check` / Secret-Audit | PASS (kein plan/apply) |
-| Terraform plan | NOT RUN (zu T011-07) |
+| Terraform plan | RUN (T011-07): 16 to add, 0 to change, 0 to destroy — Klassifikation A) EXPECTED/CLEAN |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
 | Node-Baseline (Vitest/tsc/npm) | REMOVED — Cleanup T011-04-CLEANUP; historisch via Git `449cdd7` |
@@ -78,7 +79,7 @@ Keine AWS-Ressourcen erzeugt → keine Kosten. Weitere Bewertung in Woche 4
 
 ## 7. Nächste Schritte
 
-- T011-07 — terraform validate + plan (Review) (separater Task)
+- T011-08 — `terraform apply` (nur nach menschlicher Freigabe) + Outputs dokumentieren
 
 ## 8. Zeitplan-Bewertung
 
@@ -94,3 +95,4 @@ dem Vier-Wochen-Plan (Woche 2).
 - Commit: `9a332bf` (T011-06-Checkpoint) · Push: SUCCESS (`origin/feature/http-api`)
 - Merge: `feature/http-api` → `main` (Commit `8a85b5e`) · Push main: SUCCESS
 - Cleanup: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP) · Merge → `main` · Push: SUCCESS
+- T011-07: Branch `feature/t011-07-plan-review` (T011-07 Review, read-only) · Merge → `main` · Push: SUCCESS
