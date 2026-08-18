@@ -51,3 +51,19 @@ output "cognito_user_pool_group_name" {
   description = "Name der Cognito-Gruppe 'staff' (Claim cognito:groups fuer Authorization)."
   value       = aws_cognito_user_group.staff.name
 }
+
+# T011-06 — API Gateway-Outputs
+output "api_gateway_endpoint" {
+  description = "Invoke-URL der HTTP API fuer May's Orders."
+  value       = aws_apigatewayv2_api.orders.api_endpoint
+}
+
+output "api_gateway_id" {
+  description = "ID der HTTP API fuer May's Orders."
+  value       = aws_apigatewayv2_api.orders.id
+}
+
+output "api_gateway_authorizer_id" {
+  description = "ID des JWT-Authorizers der HTTP API (Cognito User Pool)."
+  value       = aws_apigatewayv2_authorizer.jwt.id
+}

@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-05): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14) und Cognito (User Pool + Client + Gruppe `staff`) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-06): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14), Cognito (User Pool + Client + Gruppe `staff`) und API Gateway HTTP API (vier Routen, JWT-Authorizer, Lambda-Integration) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,15 +16,17 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-05, Cognito):**
+**Aktueller Stand (T011-06, HTTP API):**
 
 ```text
 terraform/
 ├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags,
 │                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy),
-│                   Lambda (Order Handler), Cognito (User Pool, Client, Gruppe)
+│                   Lambda (Order Handler), Cognito (User Pool, Client, Gruppe),
+│                   HTTP API (V2) + Stage + JWT-Authorizer + Integration + 4 Routen,
+│                   Lambda-Invoke-Permission (API GW)
 ├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito; weitere je Ressource)
+├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito, API GW; weitere je Ressource)
 └── README.md       dieses Dokument
 ```
 
@@ -141,6 +143,41 @@ Benutzer ← Access Token (JWT, ~1 h)  ← Cognito
 Benutzer → API-Request "Authorization: Bearer <JWT>" (ab T011-06)
 ```
 
+## 2.5 API Gateway HTTP API (T011-06)
+
+Fachliche Grundlage: `architecture/architecture-decisions.md` (ADR-004: HTTP API V2),
+`api/endpoints.md`, `api/api-documentation.md` (Auth: `Authorization: Bearer <JWT>`),
+`security/iam-design.md` §3 (API-GW→Lambda Invoke-Permission).
+
+| Ressource | Terraform-Typ | Name | Konfiguration |
+|-----------|---------------|------|---------------|
+| HTTP API | `aws_apigatewayv2_api.orders` | `${var.project_name}-api` | `protocol_type = "HTTP"` |
+| Stage | `aws_apigatewayv2_stage.default` | `$default` | `auto_deploy = true` |
+| JWT-Authorizer | `aws_apigatewayv2_authorizer.jwt` | `${var.project_name}-jwt-authorizer` | `authorizer_type = "JWT"`, `identity_sources = ["$request.header.Authorization"]`, Issuer = `https://<cognito-endpoint>` (aus User Pool), Audience = App Client ID |
+| Integration | `aws_apigatewayv2_integration.lambda` | – | `AWS_PROXY` + `payload_format_version = "2.0"` auf `aws_lambda_function.handler.invoke_arn` |
+| Routen | `aws_apigatewayv2_route.*` | – | 4 Routen, alle `authorization_type = "JWT"` + `authorizer_id` |
+| Invoke-Permission | `aws_lambda_permission.api_gateway` | – | `apigateway.amazonaws.com`, `source_arn = ${execution_arn}/*/*` |
+
+Vier dokumentierte Routen (`api/endpoints.md`):
+
+| Method | Path | Lambda Operation | Auth |
+|--------|------|------------------|------|
+| POST | `/orders` | AP1 Create | JWT (Cognito) |
+| GET | `/orders/{orderId}` | AP2 Get by ID | JWT (Cognito) |
+| GET | `/orders` | AP3 Listing | JWT (Cognito) |
+| PATCH | `/orders/{orderId}/status` | AP4 Status-Update | JWT (Cognito) |
+
+Bewusste Entscheidungen T011-06:
+- **Payload Format 2.0** — exakt der Event-Contract des Python-Handlers
+  (`lambda/src/index.py` routet über `routeKey`; v2-Proxy-Response). Keine Änderung an
+  `index.py` nötig (verifiziert).
+- **Kein REST API** (`aws_api_gateway_*`) — ADR-004 sieht HTTP API (V2) vor.
+- **Authorization-Logik über `cognito:groups`** wird in T011-06 noch nicht im Lambda
+  ausgewertet (A-09); der JWT-Authorizer stellt sicher, dass nur Tokens des User Pools
+  (Issuer) mit korrekter Audience (App Client) passieren. Gruppenscoping bleibt für
+  die Security-Features (Woche 3) offen.
+- Keine zusätzlichen/öffentlichen Routen.
+
 ## 3. Geplante Ressourcen
 
 | Ressource | Terraform-Typ (Vorschlag) |
@@ -148,8 +185,8 @@ Benutzer → API-Request "Authorization: Bearer <JWT>" (ab T011-06)
 | DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) ✅ |
 | IAM-Rolle | `aws_iam_role` + `aws_iam_role_policy` ✅ |
 | Lambda | `aws_lambda_function` (Zip aus Build) ✅ |
-| Lambda-Permission | `aws_lambda_permission` (API GW invoke) ⏳ T011-06 |
-| HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` |
+| Lambda-Permission | `aws_lambda_permission` (API GW invoke) ✅ |
+| HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` ✅ |
 | Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_group` ✅ |
 
 ## 4. Workflow

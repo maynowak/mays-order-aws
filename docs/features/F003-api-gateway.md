@@ -18,26 +18,33 @@ Endpunkte `POST /orders`, `GET /orders/{orderId}`, `GET /orders`, `PATCH /orders
 
 | ID | Task | Status |
 |----|------|--------|
-| T003-01 | HTTP API + Integration + Route `POST /orders` | ⏳ PLANNED |
-| T003-02 | Route `GET /orders/{orderId}` | ⏳ PLANNED |
-| T003-03 | Route `GET /orders` | ⏳ PLANNED |
-| T003-04 | Route `PATCH /orders/{orderId}/status` | ⏳ PLANNED |
-| T003-05 | JWT-Autorisator (Cognito) anbinden | ⏳ PLANNED |
-| T003-06 | Lambda-Invoke-Permission (Resource-Based Policy) | ⏳ PLANNED |
+| T003-01 | HTTP API + Integration + Route `POST /orders` | ✅ COMPLETE |
+| T003-02 | Route `GET /orders/{orderId}` | ✅ COMPLETE |
+| T003-03 | Route `GET /orders` | ✅ COMPLETE |
+| T003-04 | Route `PATCH /orders/{orderId}/status` | ✅ COMPLETE |
+| T003-05 | JWT-Autorisator (Cognito) anbinden | ✅ COMPLETE |
+| T003-06 | Lambda-Invoke-Permission (Resource-Based Policy) | ✅ COMPLETE |
 | T003-07 | Live-Test: alle Routen mit Token | ⏳ PLANNED |
+
+> T003-01…T003-06 sind im Rahmen von **F011/T011-06** (Branch `feature/http-api`) per
+> Terraform implementiert: `aws_apigatewayv2_api.orders`, `aws_apigatewayv2_stage.default`,
+> `aws_apigatewayv2_authorizer.jwt`, `aws_apigatewayv2_integration.lambda`
+> (AWS_PROXY, Payload 2.0), vier `aws_apigatewayv2_route.*` (alle JWT-geschützt),
+> `aws_lambda_permission.api_gateway`. Kein `apply` — Ressourcen erst nach Freigabe erzeugt.
 
 ## Testnachweise
 
 | Prüfung | Status |
 |---------|--------|
-| Terraform validate/plan | NOT RUN |
-| Live: Routen erreichbar (200) | NOT RUN |
-| Live: 401 ohne Token | NOT RUN |
+| Terraform fmt/init/validate | PASS (T011-06, Provider 6.60.0) |
+| Terraform plan | NOT RUN (zu T011-07) |
+| Live: Routen erreichbar (200) | NOT RUN (kein apply) |
+| Live: 401 ohne Token | NOT RUN (kein apply) |
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen · Push: offen
+- Branch: `feature/http-api` · Commit: offen · Push: offen (Checkpoint-Task)
 
 ## Next Step
 
-T003-01 (API + erste Route) — nach Freigabe.
+T003-07 (Live-Test: alle Routen mit Token) — nach `apply` und Freigabe (F011/T011-08).

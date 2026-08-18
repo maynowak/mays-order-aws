@@ -17,10 +17,10 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-05 — Cognito (COMPLETE) · Next: T011-06 (HTTP API + Routen + Authorizer)
+T011-06 — HTTP API + Routen + Authorizer (IN PROGRESS) · Next: T011-07
 
 Current Checkpoint:
-feature/cognito (T011-05 — Cognito User Pool + Client + Gruppe `staff`)
+feature/http-api (T011-06 — HTTP API V2, vier Routen, JWT Authorizer, Lambda-Integration)
 
 AWS Resources:
 NONE
@@ -30,13 +30,13 @@ IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (
 Node.js/TypeScript T011-04 bleibt als historische Baseline (45/45 Tests grün)
 
 Terraform:
-DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) konfiguriert; API GW ausstehend
+DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) konfiguriert; API GW (T011-06) in Arbeit
 
 Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
 
 API Gateway:
-DESIGNED — NOT IMPLEMENTED
+IN PROGRESS (Terraform T011-06 — HTTP API V2, vier Routen, JWT Authorizer)
 
 Lambda:
 CONFIGURED (Terraform + Python-3.14-Code) — NOT CREATED (kein apply)
@@ -88,7 +88,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | DynamoDB | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-02, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | Cognito Authentication | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-05, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
-| API Gateway (HTTP API) | ✅ COMPLETE | ⏳ PLANNED (W2) | ⏳ PLANNED | ⏳ PLANNED |
+| API Gateway (HTTP API) | ✅ COMPLETE | 🔵 IN PROGRESS (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
 | Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-05 Cognito konfiguriert) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
@@ -107,7 +107,7 @@ Node-Baseline: Vitest 45/45 PASS (unverändert)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 ⏳. Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ · T011-05 ✅ · T011-06 🔵 · T011-07 ⏳. Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

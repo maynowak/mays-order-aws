@@ -26,7 +26,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F011 — Terraform Infrastructure | PY314-INTEGRATION Python-3.14-Stand nach `main` gemerged (Pflicht-Voraussetzung T011-05) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-05 Cognito (Pool `mays-orders-users`, Client `mays-orders-client` USER_PASSWORD_AUTH + Refresh, Gruppe `staff`) | ✅ COMPLETE |
 | F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
-| F003 — API Gateway | … | ⏳ PLANNED |
+| F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | 🔵 IN PROGRESS |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
