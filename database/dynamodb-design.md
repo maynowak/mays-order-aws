@@ -35,9 +35,19 @@ IAM-Permissions erzeugen. **Entscheidung: Single-Table.**
 | `totalAmount` | Number | Server-berechnet (Σ quantity × unitPrice) |
 | `createdAt` | String | ISO-8601 UTC |
 | `updatedAt` | String | ISO-8601 UTC |
-| `version` | Number | Optimistic-Locking-Feld (Reserve für Woche 3) |
+| `version` | Number | Optimistic-Locking-Feld (Reserve für Woche 3); wird bei AP1 auf `1` initialisiert und bei AP4 inkrementiert |
 | `gsi1pk` | String (GSI1 PK) | `LIST` (konstant) |
 | `gsi1sk` | String (GSI1 SK) | `createdAt` (ISO-8601) |
+
+### Testdaten-Marker (nur Seed-Items)
+
+| Attribut | Typ | Beschreibung |
+|----------|-----|--------------|
+| `isTestData` | Boolean | **Ausschließlich** von Demo-Seed-Items gesetzt (`true`, siehe `seed/orders_seed_demo_50.json`). Kein Teil des produktiven Order-Modells: `create_order` (AP1) setzt das Feld nie, und die Validierung weist es als unbekanntes Feld in API-Requests ab (`validation.py`). `order_service.py` entfernt es aus API-Antworten (`INTERNAL_FIELDS`). |
+
+**Seed-Dateien** (Idempotenz, Details in `docs/reports/`):
+- `seed/orders_seed_demo_50.json` — **bevorzugter Demo-/Test-Seed** (50 Orders, entspricht dem Storage-Modell inkl. `version`, `isTestData`, `lineTotal`); Opt-In über Terraform `seed_example_data`.
+- `seed/orders_seed_1000.jsonl` — **optionaler größerer Test-/Load-Seed** (1.000 Orders); fehlende Modellfelder werden beim Import normalisiert.
 
 ## 3. Index-Struktur
 

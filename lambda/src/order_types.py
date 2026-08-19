@@ -51,6 +51,10 @@ class OrderDynamoItem(Order, total=False):
     gsi1pk: str
     gsi1sk: str
     version: int
+    # isTestData: ausschließlich von Demo-Seed-Items gesetzt (orders_seed_demo_50.json).
+    # KEIN Teil des produktiven Order-Modells; wird von create_order nie gesetzt und
+    # über order_service.INTERNAL_FIELDS aus API-Antworten entfernt.
+    isTestData: bool
 
 
 class OrderListItem(TypedDict):

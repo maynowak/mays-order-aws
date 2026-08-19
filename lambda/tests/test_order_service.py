@@ -124,6 +124,30 @@ class TestCreateOrder(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
         self.assertEqual(called, [])
 
+    def test_create_order_does_not_set_is_test_data(self):
+        """Normale Order-Erstellung markiert Items NICHT als Testdaten (TEST 13)."""
+        put_item = {}
+
+        def on_put(**kwargs):
+            put_item["item"] = kwargs["Item"]
+            return {}
+
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"put_item": on_put}),
+        )
+
+        service.create_order(
+            {
+                "customer": {"name": "Max Mustermann", "email": "max@example.com"},
+                "items": [{"sku": "SKU-1001", "quantity": 1, "unitPrice": 1999}],
+                "currency": "EUR",
+            }
+        )
+
+        self.assertNotIn("isTestData", put_item["item"])
+        self.assertNotIn("isTestData", put_item["item"]["items"][0])
+
 
 class TestGetOrder(unittest.TestCase):
     def test_returns_order_without_internal_fields(self):
@@ -138,6 +162,17 @@ class TestGetOrder(unittest.TestCase):
         self.assertEqual(order["status"], "PENDING")
         self.assertNotIn("pk", order)
         self.assertNotIn("version", order)
+
+    def test_returns_order_without_is_test_data_marker(self):
+        """Demo-Seed-Items tragen isTestData=true in DynamoDB, aber NICHT in der API-Antwort."""
+        item = make_order(isTestData=True)
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"get_item": lambda **kw: {"Item": item}}),
+        )
+
+        order = service.get_order(ORDER_ID)
+        self.assertNotIn("isTestData", order)
 
     def test_raises_order_not_found(self):
         service = create_order_service(
@@ -244,6 +279,10 @@ class TestUpdateOrderStatus(unittest.TestCase):
         self.assertIn("#status = :currentStatus", update_input["ConditionExpression"])
         self.assertEqual(update_input["ExpressionAttributeValues"][":currentStatus"], "PENDING")
         self.assertEqual(update_input["ExpressionAttributeValues"][":newStatus"], "CONFIRMED")
+        self.assertIn("#version = #version + :one", update_input["UpdateExpression"])
+        self.assertEqual(update_input["ExpressionAttributeValues"][":one"], 1)
+        self.assertNotIn("version", order)
+        self.assertNotIn("isTestData", order)
 
     def test_raises_invalid_transition(self):
         service = create_order_service(

@@ -28,7 +28,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-07 | `terraform validate` + `plan` (Review) | ✅ COMPLETE |
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
-| T011-10 | DynamoDB Testdaten-Seed (1.000 Orders, opt-in) | ✅ COMPLETE |
+| T011-10 | DynamoDB Demo-Seed (50 Orders, opt-in `seed_example_data`) | ✅ COMPLETE |
 
 ## Progress — laufender Arbeitsstand (Persistent Feature Progress)
 
@@ -40,14 +40,19 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-10 — DynamoDB Testdaten-Seed (1.000 Orders, opt-in) ✅ COMPLETE
-  · Seed-Datei database/seed/orders_seed_1000.jsonl (unverändert übernommen)
-  · Importer scripts/seed_orders.py (idempotent, normalisiert lineTotal/version)
-  · Cleanup scripts/delete_seed_orders.py (nur ord_00001..ord_01000)
-  · Terraform: variable seed_test_data (default false) + terraform_data.seed_orders
+T011-10 — DynamoDB Demo-Seed Finalisierung (50 Orders, opt-in) ✅ COMPLETE
+  · Seed-Datei database/seed/orders_seed_demo_50.json (Storage-Modell-konform:
+    version=1, isTestData=true, lineTotal; unverändert übernommen)
+  · Importer scripts/seed_orders.py (JSON + JSONL; minimale Normalisierung;
+    boto3-resource-API → Marshalling wie Produktivpfad; idempotent)
+  · Cleanup scripts/delete_seed_orders.py (nur Demo-Keys mit isTestData=true)
+  · Terraform: variable seed_example_data (default false) + terraform_data.seed_orders
     (count = opt-in; Trigger = Seed-Datei-SHA256 → kein Re-Run bei jedem apply)
-  · Tests 14/14 PASS · plan default 16 add (unverändert), seed=true 17 add
-  · kein apply; Report: docs/reports/DYNAMODB-SEED-1000.md
+  · version = reguläres Order-Feld (AP1 setzt 1, AP4 inkrementiert); isTestData =
+    reiner Testdaten-Marker (aus API-Antworten gestrippt, create_order setzt es nie)
+  · Tests Seed 28/28 + Lambda 51/51 PASS · plan default 16 add, seed=true 17 add
+  · kein apply; Report: docs/reports/DYNAMODB-SEED-DEMO-50.md
+  · 1.000er-Seed (orders_seed_1000.jsonl) bleibt als optionaler Test-/Load-Seed
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -58,7 +63,7 @@ Completed Tasks:
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 - T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
 - T011-07 terraform validate + plan (Review) ✅ (Branch feature/t011-07-plan-review)
-- T011-10 DynamoDB Testdaten-Seed (1.000 Orders, opt-in) ✅ (Branch feature/dynamodb-seed)
+- T011-10 DynamoDB Demo-Seed (50 Orders, opt-in) ✅ (Branch feature/dynamodb-seed-finalization)
 
 In Progress:
 - (keine)

@@ -2,20 +2,31 @@ from __future__ import annotations
 
 """Idempotenter DynamoDB-Seed-Importer für May's Orders.
 
-Lädt deterministische Test-Orders (ord_00001 … ord_01000) aus einer JSONL-Datei
-(database/seed/orders_seed_1000.jsonl) und schreibt sie in die bestehende
+Lädt deterministische Demo-Orders aus einer JSON-Datei (JSON-Array) oder einer
+JSONL-Datei (ein JSON-Objekt je Zeile) und schreibt sie in die bestehende
 DynamoDB-Tabelle. Vorhandene Items (pk+sk) werden übersprungen — die Operation
 ist dadurch idempotent und erzeugt keine Duplikate.
 
-Normalisierung beim Import (dokumentiert, siehe DYNAMODB-SEED-1000.md):
-- items[].lineTotal = quantity × unitPrice  (server-seitig, wie AP1)
-- version = 1                                (Optimistic-Locking-Feld)
+Bevorzugter Seed: 50 Demo-Orders (database/seed/orders_seed_demo_50.json) —
+die Datei entspricht bereits dem Storage-Modell (inkl. version, isTestData,
+lineTotal) und wird unverändert übernommen. Der 1.000er-Seed
+(database/seed/orders_seed_1000.jsonl) ist ein optionaler größerer
+Test-/Load-Seed; dort fehlende Modellfelder werden beim Import normalisiert:
+- items[].lineTotal = quantity × unitPrice  (falls nicht vorhanden)
+- version = 1                                (falls nicht vorhanden)
 - items[].name wird NICHT gespeichert        (nicht Teil des Item-Modells)
-Die Seed-Datei selbst bleibt unverändert.
+
+Dokumentation: docs/reports/DYNAMODB-SEED-DEMO-50.md, DYNAMODB-SEED-1000.md.
+
+Marshalling: Der Importer nutzt die boto3-**resource**-API (identisch zum
+produktiven Lambda-Pfad order_service.py). Die resource-API marshallt plain
+Python-Dicts automatisch in DynamoDB-AttributeValue-Maps (TypeSerializer);
+die low-level client-API würde manuelle Marshalling-Maps verlangen
+(AWS-Doku "Programming Amazon DynamoDB with Python and Boto3").
 
 Verwendung:
     python3 scripts/seed_orders.py --table mays-orders \
-        --file database/seed/orders_seed_1000.jsonl
+        --file database/seed/orders_seed_demo_50.json
 """
 
 import argparse
@@ -34,13 +45,18 @@ BATCH_WRITE_LIMIT = 25
 MAX_RETRIES = 8
 BASE_BACKOFF_SECONDS = 0.2
 
-_dynamodb_client = None
+_dynamodb_resource = None
 
 
-def _get_dynamodb_client():
-    """Boto3-Client lazy erzeugen (lokal ist boto3 nicht installiert)."""
-    global _dynamodb_client
-    if _dynamodb_client is None:
+def _get_dynamodb_resource():
+    """boto3-resource lazy erzeugen (lokal ist boto3 nicht installiert).
+
+    Bewusst die resource-API (nicht der low-level client): sie marshallt plain
+    Python-Dicts automatisch in DynamoDB-AttributeValue-Maps — exakt wie der
+    produktive Lambda-Pfad (order_service.py, _get_dynamodb_resource).
+    """
+    global _dynamodb_resource
+    if _dynamodb_resource is None:
         try:
             import boto3  # type: ignore[reportMissingImports]
         except ImportError as exc:  # pragma: no cover - nur bei echtem AWS-Import relevant
@@ -48,23 +64,33 @@ def _get_dynamodb_client():
                 "boto3 ist nicht installiert (pip install boto3). "
                 "Die Unit-Tests injizieren einen Fake-Client und brauchen boto3 nicht."
             ) from exc
-        _dynamodb_client = boto3.client("dynamodb", region_name=os.environ.get("AWS_REGION", "eu-central-1"))
-    return _dynamodb_client
+        _dynamodb_resource = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "eu-central-1"))
+    return _dynamodb_resource
 
 
 def normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalisiert ein Item auf das dokumentierte Item-Modell (dynamodb-design.md §2)."""
+    """Normalisiert ein Item auf das dokumentierte Storage-Modell (dynamodb-design.md §2).
+
+    Minimal-transformierend: vorhandene Werte (u. a. lineTotal, version,
+    isTestData) bleiben unverändert. Nur fehlende abgeleitete Felder werden
+    ergänzt und items[].name wird entfernt (nicht Teil des Item-Modells).
+    """
     normalized = dict(item)
     normalized["items"] = [
         {
             "sku": raw.get("sku"),
             "quantity": raw.get("quantity"),
             "unitPrice": raw.get("unitPrice"),
-            "lineTotal": raw.get("quantity", 0) * raw.get("unitPrice", 0),
+            "lineTotal": (
+                raw.get("lineTotal")
+                if raw.get("lineTotal") is not None
+                else raw.get("quantity", 0) * raw.get("unitPrice", 0)
+            ),
         }
         for raw in item.get("items", [])
     ]
-    normalized["version"] = 1
+    if "version" not in normalized:
+        normalized["version"] = 1
     return normalized
 
 
@@ -111,6 +137,9 @@ def validate_seed_item(item: Dict[str, Any]) -> None:
             raise ValueError("quantity muss ein Integer >= 1 sein")
         if not isinstance(raw.get("unitPrice"), int) or raw["unitPrice"] < 1:
             raise ValueError("unitPrice muss ein Integer >= 1 sein")
+        if "lineTotal" in raw:
+            if not isinstance(raw["lineTotal"], int) or raw["lineTotal"] != raw["quantity"] * raw["unitPrice"]:
+                raise ValueError("lineTotal muss quantity × unitPrice entsprechen")
 
     if not isinstance(item["totalAmount"], int) or item["totalAmount"] < 1:
         raise ValueError("totalAmount muss ein positiver Integer sein (Cent)")
@@ -120,29 +149,66 @@ def validate_seed_item(item: Dict[str, Any]) -> None:
             f"totalAmount {item['totalAmount']} != Summe der Items {computed}"
         )
 
+    if "version" in item:
+        if not isinstance(item["version"], int) or isinstance(item["version"], bool) or item["version"] < 1:
+            raise ValueError("version muss ein Integer >= 1 sein (Optimistic Locking)")
+    if "isTestData" in item:
+        if not isinstance(item["isTestData"], bool):
+            raise ValueError("isTestData muss ein Boolean sein")
 
-def load_seed_items(file_path: str) -> List[Dict[str, Any]]:
-    """Lädt alle Zeilen der JSONL-Datei und validiert jedes Item."""
+
+def _load_json_array(file_path: str, content: str) -> List[Dict[str, Any]]:
+    """Lädt eine JSON-Array-Datei (z. B. orders_seed_demo_50.json)."""
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{file_path}: kein gültiges JSON: {exc}") from exc
+    if not isinstance(data, list):
+        raise ValueError(f"{file_path}: erwartet wurde ein JSON-Array")
     items: List[Dict[str, Any]] = []
-    with open(file_path, "r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Zeile {line_number}: kein gültiges JSON: {exc}") from exc
-            if not isinstance(item, dict):
-                raise ValueError(f"Zeile {line_number}: erwartet wurde ein JSON-Objekt")
-            try:
-                validate_seed_item(item)
-            except ValueError as exc:
-                raise ValueError(f"Zeile {line_number} ({item.get('orderId', '?')}): {exc}") from exc
-            items.append(item)
+    for index, item in enumerate(data, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"{file_path} Element {index}: erwartet wurde ein JSON-Objekt")
+        try:
+            validate_seed_item(item)
+        except ValueError as exc:
+            raise ValueError(f"{file_path} Element {index} ({item.get('orderId', '?')}): {exc}") from exc
+        items.append(item)
+    if not items:
+        raise ValueError(f"{file_path}: Die Seed-Datei enthält keine Items")
+    return items
+
+
+def _load_jsonl(file_path: str, content: str) -> List[Dict[str, Any]]:
+    """Lädt eine JSONL-Datei (ein JSON-Objekt je Zeile)."""
+    items: List[Dict[str, Any]] = []
+    for line_number, line in enumerate(content.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Zeile {line_number}: kein gültiges JSON: {exc}") from exc
+        if not isinstance(item, dict):
+            raise ValueError(f"Zeile {line_number}: erwartet wurde ein JSON-Objekt")
+        try:
+            validate_seed_item(item)
+        except ValueError as exc:
+            raise ValueError(f"Zeile {line_number} ({item.get('orderId', '?')}): {exc}") from exc
+        items.append(item)
     if not items:
         raise ValueError("Die Seed-Datei enthält keine Items")
     return items
+
+
+def load_seed_items(file_path: str) -> List[Dict[str, Any]]:
+    """Lädt alle Items einer Seed-Datei (JSON-Array oder JSONL) und validiert jedes."""
+    with open(file_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+    if content.lstrip().startswith("["):
+        return _load_json_array(file_path, content)
+    return _load_jsonl(file_path, content)
 
 
 def _chunks(items: List[Any], size: int) -> List[List[Any]]:
@@ -205,7 +271,12 @@ def import_orders(
     client: Any = None,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
-    """Führt den idempotenten Seed-Import durch und liefert Statistiken."""
+    """Führt den idempotenten Seed-Import durch und liefert Statistiken.
+
+    `client` muss die boto3-**resource**-API-Oberfläche (batch_get_item /
+    batch_write_item) bieten — im Test ein Fake, in Produktion das Ergebnis
+    von _get_dynamodb_resource().
+    """
     raw_items = load_seed_items(file_path)
     items = [normalize_item(item) for item in raw_items]
 
@@ -217,7 +288,7 @@ def import_orders(
             "dry_run": True,
         }
 
-    active_client = client if client is not None else _get_dynamodb_client()
+    active_client = client if client is not None else _get_dynamodb_resource()
     existing = find_existing_keys(active_client, table_name, items)
 
     to_write = [item for item in items if (item["pk"], item["sk"]) not in existing]
@@ -234,7 +305,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--table", default=os.environ.get("ORDERS_TABLE", "mays-orders"))
     parser.add_argument(
         "--file",
-        default="database/seed/orders_seed_1000.jsonl",
+        default="database/seed/orders_seed_demo_50.json",
     )
     parser.add_argument("--dry-run", action="store_true", help="Nur validieren, nichts schreiben")
     args = parser.parse_args(argv)

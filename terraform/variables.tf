@@ -16,18 +16,18 @@ variable "tags" {
   default     = {}
 }
 
-# DynamoDB-Testdaten-Seed (opt-in, standardmäßig DEAKTIVIERT):
-# nur mit bewusstem `terraform apply -var="seed_test_data=true"` werden die
-# deterministischen Test-Orders (database/seed/orders_seed_1000.jsonl,
-# ord_00001..ord_01000) in die Tabelle geladen. Siehe DYNAMODB-SEED-1000.md.
-variable "seed_test_data" {
-  description = "Testdaten (1.000 Beispiel-Orders) in die DynamoDB-Tabelle laden (opt-in)."
+# DynamoDB-Beispiel-Daten-Seed (opt-in, standardmäßig DEAKTIVIERT):
+# nur mit bewusstem `terraform apply -var="seed_example_data=true"` werden die
+# 50 Demo-Orders (database/seed/orders_seed_demo_50.json) in die Tabelle geladen.
+# Siehe docs/reports/DYNAMODB-SEED-DEMO-50.md.
+variable "seed_example_data" {
+  description = "Importiert die bereitgestellten Beispiel-Orders in DynamoDB."
   type        = bool
   default     = false
 }
 
 variable "seed_file_path" {
-  description = "Pfad zur Seed-Datei (JSONL) relativ zum Repo-Root."
+  description = "Pfad zur Demo-Seed-Datei (JSON) relativ zum Repo-Root."
   type        = string
-  default     = "database/seed/orders_seed_1000.jsonl"
+  default     = "database/seed/orders_seed_demo_50.json"
 }
