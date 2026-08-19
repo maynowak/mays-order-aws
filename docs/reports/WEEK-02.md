@@ -32,6 +32,9 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-07 terraform validate + plan (Review, read-only) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-10 DynamoDB Testdaten-Seed (1.000 Orders, opt-in) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-10-Finalisierung DynamoDB Demo-Seed (50 Orders, opt-in `seed_example_data`, version/isTestData) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-11 CloudWatch Monitoring as Code (Dashboard, 6 Alarme, Log-Retention 7 Tage) | ✅ COMPLETE (IaC; kein apply) |
+| F010 — CloudWatch Monitoring | T010-02/03 (Retention 7 Tage, Dashboard + Alarme) via T011-11 | ✅ COMPLETE (IaC) |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
@@ -51,8 +54,11 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | Cleanup T011-04 (2026-08-18): `python3 build_zip.py` / `unzip -t` / `compileall` / unittest / `terraform fmt -check` / `init` / `validate` / `git diff --check` / Secret-Audit | PASS (kein plan/apply) |
 | Terraform plan | RUN (T011-07): 16 to add, 0 to change, 0 to destroy — Klassifikation A) EXPECTED/CLEAN |
 | Seed-Tests (scripts/tests) | PASS (14/14 — TEST 1-10 + Normalisierung + dry-run + Delete-Range; Fake-Client) |
+| Seed-Demo-Tests (scripts/tests) | PASS (28/28 — inkl. Demo-50 Import/Deletion, isTestData-Sicherheitscheck) |
+| Lambda-Tests (lambda/tests) | PASS (51/51 — Python, inkl. isTestData-Stripping, version-Inkrement) |
 | Seed-Data-Schema-Prüfung | PASS (1.000 Zeilen: Keys, GSI, Status, Beträge, Zeitstempel) |
 | Terraform plan (seed opt-in) | PASS (T011-10): default 16 add (unverändert); `-var="seed_test_data=true"` → 17 add (nur Seed-Ressource) |
+| Terraform plan (T011-11) | PASS (default: 24 add, 0 change, 0 destroy — 16 bestehende + 8 Monitoring; `monitoring_enabled=false` → 16 add; `dashboard_enabled=false` → 23 add) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
 | Node-Baseline (Vitest/tsc/npm) | REMOVED — Cleanup T011-04-CLEANUP; historisch via Git `449cdd7` |
@@ -101,3 +107,5 @@ dem Vier-Wochen-Plan (Woche 2).
 - Cleanup: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP) · Merge → `main` · Push: SUCCESS
 - T011-07: Branch `feature/t011-07-plan-review` (T011-07 Review, read-only) · Merge → `main` · Push: SUCCESS
 - T011-10: Branch `feature/dynamodb-seed` (DynamoDB Testdaten-Seed, opt-in, kein apply) · Merge → `main` · Push: SUCCESS
+- T011-10-Finalisierung: Branch `feature/dynamodb-seed-finalization` (Demo-50, opt-in, kein apply) · Merge → `main` (`e7347c6`) · Push: SUCCESS
+- T011-11: Branch `feature/t011-11-cloudwatch-monitoring` (CloudWatch Monitoring as Code, kein apply) · Merge → `main` · Push: offen

@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-06): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14), Cognito (User Pool + Client + Gruppe `staff`) und API Gateway HTTP API (vier Routen, JWT-Authorizer, Lambda-Integration) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand Woche 2 (T011-11): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14), Cognito (User Pool + Client + Gruppe `staff`), API Gateway HTTP API (vier Routen, JWT-Authorizer, Lambda-Integration) und CloudWatch Monitoring (Dashboard, Alarme, Log-Retention) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -16,7 +16,7 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-06, HTTP API):**
+**Aktueller Stand (T011-11, CloudWatch Monitoring):**
 
 ```text
 terraform/
@@ -24,9 +24,12 @@ terraform/
 │                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy),
 │                   Lambda (Order Handler), Cognito (User Pool, Client, Gruppe),
 │                   HTTP API (V2) + Stage + JWT-Authorizer + Integration + 4 Routen,
-│                   Lambda-Invoke-Permission (API GW)
-├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags)
-├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito, API GW; weitere je Ressource)
+│                   Lambda-Invoke-Permission (API GW), Seed-Opt-in (terraform_data)
+├── monitoring.tf   CloudWatch Monitoring (T011-11): Dashboard (mays-orders-overview),
+│                   Alarme (6), Lambda-Log-Group (Retention 7 Tage)
+├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags, Seed-Opt-in,
+│                   Monitoring-Schalter + Alarm-Schwellwerte)
+├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito, API GW)
 └── README.md       dieses Dokument
 ```
 
@@ -192,6 +195,30 @@ Bewusste Entscheidungen T011-06:
   die Security-Features (Woche 3) offen.
 - Keine zusätzlichen/öffentlichen Routen.
 
+## 2.6 CloudWatch Monitoring (T011-11)
+
+Fachliche Grundlage: `monitoring/monitoring-design.md` (Source of Truth),
+`cost/cost-analysis.md` §2 (kostenbewusst), F010.
+
+| Ressource | Terraform-Typ | Name | Konfiguration |
+|-----------|---------------|------|---------------|
+| Dashboard | `aws_cloudwatch_dashboard` | `${var.project_name}-overview` | „May's Orders — Order Management Overview"; Bereiche SYSTEM HEALTH, ORDER OPERATIONS, ERROR ANALYSIS; Widgets mit echten AWS-Metriken |
+| Alarme ×6 | `aws_cloudwatch_metric_alarm` | `${var.project_name}-api-5xx/-api-4xx/-lambda-errors/-lambda-duration/-lambda-throttles/-dynamodb-throttled` | AWS/ApiGateway, AWS/Lambda, AWS/DynamoDB; Schwellwerte als Variablen; `treat_missing_data = "notBreaching"`; kein SNS |
+| Log-Group | `aws_cloudwatch_log_group` | `/aws/lambda/${var.project_name}-handler` | `retention_in_days = var.log_retention_days` (Default 7) |
+
+- **Nur echte AWS-Namespaces:** `AWS/ApiGateway` (Count, 4XXError, 5XXError),
+  `AWS/Lambda` (Invocations, Errors, Duration, Throttles, ConcurrentExecutions),
+  `AWS/DynamoDB` (ThrottledRequests, ConditionalCheckFailedRequests).
+- **Business-Metriken** (Orders Created / by Status / Success Rate) sind **GAP /
+  PLANNED** (keine Custom Metrics, keine erfundenen Metric Names) —
+  `monitoring/monitoring-design.md` §9.
+- **Variablen:** `monitoring_enabled` (Default `true`; `false` → keine Monitoring-
+  Ressourcen), `dashboard_enabled`, `log_retention_days`, `alarm_period_seconds`,
+  `alarm_evaluation_periods`, 6 Alarm-Schwellwerte („Initial threshold / starting
+  value — requires calibration with real AWS metrics.").
+- Plan-Effekt: default **24 to add** (16 bestehende + 8 Monitoring: 1 Dashboard,
+  6 Alarme, 1 Log-Group). Kein `apply` in T011-11.
+
 ## 3. Geplante Ressourcen
 
 | Ressource | Terraform-Typ (Vorschlag) |
@@ -202,6 +229,9 @@ Bewusste Entscheidungen T011-06:
 | Lambda-Permission | `aws_lambda_permission` (API GW invoke) ✅ |
 | HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` ✅ |
 | Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_group` ✅ |
+| CloudWatch Dashboard | `aws_cloudwatch_dashboard` ✅ (T011-11) |
+| CloudWatch Alarme | `aws_cloudwatch_metric_alarm` ✅ (T011-11) |
+| CloudWatch Log-Group | `aws_cloudwatch_log_group` ✅ (T011-11, Retention 7 Tage) |
 
 ## 4. Workflow
 

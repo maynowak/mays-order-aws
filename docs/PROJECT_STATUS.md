@@ -17,12 +17,13 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
-T011-10 — DynamoDB Demo-Seed Finalisierung (50 Demo-Orders, version/isTestData, seed_example_data opt-in; kein apply; Report docs/reports/DYNAMODB-SEED-DEMO-50.md)
+T011-11 — CloudWatch Monitoring as Code (Dashboard mays-orders-overview, 6 Alarme, Log-Retention 7 Tage; IaC terraform/monitoring.tf; kein apply; Report docs/reports/T011-11-CLOUDWATCH-MONITORING.md)
+T011-10 — DynamoDB Demo-Seed Finalisierung COMPLETE (50 Demo-Orders, version/isTestData, seed_example_data opt-in; Report docs/reports/DYNAMODB-SEED-DEMO-50.md)
 T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
 
 Current Checkpoint:
-feature/dynamodb-seed-finalization (T011-10 — Demo-Seed 50, opt-in seed_example_data; kein apply)
-→ Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10
+feature/t011-11-cloudwatch-monitoring (T011-11 — CloudWatch Monitoring as Code; kein apply)
+→ Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 
 AWS Resources:
 NONE
@@ -34,6 +35,7 @@ Node.js/TypeScript T011-04: historische Baseline, aus aktivem Repo entfernt (Cle
 Terraform:
 DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) + API GW (T011-06) konfiguriert
 + DynamoDB Demo-Seed opt-in (T011-10: variable seed_example_data=false, terraform_data.seed_orders; 50 Demo-Orders)
++ CloudWatch Monitoring IaC (T011-11: Dashboard, 6 Alarme, Log-Retention 7 Tage — terraform/monitoring.tf; kein apply)
 
 Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
@@ -55,12 +57,14 @@ Cognito Authentication:
 CONFIGURED (Terraform T011-05) — NOT CREATED (kein apply)
 
 CloudWatch Monitoring:
-DESIGNED — NOT IMPLEMENTED
+IMPLEMENTED (IaC T011-11: Dashboard + 6 Alarme + Log-Retention 7 Tage, terraform/monitoring.tf) — NOT CREATED (kein apply; Live-Test übernächste Woche)
 
 Tests:
-Terraform init/validate PASS (T011-01…T011-06; AWS-Provider ~> 6.0 / 6.60.0);
+Terraform init/validate PASS (T011-01…T011-06, T011-11; AWS-Provider ~> 6.0 / 6.60.0);
 terraform plan RUN (T011-07): 16 to add, 0 to change, 0 to destroy — EXPECTED/CLEAN;
 terraform plan (T011-10): default 16 add; `-var="seed_example_data=true"` → 17 add (nur Seed-Ressource);
+terraform plan (T011-11): default 24 add (16 + 8 Monitoring: 1 Dashboard, 6 Alarme, 1 Log-Group);
+  `-var="monitoring_enabled=false"` → 16 add; `-var="dashboard_enabled=false"` → 23 add;
 Python unittest 49/49 → 51/51 PASS (Lambda) · compileall PASS · ZIP-Build/Integrität PASS;
 Seed-Tests 28/28 PASS (scripts/tests; TEST 1-10 + Normalisierung + dry-run + Delete-Range + Demo 50);
 Seed-Data-Schema-Prüfung PASS (1.000 Zeilen);
@@ -89,7 +93,8 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | W2-T011-06 | `9a332bf` (Branch `feature/http-api`) | F011/T011-06 HTTP API V2 (`mays-orders-api`) + `$default`-Stage (auto_deploy) + JWT-Authorizer (Cognito: Issuer aus `users.endpoint`, Audience = Client-ID) + Integration (AWS_PROXY, Payload 2.0) + 4 Routen (alle JWT) + Invoke-Permission (nur API GW); `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`8a85b5e`) | SUCCESS | COMPLETE |
 | W2-T011-04-CLEANUP | Cleanup (Branch `feature/lambda-python-cleanup`) | Node.js/TypeScript-Baseline (T011-04) aus aktivem Lambda-Projekt entfernt (`lambda/src/*.ts`, `tests/*.test.ts`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`; lokal `node_modules/`, `dist/index.js`); Python 3.14 bleibt aktiv; Baseline via Git `449cdd7`; Tests/Build/Terraform-Validation PASS; gemerged nach main | SUCCESS | COMPLETE |
 | W2-T011-07 | `…` (Branch `feature/t011-07-plan-review`) | F011/T011-07 Terraform validate + plan (Review, read-only): `fmt -check`/`init`/`validate` PASS; `plan` RUN — **16 to add, 0 to change, 0 to destroy**, exakt die dokumentierten Ressourcen, Klassifikation **A) EXPECTED/CLEAN**, keine unexpected changes/REPLACE, keine Discrepancies; Secret-Audit PASS; **kein apply**; Report `T011-07-TERRAFORM-PLAN-REVIEW.md`; gemerged nach main | SUCCESS | COMPLETE |
-| W2-T011-10 | `…` (Branch `feature/dynamodb-seed-finalization`) | F011/T011-10 Demo-Seed-Finalisierung: 50 Demo-Orders `database/seed/orders_seed_demo_50.json` (Storage-Modell-konform: `version=1`, `isTestData=true`, `lineTotal`), Importer `scripts/seed_orders.py` (JSON+JSONL, minimale Normalisierung, boto3-**resource**-API → Marshalling wie Produktivpfad, idempotent), Cleanup `scripts/delete_seed_orders.py` (nur Demo-Keys mit `isTestData=true`), Terraform `seed_example_data=false` + `terraform_data.seed_orders` (Trigger = Seed-Datei-SHA256); Tests Seed 28/28 + Lambda 51/51 PASS, `fmt`/`init`/`validate` PASS, `plan` default **16 add** / `seed_example_data=true` **17 add** (nur Seed-Ressource, keine Replaces/Deletes); `version` als reguläres Order-Feld bestätigt, `isTestData` nur Seed-Marker (aus API-Antworten gestrippt); **kein apply**; Report `DYNAMODB-SEED-DEMO-50.md` | SUCCESS | COMPLETE |
+| W2-T011-10 | `df046bc`/`e7347c6` (Branch `feature/dynamodb-seed-finalization`) | F011/T011-10 Demo-Seed-Finalisierung: 50 Demo-Orders `database/seed/orders_seed_demo_50.json` (Storage-Modell-konform: `version=1`, `isTestData=true`, `lineTotal`), Importer `scripts/seed_orders.py` (JSON+JSONL, minimale Normalisierung, boto3-**resource**-API → Marshalling wie Produktivpfad, idempotent), Cleanup `scripts/delete_seed_orders.py` (nur Demo-Keys mit `isTestData=true`), Terraform `seed_example_data=false` + `terraform_data.seed_orders` (Trigger = Seed-Datei-SHA256); Tests Seed 28/28 + Lambda 51/51 PASS, `fmt`/`init`/`validate` PASS, `plan` default **16 add** / `seed_example_data=true` **17 add** (nur Seed-Ressource, keine Replaces/Deletes); `version` als reguläres Order-Feld bestätigt, `isTestData` nur Seed-Marker (aus API-Antworten gestrippt); **kein apply**; Report `DYNAMODB-SEED-DEMO-50.md` | SUCCESS | COMPLETE |
+| W2-T011-11 | `…` (Branch `feature/t011-11-cloudwatch-monitoring`) | F011/T011-11 CloudWatch Monitoring as Code: `terraform/monitoring.tf` (Dashboard `mays-orders-overview` mit SYSTEM HEALTH/ORDER OPERATIONS/ERROR ANALYSIS; 6 Alarme `api-5xx`, `api-4xx`, `lambda-errors`, `lambda-duration`, `lambda-throttles`, `dynamodb-throttled`; Lambda-Log-Group Retention 7 Tage) + Monitoring-Variablen (`monitoring_enabled`, `dashboard_enabled`, `log_retention_days`, Alarm-Schwellwerte als „Initial threshold / starting value"): nur echte AWS-Namespaces (ApiGateway/Lambda/DynamoDB), Business-Metriken als GAP/PLANNED dokumentiert, kein SNS; `fmt`/`init`/`validate` PASS, `plan` default **24 add** (16+8), Toggles **16/23 add**, keine Replaces/Deletes, bestehende Infrastruktur unverändert; **kein apply**; Report `T011-11-CLOUDWATCH-MONITORING.md` | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -101,8 +106,8 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | Cognito Authentication | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-05, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
-| CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert; T011-07 plan-validiert — 16 Ressourcen; T011-10 Seed opt-in vorbereitet; apply ausstehend) | ⏳ PLANNED | ⏳ PLANNED |
+| CloudWatch Monitoring | ✅ COMPLETE | 🟡 IMPLEMENTED (IaC T011-11, kein apply) | ⏳ PLANNED (übernächste Woche) | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert; T011-07 plan-validiert — 16 Ressourcen; T011-10 Seed opt-in vorbereitet; T011-11 Monitoring IaC; apply ausstehend) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -118,8 +123,8 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | F007 — Status Transition | ⏳ PLANNED | Design: `order-lifecycle/transition-rules.md` |
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
-| F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ✅ (plan: 16 add, 0 change, 0 destroy) · T011-10 ✅ (Testdaten-Seed, opt-in). Design: `terraform/README.md` |
+| F010 — CloudWatch Monitoring | 🟡 IMPLEMENTED (IaC T011-11, kein apply) | Design: `monitoring/monitoring-design.md`; Dashboard/Alarme/Log-Retention als Terraform beschrieben; Live-Test übernächste Woche |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ✅ (plan: 16 add, 0 change, 0 destroy) · T011-10 ✅ (Testdaten-Seed, opt-in) · T011-11 ✅ (CloudWatch Monitoring IaC, plan: 24 add). Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 
