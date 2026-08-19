@@ -28,6 +28,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-07 | `terraform validate` + `plan` (Review) | ✅ COMPLETE |
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
+| T011-10 | DynamoDB Testdaten-Seed (1.000 Orders, opt-in) | ✅ COMPLETE |
 
 ## Progress — laufender Arbeitsstand (Persistent Feature Progress)
 
@@ -39,12 +40,14 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-07 — terraform validate + plan (Review) ✅ COMPLETE
-  · fmt -check / init / validate PASS
-  · plan RUN (read-only): 16 to add, 0 to change, 0 to destroy
-  · Klassifikation: A) EXPECTED/CLEAN — keine unexpected changes, kein REPLACE, keine Discrepancies
-  · kein apply; AWS Resources weiterhin NONE
-  · Report: docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md
+T011-10 — DynamoDB Testdaten-Seed (1.000 Orders, opt-in) ✅ COMPLETE
+  · Seed-Datei database/seed/orders_seed_1000.jsonl (unverändert übernommen)
+  · Importer scripts/seed_orders.py (idempotent, normalisiert lineTotal/version)
+  · Cleanup scripts/delete_seed_orders.py (nur ord_00001..ord_01000)
+  · Terraform: variable seed_test_data (default false) + terraform_data.seed_orders
+    (count = opt-in; Trigger = Seed-Datei-SHA256 → kein Re-Run bei jedem apply)
+  · Tests 14/14 PASS · plan default 16 add (unverändert), seed=true 17 add
+  · kein apply; Report: docs/reports/DYNAMODB-SEED-1000.md
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -55,6 +58,7 @@ Completed Tasks:
 - T011-05 Cognito (Pool, Client, Gruppe) ✅ (merged nach main)
 - T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
 - T011-07 terraform validate + plan (Review) ✅ (Branch feature/t011-07-plan-review)
+- T011-10 DynamoDB Testdaten-Seed (1.000 Orders, opt-in) ✅ (Branch feature/dynamodb-seed)
 
 In Progress:
 - (keine)
@@ -171,6 +175,24 @@ Changes Made:
   `plan` RUN — 16 to add, 0 to change, 0 to destroy (alle dokumentierten Ressourcen,
   Klassifikation A). Kein Code-/Architektur-Change; kein apply.
   Report: docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md
+- (T011-10) database/seed/orders_seed_1000.jsonl übernommen (1.000 deterministische
+  Test-Orders ord_00001..ord_01000; unverändert, Schema-abgeglichen)
+- (T011-10) scripts/seed_orders.py neu: idempotenter Importer (JSONL → DynamoDB),
+  normalisiert lineTotal = quantity × unitPrice, version = 1; items[].name wird
+  nicht gespeichert; batch_get_item-Existenzprüfung + batch_write_item mit
+  UnprocessedItems-Retry; --dry-run; CLI + injizierbarer Client
+- (T011-10) scripts/delete_seed_orders.py neu: Cleanup NUR ord_00001..ord_01000
+  (sk #ORDER), nicht automatisch bei terraform destroy; --dry-run
+- (T011-10) scripts/tests/test_seed_orders.py neu: 14 Tests (TEST 1-10 +
+  Normalisierung + dry-run + Delete-Range)
+- (T011-10) terraform/variables.tf: seed_test_data (bool, default false) +
+  seed_file_path (default database/seed/orders_seed_1000.jsonl)
+- (T011-10) terraform/main.tf: terraform_data.seed_orders (count = opt-in,
+  Trigger = SHA256 der Seed-Datei + Tabellenname → kein Re-Run bei jedem apply;
+  local-exec → scripts/seed_orders.py)
+- (T011-10) docs/reports/DYNAMODB-SEED-1000.md neu (Schema-Konformität, Abweichungen
+  dokumentiert, Implementierung, IAM, Tests, Kosten, Aktivierung)
+- (T011-10) database/README.md neu (Seed-Abschnitt, opt-in)
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
@@ -184,15 +206,26 @@ Tests:
 - Node-Baseline (Vitest/tsc): entfernt — historisch via Git `449cdd7` (Cleanup T011-04-CLEANUP)
 - LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): PASS (keine Diagnostics, `key_schema` in Completion)
 - Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; T011-07)
+- Seed-Tests (scripts/tests): PASS (14/14 — TEST 1-10 + Normalisierung + dry-run + Delete-Range)
+- Seed-Daten-Schema-Prüfung (100 % Zeilen): PASS (Keys, GSI, Status, Beträge, Zeitstempel)
 
 Validation:
 - Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; Klassifikation A)
+- Terraform plan (seed opt-in): PASS (RUN — 17 to add bei -var="seed_test_data=true";
+  nur terraform_data.seed_orders zusätzlich; default bleibt 16)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
 - Live-API: NOT RUN (kein apply; Lambda-Bundle nicht deployed)
+- Live-Seed (DynamoDB): NOT RUN (kein apply; Tests gegen Fake-Client, 14/14)
 - git diff --check: PASS
-- Secret-Audit: PASS (inkl. lambda/ Python-Quelltext, build_zip.py, terraform/)
+- Secret-Audit: PASS (inkl. lambda/ Python-Quelltext, build_zip.py, terraform/, scripts/)
 
 Known Issues:
+- Seed-Import normalisiert items[].lineTotal + version und speichert items[].name
+  NICHT (Abweichung dokumentiert in docs/reports/DYNAMODB-SEED-1000.md §2). Die
+  Seed-Datei bleibt unverändert; das Datenmodell bleibt Source of Truth.
+- Der Seed läuft per terraform_data.local-exec mit lokal installiertem Python + boto3.
+  Voraussetzung für die Ausführung (nur bei seed_test_data=true): `pip install boto3`
+  und gültige AWS-Credentials (lokal ist boto3 nicht installiert — Tests nutzen Fakes).
 - `index.py` unverändert: Der Handler routet bereits exakt über den HTTP-API-v2-Contract
   (`routeKey`, `pathParameters`, `queryStringParameters`, v2-Proxy-Response) — keine
   Anpassung für T011-06 erforderlich.
@@ -217,11 +250,12 @@ Blockers:
 - None
 
 Current Checkpoint:
-`feature/t011-07-plan-review` (T011-07 — Terraform validate + plan, read-only;
-Merge → main nach Push; Report docs/reports/T011-07-TERRAFORM-PLAN-REVIEW.md)
+`feature/dynamodb-seed` (T011-10 — DynamoDB Testdaten-Seed, opt-in; kein apply;
+Merge → main nach Push; Report docs/reports/DYNAMODB-SEED-1000.md)
 
 Next Step:
 T011-08 — terraform apply (nach menschlicher Freigabe) + Outputs dokumentieren
+(optional mit -var="seed_test_data=true" für den Testdaten-Import). STOP.
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -543,6 +577,7 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 - Branch: `main` · Commit: `449cdd7` · Push: SUCCESS
 - Cleanup-Stand: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP)
 - T011-07-Stand: Branch `feature/t011-07-plan-review` (T011-07 Review)
+- T011-10-Stand: Branch `feature/dynamodb-seed` (T011-10 Seed)
 
 ## Next Step
 

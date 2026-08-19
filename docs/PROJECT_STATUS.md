@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-08-18)
+## Aktueller Stand (zuletzt aktualisiert: 2026-08-19)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -17,11 +17,12 @@ Current Feature:
 F011 — Terraform Infrastructure
 
 Current Task:
+T011-10 — DynamoDB Testdaten-Seed (1.000 Orders, opt-in) COMPLETE (Branch feature/dynamodb-seed; kein apply; Report docs/reports/DYNAMODB-SEED-1000.md)
 T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
 
 Current Checkpoint:
-feature/t011-07-plan-review (T011-07 — Terraform validate + plan, read-only; kein apply)
-→ Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review
+feature/dynamodb-seed (T011-10 — DynamoDB Testdaten-Seed, opt-in; kein apply)
+→ Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10
 
 AWS Resources:
 NONE
@@ -32,6 +33,7 @@ Node.js/TypeScript T011-04: historische Baseline, aus aktivem Repo entfernt (Cle
 
 Terraform:
 DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) + API GW (T011-06) konfiguriert
++ DynamoDB Testdaten-Seed opt-in (T011-10: variable seed_test_data=false, terraform_data.seed_orders)
 
 Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
@@ -44,6 +46,7 @@ CONFIGURED (Terraform + Python-3.14-Code) — NOT CREATED (kein apply)
 
 DynamoDB:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
+Seed: 1.000 Test-Orders vorbereitet (database/seed/orders_seed_1000.jsonl) — NICHT importiert (opt-in, kein apply)
 
 IAM:
 CONFIGURED (Terraform) — NOT CREATED (kein apply)
@@ -57,7 +60,10 @@ DESIGNED — NOT IMPLEMENTED
 Tests:
 Terraform init/validate PASS (T011-01…T011-06; AWS-Provider ~> 6.0 / 6.60.0);
 terraform plan RUN (T011-07): 16 to add, 0 to change, 0 to destroy — EXPECTED/CLEAN;
+terraform plan (T011-10): default 16 add; `-var="seed_test_data=true"` → 17 add (nur Seed-Ressource);
 Python unittest 49/49 PASS · compileall PASS · ZIP-Build/Integrität PASS;
+Seed-Tests 14/14 PASS (scripts/tests; TEST 1-10 + Normalisierung + dry-run + Delete-Range);
+Seed-Data-Schema-Prüfung PASS (1.000 Zeilen);
 Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 ```
 
@@ -83,6 +89,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | W2-T011-06 | `9a332bf` (Branch `feature/http-api`) | F011/T011-06 HTTP API V2 (`mays-orders-api`) + `$default`-Stage (auto_deploy) + JWT-Authorizer (Cognito: Issuer aus `users.endpoint`, Audience = Client-ID) + Integration (AWS_PROXY, Payload 2.0) + 4 Routen (alle JWT) + Invoke-Permission (nur API GW); `fmt`/`init`/`validate` PASS, diff-check PASS, Secret-Audit PASS; gemerged nach main (`8a85b5e`) | SUCCESS | COMPLETE |
 | W2-T011-04-CLEANUP | Cleanup (Branch `feature/lambda-python-cleanup`) | Node.js/TypeScript-Baseline (T011-04) aus aktivem Lambda-Projekt entfernt (`lambda/src/*.ts`, `tests/*.test.ts`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`; lokal `node_modules/`, `dist/index.js`); Python 3.14 bleibt aktiv; Baseline via Git `449cdd7`; Tests/Build/Terraform-Validation PASS; gemerged nach main | SUCCESS | COMPLETE |
 | W2-T011-07 | `…` (Branch `feature/t011-07-plan-review`) | F011/T011-07 Terraform validate + plan (Review, read-only): `fmt -check`/`init`/`validate` PASS; `plan` RUN — **16 to add, 0 to change, 0 to destroy**, exakt die dokumentierten Ressourcen, Klassifikation **A) EXPECTED/CLEAN**, keine unexpected changes/REPLACE, keine Discrepancies; Secret-Audit PASS; **kein apply**; Report `T011-07-TERRAFORM-PLAN-REVIEW.md`; gemerged nach main | SUCCESS | COMPLETE |
+| W2-T011-10 | `…` (Branch `feature/dynamodb-seed`) | F011/T011-10 DynamoDB Testdaten-Seed (1.000 Orders, opt-in): Seed-Datei `database/seed/orders_seed_1000.jsonl` (unverändert, Schema-abgeglichen), Importer `scripts/seed_orders.py` (idempotent, normalisiert `lineTotal`/`version`), Cleanup `scripts/delete_seed_orders.py` (nur `ord_00001..ord_01000`), Terraform `seed_test_data=false` + `terraform_data.seed_orders` (Trigger = Seed-Datei-SHA256, kein Re-Run je apply); Tests 14/14 PASS, `compileall` PASS, `fmt`/`init`/`validate` PASS, `plan` default **16 add** (unverändert) / seed=true **17 add**; **kein apply**; Report `DYNAMODB-SEED-1000.md`; gemerged nach main | SUCCESS | COMPLETE |
 ## Phase-Level-Übersicht
 
 | Bereich | Design | Implementierung | Tests | Live-Verifizierung |
@@ -95,7 +102,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | IAM / Security | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-03, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | API Gateway (HTTP API) | ✅ COMPLETE | 🟡 IMPLEMENTED (Terraform T011-06, kein apply) | ⏳ PLANNED | ⏳ PLANNED |
 | CloudWatch Monitoring | ✅ COMPLETE | ⏳ PLANNED (W3/4) | ⏳ PLANNED | ⏳ PLANNED |
-| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert; T011-07 plan-validiert — 16 Ressourcen, apply ausstehend) | ⏳ PLANNED | ⏳ PLANNED |
+| Terraform | ✅ COMPLETE (Design) | 🔵 IN PROGRESS (T011-06 HTTP API konfiguriert; T011-07 plan-validiert — 16 Ressourcen; T011-10 Seed opt-in vorbereitet; apply ausstehend) | ⏳ PLANNED | ⏳ PLANNED |
 | Skalierung / Kosten / Well-Architected | ⏳ PLANNED (W4) | – | – | – |
 
 ## Feature-Status
@@ -112,7 +119,7 @@ Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 | F008 — Concurrent Update Protection | ⏳ PLANNED | Design: `reliability/consistency-and-failure-handling.md` |
 | F009 — IAM / Security | ⏳ PLANNED | Design: `security/iam-design.md` |
 | F010 — CloudWatch Monitoring | ⏳ PLANNED | Design: `monitoring/monitoring-design.md` |
-| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ✅ (plan: 16 add, 0 change, 0 destroy). Design: `terraform/README.md` |
+| F011 — Terraform Infrastructure | 🔵 IN PROGRESS | T011-01 ✅ · T011-02 ✅ · T011-03 ✅ · T011-04 ✅ (+ Cleanup) · T011-05 ✅ · T011-06 ✅ · T011-07 ✅ (plan: 16 add, 0 change, 0 destroy) · T011-10 ✅ (Testdaten-Seed, opt-in). Design: `terraform/README.md` |
 
 Detaillierte Feature-Dokumentation: `docs/features/`.
 

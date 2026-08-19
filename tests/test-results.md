@@ -8,8 +8,11 @@
 | Python-Tests (unittest) | ✅ PASS (49/49) | 2026-08-18 | `lambda/` · `PYTHONPATH=src python3 -m unittest discover -s tests -v` |
 | Python-Syntax (`compileall`) | ✅ PASS | 2026-08-18 | `python3 -m compileall -q src tests` |
 | ZIP-Build + Integrität | ✅ PASS | 2026-08-18 | `python3 build_zip.py` → `dist/lambda.zip` (6 Module) · `unzip -t` PASS |
+| Seed-Tests (scripts) | ✅ PASS (14/14) | 2026-08-19 | `scripts/` · `PYTHONPATH=scripts python3 -m unittest discover -s scripts/tests -v` (TEST 1-10 + Normalisierung + dry-run + Delete-Range) |
+| Seed-Data-Schema-Prüfung | ✅ PASS | 2026-08-19 | `database/seed/orders_seed_1000.jsonl` — 1.000 Zeilen: Keys, GSI, Status, Beträge, Zeitstempel |
 | Integration-Tests | NOT RUN | – | Lambda gegen echte DynamoDB erst nach apply |
 | Terraform validate | validate ✅ | 2026-08-18 | plan zu T011-07 |
+| Terraform plan (seed opt-in) | plan ✅ | 2026-08-19 | default 16 add; `-var="seed_test_data=true"` → 17 add (nur Seed-Ressource) |
 | Live-API-Tests | NOT RUN | – | Keine Ressourcen deployed |
 
 > Historische Node.js/TypeScript-Baseline (T011-04, Vitest 45/45, `npm run build`):
