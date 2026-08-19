@@ -4,38 +4,46 @@
 |------|------|
 | **ID** | F010 |
 | **Name** | CloudWatch Monitoring |
-| **Status** | ⏳ PLANNED |
+| **Status** | 🔵 IN PROGRESS (IaC T011-11 fertig; Live-Test offen) |
 | **Week** | 3–4 |
 | **Abhängigkeiten** | F003, F011 |
 | **Fachquelle** | `monitoring/monitoring-design.md` |
 
 ## Beschreibung
 
-Metriken (API 4xx/5xx, Lambda Errors/Duration, DynamoDB Throttling), strukturiertes JSON-Logging
-mit Retention, minimale Alarme (kostenbewusst) und ggf. Dashboard.
+Metriken (API 4xx/5xx, Lambda Errors/Duration/Throttles, DynamoDB Throttling),
+CloudWatch-Dashboard als Gesamtübersicht, minimale Alarme (kostenbewusst),
+Log-Retention 7 Tage — vollständig als **Terraform/IaC** beschrieben
+(T011-11, `terraform/monitoring.tf`). **Kein AWS Apply** in T011-11.
 
 ## Tasks
 
 | ID | Task | Status |
 |----|------|--------|
-| T010-01 | JSON-Logging in Lambda | ⏳ PLANNED |
-| T010-02 | Log-Retention setzen (7 Tage) | ⏳ PLANNED |
-| T010-03 | Metriken definieren + Alarme (falls angemessen) | ⏳ PLANNED |
-| T010-04 | Fehler-Szenarien auslösen und in Logs nachweisen | ⏳ PLANNED |
+| T010-01 | JSON-Logging in Lambda | 🟡 IMPLEMENTED (IaC-Retention; strukturiertes Logging im Handler-Code) |
+| T010-02 | Log-Retention setzen (7 Tage) | ✅ COMPLETE (T011-11: `aws_cloudwatch_log_group`, `log_retention_days=7`) |
+| T010-03 | Metriken definieren + Alarme (falls angemessen) | ✅ COMPLETE (IaC: Dashboard + 6 Alarme, konfigurierbare Schwellwerte) |
+| T010-04 | Fehler-Szenarien auslösen und in Logs nachweisen | ⏳ PLANNED (nach AWS-Live-Test, übernächste Woche) |
 | T010-05 | Skalierungs-/Kosten-Messung (Woche 4) | ⏳ PLANNED |
+| T010-06 | Business-Metriken (Orders Created / by Status / Success Rate) | ⏳ PLANNED (GAP dokumentiert, siehe monitoring-design.md §9) |
+| T010-07 | Alarm-Schwellwerte an realen Daten kalibrieren | ⏳ PLANNED (nach AWS-Live-Test) |
 
 ## Testnachweise
 
 | Prüfung | Status |
 |---------|--------|
-| Logging verifiziert | NOT RUN |
-| Alarme konfiguriert | NOT RUN |
+| Terraform fmt / init / validate | PASS (T011-11) |
+| Terraform plan (default) | PASS — 24 to add, 0 change, 0 destroy (T011-11) |
+| Logging verifiziert | NOT RUN (kein apply) |
+| Alarme konfiguriert | PASS (IaC) — live: NOT RUN |
+| Dashboard live | NOT RUN |
 | Messung (Duration/Cost) | NOT RUN |
 
 ## Git Checkpoint
 
-- Branch: `main` · Commit: offen · Push: offen
+- Branch: `feature/t011-11-cloudwatch-monitoring` · Commit: siehe T011-11 · Push: offen
 
 ## Next Step
 
-T010-01 (JSON-Logging) — nach Freigabe (Woche 3).
+AWS-Live-Test (übernächste Woche): Dashboard/Metriken/Alarme/Logs verifizieren,
+Thresholds kalibrieren.

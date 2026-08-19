@@ -29,6 +29,7 @@ vor jedem Apply; `apply` nur nach menschlicher Freigabe. Keine manuell erzeugte 
 | T011-08 | `terraform apply` (nach Freigabe) + Outputs dokumentieren | ⏳ PLANNED |
 | T011-09 | (Optional) S3-Backend-Entscheidung | ⏳ PLANNED |
 | T011-10 | DynamoDB Demo-Seed (50 Orders, opt-in `seed_example_data`) | ✅ COMPLETE |
+| T011-11 | CloudWatch Monitoring as Code (Dashboard, Alarme, Log-Retention) | ✅ COMPLETE (IaC; kein apply) |
 
 ## Progress — laufender Arbeitsstand (Persistent Feature Progress)
 
@@ -40,19 +41,22 @@ Status:
 🔵 IN PROGRESS
 
 Current Task:
-T011-10 — DynamoDB Demo-Seed Finalisierung (50 Orders, opt-in) ✅ COMPLETE
-  · Seed-Datei database/seed/orders_seed_demo_50.json (Storage-Modell-konform:
-    version=1, isTestData=true, lineTotal; unverändert übernommen)
-  · Importer scripts/seed_orders.py (JSON + JSONL; minimale Normalisierung;
-    boto3-resource-API → Marshalling wie Produktivpfad; idempotent)
-  · Cleanup scripts/delete_seed_orders.py (nur Demo-Keys mit isTestData=true)
-  · Terraform: variable seed_example_data (default false) + terraform_data.seed_orders
-    (count = opt-in; Trigger = Seed-Datei-SHA256 → kein Re-Run bei jedem apply)
-  · version = reguläres Order-Feld (AP1 setzt 1, AP4 inkrementiert); isTestData =
-    reiner Testdaten-Marker (aus API-Antworten gestrippt, create_order setzt es nie)
-  · Tests Seed 28/28 + Lambda 51/51 PASS · plan default 16 add, seed=true 17 add
-  · kein apply; Report: docs/reports/DYNAMODB-SEED-DEMO-50.md
-  · 1.000er-Seed (orders_seed_1000.jsonl) bleibt als optionaler Test-/Load-Seed
+T011-11 — CloudWatch Monitoring as Code (Dashboard, Alarme, Logs) ✅ COMPLETE
+  · terraform/monitoring.tf: aws_cloudwatch_dashboard (mays-orders-overview,
+    SYSTEM HEALTH / ORDER OPERATIONS / ERROR ANALYSIS), aws_cloudwatch_metric_alarm ×6
+    (api-5xx, api-4xx, lambda-errors, lambda-duration, lambda-throttles,
+    dynamodb-throttled), aws_cloudwatch_log_group (Lambda, Retention 7 Tage)
+  · Nur echte AWS-Namespaces (AWS/ApiGateway, AWS/Lambda, AWS/DynamoDB) — keine
+    erfundenen Metric Names; Business-Metriken (Orders Created/by Status/Success
+    Rate) als GAP/PLANNED dokumentiert (monitoring-design.md §9)
+  · Variablen: monitoring_enabled, dashboard_enabled, log_retention_days,
+    alarm_period_seconds, alarm_evaluation_periods, 6 Schwellwerte
+    ("Initial threshold / starting value — requires calibration with real AWS metrics.")
+  · kein SNS-Topic (kostenbewusst), treat_missing_data=notBreaching
+  · fmt/init/validate PASS; plan default 24 add (16+8), monitoring_enabled=false
+    → 16 add, dashboard_enabled=false → 23 add; keine Deletes/Replaces, keine
+    Änderung an bestehender Order-Infrastruktur
+  · kein apply; Report: docs/reports/T011-11-CLOUDWATCH-MONITORING.md
 
 Completed Tasks:
 - T011-01 Terraform-Gerüst             ✅
@@ -64,6 +68,7 @@ Completed Tasks:
 - T011-06 HTTP API + Routen + Authorizer ✅ (merged nach main via 8a85b5e)
 - T011-07 terraform validate + plan (Review) ✅ (Branch feature/t011-07-plan-review)
 - T011-10 DynamoDB Demo-Seed (50 Orders, opt-in) ✅ (Branch feature/dynamodb-seed-finalization)
+- T011-11 CloudWatch Monitoring as Code ✅ (Branch feature/t011-11-cloudwatch-monitoring)
 
 In Progress:
 - (keine)
@@ -198,6 +203,19 @@ Changes Made:
 - (T011-10) docs/reports/DYNAMODB-SEED-1000.md neu (Schema-Konformität, Abweichungen
   dokumentiert, Implementierung, IAM, Tests, Kosten, Aktivierung)
 - (T011-10) database/README.md neu (Seed-Abschnitt, opt-in)
+- (T011-11) terraform/monitoring.tf neu: aws_cloudwatch_dashboard (mays-orders-overview;
+  SYSTEM HEALTH, ORDER OPERATIONS [Business-Metriken GAP/PLANNED], ERROR ANALYSIS),
+  aws_cloudwatch_metric_alarm ×6 (api-5xx, api-4xx, lambda-errors, lambda-duration,
+  lambda-throttles, dynamodb-throttled; alle count=monitoring_enabled, ohne SNS),
+  aws_cloudwatch_log_group (Lambda, retention_in_days=7)
+- (T011-11) terraform/variables.tf: Monitoring-Variablen (monitoring_enabled,
+  dashboard_enabled, log_retention_days, alarm_period_seconds, alarm_evaluation_periods,
+  api_5xx_threshold, api_4xx_threshold, lambda_error_threshold,
+  lambda_duration_threshold_ms, lambda_throttle_threshold, dynamodb_throttled_threshold)
+- (T011-11) monitoring/monitoring-design.md: auf 15-Abschnitts-Stand aktualisiert
+  (Ziel, Logs, Metrics, Dashboard, Alarms, API/Lambda/DynamoDB/Order Metrics,
+  createdAt/updatedAt, Thresholds, Kosten, IaC, Validierung, AWS-Test später)
+- (T011-11) docs/reports/T011-11-CLOUDWATCH-MONITORING.md + EXECUTION-LOG neu
 
 Tests:
 - Terraform init: PASS (aws provider v6.60.0, `~> 6.0`)
@@ -212,19 +230,31 @@ Tests:
 - LSP-Test terraform-ls 0.39.0 (serve, Root = Repo): PASS (keine Diagnostics, `key_schema` in Completion)
 - Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; T011-07)
 - Seed-Tests (scripts/tests): PASS (14/14 — TEST 1-10 + Normalisierung + dry-run + Delete-Range)
+- Seed-Demo-Tests (scripts/tests): PASS (28/28 — inkl. Demo-50 Import/Deletion)
 - Seed-Daten-Schema-Prüfung (100 % Zeilen): PASS (Keys, GSI, Status, Beträge, Zeitstempel)
+- Lambda-Tests: PASS (51/51 — Python, inkl. isTestData-Stripping/version-Inkrement)
+- Terraform plan (T011-11): PASS (24 to add, 0 to change, 0 to destroy — 16 bestehende + 8 Monitoring)
+- Terraform plan (T011-11, monitoring_enabled=false): PASS (16 to add — Monitoring aus)
+- Terraform plan (T011-11, dashboard_enabled=false): PASS (23 to add — Dashboard aus)
 
 Validation:
 - Terraform plan: PASS (RUN — 16 to add, 0 to change, 0 to destroy; Klassifikation A)
 - Terraform plan (seed opt-in): PASS (RUN — 17 to add bei -var="seed_test_data=true";
   nur terraform_data.seed_orders zusätzlich; default bleibt 16)
+- Terraform plan (T011-11): PASS (24 to add, 0 to change, 0 to destroy; Toggle-Pläne PASS)
 - Terraform apply: NOT RUN (Freigabe erforderlich)
 - Live-API: NOT RUN (kein apply; Lambda-Bundle nicht deployed)
 - Live-Seed (DynamoDB): NOT RUN (kein apply; Tests gegen Fake-Client, 14/14)
+- CloudWatch live (Dashboard/Alarme/Logs): NOT RUN (kein apply)
 - git diff --check: PASS
 - Secret-Audit: PASS (inkl. lambda/ Python-Quelltext, build_zip.py, terraform/, scripts/)
 
 Known Issues:
+- Business-Metriken (Orders Created / Orders by Status / Order Success Rate) sind
+  noch KEINE CloudWatch-Metriken — GAP/PLANNED dokumentiert (monitoring-design.md §9);
+  keine erfundenen Metric Names, keine Custom Metrics in T011-11.
+- Alarm-Schwellwerte sind Initialwerte und erfordern Kalibrierung mit echten
+  AWS-Metriken ("Initial threshold / starting value").
 - Seed-Import normalisiert items[].lineTotal + version und speichert items[].name
   NICHT (Abweichung dokumentiert in docs/reports/DYNAMODB-SEED-1000.md §2). Die
   Seed-Datei bleibt unverändert; das Datenmodell bleibt Source of Truth.
@@ -255,12 +285,15 @@ Blockers:
 - None
 
 Current Checkpoint:
-`feature/dynamodb-seed` (T011-10 — DynamoDB Testdaten-Seed, opt-in; kein apply;
-Merge → main nach Push; Report docs/reports/DYNAMODB-SEED-1000.md)
+`feature/t011-11-cloudwatch-monitoring` (T011-11 — CloudWatch Monitoring as Code,
+Dashboard/Alarme/Logs; kein apply; Merge → main nach Push;
+Report docs/reports/T011-11-CLOUDWATCH-MONITORING.md)
 
 Next Step:
 T011-08 — terraform apply (nach menschlicher Freigabe) + Outputs dokumentieren
-(optional mit -var="seed_test_data=true" für den Testdaten-Import). STOP.
+(optional mit -var="seed_test_data=true" für den Demo-Import).
+Danach: AWS-Live-Test des Monitorings (Dashboard/Metriken/Alarme/Logs,
+Threshold-Kalibrierung). STOP.
 ```
 
 ## GSI1 — Begründung (T011-02)
@@ -583,7 +616,10 @@ Vergleich: `docs/architecture/LAMBDA_RUNTIME_COMPARISON.md`.
 - Cleanup-Stand: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP)
 - T011-07-Stand: Branch `feature/t011-07-plan-review` (T011-07 Review)
 - T011-10-Stand: Branch `feature/dynamodb-seed` (T011-10 Seed)
+- T011-10-Finalisierung: Branch `feature/dynamodb-seed-finalization` (Demo-50)
+- T011-11-Stand: Branch `feature/t011-11-cloudwatch-monitoring` (T011-11 Monitoring)
 
 ## Next Step
 
-T011-08 — `terraform apply` (nach menschlicher Freigabe) + Outputs dokumentieren. STOP.
+T011-08 — `terraform apply` (nach menschlicher Freigabe) + Outputs dokumentieren.
+Danach: AWS-Live-Test Monitoring. STOP.

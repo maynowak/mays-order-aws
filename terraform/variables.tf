@@ -31,3 +31,76 @@ variable "seed_file_path" {
   type        = string
   default     = "database/seed/orders_seed_demo_50.json"
 }
+
+# T011-11 — CloudWatch Monitoring (Dashboard, Alarme, Logs)
+# Fachquelle: monitoring/monitoring-design.md, cost/cost-analysis.md §2 CloudWatch.
+# monitoring_enabled=false erzeugt KEINE Monitoring-Ressourcen (kostenbewusst);
+# Standard ist aktiv, aber ohne unnötige Zusatzressourcen (kein SNS-Topic, keine
+# Custom Metrics — siehe docs/reports/T011-11-CLOUDWATCH-MONITORING.md).
+variable "monitoring_enabled" {
+  description = "Erstellt CloudWatch-Dashboard, -Alarme und die Lambda-Log-Group (Retention)."
+  type        = bool
+  default     = true
+}
+
+variable "dashboard_enabled" {
+  description = "Erstellt das CloudWatch-Übersichts-Dashboard (Teil des Monitorings)."
+  type        = bool
+  default     = true
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch-Log-Retention der Lambda-Log-Group in Tagen (kostenbewusst, monitoring-design.md §3)."
+  type        = number
+  default     = 7
+}
+
+variable "alarm_period_seconds" {
+  description = "Auswertungsperiode der Alarme in Sekunden (300 = 5 Minuten)."
+  type        = number
+  default     = 300
+}
+
+variable "alarm_evaluation_periods" {
+  description = "Anzahl aufeinanderfolgender Perioden, bis ein Alarm auslöst."
+  type        = number
+  default     = 1
+}
+
+# Schwellwerte — "Initial threshold / starting value — requires calibration with
+# real AWS metrics." Keine Produktionswerte behaupten (T011-11-Auftrag §8).
+variable "api_5xx_threshold" {
+  description = "API-5XX-Schwellwert (Summe / Auswertungsperiode). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 5
+}
+
+variable "api_4xx_threshold" {
+  description = "API-4XX-Schwellwert (Summe / Auswertungsperiode). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 20
+}
+
+variable "lambda_error_threshold" {
+  description = "Lambda-Errors-Schwellwert (Summe / Auswertungsperiode). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 1
+}
+
+variable "lambda_duration_threshold_ms" {
+  description = "Lambda-Duration-Schwellwert in Millisekunden (Average / Auswertungsperiode; Lambda-Timeout = 10000 ms). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 8000
+}
+
+variable "lambda_throttle_threshold" {
+  description = "Lambda-Throttles-Schwellwert (Summe / Auswertungsperiode). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 1
+}
+
+variable "dynamodb_throttled_threshold" {
+  description = "DynamoDB-ThrottledRequests-Schwellwert (Summe / Auswertungsperiode). Initial threshold / starting value — requires calibration with real AWS metrics."
+  type        = number
+  default     = 1
+}

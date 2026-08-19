@@ -2,6 +2,42 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-19 — CloudWatch Monitoring as Code T011-11 (F010/F011, Branch `feature/t011-11-cloudwatch-monitoring`)
+
+### Implementierung
+- `terraform/monitoring.tf` (neu): `aws_cloudwatch_dashboard` (`mays-orders-overview` —
+  „May's Orders — Order Management Overview", Bereiche SYSTEM HEALTH / ORDER
+  OPERATIONS / ERROR ANALYSIS), `aws_cloudwatch_metric_alarm` ×6 (`api-5xx`,
+  `api-4xx`, `lambda-errors`, `lambda-duration`, `lambda-throttles`,
+  `dynamodb-throttled`), `aws_cloudwatch_log_group` (`/aws/lambda/...`, Retention 7 Tage).
+- Nur echte AWS-Namespaces (`AWS/ApiGateway`, `AWS/Lambda`, `AWS/DynamoDB`) — keine
+  erfundenen Metric Names; Dimensionen referenzieren die bestehenden Terraform-Ressourcen
+  (ApiId/Stage, FunctionName, TableName).
+- Business-Metriken (Orders Created / Orders by Status / Order Success Rate) als
+  **GAP / PLANNED** dokumentiert (monitoring-design.md §9) — keine Custom Metrics,
+  keine künstliche Implementierung.
+- `terraform/variables.tf`: `monitoring_enabled` (Default `true`), `dashboard_enabled`,
+  `log_retention_days` (7), `alarm_period_seconds` (300), `alarm_evaluation_periods` (1),
+  Alarm-Schwellwerte (`api_5xx_threshold` 5, `api_4xx_threshold` 20,
+  `lambda_error_threshold` 1, `lambda_duration_threshold_ms` 8000,
+  `lambda_throttle_threshold` 1, `dynamodb_throttled_threshold` 1) — alle als
+  „Initial threshold / starting value — requires calibration with real AWS metrics."
+- `monitoring/monitoring-design.md` auf 15-Abschnitts-Stand aktualisiert (Ziel, Logs,
+  Metrics, Dashboard, Alarme, API/Lambda/DynamoDB/Order Metrics, createdAt/updatedAt,
+  Thresholds, Kosten, IaC, Validierung, AWS-Test später).
+
+### Validation
+- `terraform fmt -check`/`init`/`validate` PASS.
+- `terraform plan` (default): **24 to add, 0 to change, 0 to destroy** (16 bestehende +
+  8 Monitoring-Ressourcen) — keine Replaces/Deletes, bestehende Infrastruktur unverändert.
+- `terraform plan -var="monitoring_enabled=false"`: **16 to add** (Monitoring aus).
+- `terraform plan -var="dashboard_enabled=false"`: **23 to add** (Dashboard aus).
+- Dashboard-JSON (Widget-Schema) via `terraform console` validiert (text/metric-Widgets).
+- Python-Tests (Lambda 51/51, Seed 28/28) erneut grün · `git diff --check` PASS ·
+  Secret-Audit PASS.
+- `terraform apply`: **NOT RUN** (Freigabe erforderlich) · CloudWatch live: **NOT RUN**
+  (AWS-Live-Test erst übernächste Woche).
+
 ## 2026-08-19 — DynamoDB Demo-Seed-Finalisierung T011-10 (F011, Branch `feature/dynamodb-seed-finalization`)
 
 ### Implementierung
