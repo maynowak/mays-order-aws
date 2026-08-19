@@ -2,6 +2,41 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-19 — DynamoDB Demo-Seed-Finalisierung T011-10 (F011, Branch `feature/dynamodb-seed-finalization`)
+
+### Implementierung
+- `database/seed/orders_seed_demo_50.json` (neu): 50 modell-konforme Demo-Orders
+  (14 Felder: `pk, sk, orderId, status, customer, items, currency, totalAmount,
+  createdAt, updatedAt, version, isTestData, gsi1pk, gsi1sk`), Status-Verteilung
+  PENDING 12 · CONFIRMED 13 · SHIPPED 13 · CANCELLED 12, `version=1`,
+  `isTestData=true`, `lineTotal`/`totalAmount` konsistent; unverändert importiert.
+- `scripts/seed_orders.py`: JSON-Array- **und** JSONL-Loader (Datei-Start `[` →
+  Array), minimale Normalisierung (ergänzt nur fehlende `lineTotal`/`version`,
+  entfernt `items[].name`), boto3-**resource**-API (auto-Marshalling wie
+  `order_service.py`), Default-Datei = demo-50, `--dry-run`.
+- `scripts/delete_seed_orders.py`: Demo-Keys direkt aus der Seed-Datei
+  (Single Source of Truth) + Sicherheitsbedingung **`isTestData == true`**;
+  Nicht-Testdaten-Items werden nie gelöscht; `--dry-run`.
+- `lambda/src/order_types.py`: `OrderDynamoItem.isTestData` (optional) + Kommentar
+  (reiner Seed-Marker, kein Produktfeld).
+- `lambda/src/order_service.py`: `INTERNAL_FIELDS` += `isTestData` → wird aus
+  allen API-Antworten gestrippt; `create_order` setzt es nie.
+- `terraform/variables.tf`: `seed_example_data` (bool, **Default `false`**) +
+  `seed_file_path` (Default demo-50).
+- `terraform/main.tf`: `terraform_data.seed_orders` (count = `seed_example_data`,
+  Trigger = SHA256 der Seed-Datei + Tabellenname).
+- `docs/reports/DYNAMODB-SEED-DEMO-50.md` (neu): Finalisierungs-Report.
+
+### Validation
+- Seed-Tests **28/28 PASS** · Lambda-Tests **51/51 PASS** · `compileall` PASS ·
+  beide Skripte `--dry-run` PASS.
+- `terraform fmt -check`/`init`/`validate` PASS.
+- `terraform plan` (Default): **16 to add** — kein Beispiel-Import.
+- `terraform plan -var="seed_example_data=true"`: **17 to add** — nur
+  `terraform_data.seed_orders[0]` zusätzlich.
+- `terraform apply`: NOT RUN (Freigabe erforderlich) · `git diff --check` PASS ·
+  Secret-Audit PASS.
+
 ## 2026-08-19 — DynamoDB Testdaten-Seed T011-10 (F011, Branch `feature/dynamodb-seed`)
 
 ### Implementierung

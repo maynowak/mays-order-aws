@@ -12,7 +12,9 @@ from state_machine import can_transition
 from order_types import GSI1_PK, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
 
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "version"}
+# version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
+# darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
+INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "version", "isTestData"}
 
 _dynamodb_resource = None
 

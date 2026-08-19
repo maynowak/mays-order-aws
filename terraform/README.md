@@ -59,6 +59,20 @@ AP3 (GET /orders)            → Query(gsi1, gsi1pk=LIST, absteigend) → GSI1
 
 Kein Scan für irgendein Pattern (ADR-002).
 
+### Demo-Daten-Seed (T011-10, opt-in)
+
+Die 50 Demo-Orders (`database/seed/orders_seed_demo_50.json`) werden **nur** mit
+bewusster Aktivierung importiert (`seed_example_data`, **Default `false`**):
+
+```bash
+terraform plan                       # 16 to add — kein Beispiel-Import
+terraform apply -var="seed_example_data=true"   # nach Freigabe → Infrastruktur + 50 Demo-Orders
+```
+
+`terraform_data.seed_orders` (count = `seed_example_data`) triggert über den
+SHA256 der Seed-Datei + Tabellenname; der Importer ist zusätzlich idempotent.
+Details: `docs/reports/DYNAMODB-SEED-DEMO-50.md`.
+
 ## 2.2 IAM — Lambda Execution Role (T011-03)
 
 Fachliche Grundlage: `security/iam-design.md` §2.1. Least Privilege verpflichtend.

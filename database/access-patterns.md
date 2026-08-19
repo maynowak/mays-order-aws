@@ -50,6 +50,20 @@ UpdateItem(
 - `attribute_exists(pk)` → 404, wenn Order fehlt (statt Überschreiben).
 - `#status = :current` → atomarer Schutz gegen konkurrierende Updates (siehe `transition-rules.md` §4).
 - Verlierer erhält `ConditionalCheckFailedException` → HTTP 409.
+- `version` wird bei jedem Statuswechsel inkrementiert (`version = version + 1`, Optimistic-Locking-Feld).
+
+## 2.5 Demo-Seed-Daten (isTestData)
+
+Die 50 Demo-Orders (`database/seed/orders_seed_demo_50.json`) tragen
+`isTestData = true` in DynamoDB. Das Feld ist ein reiner Testdaten-Marker:
+
+- Es ändert **keine** der Access Patterns AP1…AP4 (GetItem / GSI1-Query / UpdateItem).
+- Es wird über `order_service.py` (`INTERNAL_FIELDS`) aus **allen API-Antworten** entfernt
+  (AP2/AP3/AP4) — Clients sehen den Marker nicht.
+- Normale Orders (AP1) erhalten das Feld **nie** (`create_order` setzt es nicht; die
+  Eingabe-Validierung weist `isTestData` als unbekanntes Feld ab).
+- AP3-Listing bleibt ein Query auf GSI1 (`gsi1pk = LIST`, `ScanIndexForward=false`)
+  — die Seed-Items liegen dort regulär, kein Scan.
 
 ## 3. Query vs. Scan — Warum kein Scan nötig ist
 
