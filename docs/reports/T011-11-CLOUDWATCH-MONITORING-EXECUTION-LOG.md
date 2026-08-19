@@ -258,3 +258,45 @@ Keine (read-only).
 Git-Checkpoint: Commit auf `feature/t011-11-cloudwatch-monitoring` → Merge nach `main`.
 
 ---
+
+## 2026-08-19 15:52 — Schritt 8
+
+### Aktion
+Git-Checkpoint (Abschnitt 20): Commit auf Feature-Branch, Merge nach `main`, Status prüfen.
+
+### Command
+git add <11 Dateien> && git commit (feat: define cloudwatch monitoring as terraform)
+git checkout main && git merge --no-ff feature/t011-11-cloudwatch-monitoring
+git log --oneline --decorate -15 && git status -sb
+
+### Ergebnis
+PASS
+
+### Evidenz
+- Commit `60fa4c7` (Branch `feature/t011-11-cloudwatch-monitoring`) — ausführlicher Body
+  (Dashboard, Metrics, Alarms, Log-Group, Variablen, Business-Metriken, createdAt/updatedAt,
+  kein apply, Report).
+- Merge `3790390` nach `main` (--no-ff). Branch bleibt erhalten.
+- Arbeitsbaum auf `main` sauber (nur untracked `docs.zip` — stray, bewusst nicht committet).
+- `git diff --check` PASS, Secret-Audit PASS (vor Commit geprüft).
+
+### Änderungen
+Git: Commit `60fa4c7`, Merge `3790390` nach `main`.
+
+### Nächster Schritt
+STOP. Kein apply, kein AWS-Live-Test. Finaler Status in
+docs/reports/T011-11-CLOUDWATCH-MONITORING.md §16.
+
+---
+
+## Abschluss
+
+| Statuswert | Wert |
+|------------|------|
+| IMPLEMENTED | Terraform-Dashboard, -Alarme, -Log-Group |
+| TESTED | Lambda 51/51, Seed 28/28, compileall |
+| VALIDATED | terraform fmt / init / validate PASS |
+| PLAN VERIFIED | plan default 24 add (0 change, 0 destroy); Toggles 16/23 add |
+| LIVE VERIFIED | NOT RUN (kein apply) |
+| NOT RUN | AWS apply, Dashboard live, Alarms live, Metrics live |
+| BLOCKED | — (keine Blocker) |
