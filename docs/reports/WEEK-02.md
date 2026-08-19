@@ -31,6 +31,7 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | F002 — Cognito Authentication | T002-01…03 (User Pool, Client, Gruppe `staff`) via T011-05 | ✅ COMPLETE |
 | F003 — API Gateway | T011-06 HTTP API + Routen + JWT Authorizer (via F011) | ✅ COMPLETE |
 | F011 — Terraform Infrastructure | T011-07 terraform validate + plan (Review, read-only) | ✅ COMPLETE |
+| F011 — Terraform Infrastructure | T011-10 DynamoDB Testdaten-Seed (1.000 Orders, opt-in) | ✅ COMPLETE |
 | F004 — Order Creation | … | ⏳ PLANNED |
 | F005 — Order Retrieval | … | ⏳ PLANNED |
 | F006 — Order Listing | … | ⏳ PLANNED |
@@ -49,6 +50,9 @@ AWS-Ressourcen erzeugt, kein `apply`.
 | Recovery T011-06 (2026-08-18): `terraform fmt -check` / `terraform validate` / `git diff --check` / Secret-Audit | PASS (read-only, kein plan/apply) |
 | Cleanup T011-04 (2026-08-18): `python3 build_zip.py` / `unzip -t` / `compileall` / unittest / `terraform fmt -check` / `init` / `validate` / `git diff --check` / Secret-Audit | PASS (kein plan/apply) |
 | Terraform plan | RUN (T011-07): 16 to add, 0 to change, 0 to destroy — Klassifikation A) EXPECTED/CLEAN |
+| Seed-Tests (scripts/tests) | PASS (14/14 — TEST 1-10 + Normalisierung + dry-run + Delete-Range; Fake-Client) |
+| Seed-Data-Schema-Prüfung | PASS (1.000 Zeilen: Keys, GSI, Status, Beträge, Zeitstempel) |
+| Terraform plan (seed opt-in) | PASS (T011-10): default 16 add (unverändert); `-var="seed_test_data=true"` → 17 add (nur Seed-Ressource) |
 | Terraform apply | NOT RUN (Freigabe erforderlich) |
 | Live-API | NOT RUN |
 | Node-Baseline (Vitest/tsc/npm) | REMOVED — Cleanup T011-04-CLEANUP; historisch via Git `449cdd7` |
@@ -96,3 +100,4 @@ dem Vier-Wochen-Plan (Woche 2).
 - Merge: `feature/http-api` → `main` (Commit `8a85b5e`) · Push main: SUCCESS
 - Cleanup: Branch `feature/lambda-python-cleanup` (T011-04-CLEANUP) · Merge → `main` · Push: SUCCESS
 - T011-07: Branch `feature/t011-07-plan-review` (T011-07 Review, read-only) · Merge → `main` · Push: SUCCESS
+- T011-10: Branch `feature/dynamodb-seed` (DynamoDB Testdaten-Seed, opt-in, kein apply) · Merge → `main` · Push: SUCCESS

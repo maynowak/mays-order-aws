@@ -2,6 +2,47 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-08-19 — DynamoDB Testdaten-Seed T011-10 (F011, Branch `feature/dynamodb-seed`)
+
+### Implementierung
+- `database/seed/orders_seed_1000.jsonl` (neu, unverändert übernommen): 1.000
+  deterministische Beispiel-Orders (`ord_00001`…`ord_01000`), Schema-abgeglichen
+  gegen `database/dynamodb-design.md` §2.
+- `scripts/seed_orders.py` (neu): idempotenter Importer — JSONL→DynamoDB,
+  `batch_get_item`-Existenzprüfung (überspringt vorhandene `pk`+`sk`),
+  `batch_write_item` mit UnprocessedItems-Retry, Normalisierung
+  (`lineTotal = quantity × unitPrice`, `version = 1`; `items[].name` wird nicht
+  gespeichert), `--dry-run`, injizierbarer Client (Tests ohne boto3).
+- `scripts/delete_seed_orders.py` (neu): Cleanup ausschließlich
+  `ord_00001`…`ord_01000` (`sk` `#ORDER`), bewusst NICHT automatisch bei
+  `terraform destroy`; `--dry-run` als Audit-Ansicht.
+- `scripts/tests/test_seed_orders.py` (neu): 14 Tests (TEST 1-10 der Aufgabe +
+  Normalisierung + dry-run + Delete-Range), Fake-Client nach Lambda-Muster.
+- `terraform/variables.tf`: `seed_test_data` (`bool`, **Default `false`**) +
+  `seed_file_path` (Default `database/seed/orders_seed_1000.jsonl`).
+- `terraform/main.tf`: `terraform_data.seed_orders` (opt-in `count`, Trigger =
+  SHA256 der Seed-Datei + Tabellenname → kein Re-Run bei jedem `apply`).
+- `docs/reports/DYNAMODB-SEED-1000.md` (neu): Report mit Schema-Konformität,
+  dokumentierten Abweichungen (`lineTotal`/`version` fehlend, `items[].name`
+  zusätzlich — beim Import normalisiert, Datei unverändert), IAM (Least
+  Privilege, keine Lambda-Role-Erweiterung), Tests, Kosten, Aktivierung.
+- `database/README.md` (neu): Seed-Abschnitt (opt-in, idempotent, Cleanup).
+
+### Validation
+- `python3 -m compileall -q scripts` PASS · `PYTHONPATH=scripts python3 -m
+  unittest discover -s scripts/tests -v` PASS (14/14).
+- `python3 scripts/seed_orders.py --dry-run` PASS (1.000 validiert, 0 geschrieben).
+- Terraform `fmt -check`/`init`/`validate` PASS.
+- `terraform plan` (Default): **16 to add** — unverändert, kein Seed.
+- `terraform plan -var="seed_test_data=true"`: **17 to add** — nur
+  `terraform_data.seed_orders` zusätzlich.
+- `terraform apply`: NOT RUN (Freigabe erforderlich) · `git diff --check` PASS ·
+  Secret-Audit PASS.
+
+### Status
+- Week 2 IN PROGRESS · F011 IN PROGRESS · T011-01…07, T011-10 COMPLETE ·
+  T011-08 NEXT (apply, Freigabe) · AWS Resources: NONE.
+
 ## 2026-08-18 — Lambda Runtime Documentation Cleanup (Doku-Cleanup)
 
 ### Dokumentation

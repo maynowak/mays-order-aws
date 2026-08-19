@@ -276,3 +276,23 @@ resource "aws_lambda_permission" "api_gateway" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.orders.execution_arn}/*/*"
 }
+
+# DynamoDB-Testdaten-Seed (opt-in) — siehe docs/reports/DYNAMODB-SEED-1000.md
+# Läuft NUR wenn var.seed_test_data = true. Trigger ist der SHA256 der
+# Seed-Datei + Tabellenname: bei unveränderter Datei KEIN Re-Run bei jedem apply
+# (der Importer selbst ist zusätzlich idempotent). Standardmäßig (count = 0)
+# bleibt der Plan unverändert (16 Ressourcen, kein Seed).
+resource "terraform_data" "seed_orders" {
+  count = var.seed_test_data ? 1 : 0
+
+  input = {
+    seed_file_sha256 = filebase64sha256("${path.module}/../${var.seed_file_path}")
+    table_name       = aws_dynamodb_table.orders.name
+  }
+
+  provisioner "local-exec" {
+    command = "python3 ${path.module}/../scripts/seed_orders.py --table ${aws_dynamodb_table.orders.name} --file ${path.module}/../${var.seed_file_path}"
+  }
+
+  depends_on = [aws_dynamodb_table.orders]
+}
