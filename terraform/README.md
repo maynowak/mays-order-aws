@@ -1,6 +1,6 @@
 # Terraform — May's Orders
 
-> Stand Woche 2 (T011-11): **DynamoDB-Tabelle + GSI1, IAM (Execution Role), Lambda (Order Handler, Python 3.14), Cognito (User Pool + Client + Gruppe `staff`), API Gateway HTTP API (vier Routen, JWT-Authorizer, Lambda-Integration) und CloudWatch Monitoring (Dashboard, Alarme, Log-Retention) umgesetzt.** AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+> Stand T011-12: **Modularisierte Terraform-Infrastruktur** — DynamoDB, IAM, Lambda, Cognito, API Gateway HTTP API, CloudWatch Monitoring in 6 Child Modules. AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
 
 ## 1. Ziel
 
@@ -11,33 +11,62 @@ Die AWS-Infrastruktur wird vollständig als Infrastructure as Code abgebildet:
 - DynamoDB (`mays-orders`)
 - IAM (Lambda Execution Role, Resource-Based Policy)
 - Cognito User Pool + Client + Gruppe `staff`
+- CloudWatch Monitoring (Dashboard, Alarme, Log-Retention)
 
 Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-11, CloudWatch Monitoring):**
+**Aktueller Stand (T011-12, Modularisierung):**
 
 ```text
 terraform/
-├── main.tf         terraform-Block, AWS-Provider, Region, Default-Tags,
-│                   DynamoDB-Tabelle + GSI1, IAM (Role, Trust, Policy),
-│                   Lambda (Order Handler), Cognito (User Pool, Client, Gruppe),
-│                   HTTP API (V2) + Stage + JWT-Authorizer + Integration + 4 Routen,
-│                   Lambda-Invoke-Permission (API GW), Seed-Opt-in (terraform_data)
-├── monitoring.tf   CloudWatch Monitoring (T011-11): Dashboard (mays-orders-overview),
-│                   Alarme (6), Lambda-Log-Group (Retention 7 Tage)
-├── variables.tf    Eingabevariablen (Region, Projekt-Name, Tags, Seed-Opt-in,
-│                   Monitoring-Schalter + Alarm-Schwellwerte)
-├── outputs.tf      Outputs (DynamoDB, IAM, Lambda, Cognito, API GW)
-└── README.md       dieses Dokument
+├── main.tf         Root Orchestrator: Provider, 6 Module Calls, 26 moved blocks, Seed Resource
+├── variables.tf    Root Variables (Region, Project Name, Tags, Seed, Monitoring, Alarm Thresholds)
+├── outputs.tf      Root Outputs (re-exported from modules)
+├── monitoring.tf   Placeholder — resources moved to module.monitoring
+└── modules/
+    ├── dynamodb/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── iam/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── lambda/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── cognito/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    ├── api/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── monitoring/
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
 ```
 
 **Quellcode der Lambda:** `lambda/` (Python 3.14, aktiv; Node.js/TypeScript-
 Baseline T011-04 entfernt, historisch via Git `449cdd7`) — siehe §2.3.
 
-**Geplante Erweiterung (ab T011-04):** Die übrigen Ressourcen (Lambda, API GW,
-Cognito) werden in `main.tf` ergänzt; relevante Outputs in `outputs.tf`.
+**Modulzuordnung (T011-12):**
+
+| Modul | Ressourcen |
+|-------|------------|
+| `module.dynamodb` | DynamoDB Tabelle + GSI1 |
+| `module.iam` | IAM Role + Policy (Least Privilege) |
+| `module.lambda` | Lambda Function + CloudWatch Log Group |
+| `module.cognito` | User Pool + App Client + Group `staff` |
+| `module.api` | HTTP API Gateway + Stage + JWT Authorizer + Integration + 4 Routes + Lambda Permission |
+| `module.monitoring` | CloudWatch Dashboard + 6 Alarme (T011-11) |
+
+Alle AWS-Ressourcen sind in den Child Modules kapselt. Das Root-Modul fungiert als Orchestrator.
 
 ## 2.1 DynamoDB-Tabelle (T011-02)
 
@@ -219,19 +248,27 @@ Fachliche Grundlage: `monitoring/monitoring-design.md` (Source of Truth),
 - Plan-Effekt: default **24 to add** (16 bestehende + 8 Monitoring: 1 Dashboard,
   6 Alarme, 1 Log-Group). Kein `apply` in T011-11.
 
-## 3. Geplante Ressourcen
+## 3. Implementierte Ressourcen (T011-12 Modularisiert)
 
-| Ressource | Terraform-Typ (Vorschlag) |
-|-----------|---------------------------|
-| DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) ✅ |
-| IAM-Rolle | `aws_iam_role` + `aws_iam_role_policy` ✅ |
-| Lambda | `aws_lambda_function` (Zip aus Build) ✅ |
-| Lambda-Permission | `aws_lambda_permission` (API GW invoke) ✅ |
-| HTTP API | `aws_apigatewayv2_api` + `aws_apigatewayv2_integration` + `aws_apigatewayv2_route` + `aws_apigatewayv2_authorizer` ✅ |
-| Cognito | `aws_cognito_user_pool`, `aws_cognito_user_pool_client`, `aws_cognito_user_group` ✅ |
-| CloudWatch Dashboard | `aws_cloudwatch_dashboard` ✅ (T011-11) |
-| CloudWatch Alarme | `aws_cloudwatch_metric_alarm` ✅ (T011-11) |
-| CloudWatch Log-Group | `aws_cloudwatch_log_group` ✅ (T011-11, Retention 7 Tage) |
+| Ressource | Terraform-Typ | Modul |
+|-----------|---------------|-------|
+| DynamoDB-Tabelle | `aws_dynamodb_table` (On-Demand, GSI1) | `module.dynamodb` |
+| IAM Role | `aws_iam_role` | `module.iam` |
+| IAM Policy | `aws_iam_role_policy` | `module.iam` |
+| IAM Policy Documents (data) | `data.aws_iam_policy_document` | `module.iam` |
+| Lambda Function | `aws_lambda_function` | `module.lambda` |
+| Lambda Log Group | `aws_cloudwatch_log_group` | `module.lambda` |
+| Lambda Permission | `aws_lambda_permission` | `module.api` |
+| HTTP API | `aws_apigatewayv2_api` | `module.api` |
+| API Stage | `aws_apigatewayv2_stage` | `module.api` |
+| JWT Authorizer | `aws_apigatewayv2_authorizer` | `module.api` |
+| Lambda Integration | `aws_apigatewayv2_integration` | `module.api` |
+| API Routes (4) | `aws_apigatewayv2_route` | `module.api` |
+| Cognito User Pool | `aws_cognito_user_pool` | `module.cognito` |
+| Cognito User Pool Client | `aws_cognito_user_pool_client` | `module.cognito` |
+| Cognito User Group | `aws_cognito_user_group` | `module.cognito` |
+| CloudWatch Dashboard | `aws_cloudwatch_dashboard` | `module.monitoring` |
+| CloudWatch Alarms (6) | `aws_cloudwatch_metric_alarm` | `module.monitoring` |
 
 ## 4. Workflow
 
