@@ -68,7 +68,7 @@ mays-orders/
 | `WEEK 3` | Business Rules, Reliability, Security |
 | `WEEK 4` | Professionalization (Skalierung, Kosten, Well-Architected) |
 
-Aktueller Status: **WEEK 1 — COMPLETE** (Analyse & Architektur abgeschlossen; noch keine Implementierung).
+Aktueller Status: **WEEK 2 — COMPLETE** (Core Implementation: Terraform Infrastructure modularisiert in 6 Child Modules; Lambda/API Gateway/DynamoDB/Cognito/Monitoring implementiert).
 
 ## Workflow-Garantien
 
