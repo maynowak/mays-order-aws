@@ -413,4 +413,104 @@
 
 ---
 
-*Ende der detaillierten Antworten. Alle 65 Fragen abgedeckt.*
+## Friday 2 — Questions 66–78
+
+### Frage 66 — Welche Terraform Module gibt es und was machen sie?
+**Kurze Antwort:** 6 Module: `dynamodb` (Tabelle + GSI1), `iam` (Lambda Execution Role + Policy), `lambda` (Order Handler Function + CloudWatch Log Group), `cognito` (User Pool + App Client + Group `staff`), `api` (HTTP API Gateway V2 + Stage + JWT Authorizer + Integration + 4 Routes + Lambda Permission), `monitoring` (CloudWatch Dashboard + 6 Alarme).
+**Projektbeleg:** `terraform/modules/`, `terraform/main.tf`
+**Status:** IMPLEMENTED
+
+---
+
+### Frage 67 — Wie sind die Module miteinander verdrahtet?
+**Kurze Antwort:** DAG: `dynamodb` → `iam` (table_arn, gsi1_arn) → `lambda` (role_arn, table_name) → {`api` (invoke_arn, function_name, cognito_endpoint, client_id), `monitoring` (function_name, api_id, api_stage_name, table_name)}. `cognito` unabhängig.
+**Projektbeleg:** `terraform/main.tf` (Module Calls), `terraform/README.md` (Dependency Graph)
+**Status:** IMPLEMENTED
+
+---
+
+### Frage 68 — Warum wurden die 26 moved Blöcke entfernt?
+**Kurze Antwort:** Die `moved` Blöcke sind **Migrations-Mechanismen** für die Refaktorisierung eines bestehenden Terraform-States in die modulare Architektur. Sie gehören **nicht** zur finalen Zielarchitektur (Clean Target Architecture). Ein sauberes Erst-Deployment (Clean Initial Deployment) benötigt keine `moved` Blöcke, da Ressourcen direkt an ihren finalen Modul-Adressen erstellt werden.
+**Projektbeleg:** `terraform/README.md` (State Migration Section), `terraform/main.tf` (0 moved blocks)
+**Status:** DOCUMENTED
+
+---
+
+### Frage 69 — Wann braucht man moved Blöcke?
+**Kurze Antwort:** Nur bei der **Migration eines bestehenden flat Terraform States** in die modulare Architektur. Nicht bei einem Neu-Deployment (Clean Initial Deployment).
+**Projektbeleg:** `terraform/README.md` (State Migration Section)
+**Status:** DOCUMENTED
+
+---
+
+### Frage 69b — Was passiert bei Migration ohne moved Blöcke?
+**Kurze Antwort:** Ohne `moved` Blöcke würde Terraform die Ressourcen an den alten Adressen als **destroy** planen und an den neuen Modul-Adressen als **create** neu anlegen — also echte AWS-Änderungen (Destroy + Create). Mit `moved` Blöcken erkennt Terraform die Adressänderung und migriert den State ohne AWS-Änderungen (0 destroy, 0 create).
+**Projektbeleg:** `terraform/README.md` (State Migration Section)
+**Status:** DOCUMENTED
+
+---
+
+### Frage 70 — Warum ist die Lambda Log Group im Lambda Module und nicht im Monitoring?
+**Kurze Antwort:** Die CloudWatch Log Group `/aws/lambda/mays-orders-handler` gehört zum **Lebenszyklus der Lambda-Funktion**. Die Lambda erzeugt die Log Group automatisch; das Lambda-Modul verwaltet sie explizit (Retention 7 Tage via IaC). Das Monitoring-Modul ist ein **Read-Only Consumer** und nutzt nur den Log Group Namen für Metriken/Logs, erstellt sie aber nicht.
+**Projektbeleg:** `terraform/modules/lambda/main.tf` (Log Group Resource), `terraform/modules/monitoring/`
+**Status:** IMPLEMENTED
+
+---
+
+### Frage 71 — Wie ist das Monitoring Modul verdrahtet?
+**Kurze Antwort:** Das Monitoring-Modul ist ein **Read-Only Consumer**. Es erstellt keine eigenen AWS-Ressourcen, die Metriken erzeugen, sondern konfiguriert nur Dashboard und Alarme. Es bezieht seine Dimensionen über Inputs aus anderen Modulen: `lambda.function_name` (Lambda-Metriken), `api.api_id` + `api.api_stage_name` (API Gateway Metriken), `dynamodb.table_name` (DynamoDB Metriken).
+**Projektbeleg:** `terraform/modules/monitoring/main.tf`, `terraform/main.tf` (module.monitoring call mit Inputs)
+**Status:** IMPLEMENTED
+
+---
+
+### Frage 72 — Was ist der Unterschied zwischen Migrations-Mechanismus und Zielarchitektur?
+**Kurze Antwort:** **Migrations-Mechanismus** (`moved` Blöcke) = historischer Mechanismus, um einen bestehenden State in die neue Adressstruktur zu überführen (History). **Zielarchitektur** (Target Architecture) = die finale modulare Struktur (6 Module + Root Orchestrator) ohne Migrations-Artefakte. Die finale Architektur hat **0 moved blocks**.
+**Projektbeleg:** `terraform/main.tf` (0 moved blocks), `terraform/README.md` (State Migration Section)
+**Status:** DOCUMENTED
+
+---
+
+### Frage 73 — Wie wurde die Friday Preview Dokumentation separiert?
+**Kurze Antwort:** Die monolithische `friday-review-prep.md` (848 Zeilen) wurde in 6 Dateien aufgeteilt: `presentation/friday-review-prep.md` (Preview, ~175 Zeilen), `presentation/friday-cheat-sheet.md` (Cheat Sheet), `docs/learning/exam-answers.md` (detaillierte 65 Antworten), `docs/learning/requirements-traceability.md` (17 BR Traceability), `docs/learning/glossary.md` (10 Kernbegriffe + erweiterte Liste), `docs/roadmap/future-extensions.md` (10 Extensions + Migration Pfade). Navigation-Links im Preview verweisen auf die Detail-Dateien.
+**Projektbeleg:** `presentation/`, `docs/learning/`, `docs/roadmap/`
+**Status:** COMPLETED
+
+---
+
+### Frage 74 — Was ist der Unterschied zwischen Preview, Learning und Roadmap?
+**Kurze Antwort:** **Preview** = Prüfungsfragen + Demo-Matrix + Top-15 Stolpersteine (Prüfung). **Learning** = detaillierte Antworten, Traceability, Glossary (Lernen). **Roadmap** = Future Extensions + Migration Pfade (Planung). **Trennung der Anliegen**: Presentation vs. Learning vs. Planning.
+**Projektbeleg:** `presentation/`, `docs/learning/`, `docs/roadmap/`
+**Status:** DOCUMENTED
+
+---
+
+### Frage 75 — Wo finde ich die detaillierte Antwort auf Frage X?
+**Kurze Antwort:** Alle 65 detaillierten Antworten mit Projektbelegen und Status finden sich in `docs/learning/exam-answers.md`. Die Original-Fragenliste im Preview (`presentation/friday-review-prep.md` Abschnitt 1) verlinkt dorthin.
+**Projektbeleg:** `docs/learning/exam-answers.md`
+**Status:** DOCUMENTED
+
+---
+
+### Frage 76 — Wo finde ich die Requirements-Traceability?
+**Kurze Antwort:** Die Requirements Traceability Matrix (17 BR → Umsetzung → Nachweis → Status) findet sich in `docs/learning/requirements-traceability.md`. Sie mappt die 17 Business Requirements aus dem Ausgangsdokument auf Implementierung, Tests und Status.
+**Projektbeleg:** `docs/learning/requirements-traceability.md`
+**Status:** DOCUMENTED
+
+---
+
+### Frage 77 — Wo finde ich das Glossar?
+**Kurze Antwort:** Das Glossar (10 Kernbegriffe + erweiterte Liste mit 30+ Begriffen + Status-Legende) findet sich in `docs/learning/glossary.md`. Zentrale Begriffsdefinitionen für Prüfung und Referenz.
+**Projektbeleg:** `docs/learning/glossary.md`
+**Status:** DOCUMENTED
+
+---
+
+### Frage 78 — Wo finde ich Future Extensions?
+**Kurze Antwort:** Future Extensions (10 Extensions + Migration Pfade + Priorisierung) finden sich in `docs/roadmap/future-extensions.md`. **WICHTIG:** Dies sind **NICHT** Teil des aktuellen Prüfungsstands (T011-12), sondern Portfolio-Ausblick / Roadmap. Keine dieser Extensions ist implementiert oder validiert.
+**Projektbeleg:** `docs/roadmap/future-extensions.md`
+**Status:** DOCUMENTED
+
+---
+
+*Ende der detaillierten Antworten. Alle 78 Fragen abgedeckt (65 Original + 13 Friday 2).*

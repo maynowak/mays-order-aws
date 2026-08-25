@@ -171,5 +171,68 @@ diesen Zustand ehrlich benennen und stattdessen Code/Tests/Plan demonstrieren.
 
 ---
 
-*Erstellt am 2026-08-20 auf Basis von Ausgangsdokument (PROJECT_6) + aktuellem Repo-Stand.*
+## Friday 2 — Was hat sich seit letztem Freitag (2026-08-22) geändert?
+
+**Letzter Freitag (2026-08-22) Baseline:** `ec831d9` (T011-11 CloudWatch Monitoring auf main gemerged, T011-10 Seed, T011-07 Plan Review, T011-06 API GW, T011-05 Cognito, T011-04 Lambda Python 3.14)
+
+**Aktueller Stand (HEAD `8512fbd`, main):** Alle T011-12 Änderungen auf main gemerged.
+
+---
+
+### Was hat sich seit letztem Freitag geändert?
+
+| Thema | Was hat sich geändert? | Warum? | Aktuelle Implementation | Mögliche Freitag-2-Fragen | Doku/Code |
+|-------|------------------------|--------|------------------------|---------------------------|-----------|
+| **T011-12: Terraform Module Refactoring** | 6 Child Modules erstellt (dynamodb, iam, lambda, cognito, api, monitoring). Root main.tf zu Orchestrator reduziert. | Bessere Wartbarkeit, Wiederverwendbarkeit, klare Verantwortlichkeiten. 6 Child Modules statt monolithischem main.tf. | 6 Module unter `terraform/modules/` mit je `main.tf`, `variables.tf`, `outputs.tf`. Root `main.tf` nur noch Orchestrator. | • Welche Module gibt es? • Wie sind Dependencies verdrahtet? • Warum Modularisierung? | `terraform/modules/`, `terraform/main.tf`, `terraform/README.md` |
+| **Clean Target Architecture** | 26 `moved` Blöcke entfernt. Root hat 0 moved blocks. | Moved Blöcke sind Migrations-Mechanismen für bestehende States, nicht Teil der Zielarchitektur. Clean Deployment braucht keine moved blocks. | `terraform/main.tf` hat 0 moved blocks, 6 Module Calls, Seed Resource. | • Warum wurden moved blocks entfernt? • Was sind moved blocks? • Wann braucht man sie? | `terraform/main.tf`, `terraform/README.md` (State Migration Section) |
+| **Terraform Module Dependencies** | Saubere Dependency-Kette: dynamodb → iam → lambda → (api + monitoring) + cognito unabhängig. | Saubere DAG, keine Zirkel. Reflektiert tatsächliche Abhängigkeiten. | `module.dynamodb` → `module.iam` → `module.lambda` → `module.api` + `module.monitoring` | • Wie sind Dependencies verdrahtet? • Warum dynamodb zuerst? • Warum cognito unabhängig? | `terraform/main.tf` (Module Calls), `terraform/README.md` (Dependency Graph) |
+| **Monitoring Module** | Aus `monitoring.tf` extrahiert in `terraform/modules/monitoring/`. | Log Group in Lambda Module verschoben (Lebenszyklus-Kopplung). Monitoring bleibt Read-Only Consumer. | `terraform/modules/monitoring/` (Dashboard + 6 Alarms). Root `monitoring.tf` nur Placeholder. | • Warum Log Group in Lambda Module? • Warum Monitoring als Consumer? | `terraform/modules/monitoring/`, `terraform/modules/lambda/main.tf` |
+| **Friday Preview Dokumentation Separation** | `friday-review-prep.md` auf ~175 Zeilen reduziert. 65 detaillierte Answers, Traceability, Glossary, Future Extensions, Cheat Sheet in separate Files. | Trennung: Preview (Prüfung) vs. Lernmaterial (Lernen) vs. Roadmap (Planung). Bessere Wartbarkeit. | `presentation/friday-review-prep.md` (~175 Zeilen), neue Files unter `docs/learning/`, `docs/roadmap/`, `presentation/friday-cheat-sheet.md`. | • Warum Separation? • Wo finde ich Details? | `presentation/`, `docs/learning/`, `docs/roadmap/` |
+
+---
+
+### Was ist NEU für Freitag 2 relevant?
+
+Die oben genannten Themen waren **letztes Freitag noch nicht existent oder nicht abgeschlossen**. Für Freitag 2 sind besonders relevant:
+
+1. **Terraform Modul-Architektur** — Verständnis der 6 Module, Dependencies, Root Orchestration
+2. **Clean Target Architecture** — Warum moved blocks entfernt wurden, Unterschied Migration vs. Clean Deploy
+2. **State Migration Konzept** — Moved Blöcke als Migrations-Mechanismus vs. Target Architecture
+4. **Monitoring Modul** — Trennung Log Group (Lambda) vs. Dashboard/Alarms (Monitoring)
+5. **Dokumentation-Separation** — Wo finde ich was?
+
+---
+
+## New Friday 2 Questions
+
+*Diese Fragen kommen durch die neuen Entwicklungen seit letztem Freitag hinzu.*
+
+| # | Frage | Kurze Antwort | Vertiefung | Projektbeleg |
+|---|-------|---------------|------------|--------------|
+| 66 | **Welche Terraform Module gibt es und was machen sie?** | 6 Module: dynamodb, iam, lambda, cognito, api, monitoring. Jedes kapselt eine Domäne. | Root orchestriert nur noch. Module unter `terraform/modules/`. | `terraform/modules/`, `terraform/main.tf` |
+| 67 | **Wie sind die Module miteinander verdrahtet?** | DAG: dynamodb → iam → lambda → {api, monitoring}. Cognito unabhängig. | Root `main.tf` Module Calls mit Outputs als Inputs. | `terraform/main.tf`, `terraform/README.md` |
+| 68 | **Warum wurden die 26 moved Blöcke entfernt?** | Sie sind Migrations-Mechanismen für bestehende States, nicht Teil der Zielarchitektur. Clean Deployment braucht sie nicht. | Moved Blocks sind Migration, nicht Architektur. | `terraform/README.md` (State Migration Section) |
+| 69 | **Wann braucht man moved Blöcke?** | Nur bei Migration eines bestehenden flat Terraform States in Module. Nicht bei Neu-Deployment. | Ohne moved blocks: destroy + create. Mit moved blocks: Adress-Migration im State. | `terraform/README.md` (State Migration Section) |
+| 69b | **Was passiert bei Migration ohne moved blocks?** | Terraform plant destroy + create der Ressourcen (echte AWS-Änderung). | Mit moved blocks: 0 Änderungen, nur Adress-Update im State. | `terraform/README.md` |
+| 70 | **Warum ist die Lambda Log Group im Lambda Module und nicht im Monitoring?** | Lebenszyklus-Kopplung: Lambda erzeugt Log Group, Monitoring konfiguriert nur Retention. Log Group gehört zum Lambda-Lebenszyklus. | `terraform/modules/lambda/main.tf` (Log Group Resource) | `terraform/modules/lambda/main.tf`, `terraform/modules/monitoring/` |
+| 71 | **Wie ist das Monitoring Modul verdrahtet?** | Read-Only Consumer: liest `lambda.function_name`, `api.api_id`, `api.api_stage_name`, `dynamodb.table_name` aus anderen Modulen. | Keine eigenen Ressourcen erzeugen, nur Metriken konsumieren. | `terraform/modules/monitoring/main.tf`, `terraform/main.tf` (module.monitoring call) |
+| 72 | **Was ist der Unterschied zwischen Migrations-Mechanismus und Zielarchitektur?** | Moved Blöcke = Migration (History). Module + Root = Zielarchitektur (Target). Zielarchitektur hat 0 moved blocks. | Zielarchitektur = saubere Modul-Struktur ohne Migrations-Artefakte. | `terraform/main.tf` (0 moved blocks), `terraform/README.md` |
+| 73 | **Wie wurde die Friday Preview Dokumentation separiert?** | In 6 Files aufgeteilt: Preview (175 Zeilen), Cheat Sheet, Exam Answers, Traceability, Glossary, Future Extensions. | Navigation-Links in Preview zu Detail-Files. | `presentation/`, `docs/learning/`, `docs/roadmap/` |
+| 74 | **Was ist der Unterschied zwischen Preview, Learning und Roadmap?** | Preview = Prüfungsfragen + Demo-Matrix + Top-15. Learning = Antworten, Traceability, Glossary. Roadmap = Future Extensions. | Trennung der Anliegen (Presentation vs. Learning vs. Planning). | `presentation/`, `docs/learning/`, `docs/roadmap/` |
+| 75 | **Wo finde ich die detaillierte Antwort auf Frage X?** | `docs/learning/exam-answers.md` (65 detaillierte Antworten mit Belegen) | Fragen im Preview verlinken auf Answers. | `docs/learning/exam-answers.md` |
+| 76 | **Wo finde ich die Requirements-Traceability?** | `docs/learning/requirements-traceability.md` (17 BR → Umsetzung → Nachweis → Status) | 17 BR aus Ausgangsdokument → Code/IaC/Doku. | `docs/learning/requirements-traceability.md` |
+| 77 | **Wo finde ich das Glossar?** | `docs/learning/glossary.md` (10 Kernbegriffe + erweiterte Liste + Status-Legende) | Zentrale Begriffsdefinitionen. | `docs/learning/glossary.md` |
+| 78 | **Wo finde ich Future Extensions?** | `docs/roadmap/future-extensions.md` (10 Extensions + Migration Pfade + Priorisierung) | Nicht Prüfungsstoff, nur Portfolio-Ausblick. | `docs/roadmap/future-extensions.md` |
+
+---
+
+**Detailantworten & Vertiefungen:** Siehe `docs/learning/exam-answers.md` (inkl. neue Fragen 66–78)  
+**Requirements-Traceability:** Siehe `docs/learning/requirements-traceability.md`  
+**Glossar:** Siehe `docs/learning/glossary.md` (inkl. erweiterte Begriffsliste)  
+**Future Extensions:** Siehe `docs/roadmap/future-extensions.md` (mit Migration Pfaden & Priorisierung)  
+**Cheat Sheet:** Siehe `presentation/friday-cheat-sheet.md` (inkl. 65 Fragen + neue 13 Fragen kompakt)
+
+---
+
+*Stand: 2026-08-25 — Freitag 2 Update auf Basis von Repo-Stand (main, HEAD `8512fbd`).*
 *Alle Statusangaben entsprechen dem Repo-Stand (kein apply, kein Live-Test).*

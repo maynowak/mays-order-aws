@@ -69,6 +69,30 @@
 
 ---
 
+## Friday 2 — Ergänzung
+
+**Welche Terraform Module?** → 6: dynamodb, iam, lambda, cognito, api, monitoring. → `terraform/modules/`
+
+**Wie Module verdrahtet?** → dynamodb → iam → lambda → {api, monitoring}. Cognito unabhängig. → `terraform/main.tf`
+
+**Warum moved blocks entfernt?** → Migrations-Artefakte, nicht Zielarchitektur. Clean Deploy braucht sie nicht. → `terraform/README.md`
+
+**Wann moved blocks?** → Nur Migration bestehenden State. Nicht Neu-Deployment. → `terraform/README.md`
+
+**Ohne moved blocks?** → destroy + create. Mit moved blocks: nur Adress-Update im State. → `terraform/README.md`
+
+**Log Group im Lambda Module?** → Lebenszyklus-Kopplung. Lambda erzeugt Log Group. Monitoring = Read-Only. → `terraform/modules/lambda/main.tf`
+
+**Monitoring Verdrahtung?** → Read-Only Consumer: liest function_name, api_id, stage_name, table_name. → `terraform/modules/monitoring/`
+
+**Migration vs Zielarchitektur?** → Moved Blocks = Migration (History). Module + Root = Zielarchitektur (0 moved blocks). → `terraform/main.tf`
+
+**Doku-Separation?** → Preview (175 Zeilen) + 5 Detail-Files. Navigation-Links in Preview. → `presentation/`, `docs/learning/`, `docs/roadmap/`
+
+**Preview vs Learning vs Roadmap?** → Preview = Prüfung, Learning = Lernen, Roadmap = Planung. → `presentation/`, `docs/learning/`, `docs/roadmap/`
+
+---
+
 ## DIE 10 WICHTIGSTEN BEGRIFFE
 
 1. **Serverless** — keine Server-Verwaltung, Pay-per-use, auto-scaling (Lambda, API GW, DynamoDB).
