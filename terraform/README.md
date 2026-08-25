@@ -17,11 +17,11 @@ Keine manuell erzeugte Infrastruktur als finales Ergebnis.
 
 ## 2. Struktur
 
-**Aktueller Stand (T011-12, Modularisierung):**
+**Aktueller Stand (T011-12, Clean Target Architecture):**
 
 ```text
 terraform/
-├── main.tf         Root Orchestrator: Provider, 6 Module Calls, 26 moved blocks, Seed Resource
+├── main.tf         Root Orchestrator: Provider, 6 Module Calls, Seed Resource
 ├── variables.tf    Root Variables (Region, Project Name, Tags, Seed, Monitoring, Alarm Thresholds)
 ├── outputs.tf      Root Outputs (re-exported from modules)
 ├── monitoring.tf   Placeholder — resources moved to module.monitoring
@@ -67,6 +67,28 @@ Baseline T011-04 entfernt, historisch via Git `449cdd7`) — siehe §2.3.
 | `module.monitoring` | CloudWatch Dashboard + 6 Alarme (T011-11) |
 
 Alle AWS-Ressourcen sind in den Child Modules kapselt. Das Root-Modul fungiert als Orchestrator.
+
+---
+
+## STATE MIGRATION
+
+**WICHTIG**: Die 26 `moved` Blöcke, die während der Refactoring-Phase (T011-12) implementiert wurden, sind **Migrations-Mechanismen für bestehende Terraform-States**, nicht Teil der Zielarchitektur.
+
+**Für eine saubere Erst-Deployment (Clean Initial Deployment):**
+- Keine `moved` Blöcke erforderlich
+- Ressourcen werden direkt an ihren finalen Modul-Adressen erstellt
+- `terraform plan` zeigt 24 Ressourcen als `create` an ihren finalen Modul-Adressen
+
+**Für Migration eines bestehenden flat Terraform States:**
+- Die 26 `moved` Blöcke würden benötigt, um bestehende Ressourcen-Adressen zu migrieren
+- Ohne `moved` Blöcke würde Terraform `destroy` + `create` planen
+- Die Migration ist als separates Verfahren dokumentiert (siehe `docs/reports/T011-12-TERRAFORM-MODULES-EXECUTION-LOG.md`)
+
+**WICHTIG:**
+- **Kein `terraform apply` wurde ausgeführt**
+- **Keine AWS-Ressourcen existieren unter Terraform-State**
+- **Keine State-Migration wurde live ausgeführt**
+- Die `moved` Blöcke sind Refactoring-Artefakte, wurden für den Clean Target Architecture entfernt
 
 ## 2.1 DynamoDB-Tabelle (T011-02)
 
