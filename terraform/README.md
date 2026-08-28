@@ -317,3 +317,40 @@ terraform apply     → nur nach Freigabe
 
 - Lambda-Zip muss vor `plan`/`apply` gebaut sein (`cd lambda && python3 build_zip.py`).
 - API-GW-Route → Integration → Lambda-Permission (T011-06) → Lambda-Deployment.
+
+## 8. Root Outputs — Infrastruktur-Interfaces
+
+Das Root-Modul re-exportet die wichtigsten Cross-Module-Interfaces für Operatoren,
+CLI/Automation und externe Consumers:
+
+| Output | Quelle | Typ | Zweck |
+|--------|--------|-----|-------|
+| `dynamodb_table_name` | `module.dynamodb` | Name | Tabellenname für CLI/Seed/Scripts |
+| `dynamodb_table_arn` | `module.dynamodb` | ARN | IAM-Policies, Cross-Account-Referenzen |
+| `iam_handler_role_name` | `module.iam` | Name | Execution Role Identifikation |
+| `iam_handler_role_arn` | `module.iam` | ARN | Lambda `iam_role_arn` Input |
+| `lambda_function_name` | `module.lambda` | Name | API Integration, Monitoring, CLI |
+| `lambda_function_arn` | `module.lambda` | ARN | Resource-basierte Policies |
+| `lambda_invoke_arn` | `module.lambda` | Invoke ARN | Direkte Lambda-Invocation (Testing) |
+| `cognito_user_pool_id` | `module.cognito` | ID | User Pool Referenz |
+| `cognito_user_pool_arn` | `module.cognito` | ARN | Cross-Account/Resource Policies |
+| `cognito_user_pool_endpoint` | `module.cognito` | Endpoint | JWT Issuer URL (Token-Validierung) |
+| `cognito_user_pool_client_id` | `module.cognito` | ID | App Client (Auth Flow, API GW Audience) |
+| `cognito_user_pool_group_name` | `module.cognito` | Name | `staff` Gruppe (Authorization Claim) |
+| `api_gateway_endpoint` | `module.api` | Endpoint | HTTP API Invoke-URL (Client-Zugriff) |
+| `api_gateway_id` | `module.api` | ID | Monitoring, CLI, Resource Policies |
+| `api_gateway_stage_name` | `module.api` | Name | API Stage (`$default`) für CLI/Monitoring |
+| `api_gateway_authorizer_id` | `module.api` | ID | JWT Authorizer Referenz |
+
+**Nicht re-exportet:** Monitoring-Outputs (Dashboard/Alarme — bedingt, Read-Only Consumer),
+interne IDs (`integration_id`, `policy_name`, `log_group_name`, `gsi1_*`, `table_stream_arn`).
+
+Struktur in `terraform/outputs.tf`:
+```text
+# DynamoDB Outputs
+# IAM Outputs
+# Lambda Outputs
+# Cognito Outputs
+# API Gateway Outputs
+# Monitoring Outputs (nicht re-exportet)
+```
