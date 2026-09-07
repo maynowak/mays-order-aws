@@ -37,7 +37,11 @@ def get_after(change: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_tags(resource: dict[str, Any]) -> dict[str, Any]:
-    tags = resource.get("tags")
+    # Decision B: evaluate EFFECTIVE tags (explicit resource tags + provider default_tags).
+    # Terraform exposes both "tags" (explicit only) and "tags_all" (merged effective tags)
+    # in the plan JSON. Counting only "tags" made provider default_tags (e.g. "Maker")
+    # invisible to the gate; "tags_all" is the authoritative effective tag set.
+    tags = resource.get("tags_all")
     return tags if isinstance(tags, dict) else {}
 
 
@@ -104,7 +108,7 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
         tags = get_tags(resource)
 
         # Required tags apply to resources that expose a Terraform tags attribute.
-        if "tags" in resource:
+        if "tags_all" in resource:
             missing = [tag for tag in required_tags if not tags.get(tag)]
             if missing:
                 errors.append(f"{address}: missing required tag(s): {', '.join(missing)}.")
@@ -193,7 +197,14 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
 
         elif resource_type.startswith("aws_apigatewayv2_"):
             name = resource.get("name")
-            if isinstance(name, str) and not name.startswith(f"{project}-"):
+            # A Stage's `name` is the API Gateway stage name, not a project-namespaced
+            # resource name. "$default" is the valid AWS HTTP-API default stage and is
+            # already namespaced under its parent aws_apigatewayv2_api (checked above).
+            # This exception is scoped to aws_apigatewayv2_stage only; it does not relax
+            # namespace validation for any other API Gateway resource type.
+            if resource_type == "aws_apigatewayv2_stage" and name == "$default":
+                pass
+            elif isinstance(name, str) and not name.startswith(f"{project}-"):
                 errors.append(f"{address}: API Gateway name '{name}' is outside the project namespace '{project}-*'.")
 
         elif resource_type == "aws_cognito_user_pool":

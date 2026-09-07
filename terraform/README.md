@@ -1,6 +1,20 @@
 # Terraform — May's Orders
 
 > Stand T011-12: **Modularisierte Terraform-Infrastruktur** — DynamoDB, IAM, Lambda, Cognito, API Gateway HTTP API, CloudWatch Monitoring in 6 Child Modules. AWS-Provider `~> 6.0`. Noch kein `apply` ausgeführt.
+>
+> Stand T011 (CloudTrail): **7. Child-Modul `cloudtrail`** hinzugefügt — Account-weiter AWS-API-Audit-Trail (Trail + zweckgebundener S3-Bucket, SSE-S3, Public-Access-Block, Bucket-Policy). Kein `apply`.
+>
+> Stand T013 (Installation Identity): erste sichere Installations-Schicht — **Projekt-Identität**. `project_name` bleibt der zentrale Namens-/Identitäts-Hebel; `Maker`-Provenance als unveränderlicher Tag hinzugefügt (siehe §9). Kein `apply`.
+>
+> Stand T014 (Installation Cost Profile): **Cost-Profile-Entscheidung** definiert — Default-Profil `LOWEST / PROTOTYPE`, entspricht exakt der aktuellen Konfiguration; als Design dokumentiert, **keine** neue Terraform-Variable (kein Consumer, §9.5). Kein `apply`.
+>
+> Stand T015 (Installation Region): **Region-Entscheidung** definiert — Default `eu-central-1` (Europe (Frankfurt)), bereits sauber variable-getrieben via `var.aws_region`; **keine** neue Variable (§9.6). Kein `apply`.
+>
+> Stand T016 (Installation Availability): **Availability-Entscheidung** definiert — Profil `LOW / PROTOTYPE` (Single Region, managed Serverless, kein VPC/Failover); **keine** Terraform-Änderung (§9.7). Kein `apply`.
+>
+> Stand T017 (Installation Data Strategy): **Data-Strategy-Entscheidung** definiert — Single-Region DynamoDB, keine Replikation, PITR/KMS/Streams deferred; **keine** Terraform-Änderung (§9.8). Kein `apply`.
+>
+> Stand T018 (Installation Security Profile): **Security-Profile-Entscheidung** definiert — Profil `LOW / PROTOTYPE` (IAM Least Privilege, Cognito+JWT, managed Verschlüsselung, CloudTrail); Gruppen-Authorization/KMS deferred; **keine** Terraform-Änderung (§9.9). Kein `apply`.
 
 ## 1. Ziel
 
@@ -46,7 +60,11 @@ terraform/
     │   ├── main.tf
     │   ├── variables.tf
     │   └── outputs.tf
-    └── monitoring/
+    ├── monitoring/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── cloudtrail/
         ├── main.tf
         ├── variables.tf
         └── outputs.tf
@@ -65,6 +83,7 @@ Baseline T011-04 entfernt, historisch via Git `449cdd7`) — siehe §2.3.
 | `module.cognito` | User Pool + App Client + Group `staff` |
 | `module.api` | HTTP API Gateway + Stage + JWT Authorizer + Integration + 4 Routes + Lambda Permission |
 | `module.monitoring` | CloudWatch Dashboard + 6 Alarme (T011-11) |
+| `module.cloudtrail` | CloudTrail Trail + S3-Log-Bucket + Policy (T011) |
 
 Alle AWS-Ressourcen sind in den Child Modules kapselt. Das Root-Modul fungiert als Orchestrator.
 
@@ -270,6 +289,31 @@ Fachliche Grundlage: `monitoring/monitoring-design.md` (Source of Truth),
 - Plan-Effekt: default **24 to add** (16 bestehende + 8 Monitoring: 1 Dashboard,
   6 Alarme, 1 Log-Group). Kein `apply` in T011-11.
 
+## 2.7 CloudTrail Audit Layer (T011)
+
+Fachliche Grundlage: `security/cloudtrail-design.md` (Source of Truth). CloudTrail ist
+**Account-Level Audit**, KEINE Anwendungs-Business-Logik → bewusst ein eigenes kleines
+Child-Modul (analog `module.monitoring`, kein Consumer-Modul, keine neuen Root-Inputs/-Outputs).
+
+| Ressource | Terraform-Typ | Name | Konfiguration |
+|-----------|---------------|------|---------------|
+| Trail | `aws_cloudtrail.trail` | `${var.project_name}-trail` | `is_multi_region_trail = true`, `include_global_service_events = true`, Management Events Read+Write (`All`), `enable_log_file_validation = true`, `enable_logging = true` |
+| Log-Bucket | `aws_s3_bucket.trail` | `${var.project_name}-cloudtrail-<account-id>` | Zweckgebunden; Account-ID via `data.aws_caller_identity` (global eindeutig) |
+| Bucket-Eigentum | `aws_s3_bucket_ownership_controls.trail` | – | `BucketOwnerEnforced` (ACLs deaktiviert) |
+| Public-Access-Block | `aws_s3_bucket_public_access_block.trail` | – | alle vier Flags `true` |
+| Verschlüsselung at rest | `aws_s3_bucket_server_side_encryption_configuration.trail` | – | SSE-S3 (`AES256`), explizit |
+| Bucket-Policy | `aws_s3_bucket_policy.trail` | – | nur `cloudtrail.amazonaws.com` `PutObject` auf `AWSLogs/<account>/CloudTrail/*` (SourceArn-Condition) |
+
+**CloudWatch vs. CloudTrail:** CloudWatch (`module.monitoring`) = operational/application
+monitoring (Logs, Metriken, Alarme, Dashboard); CloudTrail (`module.cloudtrail`) =
+AWS-API-Activity / Audit-Trail (WHO/WHAT/WHEN/WHERE). Strikte Trennung.
+
+**Bewusst NICHT (Prototyp-Scope):** Data Events, KMS (SSE-S3 statt SSE-KMS),
+S3-Lifecycle/Retention, SNS-Alarme — siehe `security/cloudtrail-design.md` §7.
+
+- Plan-Effekt (T011): **30 to add** (24 bestehende + 6 CloudTrail: Trail, Bucket,
+  Ownership-Controls, Public-Access-Block, SSE-Config, Bucket-Policy). Kein `apply`.
+
 ## 3. Implementierte Ressourcen (T011-12 Modularisiert)
 
 | Ressource | Terraform-Typ | Modul |
@@ -291,6 +335,10 @@ Fachliche Grundlage: `monitoring/monitoring-design.md` (Source of Truth),
 | Cognito User Group | `aws_cognito_user_group` | `module.cognito` |
 | CloudWatch Dashboard | `aws_cloudwatch_dashboard` | `module.monitoring` |
 | CloudWatch Alarms (6) | `aws_cloudwatch_metric_alarm` | `module.monitoring` |
+| CloudTrail Trail | `aws_cloudtrail` | `module.cloudtrail` |
+| CloudTrail S3 Bucket | `aws_s3_bucket` | `module.cloudtrail` |
+| CloudTrail S3 Bucket Policy | `aws_s3_bucket_policy` | `module.cloudtrail` |
+| CloudTrail S3 Access/SSE-Config | `aws_s3_bucket_ownership_controls` / `aws_s3_bucket_public_access_block` / `aws_s3_bucket_server_side_encryption_configuration` | `module.cloudtrail` |
 
 ## 4. Workflow
 
@@ -343,6 +391,7 @@ CLI/Automation und externe Consumers:
 | `api_gateway_authorizer_id` | `module.api` | ID | JWT Authorizer Referenz |
 
 **Nicht re-exportet:** Monitoring-Outputs (Dashboard/Alarme — bedingt, Read-Only Consumer),
+CloudTrail-Outputs (`trail_*`, `s3_bucket_*` — kein Consumer-Modul, nur Verifikation),
 interne IDs (`integration_id`, `policy_name`, `log_group_name`, `gsi1_*`, `table_stream_arn`).
 
 Struktur in `terraform/outputs.tf`:
@@ -353,4 +402,174 @@ Struktur in `terraform/outputs.tf`:
 # Cognito Outputs
 # API Gateway Outputs
 # Monitoring Outputs (nicht re-exportet)
+# CloudTrail Outputs (nicht re-exportet)
 ```
+
+## 9. Projekt-Identität (Installation Layer, T013)
+
+> Erste sichere Installations-Schicht aus dem Konzept `architecture/installation-concept.md`.
+> Nur die **Projekt-Identität** ist implementiert. Alle übrigen Installations-
+> Entscheidungen (Cost Profile, Region, Availability, Data Strategy, Security Profile,
+> Optional Features, User Confirmation) bleiben **Future Work**.
+
+### 9.1 Identitäts-Modell
+
+| Feld | Quelle | Verwendung | Verändert Ressourcen-Name? | Mutable? |
+|------|--------|------------|---------------------------|----------|
+| `Project` | `var.project_name` (Variable, Default `mays-orders`) | Ressourcen-Namen-Prefix (`${var.project_name}-*`, DynamoDB-Tabelle = `project_name`) + `Project`-Tag | **JA** | konfigurierbar **vor** erstem `apply`; nach Apply umbenennen = destroy/create |
+| `Maker` | `local.maker` (Konstante `mays-orders` in `main.tf`) | nur `Maker`-Tag via `default_tags` | **NEIN** | **unveränderlich** (Provenance) |
+| `ManagedBy` / `CreatedBy` | optional via `var.tags` (Deployment-Metadaten) | nur Tags | **NEIN** | konfigurierbar |
+
+- **Projekt-Identität (configurable)** = `project_name` → bestimmt Ressourcen-Namen & `Project`-Tag.
+- **Maker / Provenance (preserved)** = `local.maker` → nur als `Maker`-Tag, bewusst **nie**
+  in Ressourcen-Namen, damit eine Kunden-Umbenennung die Original-Provenance nicht verliert.
+- `Maker` ist ein **neutraler Projekt-Slug** (`mays-orders`), kein persönlicher Name.
+- `ManagedBy`/`CreatedBy` sind als Deployment-Metadaten über das bereits vorhandene
+  `var.tags` ausdrückbar (z. B. `-var='tags={"ManagedBy":"Mays Orders"}'`); eigene
+  Variablen werden in dieser minimalen Schicht bewusst **nicht** angelegt.
+
+### 9.2 Naming-Safety
+
+- `provider.default_tags` trägt `Project` + `Maker` automatisch auf **alle** tag-fähigen
+  Ressourcen; die Modul-eigenen `tags = merge({ "Project" = ... }, var.tags)` bleiben
+  unverändert und setzen `Project` gleichlautend (kein Konflikt).
+- **Validierung:** `project_name` muss mind. 3 Zeichen lang sein und nur `[a-z0-9-]`
+  enthalten (kein führender/trailing Bindestrich) — `terraform/variables.tf`.
+  Kleinschreibung + Bindestrich ist über alle verwendeten Ressourcen gültig
+  (DynamoDB-Tabelle == `project_name` → min. 3; S3-Bucket ist kleinschreibungs-pflichtig).
+- **Empfehlung:** `project_name` kurz halten (≲ 32 Zeichen), da Lambda-/IAM-Namen
+  (`${project_name}-handler`, `-handler-role`) 64-Zeichen-Limits und der CloudTrail-Bucket
+  (`${project_name}-cloudtrail-<account-id>`) das 63-Zeichen-Limit haben.
+
+### 9.3 Vor / Nach Apply Warnung
+
+| Zeitpunkt | Verhalten |
+|-----------|-----------|
+| **VOR erstem Apply** | `project_name` kann sicher gewählt werden (alle Namen leiten sich konsistent ab). |
+| **NACH Apply** | Ändern von `project_name` **erzeugt neue Ressourcen** (destroy/create), da der Name in Ressourcen-Identifern steckt (DynamoDB-Tabellenname, Lambda-/IAM-/Cognito-/API-/Trail-Namen, S3-Bucket). State-/Migrations-Implikationen beachten. |
+
+> Keine automatische Umbenennung, keine Migration — dies bleibt ein bewusster,
+> menschlich freigegebener Schritt.
+
+### 9.4 Was ist jetzt konfigurierbar / was bleibt Future Work
+
+- **Jetzt konfigurierbar:** `project_name` (Projekt-Identität), `tags` (inkl. `ManagedBy`/
+  `CreatedBy`), `Maker` (Provenance-Tag, Konstante), `aws_region` (Region, §9.6).
+- **Definiert (Design, keine Variable):** Cost Profile (§9.5), Availability (§9.7),
+  Data Strategy (§9.8), Security Profile (§9.9).
+- **Future Work (NICHT implementiert):** Optional Features → User Confirmation.
+
+### 9.5 Cost Profile (Installation Layer, T014)
+
+> Zweite Installations-Entscheidung aus dem Konzept `architecture/installation-concept.md` §3.
+> **Nur definiert (Design), keine `cost_profile`-Variable implementiert** — kein Consumer.
+
+- **Vier Profile** (Taxonomie, §3): `LOWEST/PROTOTYPE`, `STANDARD`, `HIGH AVAILABILITY`, `CUSTOM`.
+- **Default = `LOWEST / PROTOTYPE`** — die aktuelle Terraform-Konfiguration entspricht exakt
+  diesem Profil (Single Region, On-Demand-DynamoDB, kein PITR/KMS/custom-domain, SSE-S3,
+  HTTP-App, 7-Tage-Retention, optionale Hardening-Features sämtlich deferred).
+- **Empfohlene spätere Repräsentation:** eine `cost_profile`-Variable mit `validation {}`
+  (`lowest`/`standard`/`high_availability`/`custom`), die kostensteigernde Features **gated**,
+  aber selbst keine Ressourcen erzeugt. `CUSTOM` erfordert explizite Bestätigung (§10 Konzept).
+- **Bewusst KEINE Variable jetzt:** der Installations-Workflow konsumiert den Wert noch nicht;
+  jede kostenrelevante Option ist bereits auf LOWEST gepinnt. Die Variable soll erst eingeführt
+  werden, wenn eine Option erstmals profil-abhängig wird (Availability/Data-Strategy oder
+  Optional-Features-Task).
+
+Vollständiges Konzept: `architecture/installation-concept.md`.
+
+### 9.6 Region (Installation Layer, T015)
+
+> Dritte Installations-Entscheidung aus dem Konzept `architecture/installation-concept.md` §3.2.
+> **Bereits sauber implementiert via `var.aws_region`** — keine neue Variable nötig.
+
+- **Default / aktuell:** `eu-central-1` („Europe (Frankfurt)“) — `terraform/variables.tf`
+  (`var.aws_region`, Default `"eu-central-1"`).
+- **Konsumenten (verified):** Root-Provider `region = var.aws_region` (`main.tf:27`);
+  `module.monitoring` erhält `aws_region` (`main.tf:152`, CloudWatch-Widget-Region);
+  `module.cloudtrail` leitet die Region via `data "aws_region" "current"` ab. **Kein Provider-Alias
+  → Single-Region-Design.**
+- **Begründung:** Europäischer/deutscher Projektkontext; Frankfurt ist eine gut etablierte
+  EU-Region, die alle genutzten Services unterstützt (DynamoDB, Lambda, Cognito, HTTP-API,
+  CloudWatch, CloudTrail, S3). Projektwahl, keine Universalaussage.
+- **Beziehung zu Cost Profile (T014 `LOWEST/PROTOTYPE`):** Single Region bevorzugt; keine
+  zweite Region eingeführt.
+- **Beziehung zu Availability (T016) / Data Strategy (T017):** *deferred* — Region ≠ AZ-Design
+  ≠ Daten-Replikation (siehe Konzept §3.2/§4).
+- **Region ändern:** vor erstem `apply` (State leer) → zielt nur auf andere Region; nach `apply`
+  → Redeploy aller regionalen Ressourcen in die neue Region.**
+
+### 9.7 Availability (Installation Layer, T016)
+
+> Vierte Installations-Entscheidung aus dem Konzept `architecture/installation-concept.md` §3.3.
+> **Nur definiert (Design)** — keine Terraform-Änderung, da die aktuelle Architektur das
+> gewählte Profil bereits korrekt abbildet.
+
+- **Gewählt:** `LOW / PROTOTYPE` — Single Region (`eu-central-1`), voll auf AWS-managed
+  Serverless-Diensten, **keine** eigene Netzwerk-/Failover-Infrastruktur.
+- **Architektur (verified):** kein VPC, keine Subnets, kein IGW/NAT, keine VPC-Endpoints, kein
+  EC2. Lambda ohne `vpc_config` (AWS-managed Ausführungsumgebung); API GW, DynamoDB, Cognito,
+  CloudWatch, CloudTrail + S3-Bucket sind managed Services.
+- **Wichtig:** das Fehlen einer VPC ist für diese Serverless-Architektur **kein**
+  Availability-Defizit; eine VPC wird bewusst nicht nur für den Anschein von HA eingeführt.
+- **Abgrenzung:** Region ≠ Availability Zone ≠ Service-Verfügbarkeit ≠ Daten-Replikation.
+- **Bewusst deferred:** VPC/Subnets, NAT/IGW, VPC-Endpoints, Route-53-Failover, zweite Region,
+  DynamoDB Global Tables, Replikation, zusätzliche Failover-Services — erst unter einem
+  späteren `HIGH AVAILABILITY`/`CUSTOM`-Profil mit expliziter Bestätigung.
+- **Data Strategy (T017):** *deferred* — API/Compute-Verfügbarkeit ist getrennt von
+  Datenreplikation zu entscheiden.
+
+### 9.8 Data Strategy (Installation Layer, T017)
+
+> Fünfte Installations-Entscheidung aus dem Konzept `architecture/installation-concept.md` §3.4.
+> **Nur definiert (Design)** — keine Terraform-Änderung, da die aktuelle DynamoDB-Konfiguration
+> die gewählte Strategie bereits korrekt abbildet.
+
+- **Primärer Datenspeicher:** DynamoDB (Single Table `aws_dynamodb_table.orders`, `PAY_PER_REQUEST`,
+  Key `pk`/`sk`, GSI1 `INCLUDE-Projection`) in `eu-central-1`.
+- **Replikation:** Single Region — **keine** Global Tables / cross-region Replicas.
+- **Backup / PITR:** **NICHT aktiviert** (kein `point_in_time_recovery`). Bewusster
+  LOWEST/PROTOTYPE-Trade-off (Kosten/Einfachheit vs. Recovery); Wiederaufnahme als optionaler
+  Punkt in T019.
+- **Verschlüsselung:** DynamoDB encrypts at rest by default (AWS-owned KMS) — **kein**
+  explizites `server_side_encryption`-Block, **kein** customer-managed KMS.
+- **Deletion Protection / TTL / Streams:** nicht konfiguriert (der Modul-Output
+  `table_stream_arn` ist mangels `stream`-Block leer).
+- **Konsistenz:** Lambda nutzt Standard-DynamoDB-Reads (GetItem/Query, keine
+  `ConsistentRead`/Transaktionen) → eventually-consistent Reads; Strongly-consistent /
+  transaktionale Anforderungen sind Week-3-Arbeit.
+- **Kosten (T014 `LOWEST/PROTOTYPE`):** keine Global Tables/Replikation/KMS/Backup-Infra →
+  `LOW`.
+- **Security Profile (T018) / Optional Features (T019):** *deferred* — KMS, PITR, Streams
+  werden dort als explizite Optionen bewertet.
+
+### 9.9 Security Profile (Installation Layer, T018)
+
+> Sechste Installations-Entscheidung aus dem Konzept `architecture/installation-concept.md` §3.5.
+> **Nur definiert (Design)** — keine Terraform-Änderung, da die aktuelle Architektur das Profil
+> bereits korrekt abbildet.
+
+- **Gewählt:** `LOW / PROTOTYPE` — IAM Least Privilege, Cognito + API-Gateway-JWT, managed
+  Verschlüsselung, CloudWatch-Logging + CloudTrail-Management-Audit.
+- **Identity/Auth:** Cognito User Pool (admin-create, MFA OFF), Public Client
+  (`USER_PASSWORD_AUTH` + Refresh), Gruppe `staff`. Benutzer-Auth über Cognito, nie IAM-Keys.
+- **API-GW-Authorization:** JWT-Authorizer (Issuer = Cognito, Audience = Client-ID); **alle 4
+  Routen** sind `JWT`-geschützt (keine public Routen).
+- **Application-Authorization (GAP):** `cognito:groups`-Auswertung im Lambda **nicht**
+  implementiert (Week-3/A-09) — der Authorizer prüft nur Issuer/Audience.
+- **IAM:** eine Lambda-Execution-Role mit Inline-Policy (`PutItem/GetItem/UpdateItem/Query`
+  nur auf Tabelle+GSI1; `logs:*`); kein `Scan/Delete/Batch`, kein `iam:*`, kein `PassRole`,
+  kein `AdministratorAccess`. API-GW→Lambda als separate resource-based Permission.
+- **Permissions Boundary:** `MaysOrders-Terraform-Developer-Boundary` (Policy-Gate, optional,
+  nicht in den Terraform-Modulen) — beschränkt die Deployment-Identität; kein Pflicht-Bestandteil.
+- **Verschlüsselung:** DynamoDB AWS-managed default (kein KMS-Kundenkey); CloudTrail-S3
+  explizit SSE-S3/AES256 + Public-Access-Block + `BucketOwnerEnforced`.
+- **Transport:** HTTP API V2 (`protocol_type = "HTTP"`), kein Custom-Domain/ACM; AWS-managed
+  Endpoint liefert TLS am AWS-Edge; Custom-Domain optional.
+- **Audit:** CloudWatch (Lambda-Log-Group 7 Tage + Dashboard + 6 Alarme); CloudTrail
+  (multi-region, global service events, Mgmt-Events Read+Write, Log-Validierung, S3 mit
+  Least-Privilege-Bucket-Policy).
+- **Netzwerk:** kein VPC/Subnet/SG/NACL/NAT/IGW (managed Serverless). Kein Sicherheitsdefizit.
+- **Kosten (T014):** kein KMS/Data-Events/WAF/GuardDuty/Custom-Domain → `LOW`.
+- **Deferred (→ T019):** Gruppen-Authorization, KMS, CloudTrail Data Events/Hardening,
+  Custom-Domain/TLS, ggf. WAF/GuardDuty.

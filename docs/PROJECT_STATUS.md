@@ -36,6 +36,7 @@ Terraform:
 DynamoDB (T011-02) + IAM (T011-03) + Lambda (T011-04, runtime python3.14) + Cognito (T011-05) + API GW (T011-06) konfiguriert
 + DynamoDB Demo-Seed opt-in (T011-10: variable seed_example_data=false, terraform_data.seed_orders; 50 Demo-Orders)
 + CloudWatch Monitoring IaC (T011-11: Dashboard, 6 Alarme, Log-Retention 7 Tage — terraform/monitoring.tf; kein apply)
++ CloudTrail Audit Layer IaC (T011: Trail + S3-Log-Bucket, SSE-S3, Public-Access-Block, Bucket-Policy — module.cloudtrail; security/cloudtrail-design.md; kein apply)
 
 Authentication:
 CONFIGURED (Terraform T011-05 — Pool, Client, Gruppe `staff`) — NOT CREATED (kein apply)
@@ -58,6 +59,9 @@ CONFIGURED (Terraform T011-05) — NOT CREATED (kein apply)
 
 CloudWatch Monitoring:
 IMPLEMENTED (IaC T011-11: Dashboard + 6 Alarme + Log-Retention 7 Tage, terraform/monitoring.tf) — NOT CREATED (kein apply; Live-Test übernächste Woche)
+
+CloudTrail Audit Layer (T011):
+IMPLEMENTED (IaC: module.cloudtrail — Trail + S3-Log-Bucket, SSE-S3, Public-Access-Block, Bucket-Policy; security/cloudtrail-design.md) — NOT CREATED (kein apply)
 
 Tests:
 Terraform init/validate PASS (T011-01…T011-06, T011-11; AWS-Provider ~> 6.0 / 6.60.0);

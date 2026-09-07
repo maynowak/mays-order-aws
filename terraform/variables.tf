@@ -2,6 +2,15 @@ variable "project_name" {
   description = "Name des Projekts; wird als Prefix fuer Ressourcen-Namen verwendet."
   type        = string
   default     = "mays-orders"
+
+  # Naming-Safety (T013): ein vorhersagbarer, kompatibel nutzbarer Installationsname.
+  # Kleinschreibung + Bindestrich ist über alle verwendeten Ressourcen hinweg gültig
+  # (DynamoDB-Tabelle == project_name → min. 3 Zeichen; S3-Bucket ist kleinschreibungs-
+  # pflichtig). Kein leading/trailing Bindestrich. Siehe terraform/README.md §9.
+  validation {
+    condition     = length(var.project_name) >= 3 && can(regex("^[a-z0-9][a-z0-9-]*$", var.project_name))
+    error_message = "project_name muss mind. 3 Zeichen lang sein und darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten (kein fuehrender/trailender Bindestrich)."
+  }
 }
 
 variable "aws_region" {

@@ -44,6 +44,10 @@ Benutzer-Authentifizierung und AWS-Berechtigungen sind strikt getrennt.
 ```text
 mays-orders/
 ├── README.md
+├── Week-1/           Requirements & API/Data Design (Index)
+├── Week-2/           Core Order Management API (Index)
+├── Week-3/           Business Rules, Reliability & Security (Index)
+├── Week-4/           Scalability, Cost, Well-Architected & Finalization (Index)
 ├── requirements/     Business-/Technical-Requirements, Assumptions
 ├── architecture/     Architekturdiagramm, Request Flow, Decisions
 ├── api/              API-Dokumentation, Endpoints, Test-Cases
@@ -70,6 +74,69 @@ mays-orders/
 
 Aktueller Status: **WEEK 2 — COMPLETE** (Core Implementation: Terraform Infrastructure modularisiert in 6 Child Modules; Lambda/API Gateway/DynamoDB/Cognito/Monitoring implementiert).
 
+## Wochen-Struktur
+
+Die vier Projektwochen sind als physische Ordner mit Index-Dokumenten abgebildet. Jede
+`Week-N/README.md` verlinkt die zugehörigen Fachdateien (die thematisch im Repository
+abgelegt bleiben, um Querverweise und die Dokumentationsstruktur zu erhalten).
+
+| Week | Fokus | Haupt-Artefakte |
+|------|-------|-----------------|
+| [`Week-1`](Week-1/README.md) | Requirements & API/Data Design | Requirements, Order Lifecycle, API, DynamoDB, ADR |
+| [`Week-2`](Week-2/README.md) | Core Order Management API | Terraform (6 Module), Lambda (Python 3.14), Cognito, API Gateway |
+| [`Week-3`](Week-3/README.md) | Business Rules, Reliability & Security | State Machine, Validation, IAM, Reliability |
+| [`Week-4`](Week-4/README.md) | Scalability, Cost, Well-Architected & Finalization | Kostenanalyse, Skalierung, Test-Endbericht, Präsentation |
+
+## Voraussetzungen (Prerequisites)
+
+### Erforderlich (Required)
+
+- **Git** — Versionskontrolle und die dokumentierten Review-/Commit-Checkpoints.
+- **Terraform** — Version `>= 1.5.0` (Constraint `required_version` in `terraform/main.tf`); AWS-Provider `~> 6.0` (`hashicorp/aws`).
+- **Python 3** — für lokale Tests, Package-Build (`lambda/build_zip.py`) und Validierung (`compileall`, `unittest`). Nur Standardbibliothek nötig; `boto3` wird von der Lambda-Runtime bereitgestellt und muss lokal **nicht** installiert sein. Der Lambda-Runtime im Ziel-Account ist **`python3.14`** (`index.handler`) — das ist keine lokale Python-Version-Anforderung.
+- **AWS-Konto** — Ziel-Account, in dem Terraform die Infrastruktur anlegt.
+
+### AWS-Zugang & Identität
+
+- **AWS CLI** mit einem konfigurierten **Named Profile**. Empfohlener Profil-Name: **`maysOrdersAiDeveloper`** (Quelle: `docs/ai-developer-profile.md`).
+- Der Profil-Name ist eine **Empfehlung**; ein vorhandenes AWS-CLI-Profil darf stattdessen genutzt werden.
+- Credentials werden **außerhalb** des Repositories verwaltet (`~/.aws/`) und dürfen **niemals** committet werden (keine Access Keys, Secret Keys oder Tokens im Repo).
+- Das Profil ist für den **AI-Developer-Workflow** vorgesehen. Human- und AI-Developer-Identität sind **getrennte Konzepte**; menschliche Freigabe bleibt vor jedem kontrollierten `terraform apply`/`destroy` erforderlich.
+- Das Profil **umgeht NICHT** IAM, Permissions Boundaries oder den Policy Gate.
+
+Deployment erfordert ausreichende **IAM-Berechtigungen** für die von Terraform verwalteten Ressourcen (DynamoDB, IAM, Lambda, Cognito, API Gateway, CloudWatch, CloudTrail, S3). Eine generic `AdministratorAccess`-Policy ist **nicht** vorausgesetzt — die erforderlichen Berechtigungen werden target-seitig über AWS IAM festgelegt.
+
+### Region
+
+Default-Region: **`eu-central-1`** (Europe/Frankfurt), konfiguriert über `var.aws_region` (`terraform/variables.tf`, `terraform/main.tf`). Single-Region-Projekt — **kein** Multi-Region-Deployment.
+
+### Repository-Setup & Validierung
+
+Reine Lese-/Validierungsbefehle (deployen keine Infrastruktur):
+
+```bash
+# Identität sicher prüfen (read-only)
+aws sts get-caller-identity --profile maysOrdersAiDeveloper
+
+# Terraform validieren
+cd terraform && terraform init && terraform validate
+
+# Lambda-Code testen & bauen
+cd lambda && python3 -m compileall -q src tests
+cd lambda && PYTHONPATH=src python3 -m unittest discover -s tests -v
+cd lambda && python3 build_zip.py
+```
+
+### Policy Gate & Deployment-Workflow
+
+```text
+terraform plan  →  Policy Gate  →  menschliche Freigabe  →  terraform apply
+```
+
+Der **Policy Gate** (`terraform/policy/`, `docs/TERRAFORM_POLICY_GATE.md`) ist ein projektinterner
+Governance-Check **zwischen** `plan` und `apply`. Er ist Projekt-Governance und **ersetzt nicht**
+die AWS-IAM-Autorisierung; ein `FAIL` darf nicht umgangen werden.
+
 ## Workflow-Garantien
 
 - Test-first / evidenzbasierte Ergebnisse — nichts wird behauptet, ohne getestet zu sein.
@@ -90,6 +157,7 @@ Die Woche-1-Dokumentation liegt in den jeweiligen Unterordnern. Einstieg:
 - [API Endpoints](api/endpoints.md)
 - [DynamoDB Access Patterns](database/access-patterns.md)
 - [Architecture Decisions](architecture/architecture-decisions.md)
+- [Networking](architecture/networking.md) — Ist (Serverless) vs. Produktions-Ziel (VPC/Subnetz/AZ/CIDR)
 - [Vier-Wochen-Plan](docs/reports/four-week-plan.md)
 
 ## Projektakte (`docs/`)
@@ -101,3 +169,6 @@ Die Woche-1-Dokumentation liegt in den jeweiligen Unterordnern. Einstieg:
 - [Features](docs/features/README.md) — Feature-/Task-Dokumentation (F001–F011)
 - [Weekly Reports](docs/reports/) — `WEEK-01…04.md`
 - [Documentation Transfer Report](docs/reports/documentation-transfer-report.md)
+- [Terraform Policy Gate](docs/TERRAFORM_POLICY_GATE.md) — Pre-Apply-Governance
+- [AI Developer Profile](docs/ai-developer-profile.md) — empfohlene AWS-CLI-Identität für den AI Developer
+- [Industry-Standard Evolution](docs/roadmap/future-extensions.md) — Ausbau zu Produktions-/Industrie-Standards

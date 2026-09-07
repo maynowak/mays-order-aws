@@ -9,11 +9,36 @@ terraform {
   }
 }
 
+# Identity / provenance (erste sichere Installations-Schicht, T013).
+# Trennung gemäß architecture/installation-concept.md:
+#   Project     = var.project_name      → KONFIGURIERBAR (Ressourcen-Namen + "Project"-Tag)
+#   Maker       = local.maker           → UNVERÄNDERLICH (Original-/Provenance-Identität,
+#                                         nur als "Maker"-Tag, NIE in Ressourcen-Namen)
+#   Environment = local.environment     → Governance-Tag (Policy-Gate Pflichtfeld).
+#                                         Entwicklungs-/Prototyp-Stand "Development";
+#                                         "Production" ist vom Developer-Gate gesperrt.
+#   ManagedBy / CreatedBy               → optionale Deployment-Metadaten via var.tags
+#                                         (keine eigenen Variablen in dieser Schicht)
+# `Maker` ist bewusst ein neutraler Projekt-Slug (kein Personen-Name) und lebt nur
+# als Tag, damit eine spätere Umbenennung von `project_name` die Provenance nicht
+# verliert. Siehe terraform/README.md §9.
+locals {
+  maker       = "mays-orders"
+  environment = "Development"
+}
+
 provider "aws" {
   region = var.aws_region
 
   default_tags {
-    tags = merge({ "Project" = var.project_name }, var.tags)
+    tags = merge(
+      {
+        "Project"     = var.project_name
+        "Maker"       = local.maker
+        "Environment" = local.environment
+      },
+      var.tags
+    )
   }
 }
 
@@ -108,6 +133,20 @@ resource "terraform_data" "seed_orders" {
 # Fachquelle: monitoring/monitoring-design.md, cost/cost-analysis.md §2
 # Scope T011-11: Dashboard + 6 Alarme (API, Lambda, DynamoDB). Kein SNS, keine Log-Group.
 # Log-Group ist im Lambda-Modul.
+
+# T011 — CloudTrail Audit Layer (Account-Audit, KEINE Anwendungs-Business-Logik)
+# Fachquelle: security/cloudtrail-design.md
+# Scope: Trail (multi-region, Management Events Read+Write) + dedizierter S3-Bucket
+# (SSE-S3 at rest, Public-Access-Block, CloudTrail-Bucket-Policy) + Log-Validierung.
+# Kein Consumer-Modul → keine neuen Root-Inputs/-Outputs. Bewusst eigenes kleines
+# Child-Modul (analog module.monitoring). CloudWatch bleibt getrennt für operational
+# monitoring; CloudTrail ist der AWS-API-Audit-Trail.
+
+module "cloudtrail" {
+  source       = "./modules/cloudtrail"
+  project_name = var.project_name
+  tags         = var.tags
+}
 
 module "monitoring" {
   source                       = "./modules/monitoring"
