@@ -43,3 +43,61 @@ At the end, finalize the log with the complete audit summary.
 IMPORTANT:
 The execution log itself is part of the audit workflow and must be
 kept accurate even if the audit remains completely read-only.
+
+==================================================
+CHECKPOINT: 2026-09-11 — FINAL DOCUMENTATION CHECKPOINT
+==================================================
+
+## Current Status
+
+**Task:** Documentation and project overview checkpoint
+**Date:** 2026-09-11
+**Git Branch:** main
+**HEAD:** 01aee733ed91e8bf3349c7dccfa5edfc0817b6b8
+
+### Audit Scope
+
+1. Review root README for correct AWS development profile names
+2. Verify project overview documentation
+3. Create git checkpoint tag
+4. Preserve implementation work (SQS, backup, Terraform, Lambda)
+
+### Files Reviewed
+
+- `README.md` - Profile naming documentation
+- `docs/ai-developer-profile.md` - AI Developer profile documentation
+- `docs/PROJECT_STATUS.md` - Project status
+- `docs/reports/WEEK-03.md` - Week 3 progress
+- `docs/reports/WEEK-04.md` - Week 4 progress
+
+### Findings
+
+1. **Profile Naming**: The README correctly references `maysOrdersAiDeveloper` as the recommended AI Developer profile name. The profile is properly documented as a CLI profile name (not an IAM role) in `docs/ai-developer-profile.md`.
+
+2. **Human vs AI Developer Separation**: The documentation correctly distinguishes between human developer profiles and the AI developer profile (`maysOrdersAiDeveloper`).
+
+3. **Uncommitted Work**: The following implementation work remains uncommitted as per requirements:
+   - `lambda/src/sqs_handler.py`
+   - `terraform/modules/sqs-worker/`
+   - `terraform/modules/sqs/`
+   - `terraform/tfplan-backup`
+
+### Git Status
+
+```
+?? lambda/src/sqs_handler.py
+?? terraform/modules/sqs-worker/
+?? terraform/modules/sqs/
+?? terraform/tfplan-backup
+```
+
+### Validation
+
+- `git diff --check` - No whitespace errors found
+- README profile references consistent with ai-developer-profile.md
+- Project status up to date with documented checkpoints
+
+### Next Step
+
+Create git tag `docs-checkpoint-20260911` for this verified documentation state.
+Resume work on SQS integration testing after checkpoint is verified.
