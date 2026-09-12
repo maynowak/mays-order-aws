@@ -156,3 +156,59 @@ Uncommitted implementation work intentionally preserved.
 - `git diff --check` - PASS (no whitespace errors)
 - Documentation consistent with project requirements
 - Implementation work intentionally left uncommitted
+
+==================================================
+WEEKLY CHECKPOINTS CREATED
+==================================================
+
+**Week 1 Checkpoint:**
+- Tag: `week-1-checkpoint-20260911`
+- Commit: `d25a1ed`
+- Milestone: Week 1 — Requirements & API/Data Design (COMPLETE)
+
+**Week 2 Checkpoint:**
+- Tag: `week-2-checkpoint-20260912`
+- Commit: `01aee73`
+- Milestone: Week 2 — Core Order Management API (COMPLETE)
+
+**Week 3 Checkpoint:**
+- Tag: `aws-baseline-no-sqs-20260911` (existing tag)
+- Tag: `week-3-checkpoint-20260911` (new tag)
+- Commit: `01aee73`
+- Milestone: Week 3 baseline — Architecture complete, ready for SQS integration
+
+**Week 4 Checkpoint:**
+- Tag: `week-4-checkpoint-20260911`
+- Commit: `01aee73`
+- Milestone: Week 4 — Scalability, Cost, Well-Architected (NOT STARTED - Planned)
+
+**Documentation Checkpoint:**
+- Tag: `docs-checkpoint-20260911`
+- Commit: `199dbb7`
+- Milestone: Documentation and project overview checkpoint
+
+==================================================
+FINAL GIT STATUS
+==================================================
+
+**Uncommitted Files (intentionally preserved):**
+```
+?? lambda/src/sqs_handler.py
+?? terraform/modules/sqs-worker/
+?? terraform/modules/sqs/
+?? terraform/tfplan-backup
+```
+
+**Tags Created:**
+- week-1-checkpoint-20260911
+- week-2-checkpoint-20260912
+- week-3-checkpoint-20260911
+- week-4-checkpoint-20260911
+- docs-checkpoint-20260911
+- aws-baseline-no-sqs-20260911 (existing)
+
+==================================================
+RESUME POINT
+==================================================
+
+Next action: Push commits and tags to remote repository, then execute SQS integration tests.
