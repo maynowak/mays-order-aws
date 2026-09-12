@@ -30,3 +30,24 @@ Architekturentscheidungen. Die Inhalte liegen thematisch strukturiert im Reposit
 ## Wöchentlicher Nachweis
 
 - [Weekly Report Woche 1](../docs/reports/WEEK-01.md)
+
+## Git Checkpoint
+
+**Tag:** `week-1-checkpoint-20260911`  
+**Commit:** `d25a1ed`  
+**Date:** Initial project setup and requirements analysis  
+**Milestone:** Week 1 — Requirements & API/Data Design (COMPLETE)
+
+To explore this exact historical state:
+
+```bash
+git checkout week-1-checkpoint-20260911
+```
+
+At this checkpoint, the project foundation was established with:
+- Business and technical requirements documented
+- API endpoint designs finalized
+- Database access patterns defined
+- State machine and order lifecycle design complete
+- Authentication and IAM design documented
+- Architecture decisions recorded

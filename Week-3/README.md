@@ -32,3 +32,29 @@ zugehörigen Fachquellen aus Woche 1 existieren bereits und sind hier verlinkt.
 ## Wöchentlicher Nachweis
 
 - [Weekly Report Woche 3](../docs/reports/WEEK-03.md) (Notiz: NOT STARTED)
+
+## Git Checkpoint
+
+**Tag:** `aws-baseline-no-sqs-20260911`  
+**Commit:** `01aee73`  
+**Date:** September 7-11, 2026 (before SQS integration)  
+**Milestone:** Week 3 baseline — Architecture complete, ready for SQS integration
+
+To explore this exact historical state:
+
+```bash
+git checkout aws-baseline-no-sqs-20260911
+```
+
+At this checkpoint, the project is at the following state:
+- Core AWS infrastructure configured (Terraform)
+- Lambda runtime ready (Python 3.14)
+- API Gateway with JWT authorizer integrated
+- Cognito user pool and groups configured
+- **SQS Worker NOT YET INTEGRATED**
+
+SQS integration represents the next major architecture evolution:
+- Current: Client → API Gateway → Lambda → DynamoDB
+- With SQS: Client → API Gateway → Lambda → DynamoDB + SQS → Worker Lambda → DynamoDB
+
+**Note:** SQS worker implementation is in working directory but NOT committed. This tag represents the state BEFORE SQS integration.

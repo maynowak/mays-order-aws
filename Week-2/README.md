@@ -32,3 +32,23 @@ Terraform validate/plan — kein `apply`).
 ## Wöchentlicher Nachweis
 
 - [Weekly Report Woche 2](../docs/reports/WEEK-02.md)
+
+## Git Checkpoint
+
+**Tag:** `week-2-checkpoint-20260912`  
+**Commit:** `01aee73`  
+**Date:** September 7, 2026  
+**Milestone:** Week 2 — Core Order Management API (COMPLETE)
+
+To explore this exact historical state:
+
+```bash
+git checkout week-2-checkpoint-20260912
+```
+
+At this checkpoint, the core infrastructure was implemented:
+- Terraform modules for DynamoDB, IAM, Lambda, Cognito, API Gateway
+- CloudWatch monitoring and CloudTrail audit layer
+- Python 3.14 Lambda handler with unit tests
+- Seed scripts for test data (opt-in)
+- All configurations tested but no `terraform apply` executed

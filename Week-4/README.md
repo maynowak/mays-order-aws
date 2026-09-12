@@ -31,3 +31,25 @@ Fachquellen (Kostenanalyse, Test-Bericht, Präsentations-Vorbereitung) existiere
 ## Wöchentlicher Nachweis
 
 - [Weekly Report Woche 4](../docs/reports/WEEK-04.md) (Notiz: NOT STARTED)
+
+## Git Checkpoint
+
+**Tag:** `week-4-checkpoint-20260911`  
+**Commit:** `01aee73`  
+**Date:** September 11, 2026  
+**Milestone:** Week 4 — Scalability, Cost, Well-Architected (NOT STARTED - Planned)
+
+To explore this exact historical state:
+
+```bash
+git checkout week-4-checkpoint-20260911
+```
+
+At this checkpoint, Week 4 work is NOT YET STARTED. The project is ready for:
+- Scalability analysis (100 → 100k orders/day)
+- Cost measurement (CloudWatch billing metrics)
+- Well-Architected review (5 pillars)
+- Final API documentation
+- Test report and presentation
+
+**Current State:** Week 4 deliverables are planned but not implemented. SQS worker and backup verification remain in working directory (uncommitted).
