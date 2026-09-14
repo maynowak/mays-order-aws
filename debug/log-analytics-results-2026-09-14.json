@@ -1,0 +1,382 @@
+[
+    {
+        "@timestamp": "2026-09-14 07:45:48.842",
+        "@message": "END RequestId: e2c8a582-6ef5-5d7f-b3e2-c6a3c697419c\n"
+    },
+    {
+        "@timestamp": "2026-09-14 07:45:48.842",
+        "@message": "REPORT RequestId: e2c8a582-6ef5-5d7f-b3e2-c6a3c697419c\tDuration: 2.29 ms\tBilled Duration: 118 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 115.64 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-14 07:45:48.834",
+        "@message": "Worker processing: order_id=diag_1789371946, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-14 07:45:48.833",
+        "@message": "START RequestId: e2c8a582-6ef5-5d7f-b3e2-c6a3c697419c Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-14 07:45:48.714",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.633",
+        "@message": "REPORT RequestId: 117378cb-2c69-5b43-88e0-1bebdcf22b19\tDuration: 2.06 ms\tBilled Duration: 109 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 106.58 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.615",
+        "@message": "END RequestId: 117378cb-2c69-5b43-88e0-1bebdcf22b19\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.613",
+        "@message": "Worker processing: order_id=ord_f5f2e35b6be387af71785e98, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.612",
+        "@message": "START RequestId: 117378cb-2c69-5b43-88e0-1bebdcf22b19 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.502",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.351",
+        "@message": "REPORT RequestId: 34b44449-336a-4dae-a59b-f3c8225917dd\tDuration: 6922.04 ms\tBilled Duration: 7199 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\tInit Duration: 276.70 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.351",
+        "@message": "END RequestId: 34b44449-336a-4dae-a59b-f3c8225917dd\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:39.317",
+        "@message": "Sent order ord_f5f2e35b6be387af71785e98 to SQS\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:32.428",
+        "@message": "START RequestId: 34b44449-336a-4dae-a59b-f3c8225917dd Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 18:41:32.148",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v66\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:560c77f6cdda2265a11ed7de2b405e29d23c8bdc6c1231ca1347c0c233efa191\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:47:50.016",
+        "@message": "END RequestId: a63bff40-7354-537b-8629-9c609751b945\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:47:50.016",
+        "@message": "REPORT RequestId: a63bff40-7354-537b-8629-9c609751b945\tDuration: 2.05 ms\tBilled Duration: 105 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 102.58 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:47:50.014",
+        "@message": "Worker processing: order_id=ord_manualtest, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:47:50.013",
+        "@message": "START RequestId: a63bff40-7354-537b-8629-9c609751b945 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:47:49.907",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.665",
+        "@message": "REPORT RequestId: 733d3991-4a13-5978-a0c8-5ab19553a6fa\tDuration: 1.96 ms\tBilled Duration: 109 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 106.07 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.665",
+        "@message": "END RequestId: 733d3991-4a13-5978-a0c8-5ab19553a6fa\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.663",
+        "@message": "Worker processing: order_id=ord_a42ff91ff64e073985455ecd, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.662",
+        "@message": "START RequestId: 733d3991-4a13-5978-a0c8-5ab19553a6fa Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.553",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.433",
+        "@message": "END RequestId: 28949ee4-e3a8-45ce-a3cb-ee708c9d614f\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.433",
+        "@message": "REPORT RequestId: 28949ee4-e3a8-45ce-a3cb-ee708c9d614f\tDuration: 6879.92 ms\tBilled Duration: 7007 ms\tMemory Size: 128 MB\tMax Memory Used: 98 MB\tInit Duration: 126.46 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:46.399",
+        "@message": "Sent order ord_a42ff91ff64e073985455ecd to SQS\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:39.553",
+        "@message": "START RequestId: 28949ee4-e3a8-45ce-a3cb-ee708c9d614f Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:27:39.423",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v66\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:560c77f6cdda2265a11ed7de2b405e29d23c8bdc6c1231ca1347c0c233efa191\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:03:07.041",
+        "@message": "REPORT RequestId: 18ea7d36-eca2-5874-bc66-1e1635224c48\tDuration: 2.49 ms\tBilled Duration: 121 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 117.83 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:03:07.041",
+        "@message": "END RequestId: 18ea7d36-eca2-5874-bc66-1e1635224c48\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:03:07.034",
+        "@message": "Worker processing: order_id=ord_test123, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:03:07.033",
+        "@message": "START RequestId: 18ea7d36-eca2-5874-bc66-1e1635224c48 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 17:03:06.912",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:43:13.826",
+        "@message": "END RequestId: a02fbb66-1675-403f-aa37-93385dc9fb88\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:43:13.826",
+        "@message": "REPORT RequestId: a02fbb66-1675-403f-aa37-93385dc9fb88\tDuration: 6699.64 ms\tBilled Duration: 6830 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\tInit Duration: 130.28 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:43:13.767",
+        "@message": "Unexpected error: Object of type Decimal is not JSON serializable\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:43:07.126",
+        "@message": "START RequestId: a02fbb66-1675-403f-aa37-93385dc9fb88 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:43:06.992",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v66\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:560c77f6cdda2265a11ed7de2b405e29d23c8bdc6c1231ca1347c0c233efa191\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:07.216",
+        "@message": "END RequestId: 3ce99624-8d8d-5179-8537-f5045f0d63f9\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:07.216",
+        "@message": "REPORT RequestId: 3ce99624-8d8d-5179-8537-f5045f0d63f9\tDuration: 2.24 ms\tBilled Duration: 109 ms\tMemory Size: 128 MB\tMax Memory Used: 39 MB\tInit Duration: 105.99 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:07.214",
+        "@message": "Worker processing: order_id=ord_16eab56b64377ade8410e459, status=CONFIRMED\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:07.214",
+        "@message": "START RequestId: 3ce99624-8d8d-5179-8537-f5045f0d63f9 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:07.104",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:06.948",
+        "@message": "END RequestId: 889f526d-fd89-4c7b-93fc-48acc5f93eac\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:06.948",
+        "@message": "REPORT RequestId: 889f526d-fd89-4c7b-93fc-48acc5f93eac\tDuration: 6967.16 ms\tBilled Duration: 7099 ms\tMemory Size: 128 MB\tMax Memory Used: 98 MB\tInit Duration: 131.78 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:33:06.922",
+        "@message": "Sent order ord_16eab56b64377ade8410e459 to SQS\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:32:59.981",
+        "@message": "START RequestId: 889f526d-fd89-4c7b-93fc-48acc5f93eac Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-13 16:32:59.845",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v66\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:560c77f6cdda2265a11ed7de2b405e29d23c8bdc6c1231ca1347c0c233efa191\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:24:20.999",
+        "@message": "REPORT RequestId: d52fd23e-6539-4bac-aca8-0525c5a90eb6\tDuration: 6360.87 ms\tBilled Duration: 6485 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\tInit Duration: 123.94 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:24:20.999",
+        "@message": "END RequestId: d52fd23e-6539-4bac-aca8-0525c5a90eb6\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:24:14.637",
+        "@message": "START RequestId: d52fd23e-6539-4bac-aca8-0525c5a90eb6 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:24:14.510",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:06:49.850",
+        "@message": "REPORT RequestId: 84f1a405-aacb-461d-a8d1-b4055ab8390c\tDuration: 222.04 ms\tBilled Duration: 223 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:06:49.850",
+        "@message": "END RequestId: 84f1a405-aacb-461d-a8d1-b4055ab8390c\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:06:49.628",
+        "@message": "START RequestId: 84f1a405-aacb-461d-a8d1-b4055ab8390c Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:05:29.190",
+        "@message": "END RequestId: d24e9029-7b85-41a4-a264-79717e91b7d2\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:05:29.190",
+        "@message": "REPORT RequestId: d24e9029-7b85-41a4-a264-79717e91b7d2\tDuration: 57.99 ms\tBilled Duration: 58 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:05:29.131",
+        "@message": "START RequestId: d24e9029-7b85-41a4-a264-79717e91b7d2 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:04:41.810",
+        "@message": "END RequestId: a9de7b61-c3ee-449e-9fbf-1e4f80b88244\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:04:41.810",
+        "@message": "REPORT RequestId: a9de7b61-c3ee-449e-9fbf-1e4f80b88244\tDuration: 77.20 ms\tBilled Duration: 78 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:04:41.732",
+        "@message": "START RequestId: a9de7b61-c3ee-449e-9fbf-1e4f80b88244 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:45.989",
+        "@message": "END RequestId: bd77073c-265f-49e3-b364-e6260b86afb3\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:45.989",
+        "@message": "REPORT RequestId: bd77073c-265f-49e3-b364-e6260b86afb3\tDuration: 224.75 ms\tBilled Duration: 225 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:45.764",
+        "@message": "START RequestId: bd77073c-265f-49e3-b364-e6260b86afb3 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:31.809",
+        "@message": "END RequestId: 84b8fbf9-725b-4023-8983-bd662e5ff118\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:31.809",
+        "@message": "REPORT RequestId: 84b8fbf9-725b-4023-8983-bd662e5ff118\tDuration: 92.34 ms\tBilled Duration: 93 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 13:01:31.716",
+        "@message": "START RequestId: 84b8fbf9-725b-4023-8983-bd662e5ff118 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:58:08.008",
+        "@message": "REPORT RequestId: cd2b8413-6fa0-4f33-893c-e3cc414bbb83\tDuration: 42.80 ms\tBilled Duration: 43 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:58:08.008",
+        "@message": "END RequestId: cd2b8413-6fa0-4f33-893c-e3cc414bbb83\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:58:07.965",
+        "@message": "START RequestId: cd2b8413-6fa0-4f33-893c-e3cc414bbb83 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:56:03.828",
+        "@message": "REPORT RequestId: 7f7f5e4b-8ed9-4501-adb7-28342ad81c05\tDuration: 29.78 ms\tBilled Duration: 30 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:56:03.828",
+        "@message": "END RequestId: 7f7f5e4b-8ed9-4501-adb7-28342ad81c05\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:56:03.798",
+        "@message": "START RequestId: 7f7f5e4b-8ed9-4501-adb7-28342ad81c05 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:42.367",
+        "@message": "REPORT RequestId: 08437200-0de6-477b-8eb9-73a05b81df85\tDuration: 47.22 ms\tBilled Duration: 48 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:42.367",
+        "@message": "END RequestId: 08437200-0de6-477b-8eb9-73a05b81df85\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:42.319",
+        "@message": "START RequestId: 08437200-0de6-477b-8eb9-73a05b81df85 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:16.027",
+        "@message": "REPORT RequestId: b5e2c188-4981-4768-a463-ed7c6fb3fb58\tDuration: 65.51 ms\tBilled Duration: 66 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:16.027",
+        "@message": "END RequestId: b5e2c188-4981-4768-a463-ed7c6fb3fb58\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:53:15.961",
+        "@message": "START RequestId: b5e2c188-4981-4768-a463-ed7c6fb3fb58 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:49:26.307",
+        "@message": "REPORT RequestId: ee78e9d2-00f9-48c7-9d33-25cef60b237c\tDuration: 6114.87 ms\tBilled Duration: 6238 ms\tMemory Size: 128 MB\tMax Memory Used: 97 MB\tInit Duration: 122.80 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:49:26.307",
+        "@message": "END RequestId: ee78e9d2-00f9-48c7-9d33-25cef60b237c\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:49:20.191",
+        "@message": "START RequestId: ee78e9d2-00f9-48c7-9d33-25cef60b237c Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:49:20.065",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:20:20.431",
+        "@message": "REPORT RequestId: df390de8-d118-40bd-8f05-48f1894fab73\tDuration: 513.00 ms\tBilled Duration: 514 ms\tMemory Size: 128 MB\tMax Memory Used: 96 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:20:20.431",
+        "@message": "END RequestId: df390de8-d118-40bd-8f05-48f1894fab73\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:20:19.918",
+        "@message": "START RequestId: df390de8-d118-40bd-8f05-48f1894fab73 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:19:36.831",
+        "@message": "END RequestId: 0be9dfbd-8681-4da5-87eb-5fda542c4558\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:19:36.831",
+        "@message": "REPORT RequestId: 0be9dfbd-8681-4da5-87eb-5fda542c4558\tDuration: 22.72 ms\tBilled Duration: 23 ms\tMemory Size: 128 MB\tMax Memory Used: 96 MB\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:19:36.808",
+        "@message": "START RequestId: 0be9dfbd-8681-4da5-87eb-5fda542c4558 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:18:39.552",
+        "@message": "END RequestId: 08577d26-e967-4268-8318-62c3f0743c91\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:18:39.552",
+        "@message": "REPORT RequestId: 08577d26-e967-4268-8318-62c3f0743c91\tDuration: 5753.80 ms\tBilled Duration: 5879 ms\tMemory Size: 128 MB\tMax Memory Used: 96 MB\tInit Duration: 124.33 ms\t\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:18:33.797",
+        "@message": "START RequestId: 08577d26-e967-4268-8318-62c3f0743c91 Version: $LATEST\n"
+    },
+    {
+        "@timestamp": "2026-09-11 12:18:33.669",
+        "@message": "INIT_START Runtime Version: python:3.14.mainline.v63\tRuntime Version ARN: arn:aws:lambda:eu-central-1::runtime:eeb8a9516d399508120f0ea5616b892b0aa6f2f2e9c66961b3734b3ec62d8871\n"
+    }
+]

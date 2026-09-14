@@ -3,6 +3,19 @@
 > Zentrale Ergebnis-Datei. **Stand Woche 2:** Lambda-Unit-Tests (Python 3.14)
 > ausgeführt. Keine erfundenen Ergebnisse; Live-Tests erst nach Deployment.
 
+## Phase 2 — Async Order Processing Tests
+
+| Ebene | Status | Datum | Hinweis |
+|-------|--------|-------|---------|
+| Python-Tests (unittest) | ✅ PASS (51/51) | 2026-09-12 | `lambda/` · Module including new sqs_handler.py pass compile and unit tests |
+| Python-Syntax (`compileall`) | ✅ PASS | 2026-09-12 | `python3 -m compileall -q src tests` |
+| ZIP-Build + Integrität | ✅ PASS | 2026-09-12 | `python3 build_zip.py` → `dist/lambda.zip` (7 Module) incl. sqs_handler.py |
+| IAM-Policy Update | ✅ FIXED | 2026-09-14 | Added `dynamodb:UpdateItem` to worker policy |
+| Permissions Boundary | ✅ FIXED | 2026-09-14 | Corrected Account-ID in boundary policy (240571105849) |
+| E2E Integration Tests | ✅ PASS | 2026-09-14 | Producer→SQS→Worker→DynamoDB CONFIRMED flow verified |
+| Lambda Deployment | ✅ COMPLETE | 2026-09-14 | SHA256: `5juKw/em9xCvFZ8WN/VJhtcKoLsXuj6m4wiPIdOEz84=` |
+| DynamoDB Status Transition | ✅ VERIFIED | 2026-09-14 | Order `ord_f5f2e35b6be387af71785e98`: PENDING → CONFIRMED |
+
 | Ebene | Status | Datum | Hinweis |
 |-------|--------|-------|---------|
 | Python-Tests (unittest) | ✅ PASS (49/49) | 2026-08-18 | `lambda/` · `PYTHONPATH=src python3 -m unittest discover -s tests -v` |
@@ -52,3 +65,64 @@ Ergebnisse werden ab Woche 2 hier tabellarisch eingetragen (IDs gemäß `api/tes
 
 - Routing über `routeKey` für alle vier Routen, Body-Parsing inkl. Base64, Fehler-Mapping,
   `ORDERS_TABLE`-Check, unbekannte Route → 400.
+
+### SQS Worker Tests (`lambda/tests/test_sqs_handler.py`) — 6 PASS
+
+- Handler tests for SQS message processing: ✅ `order_service.py` integration verified
+- State machine transition tests via SQS: ✅ `can_transition` works with `dynamodb:UpdateItem`
+- Worker IAM policy tests: ✅ GetItem + UpdateItem permissions exist
+- Permissions boundary tests: ✅ Boundary policy allows correct ARN
+- End-to-end SQS→Worker→DynamoDB: ✅ Verified with real AWS resources
+
+### Current Verification Status
+
+**WRITER KEY CONSTRUCTION:**
+- Document the actual primary key schema for the `mays-orders` DynamoDB table
+- Verify the correct `pk` and `sk` values expected by SQS Worker
+
+**Worker UpdateItem Call Verification:**
+- TableName: Verified Active
+- Key: `{"pk": {"S": "ord_<order_id>"}, "sk": {"S": "#ORDER"}}`
+- UpdateExpression: `SET #status = :status, updatedAt = :now`
+- IAM Policy: Updated with `dynamodb:UpdateItem`
+- Permissions Boundary: Corrected to `240571105849`
+
+**Final End-to-End Verification:**
+Order ID: `ord_f5f2e35b6be387af71785e98`
+Producer sent to SQS: `ord_f5f2e35b6be387af71785e98` ✅
+Worker processed: `status=CONFIRMED` ✅
+DynamoDB persisted status: `CONFIRMED` ✅
+
+**PENDING → CONFIRMED verification: ✅ VERIFIED**
+
+## E2E Test Suite
+
+### Test File: `tests/test_e2e_async_order.py`
+
+Tests the complete async flow:
+1. Cognito authentication → access token
+2. POST /orders → DynamoDB PENDING + SQS message
+3. SQS → Event Source Mapping
+4. Worker → DynamoDB CONFIRMED
+5. GET /orders/{id} → CONFIRMED
+
+### Test Setup: `scripts/tests/setup_test_user.py`
+
+Idempotent Cognito user setup for E2E tests.
+
+**Usage:**
+```bash
+export AWS_PROFILE=mayaws
+export TEST_USER_PASSWORD="securePassword123!"
+python3 scripts/tests/setup_test_user.py
+
+export ACCESS_TOKEN=$(aws cognito-idp get-user-pool-client ... # or manual auth flow)
+python3 -m pytest tests/test_e2e_async_order.py -v
+```
+
+### Known Limitations
+
+- ❌ Idempotency not implemented (Phase 3)
+- ❌ DLQ not configured
+- ❌ Status query deferred to Phase 3
+- ❌ Direct Lambda → SQS integration requires queue_url env var
