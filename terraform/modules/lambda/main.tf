@@ -15,7 +15,8 @@ resource "aws_lambda_function" "handler" {
 
   environment {
     variables = {
-      ORDERS_TABLE = var.dynamodb_table_name
+      ORDERS_TABLE  = var.dynamodb_table_name
+      SQS_QUEUE_URL = var.queue_url
     }
   }
 

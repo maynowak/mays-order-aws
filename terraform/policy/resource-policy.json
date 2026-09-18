@@ -54,7 +54,7 @@
     "max_ebs_gib": 20
   },
   "lambda": {
-    "allowed_runtimes": ["python3.14"],
+    "allowed_runtimes": ["python3.11"],
     "max_timeout_seconds": 10,
     "max_log_retention_days": 7
   },

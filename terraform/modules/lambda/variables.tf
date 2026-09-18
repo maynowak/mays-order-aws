@@ -28,7 +28,7 @@ variable "handler" {
 variable "runtime" {
   description = "Lambda Runtime."
   type        = string
-  default     = "python3.14"
+  default     = "python3.11"
 }
 
 variable "timeout" {
@@ -52,4 +52,10 @@ variable "log_retention_days" {
   description = "CloudWatch-Log-Retention der Lambda-Log-Group in Tagen."
   type        = number
   default     = 7
+}
+
+variable "queue_url" {
+  description = "SQS queue URL for producer to send messages"
+  type        = string
+  default     = ""
 }

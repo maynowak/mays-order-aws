@@ -18,9 +18,7 @@ data "aws_iam_policy_document" "worker_policy" {
       "dynamodb:GetItem",
       "dynamodb:UpdateItem",
     ]
-    resources = [
-      "arn:aws:dynamodb:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/${var.project_name}",
-    ]
+    resources = [var.dynamodb_table_arn]
   }
 
   statement {
@@ -50,8 +48,8 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 resource "aws_iam_role" "worker" {
-  name               = "${var.project_name}-sqs-worker-role"
-  assume_role_policy = data.aws_iam_policy_document.worker_trust.json
+  name                 = "${var.project_name}-sqs-worker-role"
+  assume_role_policy   = data.aws_iam_policy_document.worker_trust.json
   permissions_boundary = var.lambda_execution_boundary
 
   tags = merge({ "Project" = var.project_name }, var.tags)

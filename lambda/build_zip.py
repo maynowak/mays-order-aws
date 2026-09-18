@@ -25,6 +25,7 @@ MODULES = [
     "validation.py",
     "errors.py",
     "order_types.py",
+    "sqs_handler.py",
 ]
 
 

@@ -31,6 +31,15 @@ data "aws_iam_policy_document" "handler" {
   }
 
   statement {
+    sid    = "SQS"
+    effect = "Allow"
+    actions = [
+      "sqs:SendMessage",
+    ]
+    resources = [var.sqs_queue_arn]
+  }
+
+  statement {
     sid    = "Logs"
     effect = "Allow"
     actions = [

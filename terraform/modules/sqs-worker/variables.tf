@@ -24,6 +24,11 @@ variable "dynamodb_table_name" {
   type        = string
 }
 
+variable "dynamodb_table_arn" {
+  description = "ARN of DynamoDB table"
+  type        = string
+}
+
 variable "lambda_execution_boundary" {
   description = "IAM permissions boundary"
   type        = string
