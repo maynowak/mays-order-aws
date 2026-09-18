@@ -42,8 +42,7 @@ def get_access_token():
         raise ValueError("COGNITO_CLIENT_ID, TEST_USER_EMAIL, and TEST_USER_PASSWORD must be set")
 
     cognito = boto3.client("cognito-idp", region_name="eu-central-1")
-    response = cognito.authenticate_user(
-        UserPoolId=os.environ.get("COGNITO_USER_POOL_ID", ""),
+    response = cognito.initiate_auth(
         ClientId=client_id,
         AuthFlow="USER_PASSWORD_AUTH",
         AuthParameters={

@@ -4,7 +4,11 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 6.0"
+      version = ">= 6.0"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.11"
     }
   }
 }
@@ -23,12 +27,13 @@ terraform {
 # als Tag, damit eine spätere Umbenennung von `project_name` die Provenance nicht
 # verliert. Siehe terraform/README.md §9.
 locals {
-  maker       = "mays-orders"
+  maker       = "Maymilly Nowak"
   environment = "Development"
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = "mayaws"
 
   default_tags {
     tags = merge(
@@ -61,6 +66,7 @@ module "iam" {
   tags               = var.tags
   dynamodb_table_arn = module.dynamodb.table_arn
   dynamodb_gsi1_arn  = module.dynamodb.gsi1_arn
+  sqs_queue_arn      = module.sqs.queue_arn
 }
 
 # T011-04 — Lambda: Order Handler (Zip-Build, Python 3.14)
@@ -75,6 +81,7 @@ module "lambda" {
   tags                = var.tags
   iam_role_arn        = module.iam.role_arn
   dynamodb_table_name = module.dynamodb.table_name
+  queue_url           = module.sqs.queue_url
   monitoring_enabled  = var.monitoring_enabled
   log_retention_days  = var.log_retention_days
   filename            = "${path.root}/../lambda/dist/lambda.zip"
@@ -167,4 +174,28 @@ module "monitoring" {
   api_id                       = module.api.api_id
   api_stage_name               = module.api.api_stage_name
   dynamodb_table_name          = module.dynamodb.table_name
+}
+
+# SQS Queue for async order processing
+# This module will be imported to manage existing AWS resources
+module "sqs" {
+  source       = "./modules/sqs"
+  project_name = var.project_name
+  tags         = var.tags
+  queue_name   = "${var.project_name}-orders-queue"
+}
+
+# SQS Worker Lambda - processes messages from SQS queue
+# This module will be imported to manage existing AWS resources
+module "sqs_worker" {
+  source              = "./modules/sqs-worker"
+  project_name        = var.project_name
+  tags                = var.tags
+  sqs_queue_arn       = module.sqs.queue_arn
+  sqs_queue_name      = module.sqs.queue_name
+  dynamodb_table_name = module.dynamodb.table_name
+  dynamodb_table_arn  = module.dynamodb.table_arn
+  filename            = "${path.root}/../lambda/dist/lambda.zip"
+  monitoring_enabled  = var.monitoring_enabled
+  log_retention_days  = var.log_retention_days
 }

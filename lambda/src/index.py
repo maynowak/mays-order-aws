@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import sys
+import uuid
 from typing import Any, Dict, Optional
 
 from errors import OrderError, error_body, internal_error, validation_error
@@ -12,6 +13,38 @@ from validation import validate_list_params, validate_order_id, validate_status_
 
 JSON_HEADERS = {"Content-Type": "application/json"}
 
+SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+
+def _get_sqs_client():
+    import boto3
+    return boto3.client('sqs', region_name=os.environ.get('AWS_REGION', 'eu-central-1'))
+
+def _send_to_sqs(order_id: str) -> bool:
+    if not SQS_QUEUE_URL:
+        print("SQS_QUEUE_URL not configured")
+        return False
+    try:
+        sqs = _get_sqs_client()
+        message = {
+            "orderId": order_id,
+            "status": "CONFIRMED",
+            "metadata": {"reason": "order_created"}
+        }
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps(message),
+            MessageAttributes={
+                "orderId": {
+                    "StringValue": order_id,
+                    "DataType": "String"
+                }
+            }
+        )
+        print(f"Sent order {order_id} to SQS")
+        return True
+    except Exception as e:
+        print(f"Failed to send to SQS: {e}")
+        return False
 
 def parse_body(event: Dict[str, Any]) -> Any:
     body = event.get("body")
@@ -74,6 +107,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if route == "POST /orders":
             order = service.create_order(parse_body(event))
+            order_id = order.get("orderId")
+            if order_id and SQS_QUEUE_URL:
+                _send_to_sqs(order_id)
             return ok(201, order)
 
         if route == "GET /orders":

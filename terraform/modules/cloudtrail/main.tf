@@ -19,18 +19,21 @@ data "aws_region" "current" {}
 resource "aws_s3_bucket" "trail" {
   bucket = "${var.project_name}-cloudtrail-${data.aws_caller_identity.current.account_id}"
 
-  tags = merge({ "Project" = var.project_name }, var.tags)
+  tags          = merge({ "Project" = var.project_name }, var.tags)
+  force_destroy = true
 }
+
+
 
 # Moderne S3-Eigentümer-Kontrolle: ACLs deaktiviert, nur Bucket-Policy entscheidet.
 # Verhindert ACL-basierte öffentliche Objekte (AWS-Best-Practice für neue Buckets).
-resource "aws_s3_bucket_ownership_controls" "trail" {
-  bucket = aws_s3_bucket.trail.id
+#resource "aws_s3_bucket_ownership_controls" "trail" {
+#  bucket = aws_s3_bucket.trail.id
 
-  rule {
-    object_ownership = "BucketOwnerEnforced"
-  }
-}
+#  rule {
+#    object_ownership = "BucketOwnerEnforced"
+#  }
+#}
 
 # Öffentlicher Zugriff vollständig gesperrt (Verteidigung in der Tiefe;
 # Buckets sind zwar default-privat, dies ist die explizite Sicherung).
@@ -53,41 +56,62 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "trail" {
       sse_algorithm = "AES256"
     }
   }
+  depends_on = [aws_s3_bucket.trail]
 }
 
-# CloudTrail-Bucket-Policy: NUR der CloudTrail-Service darf schreiben, eng auf
-# das AWSLogs/<account>/CloudTrail/*-Prefix der Account-ID + Trail-ARN begrenzt (Least Privilege).
-# Kein `s3:x-amz-acl`-Condition, da BucketOwnerEnforced ACLs deaktiviert.
-data "aws_iam_policy_document" "trail_bucket" {
-  statement {
-    sid    = "AWSCloudTrailWrite"
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudtrail.amazonaws.com"]
-    }
-
-    actions = ["s3:PutObject"]
-
-    resources = [
-      "${aws_s3_bucket.trail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/CloudTrail/*",
-    ]
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceArn"
-      values   = [aws_cloudtrail.trail.arn]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "trail" {
+# CloudTrail-Bucket-Policy: Nur der CloudTrail-Service darf schreiben.
+# Diese Policy ermöglicht das CloudWatch-Tracing in einem dedizierten S3-Bucket.
+resource "aws_s3_bucket_policy" "trail_policy" {
   bucket = aws_s3_bucket.trail.id
-  policy = data.aws_iam_policy_document.trail_bucket.json
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSCloudTrailAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = aws_s3_bucket.trail.arn
+      },
+      {
+        Sid    = "AWSCloudTrailWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.trail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+        Condition = {
+          StringEquals = {
+            "aws:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-trail"
+            "s3:x-amz-acl"  = "bucket-owner-full-control"
+          }
+        }
+      },
+      {
+        Sid    = "AWSCloudTrailWriteAcl"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObjectAcl"
+        Resource = "${aws_s3_bucket.trail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+      }
+    ]
+  })
+
+  depends_on = [aws_s3_bucket.trail]
 }
 
-# CloudTrail-Trail: alle Regionen, globale Service-Events (IAM etc.), Management-Events
+resource "time_sleep" "wait_for_bucket_policy" {
+  depends_on      = [aws_s3_bucket_policy.trail_policy]
+  create_duration = "60s"
+}
+
+# CloudTrail-Trail: Alle Regionen, globale Service-Events (IAM etc.), Management-Events
 # (Read+Write), Log-File-Validierung (Integrität) und Logging aktiv.
 resource "aws_cloudtrail" "trail" {
   name                          = "${var.project_name}-trail"
@@ -103,4 +127,6 @@ resource "aws_cloudtrail" "trail" {
   }
 
   tags = merge({ "Project" = var.project_name }, var.tags)
+
+  depends_on = [aws_s3_bucket.trail, aws_s3_bucket_policy.trail_policy, time_sleep.wait_for_bucket_policy]
 }
