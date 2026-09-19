@@ -13,6 +13,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from installer.core.deployment_identity import (
+    DeploymentContext,
+    DeploymentId,
+    SemanticVersion,
+    DevelopmentPhase,
+    DevelopmentState,
+    DevelopmentStatus,
+    PlanOperation,
+    PlanMetadata,
+    PlanIdentity,
+    TagSet,
+    ResourceOwnership,
+    OwnershipStatus,
+    DeploymentContext,
+    create_deployment_context,
+)
+
 
 @dataclass
 class AWSExecutionContext:
@@ -91,6 +108,12 @@ class InstallationContext:
     environment: str = "Development"
     project_name: str = "mays-orders"
 
+    # H2: Deployment Identity & Versioning
+    deployment_version: str = "0.1.0"           # Semantic version (major.minor.patch)
+    development_phase: str = "H2"               # Development phase (e.g., H2, D8)
+    development_step: int = 0                   # Development step number
+    development_status: str = "development"     # development, testing, staging, production, archived
+
     # Cognito Configuration
     cognito_mode: str = "user_pool"  # user_pool, identity_pool, external
     cognito_user_pool_id: Optional[str] = None
@@ -137,6 +160,10 @@ class InstallationContext:
             identity_arn=os.environ.get("AWS_IDENTITY_ARN"),
             environment=os.environ.get("ENVIRONMENT", "Development"),
             project_name=os.environ.get("PROJECT_NAME", "mays-orders"),
+            deployment_version=os.environ.get("DEPLOYMENT_VERSION", "0.1.0"),
+            development_phase=os.environ.get("DEVELOPMENT_PHASE", "H2"),
+            development_step=int(os.environ.get("DEVELOPMENT_STEP", "0")),
+            development_status=os.environ.get("DEVELOPMENT_STATUS", "development"),
             cognito_mode=os.environ.get("COGNITO_MODE", "user_pool"),
             cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID"),
             cognito_client_id=os.environ.get("COGNITO_CLIENT_ID"),
@@ -168,6 +195,54 @@ class InstallationContext:
         if context_file.exists():
             return cls.from_json(context_file.read_text())
         raise FileNotFoundError(f"Context file not found: {context_file}")
+
+    def get_deployment_id(self) -> "DeploymentId":
+        """Get canonical deployment ID from context."""
+        from installer.core.deployment_identity import DeploymentId
+        if not self.aws_execution_context:
+            raise ValueError("AWS execution context not validated")
+        return DeploymentId(
+            account_id=self.aws_execution_context.account_id,
+            project=self.project_name,
+            environment=self.environment
+        )
+
+    def get_deployment_context(self) -> "DeploymentContext":
+        """Create H2 DeploymentContext from this installation context."""
+        from installer.core.deployment_identity import (
+            DeploymentContext, DeploymentId, SemanticVersion,
+            DevelopmentPhase, DevelopmentState, DevelopmentStatus
+        )
+        if not self.aws_execution_context:
+            raise ValueError("AWS execution context not validated")
+
+        deployment_id = DeploymentId(
+            account_id=self.aws_execution_context.account_id,
+            project=self.project_name,
+            environment=self.environment
+        )
+
+        version = SemanticVersion.parse(self.deployment_version)
+        dev_phase = DevelopmentPhase.parse(self.development_phase)
+
+        dev_state = DevelopmentState(
+            version=version,
+            phase=dev_phase,
+            status=DevelopmentStatus(self.development_status)
+        )
+
+        return DeploymentContext(
+            deployment_id=deployment_id,
+            version=version,
+            development_state=dev_state,
+            aws_region=self.aws_region,
+            aws_profile=self.aws_profile,
+            allow_aws_operations=self.allow_aws_operations,
+            dry_run=self.dry_run,
+            run_id=self.run_id,
+            run_dir=self.run_dir,
+            terraform_dir=self.terraform_dir
+        )
 
     def validate_aws_context(self) -> Optional["AWSExecutionContext"]:
         """

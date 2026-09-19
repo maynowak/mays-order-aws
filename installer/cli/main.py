@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Optional
 
 from installer.core.context import InstallationContext, ValidationLayer
+from installer.core.deployment_identity import (
+    DeploymentContext, DeploymentId, SemanticVersion,
+    DevelopmentPhase, PlanOperation, PlanMetadata,
+    PlanDiscovery, PlanSequenceManager
+)
 from installer.terraform.runner import TerraformRunner, PlanResult
 from installer.terraform.plan_analysis import evaluate_plan_safety
 from installer.run.manager import RunDirectoryManager, PlanArtifactManager
@@ -80,6 +85,30 @@ class InstallerCLI:
             action="store_true",
             default=True,
             help="Run in dry-run mode (default: True)"
+        )
+
+        # H2: Deployment identity and versioning
+        parser.add_argument(
+            "--deployment-version",
+            default=os.environ.get("DEPLOYMENT_VERSION", "0.1.0"),
+            help="Deployment semantic version (default: 0.1.0)"
+        )
+        parser.add_argument(
+            "--development-phase",
+            default=os.environ.get("DEVELOPMENT_PHASE", "H2"),
+            help="Development phase (e.g., H2, D8) (default: H2)"
+        )
+        parser.add_argument(
+            "--development-step",
+            type=int,
+            default=int(os.environ.get("DEVELOPMENT_STEP", "0")),
+            help="Development step number (default: 0)"
+        )
+        parser.add_argument(
+            "--development-status",
+            default=os.environ.get("DEVELOPMENT_STATUS", "development"),
+            choices=["development", "testing", "staging", "production", "archived"],
+            help="Development status (default: development)"
         )
 
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -310,6 +339,12 @@ class InstallerCLI:
         context.terraform_dir = parsed.terraform_dir
         context.run_dir = parsed.run_dir
         context.dry_run = parsed.dry_run
+
+        # H2: Deployment identity and versioning
+        context.deployment_version = getattr(parsed, 'deployment_version', '0.1.0')
+        context.development_phase = getattr(parsed, 'development_phase', 'H2')
+        context.development_step = getattr(parsed, 'development_step', 0)
+        context.development_status = getattr(parsed, 'development_status', 'development')
         return context
 
     def _cmd_validate(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
@@ -358,9 +393,14 @@ class InstallerCLI:
         return 0 if not result.has_errors() else 1
 
     def _cmd_plan(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
-        """Generate deployment plan."""
+        """Generate deployment plan with H2 plan identity."""
         print(f"Generating deployment plan...")
         print(f"Profile: {context.aws_profile}, Region: {context.aws_region}")
+        print(f"Environment: {context.environment}")
+        print(f"Project: {context.project_name}")
+        print(f"Deployment Version: {context.deployment_version}")
+        print(f"Development Phase: {context.development_phase}{context.development_step if context.development_step > 0 else ''}")
+        print(f"Development Status: {context.development_status}")
         print(f"Run directory: {run_dir}")
 
         # Run validation first
@@ -378,12 +418,12 @@ class InstallerCLI:
 
         # Run terraform init
         print("\nRunning terraform init...")
-        
+
         # Validate AWS context first
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed with plan.")
             return 1
-        
+
         runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
 
         # Check if backend should be configured
@@ -401,10 +441,28 @@ class InstallerCLI:
             return 1
         print("Terraform validate passed")
 
-        # Run terraform plan
-        print(f"\nGenerating plan: {parsed.out}")
-        # Use just the filename for output since we'll run from terraform_dir
-        out_filename = Path(parsed.out).name
+        # H2: Get deployment context for plan identity
+        deployment_context = context.get_deployment_context()
+        operation = PlanOperation.DESTROY if parsed.destroy else PlanOperation.DEPLOY
+
+        # Get next sequence number
+        sequence_manager = PlanSequenceManager()
+        sequence_number = sequence_manager.get_next_sequence(deployment_context.deployment_id, operation)
+
+        # Create plan metadata
+        plan_metadata = PlanMetadata(
+            deployment_id=deployment_context.deployment_id,
+            version=deployment_context.version,
+            development_phase=deployment_context.development_state.phase,
+            operation=operation,
+            sequence_number=sequence_number,
+            git_commit=deployment_context.installer_commit
+        )
+
+        # Generate H2 plan filename
+        out_filename = plan_metadata.to_filename()
+        print(f"\nGenerating plan: {out_filename}")
+
         original_cwd = os.getcwd()
         try:
             os.chdir(context.terraform_dir)
@@ -435,15 +493,24 @@ class InstallerCLI:
 
         print("Plan generated successfully")
 
-        # Save plan artifacts
+        # Save plan artifacts with H2 metadata
         plan_file_in_terraform = Path(context.terraform_dir) / out_filename
         run_manager = RunDirectoryManager()
         run_manager.save_plan_file(run_dir, str(Path(context.terraform_dir) / out_filename), "destroy" if parsed.destroy else "deploy")
 
+        # Save plan metadata alongside plan file
+        plan_metadata_path = run_dir / "plans" / f"{out_filename}.meta.json"
+        plan_metadata_path.write_text(plan_metadata.to_json())
+
+        # Also save deployment context for reference
+        deployment_context = context.get_deployment_context()
+        deployment_context_path = run_dir / "plans" / f"{out_filename}.context.json"
+        deployment_context_path.write_text(deployment_context.to_json())
+
         from installer.run.manager import PlanArtifactManager
         PlanArtifactManager.save_plan_safely(
             str(Path(context.terraform_dir) / out_filename),
-            Path(f".mays-installer/runs/{datetime.now().strftime('%Y%m%d-%H%M%S')}/plans/deploy.tfplan"),
+            Path(f".mays-installer/runs/{datetime.now().strftime('%Y%m%d-%H%M%S')}/plans/{out_filename}"),
             sanitize=False  # Skip sanitization to avoid provider initialization
         )
 
@@ -452,7 +519,8 @@ class InstallerCLI:
         cmd = "destroy" if parsed.destroy else "deploy"
         print(f"\nPlan Summary:")
         print(f"  Plan file: {out_filename}")
-        print(f"  {cmd.capitalize()} with: ./mays-installer {cmd} --plan {run_plan_path}")
+        print(f"  Plan metadata: {plan_metadata_path.name}")
+        print(f"  {cmd.capitalize()} with: ./Mays-Order-AWS-installer {cmd} --plan {run_plan_path}")
         print(f"  Status: Generated successfully")
 
         return 0
@@ -466,44 +534,63 @@ class InstallerCLI:
         return self._cmd_plan(context, parsed, run_dir)
 
     def _cmd_deploy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
-        """Apply a saved deployment plan."""
-        print(f"Deploying plan: {parsed.plan}")
+        """Apply a saved deployment plan with H2 deployment identity validation."""
+        print(f"Deploying plan: {parsed.plan if parsed.plan else 'auto-detect'}")
         print(f"Profile: {context.aws_profile}, Region: {context.aws_region}")
+        print(f"Environment: {context.environment}")
+        print(f"Project: {context.project_name}")
+        print(f"Deployment Version: {context.deployment_version}")
+        print(f"Development Phase: {context.development_phase}{context.development_step if context.development_step > 0 else ''}")
+        print(f"Development Status: {context.development_status}")
         print(f"Run directory: {run_dir}")
         print(f"Dry-run mode: {context.dry_run}")
         print(f"Allow AWS operations: {context.allow_aws_operations}")
-        
+
         # Validate AWS context
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed with deployment.")
             return 1
-        
+
         # Enforce allow_aws_operations for mutations
         if not context.allow_aws_operations:
             print("ERROR: AWS operations not allowed. Set ALLOW_AWS_OPERATIONS=true to enable mutations.")
             return 1
-        
-        # Auto-detect latest deploy plan if not provided
+
+        # Get deployment context for identity validation
+        deployment_context = context.get_deployment_context()
+
+        # Auto-detect latest deploy plan if not provided - using H2 PlanDiscovery
         if parsed.plan is None:
-            run_dirs = sorted(Path(".mays-installer/runs").glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
-            found = False
-            for rd in run_dirs:
-                candidate = rd / "plans" / "deploy.tfplan"
-                if candidate.exists():
-                    parsed.plan = str(candidate)
-                    print(f"Auto-detected latest deploy plan: {parsed.plan}")
-                    found = True
-                    break
-            if not found:
-                print("No deploy plan found in .mays-installer/runs/*/plans/deploy.tfplan")
+            plan_discovery = PlanDiscovery()
+            latest_plan = plan_discovery.find_latest_plan(
+                deployment_id=deployment_context.deployment_id,
+                operation=PlanOperation.DEPLOY,
+                version=deployment_context.version,
+                development_phase=deployment_context.development_state.phase
+            )
+            if latest_plan:
+                parsed.plan = str(latest_plan.file_path)
+                print(f"Auto-detected latest deploy plan: {parsed.plan}")
+                print(f"  Plan metadata: {latest_plan.metadata.to_json()}")
+            else:
+                print("No matching deploy plan found in .mays-installer/runs/*/plans/")
+                print(f"  Filter: deployment_id={deployment_context.deployment_id}, version={deployment_context.version}, phase={deployment_context.development_state.phase}")
                 print("Run './Mays-Order-AWS-installer plan' first to generate a plan.")
                 return 1
-        
+
         # Check if plan file exists
         plan_file = Path(parsed.plan)
         if not plan_file.is_absolute():
             plan_file = Path(".") / parsed.plan
-        
+
+        # Validate plan matches deployment identity BEFORE copying
+        plan_discovery = PlanDiscovery()
+        is_valid, error_msg = plan_discovery.validate_plan_context(plan_file, deployment_context.deployment_id)
+        if not is_valid:
+            print(f"Plan validation failed: {error_msg}")
+            print("ERROR: --yes cannot bypass deployment identity mismatch.")
+            return 1
+
         # If plan is in run directory, copy to terraform/ for relative path resolution
         if ".mays-installer/runs/" in str(plan_file) and plan_file.exists():
             import shutil
@@ -511,36 +598,73 @@ class InstallerCLI:
             shutil.copy2(plan_file, terraform_plan)
             plan_file = terraform_plan
             print(f"Plan copied to {terraform_plan} for terraform execution")
-        
+
         if not plan_file.exists():
             print(f"Plan file not found: {plan_file}")
             return 1
-        
+
         # Plan integrity check (includes AWS context matching)
         run_manager = RunDirectoryManager()
         runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
-        
+
         # Use resolved plan_file path for verification
-        # For terraform execution, plan must be relative to terraform working_dir
         plan_path = str(plan_file)
         if context.terraform_dir in plan_path:
-            # Plan is in terraform dir, use just filename for terraform commands
             terraform_plan_file = Path(plan_path).name
         else:
             terraform_plan_file = plan_path
-        
+
         # Verify plan integrity
         is_valid, error_msg = runner.verify_plan_integrity(terraform_plan_file, context.run_id)
         if not is_valid:
             print(f"Plan integrity check failed: {error_msg}")
             return 1
-        
+
         # Verify plan matches current AWS execution context
         is_valid, error_msg = runner.verify_plan_context_match(terraform_plan_file, context.aws_execution_context)
         if not is_valid:
             print(f"Plan context mismatch: {error_msg}")
             return 1
-        
+
+        # H2: Verify plan metadata matches deployment context
+        plan_discovery = PlanDiscovery()
+        meta = PlanMetadata.parse_filename(plan_file.name)
+        if meta:
+            if not meta.matches_deployment(deployment_context.deployment_id):
+                print(f"ERROR: Plan deployment ID mismatch!")
+                print(f"  Expected: {deployment_context.deployment_id}")
+                print(f"  Plan:     {meta.deployment_id}")
+                print("ERROR: --yes cannot bypass deployment identity mismatch.")
+                return 1
+
+            if meta.operation != PlanOperation.DEPLOY:
+                print(f"ERROR: Plan operation mismatch! Expected deploy, got {meta.operation.value}")
+                print("ERROR: --yes cannot bypass operation mismatch.")
+                return 1
+
+            if meta.version != deployment_context.version:
+                print(f"WARNING: Plan version mismatch!")
+                print(f"  Context: {deployment_context.version}")
+                print(f"  Plan:    {meta.version}")
+                # Don't block, just warn
+
+            if meta.development_phase != deployment_context.development_state.phase:
+                print(f"WARNING: Plan development phase mismatch!")
+                print(f"  Context: {deployment_context.development_state.phase}")
+                print(f"  Plan:    {meta.development_phase}")
+                # Don't block, just warn
+        else:
+            print(f"WARNING: Could not parse plan metadata from filename: {plan_file.name}")
+            print("Proceeding with basic validation only.")
+
+        # Display plan summary before approval
+
+        # Verify plan matches current AWS execution context
+        is_valid, error_msg = runner.verify_plan_context_match(terraform_plan_file, context.aws_execution_context)
+        if not is_valid:
+            print(f"Plan context mismatch: {error_msg}")
+            return 1
+
         # Display plan summary before approval
         print(f"\n=== DEPLOYMENT APPROVAL ===")
         print(f"Profile: {context.aws_profile}")
@@ -550,7 +674,7 @@ class InstallerCLI:
         print(f"Plan file: {parsed.plan}")
         print(f"Run ID: {context.run_id}")
         print()
-        
+
         # Show plan summary
         runner_dummy = TerraformRunner(context.terraform_dir, context.aws_execution_context)
         plan_json_result = runner_dummy.show_plan(terraform_plan_file)
@@ -561,7 +685,7 @@ class InstallerCLI:
             print(f"Plan: {plan_summary.add} to add, {plan_summary.change} to change, {plan_summary.destroy} to destroy, {plan_summary.replace} to replace")
         else:
             print("Plan summary: (could not parse plan details)")
-        
+
         print()
         if plan_json_result.success:
             import json
@@ -572,21 +696,21 @@ class InstallerCLI:
             for check in safety.get("checks", []):
                 status_icon = {"PASS": "✓", "WARNING": "⚠", "BLOCKED": "✗"}.get(check["status"], "?")
                 print(f"  {status_icon} {check['name']}: {check['message']}")
-            
+
             if safety["status"] == "BLOCKED":
                 print("\n⚠ Plan blocked by safety policy")
                 return 1
-        
+
         # Policy gate check (skip in dry-run mode since providers aren't initialized)
         if not context.dry_run:
             print("\nRunning policy gate check...")
             import subprocess
             import tempfile
             import json
-            
+
             # Get plan JSON using terraform show -json
             plan_json_result = TerraformRunner(context.terraform_dir, context.aws_execution_context).show_plan(terraform_plan_file)
-            
+
             if not plan_json_result.success:
                 print(f"Warning: Could not get plan JSON for policy gate: {plan_json_result.stderr}")
                 print("Skipping policy gate check (plan may be stale or providers not initialized)")
@@ -595,12 +719,12 @@ class InstallerCLI:
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tf:
                     json.dump(json.loads(plan_json_result.stdout), tf)
                     plan_json_path = tf.name
-                
+
                 try:
                     policy_result = subprocess.run([
                         "python3", "terraform/policy/validate-plan.py", plan_json_path
                     ], capture_output=True, text=True, cwd=".", timeout=60)
-                    
+
                     if policy_result.returncode != 0:
                         print(f"Policy gate FAILED:")
                         print(policy_result.stdout)
@@ -617,7 +741,7 @@ class InstallerCLI:
                         pass
         else:
             print("\nSkipping policy gate check (dry-run mode)")
-        
+
         # Approval gate
         if not parsed.yes:
             print()
@@ -625,18 +749,18 @@ class InstallerCLI:
             if response not in ("y", "yes"):
                 print("Deployment cancelled.")
                 return 0
-        
+
         # Apply the plan
         print("\nApplying plan...")
         runner = TerraformRunner("terraform", context.aws_execution_context)
         apply_result = runner.apply(str(Path.cwd() / parsed.plan))
-        
+
         if not apply_result.success:
             print(f"Deployment failed: {apply_result.stderr}")
             return 1
-        
+
         print("Deployment successful!")
-        
+
         # Post-apply verification
         print("\nRunning post-apply verification...")
         verify_result = runner.state_list()
@@ -644,14 +768,14 @@ class InstallerCLI:
             print("✓ Terraform state accessible")
         else:
             print("⚠ Could not verify Terraform state")
-        
+
         # Verify AWS identity
         verify_identity = TerraformRunner("terraform", context.aws_execution_context).version()
         if verify_identity.success:
             print("✓ AWS identity verified")
         else:
             print("⚠ Could not verify AWS identity")
-        
+
         print("\nDeployment completed successfully!")
         return 0
 
@@ -664,44 +788,63 @@ class InstallerCLI:
         return self._cmd_plan(context, parsed, run_dir)
 
     def _cmd_destroy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
-        """Apply a saved destroy plan."""
-        print(f"Destroying with plan: {parsed.plan}")
+        """Apply a saved destroy plan with H2 deployment identity validation."""
+        print(f"Destroying with plan: {parsed.plan if parsed.plan else 'auto-detect'}")
         print(f"Profile: {context.aws_profile}, Region: {context.aws_region}")
+        print(f"Environment: {context.environment}")
+        print(f"Project: {context.project_name}")
+        print(f"Deployment Version: {context.deployment_version}")
+        print(f"Development Phase: {context.development_phase}{context.development_step if context.development_step > 0 else ''}")
+        print(f"Development Status: {context.development_status}")
         print(f"Run directory: {run_dir}")
         print(f"Dry-run mode: {context.dry_run}")
         print(f"Allow AWS operations: {context.allow_aws_operations}")
-        
+
         # Validate AWS context
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed with destruction.")
             return 1
-        
+
         # Enforce allow_aws_operations for mutations
         if not context.allow_aws_operations:
             print("ERROR: AWS operations not allowed. Set ALLOW_AWS_OPERATIONS=true to enable mutations.")
             return 1
-        
-        # Auto-detect latest destroy plan if not provided
+
+        # Get deployment context for identity validation
+        deployment_context = context.get_deployment_context()
+
+        # Auto-detect latest destroy plan if not provided - using H2 PlanDiscovery
         if parsed.plan is None:
-            run_dirs = sorted(Path(".mays-installer/runs").glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
-            found = False
-            for rd in run_dirs:
-                candidate = rd / "plans" / "destroy.tfplan"
-                if candidate.exists():
-                    parsed.plan = str(candidate)
-                    print(f"Auto-detected latest destroy plan: {parsed.plan}")
-                    found = True
-                    break
-            if not found:
-                print("No destroy plan found in .mays-installer/runs/*/plans/destroy.tfplan")
+            plan_discovery = PlanDiscovery()
+            latest_plan = plan_discovery.find_latest_plan(
+                deployment_id=deployment_context.deployment_id,
+                operation=PlanOperation.DESTROY,
+                version=deployment_context.version,
+                development_phase=deployment_context.development_state.phase
+            )
+            if latest_plan:
+                parsed.plan = str(latest_plan.file_path)
+                print(f"Auto-detected latest destroy plan: {parsed.plan}")
+                print(f"  Plan metadata: {latest_plan.metadata.to_json()}")
+            else:
+                print("No matching destroy plan found in .mays-installer/runs/*/plans/")
+                print(f"  Filter: deployment_id={deployment_context.deployment_id}, version={deployment_context.version}, phase={deployment_context.development_state.phase}")
                 print("Run './Mays-Order-AWS-installer plan-destroy' first to generate a destroy plan.")
                 return 1
-        
+
         # Check if plan file exists
         plan_file = Path(parsed.plan)
         if not plan_file.is_absolute():
             plan_file = Path(".") / parsed.plan
-        
+
+        # Validate plan matches deployment identity BEFORE copying
+        plan_discovery = PlanDiscovery()
+        is_valid, error_msg = plan_discovery.validate_plan_context(plan_file, deployment_context.deployment_id)
+        if not is_valid:
+            print(f"Plan validation failed: {error_msg}")
+            print("ERROR: --yes cannot bypass deployment identity mismatch.")
+            return 1
+
         # If plan is in run directory, copy to terraform/ for relative path resolution
         if ".mays-installer/runs/" in str(plan_file) and plan_file.exists():
             import shutil
@@ -709,34 +852,65 @@ class InstallerCLI:
             shutil.copy2(plan_file, terraform_plan)
             plan_file = terraform_plan
             print(f"Plan copied to {terraform_plan} for terraform execution")
-        
+
         if not plan_file.exists():
             print(f"Destroy plan file not found: {plan_file}")
             return 1
-        
+
         # Plan integrity check (includes AWS context matching)
         run_manager = RunDirectoryManager()
         runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
-        
+
         # Use resolved plan_file path for verification
         plan_path = str(plan_file)
         if context.terraform_dir in plan_path:
             terraform_plan_file = Path(plan_path).name
         else:
             terraform_plan_file = plan_path
-        
+
         # Verify plan integrity
         is_valid, error_msg = runner.verify_plan_integrity(terraform_plan_file, context.run_id)
         if not is_valid:
             print(f"Destroy plan integrity check failed: {error_msg}")
             return 1
-        
+
         # Verify plan matches current AWS execution context
         is_valid, error_msg = runner.verify_plan_context_match(terraform_plan_file, context.aws_execution_context)
         if not is_valid:
             print(f"Plan context mismatch: {error_msg}")
             return 1
-        
+
+        # H2: Verify plan metadata matches deployment context
+        plan_discovery = PlanDiscovery()
+        meta = PlanMetadata.parse_filename(plan_file.name)
+        if meta:
+            if not meta.matches_deployment(deployment_context.deployment_id):
+                print(f"ERROR: Plan deployment ID mismatch!")
+                print(f"  Expected: {deployment_context.deployment_id}")
+                print(f"  Plan:     {meta.deployment_id}")
+                print("ERROR: --yes cannot bypass deployment identity mismatch.")
+                return 1
+
+            if meta.operation != PlanOperation.DESTROY:
+                print(f"ERROR: Plan operation mismatch! Expected destroy, got {meta.operation.value}")
+                print("ERROR: --yes cannot bypass operation mismatch.")
+                return 1
+
+            if meta.version != deployment_context.version:
+                print(f"WARNING: Plan version mismatch!")
+                print(f"  Context: {deployment_context.version}")
+                print(f"  Plan:    {meta.version}")
+                # Don't block, just warn
+
+            if meta.development_phase != deployment_context.development_state.phase:
+                print(f"WARNING: Plan development phase mismatch!")
+                print(f"  Context: {deployment_context.development_state.phase}")
+                print(f"  Plan:    {meta.development_phase}")
+                # Don't block, just warn
+        else:
+            print(f"WARNING: Could not parse plan metadata from filename: {plan_file.name}")
+            print("Proceeding with basic validation only.")
+
         # Display destroy plan summary before approval
         print(f"\n=== DESTROY APPROVAL ===")
         print(f"Profile: {context.aws_profile}")
@@ -746,7 +920,7 @@ class InstallerCLI:
         print(f"Plan file: {plan_path}")
         print(f"Run ID: {context.run_id}")
         print()
-        
+
         # Show destroy plan summary
         runner_dummy = TerraformRunner(context.terraform_dir, context.aws_execution_context)
         plan_json_result = runner_dummy.show_plan(terraform_plan_file)
@@ -757,9 +931,9 @@ class InstallerCLI:
             print(f"Destroy Plan: {plan_summary.add} to add, {plan_summary.change} to change, {plan_summary.destroy} to destroy, {plan_summary.replace} to replace")
         else:
             print("Destroy plan summary: (could not parse plan details)")
-        
+
         print()
-        
+
         # Safety evaluation
         plan_json_result = TerraformRunner(context.terraform_dir, context.aws_execution_context).show_plan(terraform_plan_file)
         if plan_json_result.success:
@@ -771,11 +945,11 @@ class InstallerCLI:
             for check in safety.get("checks", []):
                 status_icon = {"PASS": "✓", "WARNING": "⚠", "BLOCKED": "✗"}.get(check["status"], "?")
                 print(f"  {status_icon} {check['name']}: {check['message']}")
-            
+
             if safety["status"] == "BLOCKED":
                 print("\n⚠ Destroy plan blocked by safety policy")
                 return 1
-        
+
         # Approval gate
         if not parsed.yes:
             print()
@@ -783,18 +957,18 @@ class InstallerCLI:
             if response not in ("y", "yes"):
                 print("Destruction cancelled.")
                 return 0
-        
+
         # Apply the destroy plan
         print("\nApplying destroy plan...")
         runner = TerraformRunner("terraform", context.aws_execution_context)
         destroy_result = runner.destroy(str(Path.cwd() / parsed.plan))
-        
+
         if not destroy_result.success:
             print(f"Destruction failed: {destroy_result.stderr}")
             return 1
-        
+
         print("Destruction successful!")
-        
+
         # Post-destroy verification
         print("\nRunning post-destroy verification...")
         verify_result = runner.state_list()
@@ -802,7 +976,7 @@ class InstallerCLI:
             print("✓ Terraform state accessible")
         else:
             print("⚠ Could not verify Terraform state")
-        
+
         print("\nDestruction completed successfully!")
         return 0
 
@@ -812,9 +986,9 @@ class InstallerCLI:
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed with state operations.")
             return 1
-        
+
         runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
-        
+
         if parsed.state_command == "list":
             result = runner.state_list(parsed.state_file)
             if result.success:
@@ -822,7 +996,7 @@ class InstallerCLI:
             else:
                 print(f"Error: {result.stderr}")
                 return 1
-        
+
         elif parsed.state_command == "show":
             if not parsed.address:
                 print("Error: address is required for state show")
@@ -833,7 +1007,7 @@ class InstallerCLI:
             else:
                 print(f"Error: {result.stderr}")
                 return 1
-        
+
         elif parsed.state_command == "pull":
             result = runner.state_pull()
             if result.success:
@@ -841,7 +1015,7 @@ class InstallerCLI:
             else:
                 print(f"Error: {result.stderr}")
                 return 1
-        
+
         elif parsed.state_command == "push":
             # state push is a mutating operation - requires allow_aws_operations
             if not context.allow_aws_operations:
@@ -856,11 +1030,11 @@ class InstallerCLI:
             else:
                 print(f"Error: {result.stderr}")
                 return 1
-        
+
         else:
             print(f"Unknown state command: {parsed.state_command}")
             return 1
-        
+
         return 0
 
     def _cmd_output(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
@@ -869,7 +1043,7 @@ class InstallerCLI:
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed with output operations.")
             return 1
-        
+
         runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
         result = runner.output(parsed.name, parsed.state_file)
         if result.success:
@@ -885,14 +1059,14 @@ class InstallerCLI:
         if not context.validate_aws_context():
             print("AWS context validation failed. Cannot proceed.")
             return 1
-        
+
         runner = TerraformRunner("terraform", context.aws_execution_context)
         result = runner.version()
         if result.success:
             import json
             version_info = json.loads(result.stdout)
             print(f"Terraform Version: {version_info.get('terraform_version', 'unknown')}")
-        
+
         # Show AWS identity
         import subprocess
         try:
@@ -912,7 +1086,7 @@ class InstallerCLI:
         except Exception as e:
             print(f"Error getting identity: {e}")
             return 1
-        
+
         print(f"\nProfile: {context.aws_profile}")
         print(f"Region: {context.aws_region}")
         print(f"Project: {context.project_name}")

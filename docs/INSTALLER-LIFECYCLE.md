@@ -412,6 +412,81 @@ All commands use validated `AWSExecutionContext`.
 
 ---
 
+### H2 — Versioned Deployment Identity, Plan Isolation & AWS Tagging (✅ COMPLETED)
+
+**Status:** ✅ **COMPLETED**
+
+**Objective:** Extend the installer so that multiple projects can safely coexist inside the same AWS account and region without interfering with each other.
+
+**Components Implemented:**
+
+#### 1. Deployment Identity
+- Canonical `DeploymentId` derived from: `<account>:<project>:<environment>`
+- Example: `240571105849:mays-orders:development`
+- Version is NOT part of deployment identity - it's an upgrade of the same deployment
+- Available through central `DeploymentContext` / `AWSExecutionContext`
+- Installer validates current AWS account, project, environment match expected Deployment ID before any mutation
+
+#### 2. Versioned Development State
+- Semantic versioning: `major.minor.patch` (e.g., `0.3.0`)
+- Development phase/step: `H2`, `H217`, `D8`, etc.
+- Development status: `development`, `testing`, `staging`, `production`, `archived`
+- Comparison model distinguishes:
+  - `SAME` — identical version and phase
+  - `DEVELOPMENT_UPDATE` — same version, different step
+  - `PATCH_UPDATE` — patch version change
+  - `MINOR_UPGRADE` — minor version change
+  - `MAJOR_UPGRADE` — major version change
+  - `MIGRATION_REQUIRED` / `INCOMPATIBLE` — incompatible changes
+
+#### 3. Plan Identity
+- Structured plan filenames with all identity metadata:
+  - Format: `<project>-<environment>-<version>-<phase>-<account>-<operation>-<sequence>.tfplan`
+  - Deploy example: `mays-orders-development-0.3.0-H2-240571105849-deploy-0042.tfplan`
+  - Destroy example: `mays-orders-development-0.3.0-H2-240571105849-destroy-0043.tfplan`
+- Monotonically increasing sequence number per deployment+operation
+- Plan metadata stored as JSON alongside plan file (`.meta.json`)
+- Deployment context saved alongside plan (`.context.json`)
+
+#### 4. Plan Discovery / Auto-Selection
+- Hardened automatic plan discovery using `PlanDiscovery` class
+- Plans filtered by: Deployment ID, Version, Development Phase, Operation
+- Filename is NOT the sole security mechanism - metadata/context validated
+- Mismatch results in hard stop
+- `--yes` CANNOT bypass context/version/phase mismatch validation
+
+#### 5. Destroy Isolation
+- Destroy explicitly scoped to current deployment identity
+- Resources belonging to another Deployment ID are not destroyable
+- Resources with ambiguous ownership surfaced, not silently adopted
+- H1 destroy safety mechanisms remain intact
+
+#### 6. AWS Resource Tagging
+- Canonical tagging model (`TagSet`):
+  - **Required identity tags:** Project, Environment, DeploymentId
+  - **Version/development tags:** Version, DevelopmentPhase, DevelopmentStep
+  - **Governance tags:** ManagedBy, Owner, Maker
+  - **System/component tags:** System, Component
+  - **Custom tags:** Prefixed with `Custom:` to avoid conflicts
+- Merges with existing tags preserving unrelated tags
+- Canonical tags take precedence for identity/version metadata
+
+#### 7. Existing Resource / Upgrade Awareness
+- `OwnershipAnalyzer` classifies existing resources:
+  - `OWNED` — belongs to current deployment
+  - `FOREIGN` — belongs to different project/environment/account
+  - `AMBIGUOUS` — same deployment ID but different version/phase
+  - `UNMANAGED` — no deployment metadata
+- Ambiguous ownership surfaced, not silently adopted
+- Existing resources considered in future upgrade planning
+
+#### 8. Configuration / Context Separation
+- **INSTALLER CONTEXT:** installer name, version, commit
+- **TARGET CONTEXT:** AWS account, region, project, environment, deployment ID, version, development phase/step
+- Installer repository never confused with target project
+
+---
+
 ### 📋 REMAINING TASKS
 
 | Task | Priority | Status |
