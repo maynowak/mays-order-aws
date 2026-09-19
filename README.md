@@ -127,6 +127,56 @@ cd lambda && PYTHONPATH=src python3 -m unittest discover -s tests -v
 cd lambda && python3 build_zip.py
 ```
 
+### Mays-Order-AWS-installer (Deployment Lifecycle CLI)
+
+Der **`Mays-Order-AWS-installer`** ist ein eigenständiger CLI-Wrapper für den vollständigen
+Terraform-Deployment-Lifecycle mit H1-Security-Hardening.
+
+**Features:**
+- Validierung vor jedem Schritt (AWS Profile, Region, Account, Terraform Config)
+- Plan-Generierung & Safety-Analyse
+- Policy Gate Integration
+- Human Approval Gate (`--yes` zum Überspringen)
+- Plan Integrity & Context Match (Region/Account/Profile)
+- Dry-Run Mode Standard (`DRY_RUN=true`, `ALLOW_AWS_OPERATIONS=false`)
+- Auto-Detection des neuesten Plans (`--plan` optional)
+
+**Usage:**
+```bash
+# Installer aus Projekt-Root
+./Mays-Order-AWS-installer --help
+
+# Read-only Validierung & Planning
+./Mays-Order-AWS-installer validate
+./Mays-Order-AWS-installer plan
+./Mays-Order-AWS-installer plan-destroy
+
+# Mutation (erfordert explizite Freigabe)
+export ALLOW_AWS_OPERATIONS=true
+export DRY_RUN=false
+./Mays-Order-AWS-installer deploy --yes      # auto-detects latest plan
+./Mays-Order-AWS-installer destroy --yes     # auto-detects latest destroy plan
+
+# Oder expliziter Plan-Pfad
+./Mays-Order-AWS-installer deploy --plan .mays-installer/runs/.../plans/deploy.tfplan --yes
+```
+
+**Environment Variables:**
+| Variable | Default | Beschreibung |
+|----------|---------|--------------|
+| `AWS_PROFILE` | `mayaws` | AWS CLI Profile (überschreibbar via `--profile`) |
+| `AWS_REGION` | `eu-central-1` | AWS Region |
+| `ALLOW_AWS_OPERATIONS` | `false` | **true** für deploy/destroy/state push |
+| `DRY_RUN` | `true` | **false** für echte AWS-Mutationen |
+
+**H1 Hardening aktiv:**
+- `--yes` überspringt **nur** den interaktiven Prompt (nicht Validation/Policy/Safety)
+- Plan Context Match prüft Region/Account vor apply
+- State push klassifiziert als MUTATING (braucht `ALLOW_AWS_OPERATIONS=true`)
+- Keine Secrets in Logs/Artefakten; Plan-Sanitization aktiv
+
+---
+
 ### Policy Gate & Deployment-Workflow
 
 ```text

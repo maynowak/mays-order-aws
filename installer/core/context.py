@@ -1,0 +1,749 @@
+"""
+Installation Context - Central configuration and state for the installer.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import re
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+
+@dataclass
+class AWSExecutionContext:
+    """
+    Validated AWS execution context.
+
+    Contains all validated AWS credentials and identity information.
+    Every Terraform operation requires a validated AWSExecutionContext.
+    """
+    profile: str
+    region: str
+    account_id: str
+    identity_arn: str
+    validated: bool = True
+    validation_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    profile_source: str = "explicit"  # explicit, env, config
+
+    def __post_init__(self):
+        if not self.profile:
+            raise ValueError("Profile cannot be empty")
+        if not self.region:
+            raise ValueError("Region cannot be empty")
+        if not self.account_id:
+            raise ValueError("Account ID cannot be empty")
+        if not self.identity_arn:
+            raise ValueError("Identity ARN cannot be empty")
+        if not self.validated:
+            raise ValueError("Context must be validated")
+
+    def to_env(self) -> dict:
+        """Return environment variables for Terraform execution."""
+        return {
+            "AWS_PROFILE": self.profile,
+            "AWS_REGION": self.region,
+        }
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2, default=str)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "AWSExecutionContext":
+        data = json.loads(json_str)
+        return cls(**data)
+
+    def get_environment(self, extra_env: Optional[dict] = None) -> dict:
+        """Get complete environment for Terraform execution."""
+        env = {**os.environ}
+        env.update(self.to_env())
+        if extra_env:
+            env.update(extra_env)
+        return env
+
+
+@dataclass
+class InstallationContext:
+    """
+    Central configuration context for the installer.
+
+    Contains all configuration needed for the deployment lifecycle.
+    No AWS secrets are stored in this context.
+    """
+
+    # AWS Configuration
+    aws_profile: str = "mayaws"
+    aws_region: str = "eu-central-1"
+    aws_account_id: Optional[str] = None
+    identity_arn: Optional[str] = None
+
+    # Validated AWS execution context (set after validation)
+    aws_execution_context: Optional["AWSExecutionContext"] = None
+
+    # Environment Configuration
+    environment: str = "Development"
+    project_name: str = "mays-orders"
+
+    # Cognito Configuration
+    cognito_mode: str = "user_pool"  # user_pool, identity_pool, external
+    cognito_user_pool_id: Optional[str] = None
+    cognito_client_id: Optional[str] = None
+
+    # Terraform Configuration
+    terraform_dir: str = "terraform"
+    terraform_workspace: str = "default"
+
+    # Run Configuration
+    run_id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d-%H%M%S"))
+    run_dir: Optional[str] = None
+
+    # Safety flags
+    allow_aws_operations: bool = False  # Must be explicitly enabled for apply/destroy
+    dry_run: bool = True  # Default to dry-run mode
+
+    def __post_init__(self):
+        """Initialize derived fields."""
+        if self.run_dir is None:
+            self.run_dir = f".mays-installer/runs/{self.run_id}"
+
+    def to_dict(self) -> dict:
+        """Serialize to dictionary."""
+        return asdict(self)
+
+    def to_json(self) -> str:
+        """Serialize to JSON string."""
+        return json.dumps(self.to_dict(), indent=2, default=str)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> InstallationContext:
+        """Deserialize from JSON string."""
+        data = json.loads(json_str)
+        return cls(**data)
+
+    @classmethod
+    def from_env(cls) -> InstallationContext:
+        """Create context from environment variables."""
+        return cls(
+            aws_profile=os.environ.get("AWS_PROFILE", "mayaws"),
+            aws_region=os.environ.get("AWS_REGION", "eu-central-1"),
+            aws_account_id=os.environ.get("AWS_ACCOUNT_ID"),
+            identity_arn=os.environ.get("AWS_IDENTITY_ARN"),
+            environment=os.environ.get("ENVIRONMENT", "Development"),
+            project_name=os.environ.get("PROJECT_NAME", "mays-orders"),
+            cognito_mode=os.environ.get("COGNITO_MODE", "user_pool"),
+            cognito_user_pool_id=os.environ.get("COGNITO_USER_POOL_ID"),
+            cognito_client_id=os.environ.get("COGNITO_CLIENT_ID"),
+            terraform_dir=os.environ.get("TERRAFORM_DIR", "terraform"),
+            terraform_workspace=os.environ.get("TERRAFORM_WORKSPACE", "default"),
+            run_id=os.environ.get("RUN_ID", datetime.now().strftime("%Y%m%d-%H%M%S")),
+            run_dir=os.environ.get("RUN_DIR"),
+            allow_aws_operations=os.environ.get("ALLOW_AWS_OPERATIONS", "false").lower() == "true",
+            dry_run=os.environ.get("DRY_RUN", "true").lower() == "true",
+        )
+
+    def ensure_run_dir(self) -> Path:
+        """Create and return the run directory."""
+        run_path = Path(self.run_dir)
+        run_path.mkdir(parents=True, exist_ok=True)
+        return run_path
+
+    def save(self) -> Path:
+        """Save context to run directory."""
+        run_path = self.ensure_run_dir()
+        context_file = run_path / "context.json"
+        context_file.write_text(self.to_json())
+        return context_file
+
+    @classmethod
+    def load(cls, run_dir: str) -> InstallationContext:
+        """Load context from run directory."""
+        context_file = Path(run_dir) / "context.json"
+        if context_file.exists():
+            return cls.from_json(context_file.read_text())
+        raise FileNotFoundError(f"Context file not found: {context_file}")
+
+    def validate_aws_context(self) -> Optional["AWSExecutionContext"]:
+        """
+        Validate AWS profile and create AWSExecutionContext.
+
+        Returns:
+            AWSExecutionContext if validation succeeds, None otherwise
+        """
+        # Run validation using ValidationLayer
+        validation = ValidationLayer(self)
+        result = validation.run_all()
+
+        if result.has_errors():
+            return None
+
+        # If we got here, the AWS context was created during validation
+        return self.aws_execution_context
+
+
+@dataclass
+class ValidationCheck:
+    """Individual validation check result."""
+    name: str
+    status: str  # PASS, FAIL, WARNING, SKIP
+    message: str
+    details: Optional[dict] = None
+
+
+@dataclass
+class ValidationResult:
+    """Result of validation checks."""
+    status: str  # READY, BLOCKED, WARNING
+    checks: list[ValidationCheck] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def add_check(self, check: ValidationCheck) -> None:
+        """Add a validation check."""
+        self.checks.append(check)
+        if check.status == "FAIL":
+            self.errors.append(f"{check.name}: {check.message}")
+            self.status = "BLOCKED"
+        elif check.status == "WARNING":
+            self.warnings.append(f"{check.name}: {check.message}")
+            if self.status != "BLOCKED":
+                self.status = "WARNING"
+        elif check.status == "PASS":
+            if self.status == "":
+                self.status = "READY"
+
+    def has_errors(self) -> bool:
+        return len(self.errors) > 0
+
+    def has_warnings(self) -> bool:
+        return len(self.warnings) > 0
+
+    def summary(self) -> str:
+        """Generate a summary string."""
+        passed = sum(1 for c in self.checks if c.status == "PASS")
+        failed = sum(1 for c in self.checks if c.status == "FAIL")
+        warned = sum(1 for c in self.checks if c.status == "WARNING")
+        skipped = sum(1 for c in self.checks if c.status == "SKIP")
+
+        return (
+            f"Validation {self.status}: {passed} passed, "
+            f"{failed} failed, {warned} warned, {skipped} skipped"
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "status": self.status,
+            "checks": [asdict(c) for c in self.checks],
+            "errors": self.errors,
+            "warnings": self.warnings,
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2, default=str)
+
+
+class ValidationLayer:
+    """
+    Validation layer for pre-flight checks.
+
+    Performs structured validation checks before any Terraform operations.
+    """
+
+    def __init__(self, context: InstallationContext):
+        self.context = context
+        self.result = ValidationResult(status="")
+
+    def run_all(self) -> ValidationResult:
+        """Run all validation checks."""
+        self.result = ValidationResult(status="")
+
+        # Core checks
+        self._check_aws_profile_validated()
+        self._check_region()
+        self._check_terraform_cli()
+        self._check_terraform_version()
+        self._check_terraform_working_dir()
+        self._check_terraform_config()
+        self._check_installer_config()
+
+        return self.result
+
+    def _add_check(self, name: str, status: str, message: str, details: Optional[dict] = None):
+        check = ValidationCheck(name=name, status=status, message=message, details=details)
+        self.result.add_check(check)
+
+    def _check_aws_profile_validated(self) -> None:
+        """Check if AWS profile is validated and create AWSExecutionContext."""
+        import subprocess
+        import json
+
+        try:
+            # Check profile exists
+            result = subprocess.run(
+                ["aws", "configure", "list", "--profile", self.context.aws_profile],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                self._add_check(
+                    "aws_profile_validated",
+                    "FAIL",
+                    f"AWS profile '{self.context.aws_profile}' not found: {result.stderr}"
+                )
+                return
+
+            # Get caller identity
+            result = subprocess.run(
+                ["aws", "sts", "get-caller-identity", "--profile", self.context.aws_profile],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode != 0:
+                self._add_check(
+                    "aws_identity_validated",
+                    "FAIL",
+                    f"Cannot get AWS identity: {result.stderr}"
+                )
+                return
+
+            import json
+            identity = json.loads(result.stdout)
+            account_id = identity.get("Account")
+            identity_arn = identity.get("Arn")
+
+            if not account_id:
+                self._add_check(
+                    "aws_account_id_validated",
+                    "FAIL",
+                    "Could not determine account ID from STS"
+                )
+                return
+
+            if not identity.get("Arn"):
+                self._add_check(
+                    "aws_identity_arn_validated",
+                    "FAIL",
+                    "Could not determine identity ARN from STS"
+                )
+                return
+
+            # Create validated AWS execution context
+            self.context.aws_execution_context = AWSExecutionContext(
+                profile=self.context.aws_profile,
+                region=self.context.aws_region,
+                account_id=account_id,
+                identity_arn=identity.get("Arn"),
+                validated=True,
+                validation_timestamp=datetime.now().isoformat(),
+                profile_source="explicit"
+            )
+
+            self._add_check(
+                "aws_profile_validated",
+                "PASS",
+                f"AWS profile '{self.context.aws_profile}' validated for account {account_id}"
+            )
+            self._add_check(
+                "aws_identity_validated",
+                "PASS",
+                f"AWS identity validated: {identity.get('Arn')}"
+            )
+            self._add_check(
+                "aws_account_id_validated",
+                "PASS",
+                f"Account ID validated: {account_id}"
+            )
+
+        except FileNotFoundError:
+            self._add_check(
+                "aws_cli",
+                "FAIL",
+                "AWS CLI not found in PATH"
+            )
+        except subprocess.TimeoutExpired:
+            self._add_check(
+                "aws_cli_timeout",
+                "FAIL",
+                "AWS CLI timeout"
+            )
+        except Exception as e:
+            self._add_check(
+                "aws_validation_error",
+                "FAIL",
+                f"Error validating AWS context: {e}"
+            )
+
+
+@dataclass
+class ValidationCheck:
+    """Individual validation check result."""
+    name: str
+    status: str  # PASS, FAIL, WARNING, SKIP
+    message: str
+    details: Optional[dict] = None
+
+
+@dataclass
+class ValidationResult:
+    """Result of validation checks."""
+    status: str  # READY, BLOCKED, WARNING
+    checks: list[ValidationCheck] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def add_check(self, check: ValidationCheck) -> None:
+        """Add a validation check."""
+        self.checks.append(check)
+        if check.status == "FAIL":
+            self.errors.append(f"{check.name}: {check.message}")
+            self.status = "BLOCKED"
+        elif check.status == "WARNING":
+            self.warnings.append(f"{check.name}: {check.message}")
+            if self.status != "BLOCKED":
+                self.status = "WARNING"
+        elif check.status == "PASS":
+            if self.status == "":
+                self.status = "READY"
+
+    def has_errors(self) -> bool:
+        return len(self.errors) > 0
+
+    def has_warnings(self) -> bool:
+        return len(self.warnings) > 0
+
+    def summary(self) -> str:
+        """Generate a summary string."""
+        passed = sum(1 for c in self.checks if c.status == "PASS")
+        failed = sum(1 for c in self.checks if c.status == "FAIL")
+        warned = sum(1 for c in self.checks if c.status == "WARNING")
+        skipped = sum(1 for c in self.checks if c.status == "SKIP")
+
+        return (
+            f"Validation {self.status}: {passed} passed, "
+            f"{failed} failed, {warned} warned, {skipped} skipped"
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "status": self.status,
+            "checks": [asdict(c) for c in self.checks],
+            "errors": self.errors,
+            "warnings": self.warnings,
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2, default=str)
+
+
+class ValidationLayer:
+    """
+    Validation layer for pre-flight checks.
+
+    Performs structured validation checks before any Terraform operations.
+    """
+
+    def __init__(self, context: InstallationContext):
+        self.context = context
+        self.result = ValidationResult(status="")
+
+    def run_all(self) -> ValidationResult:
+        """Run all validation checks."""
+        self.result = ValidationResult(status="")
+
+        # Core checks
+        self._check_aws_profile_validated()
+        self._check_region()
+        self._check_terraform_cli()
+        self._check_terraform_version()
+        self._check_terraform_working_dir()
+        self._check_terraform_config()
+        self._check_installer_config()
+
+        return self.result
+
+    def _add_check(self, name: str, status: str, message: str, details: Optional[dict] = None):
+        check = ValidationCheck(name=name, status=status, message=message, details=details)
+        self.result.add_check(check)
+
+    def _check_region(self) -> None:
+        """Check if region is valid."""
+        valid_regions = [
+            "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+            "eu-west-1", "eu-west-2", "eu-west-3",
+            "eu-central-1", "eu-central-2",
+            "eu-north-1", "eu-south-1", "eu-south-2",
+            "ap-northeast-1", "ap-northeast-2", "ap-northeast-3",
+            "ap-southeast-1", "ap-southeast-2", "ap-southeast-3",
+            "ap-south-1", "ap-south-2",
+            "ca-central-1", "ca-west-1",
+            "sa-east-1",
+            "me-south-1", "me-central-1",
+            "af-south-1",
+            "il-central-1"
+        ]
+
+        if self.context.aws_region in valid_regions:
+            self._add_check(
+                "region",
+                "PASS",
+                f"Region '{self.context.aws_region}' is valid"
+            )
+        else:
+            self._add_check(
+                "region",
+                "WARNING",
+                f"Region '{self.context.aws_region}' may not be valid"
+            )
+
+    def _check_terraform_cli(self) -> None:
+        """Check if Terraform CLI is available."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["terraform", "version"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                version_line = result.stdout.split('\n')[0]
+                self._add_check(
+                    "terraform_cli",
+                    "PASS",
+                    f"Terraform available: {version_line}"
+                )
+            else:
+                self._add_check(
+                    "terraform_cli",
+                    "FAIL",
+                    f"Terraform version check failed: {result.stderr}"
+                )
+        except FileNotFoundError:
+            self._add_check(
+                "terraform_cli",
+                "FAIL",
+                "Terraform CLI not found in PATH"
+            )
+        except Exception as e:
+            self._add_check(
+                "terraform_cli",
+                "FAIL",
+                f"Error checking Terraform: {e}"
+            )
+
+    def _check_terraform_version(self) -> None:
+        """Check Terraform version meets minimum."""
+        import subprocess
+        import re
+        try:
+            result = subprocess.run(
+                ["terraform", "version", "-json"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                import json
+                version_info = json.loads(result.stdout)
+                version_str = version_info.get("terraform_version", "")
+
+                # Parse version
+                match = re.match(r"(\d+)\.(\d+)\.(\d+)", version_str)
+                if match:
+                    major, minor, patch = map(int, match.groups())
+                    if major > 1 or (major == 1 and minor >= 5):
+                        self._add_check(
+                            "terraform_version",
+                            "PASS",
+                            f"Terraform version {version_str} meets minimum (>=1.5.0)"
+                        )
+                    else:
+                        self._add_check(
+                            "terraform_version",
+                            "WARNING",
+                            f"Terraform version {version_str} may be below minimum 1.5.0"
+                        )
+                else:
+                    self._add_check(
+                        "terraform_version",
+                        "WARNING",
+                        f"Could not parse Terraform version: {version_str}"
+                    )
+            else:
+                self._add_check(
+                    "terraform_version",
+                    "WARNING",
+                    "Could not get Terraform version info"
+                )
+        except Exception as e:
+            self._add_check(
+                "terraform_version",
+                "WARNING",
+                f"Could not check Terraform version: {e}"
+            )
+
+    def _check_terraform_working_dir(self) -> None:
+        """Check Terraform working directory exists."""
+        terraform_dir = Path(self.context.terraform_dir)
+        if terraform_dir.exists() and terraform_dir.is_dir():
+            self._add_check(
+                "terraform_working_dir",
+                "PASS",
+                f"Terraform directory exists: {terraform_dir}"
+            )
+        else:
+            self._add_check(
+                "terraform_working_dir",
+                "FAIL",
+                f"Terraform directory not found: {terraform_dir}"
+            )
+
+    def _check_terraform_config(self) -> None:
+        """Check Terraform configuration files exist."""
+        terraform_dir = Path(self.context.terraform_dir)
+        required_files = ["main.tf", "variables.tf", "outputs.tf"]
+
+        missing = []
+        for req in required_files:
+            if not (terraform_dir / req).exists():
+                missing.append(req)
+
+        if not missing:
+            self._add_check(
+                "terraform_config",
+                "PASS",
+                "All required Terraform config files present"
+            )
+        else:
+            self._add_check(
+                "terraform_config",
+                "FAIL",
+                f"Missing Terraform config files: {', '.join(missing)}"
+            )
+
+    def _check_installer_config(self) -> None:
+        """Check installer configuration."""
+        if self.context.project_name:
+            self._add_check(
+                "project_name",
+                "PASS",
+                f"Project name: {self.context.project_name}"
+            )
+        else:
+            self._add_check(
+                "project_name",
+                "FAIL",
+                "Project name not configured"
+            )
+
+        if self.context.environment:
+            self._add_check(
+                "environment",
+                "PASS",
+                f"Environment: {self.context.environment}"
+            )
+        else:
+            self._add_check(
+                "environment",
+                "WARNING",
+                "Environment not set, defaulting to Development"
+            )
+
+    def _check_aws_profile_validated(self) -> None:
+        """Check if AWS profile is validated and create AWSExecutionContext."""
+        import subprocess
+        import json
+
+        try:
+            # Check profile exists
+            result = subprocess.run(
+                ["aws", "configure", "list", "--profile", self.context.aws_profile],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                self._add_check(
+                    "aws_profile_validated",
+                    "FAIL",
+                    f"AWS profile '{self.context.aws_profile}' not found: {result.stderr}"
+                )
+                return
+
+            # Get caller identity
+            result = subprocess.run(
+                ["aws", "sts", "get-caller-identity", "--profile", self.context.aws_profile],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode != 0:
+                self._add_check(
+                    "aws_identity_validated",
+                    "FAIL",
+                    f"Cannot get AWS identity: {result.stderr}"
+                )
+                return
+
+            import json
+            identity = json.loads(result.stdout)
+            account_id = identity.get("Account")
+            identity_arn = identity.get("Arn")
+
+            if not account_id:
+                self._add_check(
+                    "aws_account_id_validated",
+                    "FAIL",
+                    "Could not determine account ID from STS"
+                )
+                return
+
+            if not identity.get("Arn"):
+                self._add_check(
+                    "aws_identity_arn_validated",
+                    "FAIL",
+                    "Could not determine identity ARN from STS"
+                )
+                return
+
+            # Create validated AWS execution context
+            self.context.aws_execution_context = AWSExecutionContext(
+                profile=self.context.aws_profile,
+                region=self.context.aws_region,
+                account_id=account_id,
+                identity_arn=identity.get("Arn"),
+                validated=True,
+                validation_timestamp=datetime.now().isoformat(),
+                profile_source="explicit"
+            )
+
+            self._add_check(
+                "aws_profile_validated",
+                "PASS",
+                f"AWS profile '{self.context.aws_profile}' validated for account {account_id}"
+            )
+            self._add_check(
+                "aws_identity_validated",
+                "PASS",
+                f"AWS identity validated: {identity.get('Arn')}"
+            )
+            self._add_check(
+                "aws_account_id_validated",
+                "PASS",
+                f"Account ID validated: {account_id}"
+            )
+
+        except FileNotFoundError:
+            self._add_check(
+                "aws_cli",
+                "FAIL",
+                "AWS CLI not found in PATH"
+            )
+        except subprocess.TimeoutExpired:
+            self._add_check(
+                "aws_cli_timeout",
+                "FAIL",
+                "AWS CLI timeout"
+            )
+        except Exception as e:
+            self._add_check(
+                "aws_validation_error",
+                "FAIL",
+                f"Error validating AWS context: {e}"
+            )
