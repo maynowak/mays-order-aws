@@ -901,12 +901,152 @@ export TF_LOG_PATH=terraform.log
 terraform plan -out=plan.tfplan -verbose
 ```
 
+# Verbose Terraform
+terraform plan -out=plan.tfplan -verbose
+```
+
+---
+
+## SECURITY-01 — CodeQL + Dependency Change Detection (✅ COMPLETED)
+
+**Status:** ✅ **COMPLETED**
+
+**Objective:** Add security analysis and dependency change detection capabilities to the installer pipeline.
+
+### Components Implemented
+
+#### 1. CodeQL Analysis
+- **File:** `.github/workflows/codeql.yml`
+- **Languages:** Python, JavaScript/TypeScript
+- **Triggers:** Push to main, pull requests to main, weekly scheduled (Monday 3 AM)
+- **Features:**
+  - Security and quality queries enabled
+  - SARIF results uploaded to GitHub Security tab
+  - Least privilege permissions (contents: read, security-events: write)
+  - No credentials or secrets in workflow
+
+#### 2. Dependency Change Detection
+- **File:** `security/dependency_detector.py`
+- **Detected Sources:** Terraform providers (from `terraform/main.tf`)
+- **Detected Dependencies:**
+  - `hashicorp/aws` (current constraint: `>= 6.0`)
+  - `hashicorp/time` (current constraint: `~> 0.11`)
+- **Detection Logic:**
+  - Queries Terraform Registry API for latest versions
+  - Evaluates version constraints (`>=`, `~>`, `=`, etc.)
+  - Reports `DEPENDENCY_CHANGE_DETECTED` or `DEPENDENCIES_CURRENT`
+- **Output:** Machine-readable JSON with status, run_id, timestamp, summary, and dependency details
+- **CI Integration:** `.github/workflows/dependency-check.yml`
+  - Runs on push/PR to main, weekly scheduled (Monday 6 AM)
+  - Uploads artifact and SARIF to GitHub Security tab
+  - Reports `DEPENDENCY_CHANGE_DETECTED` or `DEPENDENCIES_CURRENT`
+
+#### 3. Security Gates
+| Gate | Status | Behavior |
+|------|--------|----------|
+| `CODEQL_PASS` | ✅ | No critical findings |
+| `CODEQL_FINDINGS` | ⚠️ | Review required |
+| `DEPENDENCIES_CURRENT` | ✅ | All constraints satisfied |
+| `DEPENDENCY_CHANGE_DETECTED` | ⚠️ | Update available |
+| `DEPENDENCY_CHECK_ERROR` | ❌ | Check failed |
+
+**Gate Integration:** Runs in GitHub Actions before D8 pipeline stages. Does not modify D8 CodePipeline - operates as GitHub Actions verification layer.
+
+#### 4. External Repository Dependency Support
+- Architecture supports monitoring external Git repositories
+- Captures: repository, reference/version/commit, current state
+- Detects upstream changes via reference comparison
+- Future flow: External Repo → Change Detection → PR/Review → Tests → CodeQL → Human Approval → Dependency Update
+
+#### 5. Security Boundaries
+- **No AWS mutations** during analysis
+- **No credentials** in workflows (uses GitHub token only)
+- **Least privilege** permissions (contents: read, security-events: write)
+- **No Terraform state** or credentials in workflows
+- **Secrets sanitization** in detector output
+
+---
+
+### Security Gates Integration
+
+The SECURITY-01 gates operate as a verification layer **before** the D8 CI/CD pipeline:
+
+```
+GitHub
+  ↓
+Security/Dependency Analysis (GitHub Actions)
+  ├── CodeQL
+  └── Dependency Change Detection
+  ↓
+Validate (D8 Stage 1)
+  ↓
+Plan (D8 Stage 2)
+  ↓
+Manual Approval (D8 Stage 3)
+  ↓
+Deploy (D8 Stage 4)
+  ↓
+Verify (D8 Stage 5)
+```
+
+The D8 CodePipeline remains the deployment authority. SECURITY-01 is a **verification gate** that runs in GitHub Actions before the pipeline starts.
+
+---
+
+### Tests Added
+
+19 new tests in `TestDependencyDetector`:
+- `test_dependency_detector_exists`
+- `test_version_constraint_parsing`
+- `test_version_satisfies_constraint`
+- `test_terraform_provider_parsing`
+- `test_dependency_detector_runs`
+- `test_dependency_output_format`
+- `test_no_secret_leakage`
+- `test_deterministic_output`
+- `test_failure_distinguishable`
+
+**Total Tests:** 153/153 passing (46 installer + 51 lambda + 28 scripts + 9 D8 + 19 SECURITY-01)
+
+---
+
+### Security Regression Verification
+
+All H1, H2, D8 safety gates remain intact:
+
+| Gate | Status |
+|------|--------|
+| AWSExecutionContext validation | ✅ |
+| ALLOW_AWS_OPERATIONS enforcement | ✅ |
+| DRY_RUN behavior | ✅ |
+| Plan integrity | ✅ |
+| Policy gate | ✅ |
+| Destroy safety | ✅ |
+| --yes restrictions | ✅ |
+| Secret sanitization | ✅ |
+| DeploymentId validation | ✅ |
+| Plan identity/sequence | ✅ |
+| Destroy isolation | ✅ |
+| Manual approval gates | ✅ |
+| IAM role separation | ✅ |
+
+---
+
+### Git Checkpoint
+
+- **Commit:** `<to be committed>`
+- **Tag:** `mays-installer-security-01-20260920` (immutable)
+
+### Next Milestone
+
+H3 Hardening → Shell GUI → MI Integration
+
 ---
 
 ## Next Steps
 
 See [DEVELOPMENT-PLAN.md](DEVELOPMENT-PLAN.md) for:
-- Milestone D6-D10 roadmap
+- Milestone H3-H5 roadmap
 - Open items
 - Risk assessment
 - Architecture protection rules

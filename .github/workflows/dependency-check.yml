@@ -1,0 +1,73 @@
+name: "Dependency Change Detection"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  dependency-check:
+    name: Dependency Change Detection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --quiet --upgrade pip
+
+      - name: Run dependency detector
+        id: detector
+        run: |
+          python3 security/dependency_detector.py > dependency_result.json
+          cat dependency_result.json
+          echo "result=$(cat dependency_result.json | jq -r .status)" >> $GITHUB_OUTPUT
+
+      - name: Upload dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report
+          path: dependency_result.json
+          retention-days: 30
+
+      - name: Report result
+        run: |
+          STATUS=$(jq -r .status dependency_result.json)
+          SUMMARY=$(jq -r .summary dependency_result.json)
+          echo "Dependency Status: $STATUS"
+          echo "Summary: $SUMMARY"
+          if [ "$STATUS" = "DEPENDENCY_CHANGE_DETECTED" ]; then
+            echo "::warning::Dependency changes detected - review required"
+            jq -r '.dependencies[] | select(.status=="CHANGED") | "\(.name) (\(.type)): \(.current_version) -> \(.available_version)"' dependency_result.json
+          elif [ "$STATUS" = "DEPENDENCY_CHECK_ERROR" ]; then
+            echo "::error::Dependency check failed"
+            exit 1
+          else
+            echo "::notice::All dependencies are current"
+          fi
+
+      - name: Upload SARIF (if findings)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: dependency_result.json
+          category: dependency-check

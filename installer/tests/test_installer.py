@@ -1276,5 +1276,190 @@ class TestD8CICD(unittest.TestCase):
             self.assertEqual(result.returncode, 0, f"terraform validate failed in {tf_dir}: {result.stderr}")
 
 
+class TestDependencyDetector(unittest.TestCase):
+    """Test SECURITY-01 Dependency Change Detector."""
+
+    def test_dependency_detector_exists(self):
+        """Test that dependency detector script exists."""
+        from pathlib import Path
+        self.assertTrue(Path("security/dependency_detector.py").exists())
+
+    def test_version_constraint_parsing(self):
+        """Test version constraint parsing."""
+        from security.dependency_detector import parse_version_constraint
+
+        # Test various constraint formats
+        self.assertEqual(parse_version_constraint(">= 6.0"), (">=", "6.0"))
+        self.assertEqual(parse_version_constraint("~> 0.11"), ("~>", "0.11"))
+        self.assertEqual(parse_version_constraint("= 1.0.0"), ("=", "1.0.0"))
+        self.assertEqual(parse_version_constraint("1.0.0"), ("=", "1.0.0"))
+        self.assertEqual(parse_version_constraint("<= 2.0.0"), ("<=", "2.0.0"))
+        self.assertEqual(parse_version_constraint("> 1.0"), (">", "1.0"))
+
+    def test_version_satisfies_constraint(self):
+        """Test version constraint satisfaction."""
+        from security.dependency_detector import version_satisfies_constraint
+
+        # Exact match
+        self.assertTrue(version_satisfies_constraint("1.0.0", "= 1.0.0"))
+        self.assertFalse(version_satisfies_constraint("1.0.1", "= 1.0.0"))
+
+        # Greater than or equal
+        self.assertTrue(version_satisfies_constraint("6.0.0", ">= 6.0"))
+        self.assertTrue(version_satisfies_constraint("6.1.0", ">= 6.0"))
+        self.assertFalse(version_satisfies_constraint("5.41.0", ">= 6.0"))
+
+        # Less than or equal
+        self.assertTrue(version_satisfies_constraint("5.0.0", "<= 6.0"))
+        self.assertFalse(version_satisfies_constraint("7.0.0", "<= 6.0"))
+
+        # Pessimistic constraint
+        self.assertTrue(version_satisfies_constraint("1.2.0", "~> 1.2"))
+        self.assertTrue(version_satisfies_constraint("1.2.3", "~> 1.2"))
+        self.assertFalse(version_satisfies_constraint("1.3.0", "~> 1.2"))
+        self.assertTrue(version_satisfies_constraint("1.2.3", "~> 1.2.3"))
+        self.assertFalse(version_satisfies_constraint("1.2.4", "~> 1.2.3"))
+
+    def test_terraform_provider_parsing(self):
+        """Test Terraform provider parsing."""
+        from security.dependency_detector import parse_terraform_providers
+        from pathlib import Path
+
+        deps = parse_terraform_providers(Path("terraform/main.tf"))
+
+        self.assertGreaterEqual(len(deps), 2)
+        names = {d.name for d in deps}
+        self.assertIn("aws", names)
+        self.assertIn("time", names)
+
+        for dep in deps:
+            self.assertEqual(dep.type, "terraform_provider")
+            self.assertIn("hashicorp/", dep.current_reference)
+
+    def test_dependency_detector_runs(self):
+        """Test that dependency detector runs without error."""
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        self.assertEqual(result.returncode, 1)  # Changes detected
+
+        # Parse JSON output
+        output = json.loads(result.stdout)
+        self.assertIn("status", output)
+        self.assertIn("run_id", output)
+        self.assertIn("timestamp", output)
+        self.assertIn("summary", output)
+        self.assertIn("dependencies", output)
+        self.assertIsInstance(output["dependencies"], list)
+
+    def test_dependency_output_format(self):
+        """Test that dependency output has required fields."""
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        output = json.loads(result.stdout)
+
+        for dep in output["dependencies"]:
+            self.assertIn("name", dep)
+            self.assertIn("type", dep)
+            self.assertIn("source", dep)
+            self.assertIn("current_version", dep)
+            self.assertIn("current_reference", dep)
+            self.assertIn("available_version", dep)
+            self.assertIn("available_reference", dep)
+            self.assertIn("status", dep)
+            self.assertIn("details", dep)
+            self.assertIn("detected_at", dep)
+
+            self.assertIn(dep["status"], ["CURRENT", "CHANGED", "ERROR", "UNKNOWN"])
+            self.assertIn(dep["type"], ["terraform_provider", "github_action", "python_package", "npm_package", "git_submodule"])
+
+    def test_no_secret_leakage(self):
+        """Test that detector output doesn't contain secrets."""
+        import subprocess
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        output = result.stdout
+
+        # Should not contain any secrets
+        self.assertNotIn("aws_secret_access_key", output)
+        self.assertNotIn("aws_access_key_id", output)
+        self.assertNotIn("secret_access_key", output)
+        self.assertNotIn("password", output.lower())
+
+    def test_deterministic_output(self):
+        """Test that detector output is deterministic for same input."""
+        import subprocess
+        import json
+
+        result1 = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        result2 = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        # Both should have same status and dependency structure
+        out1 = json.loads(result1.stdout)
+        out2 = json.loads(result2.stdout)
+
+        self.assertEqual(out1["status"], out2["status"])
+        self.assertEqual(len(out1["dependencies"]), len(out2["dependencies"]))
+        for d1, d2 in zip(out1["dependencies"], out2["dependencies"]):
+            self.assertEqual(d1["name"], d2["name"])
+            self.assertEqual(d1["current_version"], d2["current_version"])
+
+    def test_failure_distinguishable(self):
+        """Test that failure is distinguishable from 'no changes'."""
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        output = json.loads(result.stdout)
+
+        # Status should be one of the expected values
+        self.assertIn(output["status"], [
+            "DEPENDENCIES_CURRENT",
+            "DEPENDENCY_CHANGE_DETECTED",
+            "DEPENDENCY_CHECK_ERROR"
+        ])
+
+        # Should not be empty
+        self.assertIsNotNone(output["status"])
+        self.assertNotEqual(output["status"], "")
+
+
 if __name__ == "__main__":
     unittest.main()
