@@ -18,7 +18,7 @@ from typing import List, Dict, Any
 
 @dataclass
 class SarifLocation:
-    """SARIF location object."""
+    """SARIF location object per SARIF 2.1.0 spec."""
     uri: str
     start_line: Optional[int] = None
     start_column: Optional[int] = None
@@ -26,15 +26,10 @@ class SarifLocation:
     end_column: Optional[int] = None
 
     def to_dict(self) -> dict:
-        result = {"uri": self.uri}
-        if self.start_line is not None:
-            result["startLine"] = self.start_line
-        if self.start_column is not None:
-            result["startColumn"] = self.start_column
-        if self.end_line is not None:
-            result["endLine"] = self.end_line
-        if self.end_column is not None:
-            result["endColumn"] = self.end_column
+        """Convert to SARIF 2.1.0 location format with physicalLocation.artifactLocation.uri"""
+        artifact_location = {"uri": self.uri}
+        physical_location = {"artifactLocation": artifact_location}
+        result = {"physicalLocation": physical_location}
         return result
 
 
