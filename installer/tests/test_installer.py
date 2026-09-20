@@ -1385,7 +1385,7 @@ class TestDependencyDetector(unittest.TestCase):
             self.assertIn("details", dep)
             self.assertIn("detected_at", dep)
 
-            self.assertIn(dep["status"], ["CURRENT", "CHANGED", "ERROR", "UNKNOWN"])
+            self.assertIn(dep["status"], ["CURRENT", "UPDATE_AVAILABLE", "CONSTRAINT_UNSATISFIED", "LOOKUP_ERROR", "ERROR", "UNKNOWN"])
             self.assertIn(dep["type"], ["terraform_provider", "github_action", "python_package", "npm_package", "git_submodule"])
 
     def test_no_secret_leakage(self):
@@ -1459,6 +1459,215 @@ class TestDependencyDetector(unittest.TestCase):
         # Should not be empty
         self.assertIsNotNone(output["status"])
         self.assertNotEqual(output["status"], "")
+
+
+class TestSarifAdapter(unittest.TestCase):
+    """Test SECURITY-01-FIX SARIF Adapter."""
+
+    def test_sarif_adapter_exists(self):
+        """Test that SARIF adapter script exists."""
+        from pathlib import Path
+        self.assertTrue(Path("security/sarif_adapter.py").exists())
+
+    def test_sarif_conversion(self):
+        """Test that native dependency result converts to SARIF."""
+        import subprocess
+        import json
+
+        # Run detector
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        native_result = json.loads(result.stdout)
+
+        # Convert to SARIF
+        result = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(Path("dependency_result.sarif").exists())
+
+        # Validate SARIF structure
+        with open("dependency_result.sarif") as f:
+            sarif = json.load(f)
+
+        self.assertEqual(sarif.get("version"), "2.1.0")
+        self.assertEqual(sarif.get("$schema"), "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json")
+        self.assertIn("runs", sarif)
+        self.assertIsInstance(sarif["runs"], list)
+        self.assertGreater(len(sarif["runs"]), 0)
+
+        run = sarif["runs"][0]
+        self.assertIn("tool", run)
+        self.assertIn("driver", run["tool"])
+        self.assertIn("results", run)
+        self.assertIn("columnKind", run)
+        self.assertEqual(run["columnKind"], "utf16")
+
+    def test_sarif_no_native_top_level_fields(self):
+        """Test that SARIF doesn't contain native top-level fields."""
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        native_result = json.loads(result.stdout)
+
+        result = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        with open("dependency_result.sarif") as f:
+            sarif = json.load(f)
+
+        # SARIF should not have native top-level fields
+        self.assertNotIn("status", sarif)
+        self.assertNotIn("run_id", sarif)
+        self.assertNotIn("timestamp", sarif)
+        self.assertNotIn("summary", sarif)
+        self.assertNotIn("dependencies", sarif)
+
+    def test_sarif_multiple_findings(self):
+        """Test SARIF with multiple dependency findings."""
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        native_result = json.loads(result.stdout)
+
+        result = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        with open("dependency_result.sarif") as f:
+            sarif = json.load(f)
+
+        # Should have results for each dependency
+        run = sarif["runs"][0]
+        self.assertGreaterEqual(len(run["results"]), 1)
+
+        for result in run["results"]:
+            self.assertIn("ruleId", result)
+            self.assertIn("level", result)
+            self.assertIn("message", result)
+            self.assertIn("locations", result)
+            self.assertIn("properties", result)
+
+            # Check level is valid
+            self.assertIn(result["level"], ["error", "warning", "note", "none"])
+
+            # Check properties
+            props = result["properties"]
+            self.assertIn("dependency_name", props)
+            self.assertIn("dependency_type", props)
+            self.assertIn("current_version", props)
+
+    def test_sarif_error_conversion(self):
+        """Test SARIF conversion for error status."""
+        # Test that LOOKUP_ERROR status converts to warning level
+        import subprocess
+        import json
+
+        result = subprocess.run(
+            ["python3", "security/dependency_detector.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        native_result = json.loads(result.stdout)
+
+        result = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        with open("dependency_result.sarif") as f:
+            sarif = json.load(f)
+
+        run = sarif["runs"][0]
+        for result in run["results"]:
+            if "CONSTRAINT_UNSATISFIED" in result["ruleId"]:
+                self.assertEqual(result["level"], "error")
+            elif "UPDATE_AVAILABLE" in result["ruleId"]:
+                self.assertEqual(result["level"], "note")
+            elif "LOOKUP_ERROR" in result["ruleId"]:
+                self.assertEqual(result["level"], "warning")
+            elif "CURRENT" in result["ruleId"]:
+                self.assertEqual(result["level"], "note")
+
+    def test_sarif_deterministic(self):
+        """Test that SARIF generation is deterministic."""
+        import subprocess
+        import json
+
+        result1 = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result1.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+        result2 = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result2.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        self.assertEqual(result1.returncode, 0)
+        self.assertEqual(result2.returncode, 0)
+
+        with open("dependency_result1.sarif") as f:
+            sarif1 = json.load(f)
+        with open("dependency_result2.sarif") as f:
+            sarif2 = json.load(f)
+
+        # Structure should be identical
+        self.assertEqual(sarif1["version"], sarif2["version"])
+        self.assertEqual(len(sarif1["runs"]), len(sarif2["runs"]))
+        self.assertEqual(len(sarif1["runs"][0]["results"]), len(sarif2["runs"][0]["results"]))
+
+    def test_no_secret_leakage_in_sarif(self):
+        """Test that SARIF doesn't leak secrets."""
+        import subprocess
+
+        result = subprocess.run(
+            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            capture_output=True,
+            text=True,
+            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+        )
+
+        sarif_output = result.stdout + result.stderr
+
+        self.assertNotIn("aws_secret_access_key", sarif_output)
+        self.assertNotIn("aws_access_key_id", sarif_output)
+        self.assertNotIn("secret_access_key", sarif_output)
+        self.assertNotIn("password", sarif_output.lower())
+        self.assertNotIn("token", sarif_output.lower())
 
 
 if __name__ == "__main__":

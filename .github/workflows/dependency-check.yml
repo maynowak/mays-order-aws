@@ -42,12 +42,39 @@ jobs:
           cat dependency_result.json
           echo "result=$(cat dependency_result.json | jq -r .status)" >> $GITHUB_OUTPUT
 
+      - name: Convert to SARIF
+        run: |
+          python3 -m security.sarif_adapter dependency_result.json dependency_result.sarif
+          cat dependency_result.sarif
+
+      - name: Validate SARIF
+        run: |
+          # Basic SARIF validation
+          python3 -c "
+          import json
+          with open('dependency_result.sarif') as f:
+              sarif = json.load(f)
+          assert sarif.get('version') == '2.1.0', 'SARIF version must be 2.1.0'
+          assert 'runs' in sarif, 'SARIF must have runs'
+          for run in sarif['runs']:
+              assert 'tool' in run, 'Run must have tool'
+              assert 'driver' in run['tool'], 'Tool must have driver'
+              assert 'results' in run, 'Run must have results'
+          print('SARIF validation passed')
+          "
+
       - name: Upload dependency report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-report
           path: dependency_result.json
           retention-days: 30
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: dependency_result.sarif
+          category: dependency-check
 
       - name: Report result
         run: |
@@ -57,17 +84,10 @@ jobs:
           echo "Summary: $SUMMARY"
           if [ "$STATUS" = "DEPENDENCY_CHANGE_DETECTED" ]; then
             echo "::warning::Dependency changes detected - review required"
-            jq -r '.dependencies[] | select(.status=="CHANGED") | "\(.name) (\(.type)): \(.current_version) -> \(.available_version)"' dependency_result.json
+            jq -r '.dependencies[] | select(.status=="CONSTRAINT_UNSATISFIED" or .status=="UPDATE_AVAILABLE" or .status=="CHANGED") | "\(.name) (\(.type)): \(.current_version) -> \(.available_version)"' dependency_result.json
           elif [ "$STATUS" = "DEPENDENCY_CHECK_ERROR" ]; then
             echo "::error::Dependency check failed"
             exit 1
           else
             echo "::notice::All dependencies are current"
           fi
-
-      - name: Upload SARIF (if findings)
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: dependency_result.json
-          category: dependency-check

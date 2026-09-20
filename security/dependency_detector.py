@@ -79,18 +79,18 @@ def version_satisfies_constraint(version: str, constraint: str) -> bool:
     Simplified implementation for common Terraform constraints.
     """
     op, constraint_version = parse_version_constraint(constraint)
-    
+
     def parse_ver(v: str) -> tuple:
         # Parse semantic version, handle pre-release suffixes
         parts = v.split("-")[0].split(".")
         return tuple(int(p) for p in parts)
-    
+
     try:
         v = parse_ver(version)
         cv = parse_ver(constraint_version)
     except ValueError:
         return False
-    
+
     if op == "=":
         return v == cv
     elif op == "!=":
@@ -116,7 +116,7 @@ def version_satisfies_constraint(version: str, constraint: str) -> bool:
                 patch = int(parts[2])
                 return v >= (major, minor, patch) and v < (major, minor, patch + 1)
         return False
-    
+
     return False
 
 
@@ -128,17 +128,17 @@ def run_id() -> str:
 def parse_terraform_providers(tf_file: Path) -> list[Dependency]:
     """Parse Terraform required_providers from main.tf."""
     deps = []
-    
+
     if not tf_file.exists():
         return deps
-    
+
     content = tf_file.read_text()
-    
+
     # Find required_providers block with proper brace matching
     start = content.find('required_providers')
     if start == -1:
         return deps
-    
+
     brace_count = 0
     end = -1
     for i, ch in enumerate(content[start:], start):
@@ -149,23 +149,23 @@ def parse_terraform_providers(tf_file: Path) -> list[Dependency]:
             if brace_count == 0:
                 end = i + 1
                 break
-    
+
     if end == -1:
         return deps
-    
+
     providers_block = content[start:end]
-    
+
     # Parse each provider: name = { source = "...", version = "..." }
     provider_re = re.compile(
         r'(\w+)\s*=\s*\{[^}]*source\s*=\s*"([^"]+)"[^}]*version\s*=\s*"([^"]+)"',
         re.DOTALL
     )
-    
+
     for match in provider_re.finditer(providers_block):
         name = match.group(1)
         source = match.group(2)
         version = match.group(3)
-        
+
         deps.append(Dependency(
             name=name,
             type="terraform_provider",
@@ -174,7 +174,7 @@ def parse_terraform_providers(tf_file: Path) -> list[Dependency]:
             current_reference=source,
             details=f"Terraform provider {name} from {source}"
         ))
-    
+
     return deps
 
 
@@ -187,12 +187,12 @@ def fetch_latest_terraform_provider_version(provider_source: str, current_versio
     parts = provider_source.split("/")
     if len(parts) != 2:
         return None, f"Invalid provider source format: {provider_source}"
-    
+
     namespace, name = parts
-    
+
     # Query Terraform Registry API
     url = f"https://registry.terraform.io/v1/providers/{namespace}/{name}/versions"
-    
+
     try:
         req = urllib.request.Request(
             url,
@@ -200,26 +200,26 @@ def fetch_latest_terraform_provider_version(provider_source: str, current_versio
         )
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
-        
+
         versions = data.get("versions", [])
         if not versions:
             return None, "No versions found in registry"
-        
+
         # Find latest stable version (not beta, alpha, rc)
         stable_versions = []
         for v in versions:
             version = v.get("version", "")
             if version and not any(x in version.lower() for x in ["alpha", "beta", "rc"]):
                 stable_versions.append(version)
-        
+
         if not stable_versions:
             # Fallback: use latest version even if pre-release
             latest = versions[0].get("version", "")
             return latest, f"Latest (pre-release): {latest}"
-        
+
         latest = stable_versions[0]
         return latest, f"Latest stable: {latest}"
-        
+
     except urllib.error.HTTPError as e:
         return None, f"HTTP error {e.code} querying registry"
     except urllib.error.URLError as e:
@@ -228,10 +228,32 @@ def fetch_latest_terraform_provider_version(provider_source: str, current_versio
         return None, f"Error: {e}"
 
 
+def compare_versions(v1: str, v2: str) -> int:
+    """
+    Compare two semantic versions.
+    Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+    """
+    def parse_ver(v: str) -> tuple:
+        parts = v.split("-")[0].split(".")
+        return tuple(int(p) for p in parts)
+
+    try:
+        v1_parts = parse_ver(v1)
+        v2_parts = parse_ver(v2)
+    except ValueError:
+        return 0
+
+    if v1_parts < v2_parts:
+        return -1
+    elif v1_parts > v2_parts:
+        return 1
+    return 0
+
+
 def check_terraform_providers(tf_file: Path) -> list[Dependency]:
     """Check all Terraform providers for updates."""
     deps = parse_terraform_providers(tf_file)
-    
+
     for dep in deps:
         if dep.type == "terraform_provider":
             latest, details = fetch_latest_terraform_provider_version(
@@ -239,19 +261,27 @@ def check_terraform_providers(tf_file: Path) -> list[Dependency]:
             )
             dep.available_version = latest
             dep.details += f"; {details}"
-            
+
+            if not latest:
+                dep.status = "LOOKUP_ERROR"
+                continue
+
             # Check if latest version satisfies the current constraint
-            if latest:
-                if version_satisfies_constraint(latest, dep.current_version):
-                    # Latest version satisfies constraint - check if there's a newer version within constraint
-                    # For now, if it satisfies, it's CURRENT (we don't check for newer within constraint)
-                    dep.status = "CURRENT"
-                else:
-                    # Latest doesn't satisfy constraint - there's a newer version outside constraint
-                    dep.status = "CHANGED"
+            constraint_satisfied = version_satisfies_constraint(latest, dep.current_version)
+
+            if not constraint_satisfied:
+                # Latest version doesn't satisfy the constraint
+                dep.status = "CONSTRAINT_UNSATISFIED"
             else:
-                dep.status = "ERROR"
-    
+                # Latest satisfies constraint - check if it's actually newer
+                cmp_result = compare_versions(latest, dep.current_version)
+                if cmp_result > 0:
+                    # Latest is newer and satisfies constraint
+                    dep.status = "UPDATE_AVAILABLE"
+                else:
+                    # Latest is same or older
+                    dep.status = "CURRENT"
+
     return deps
 
 
@@ -260,32 +290,36 @@ def detect_all_changes() -> DetectionResult:
     run = run_id()
     timestamp = datetime.now(timezone.utc).isoformat() + "Z"
     all_deps = []
-    
+
     # Check Terraform providers
     tf_file = Path("terraform/main.tf")
     if tf_file.exists():
         tf_deps = check_terraform_providers(tf_file)
         all_deps.extend(tf_deps)
-    
+
     # TODO: Add GitHub Actions workflow detection
     # TODO: Add Python package detection (if requirements.txt/pyproject.toml added)
     # TODO: Add npm package detection (if package.json added)
     # TODO: Add git submodule detection
-    
+
     # Determine overall status
-    changed = [d for d in all_deps if d.status == "CHANGED"]
-    errors = [d for d in all_deps if d.status == "ERROR"]
-    
+    changed = [d for d in all_deps if d.status in ("CHANGED", "UPDATE_AVAILABLE")]
+    constraint_unsatisfied = [d for d in all_deps if d.status == "CONSTRAINT_UNSATISFIED"]
+    errors = [d for d in all_deps if d.status in ("ERROR", "LOOKUP_ERROR")]
+
     if errors:
         status = "DEPENDENCY_CHECK_ERROR"
         summary = f"{len(errors)} dependency check(s) failed"
+    elif constraint_unsatisfied:
+        status = "DEPENDENCY_CHANGE_DETECTED"
+        summary = f"{len(constraint_unsatisfied)} dependency constraint(s) unsatisfied"
     elif changed:
         status = "DEPENDENCY_CHANGE_DETECTED"
         summary = f"{len(changed)} dependency update(s) available"
     else:
         status = "DEPENDENCIES_CURRENT"
         summary = "All dependencies are current"
-    
+
     return DetectionResult(
         status=status,
         dependencies=all_deps,
@@ -300,14 +334,14 @@ def main() -> int:
     try:
         result = detect_all_changes()
         print(result.to_json())
-        
+
         # Exit code: 0 = current, 1 = changes detected, 2 = error
         if result.status == "DEPENDENCY_CHECK_ERROR":
             return 2
         elif result.status == "DEPENDENCY_CHANGE_DETECTED":
             return 1
         return 0
-        
+
     except Exception as e:
         error_result = DetectionResult(
             status="DEPENDENCY_CHECK_ERROR",
