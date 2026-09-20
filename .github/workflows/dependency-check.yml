@@ -8,6 +8,7 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -38,9 +39,18 @@ jobs:
       - name: Run dependency detector
         id: detector
         run: |
+          set +e
           python3 security/dependency_detector.py > dependency_result.json
+          DETECTOR_EXIT=$?
+          set -e
           cat dependency_result.json
+          echo "detector_exit=$DETECTOR_EXIT" >> $GITHUB_OUTPUT
           echo "result=$(cat dependency_result.json | jq -r .status)" >> $GITHUB_OUTPUT
+
+          if [ "$DETECTOR_EXIT" -eq 2 ]; then
+            echo "::error::Dependency detector failed"
+            exit 2
+          fi
 
       - name: Convert to SARIF
         run: |
@@ -71,7 +81,7 @@ jobs:
           retention-days: 30
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: dependency_result.sarif
           category: dependency-check
