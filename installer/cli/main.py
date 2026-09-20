@@ -287,6 +287,17 @@ class InstallerCLI:
             help="AWS region"
         )
 
+        # gui command
+        gui_parser = subparsers.add_parser(
+            "gui",
+            help="Launch the Shell GUI (read-only terminal interface)"
+        )
+        gui_parser.add_argument(
+            "--no-clear",
+            action="store_true",
+            help="Don't clear screen on each menu refresh"
+        )
+
         return parser
 
     def run(self, args: Optional[list] = None) -> int:
@@ -325,6 +336,8 @@ class InstallerCLI:
             return self._cmd_output(context, parsed, run_dir)
         elif parsed.command == "identity":
             return self._cmd_identity(context, parsed, run_dir)
+        elif parsed.command == "gui":
+            return self._cmd_gui(context, parsed, run_dir)
 
         return 1
 
@@ -1092,6 +1105,14 @@ class InstallerCLI:
         print(f"Project: {context.project_name}")
         print(f"Environment: {context.environment}")
         return 0
+
+    def _cmd_gui(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
+        """Launch the Shell GUI (read-only terminal interface)."""
+        from installer.cli.gui import ShellGUI
+
+        # Create and run the GUI
+        gui = ShellGUI(context)
+        return gui.run()
 
 
 def main():
