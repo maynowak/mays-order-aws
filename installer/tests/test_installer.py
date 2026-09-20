@@ -1509,7 +1509,7 @@ class TestSarifAdapter(unittest.TestCase):
         self.assertIn("driver", run["tool"])
         self.assertIn("results", run)
         self.assertIn("columnKind", run)
-        self.assertEqual(run["columnKind"], "utf16")
+        self.assertEqual(run["columnKind"], "utf16CodeUnits")
 
     def test_sarif_no_native_top_level_fields(self):
         """Test that SARIF doesn't contain native top-level fields."""

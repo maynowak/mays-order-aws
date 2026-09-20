@@ -106,7 +106,7 @@ class SarifRun:
     """SARIF run object."""
     tool: dict
     results: List[SarifResult]
-    column_kind: str = "utf16"
+    column_kind: str = "utf16CodeUnits"
     original_uri_base_ids: Optional[dict] = None
     automation_details: Optional[dict] = None
 
@@ -118,8 +118,11 @@ class SarifRun:
         }
         if self.original_uri_base_ids:
             result["originalUriBaseIds"] = self.original_uri_base_ids
-        if self.automation_details:
-            result["automationDetails"] = self.automation_details
+        # Only include automationDetails if it has a valid description object
+        if self.automation_details and "description" in self.automation_details:
+            desc = self.automation_details["description"]
+            if isinstance(desc, dict) and "text" in desc:
+                result["automationDetails"] = self.automation_details
         return result
 
 
@@ -255,7 +258,7 @@ class SarifAdapter:
             results=results,
             automation_details={
                 "id": "security-01-dependency-check",
-                "description": "SECURITY-01 Dependency Change Detection"
+                "description": {"text": "SECURITY-01 Dependency Change Detection"}
             }
         )
 
