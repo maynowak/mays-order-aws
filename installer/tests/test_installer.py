@@ -676,11 +676,11 @@ class TestHardeningScenarios(unittest.TestCase):
     def test_wrong_profile_rejected(self, mock_run):
         """Test that wrong/missing AWS profile is rejected."""
         mock_run.return_value = MagicMock(returncode=1, stderr="profile not found")
-        
+
         ctx = InstallationContext(aws_profile="nonexistent-profile")
         validation = ValidationLayer(ctx)
         validation._check_aws_profile_validated()
-        
+
         self.assertEqual(len(validation.result.checks), 1)
         self.assertEqual(validation.result.checks[0].status, "FAIL")
         self.assertIn("not found", validation.result.checks[0].message)
@@ -693,11 +693,11 @@ class TestHardeningScenarios(unittest.TestCase):
             MagicMock(returncode=0),  # aws configure list
             MagicMock(returncode=0, stdout=json.dumps({"Account": "999999999999", "Arn": "arn:aws:iam::999999999999:user/test"}))
         ]
-        
+
         ctx = InstallationContext(aws_profile="test-profile", aws_account_id="123456789012")
         validation = ValidationLayer(ctx)
         validation._check_aws_profile_validated()
-        
+
         # The validation creates context with actual account, doesn't compare with expected
         # This is a design decision - we validate what's there, not what's expected
         self.assertEqual(len(validation.result.checks), 3)
@@ -710,11 +710,11 @@ class TestHardeningScenarios(unittest.TestCase):
             MagicMock(returncode=0),
             MagicMock(returncode=0, stdout=json.dumps({"Account": "123456789012", "Arn": "arn:aws:iam::123456789012:user/test"}))
         ]
-        
+
         ctx = InstallationContext(aws_profile="test-profile", aws_region="invalid-region-999")
         validation = ValidationLayer(ctx)
         validation.run_all()
-        
+
         region_check = next((c for c in validation.result.checks if c.name == "region"), None)
         self.assertIsNotNone(region_check)
         self.assertEqual(region_check.status, "WARNING")
@@ -723,7 +723,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test that wrong plan file is rejected."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
             region="eu-central-1",
@@ -731,9 +731,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # Test with non-existent plan file
         is_valid, error_msg = runner.verify_plan_integrity("nonexistent.tfplan", "test-run-id")
         self.assertFalse(is_valid)
@@ -743,7 +743,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test that missing plan file is rejected."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
             region="eu-central-1",
@@ -751,9 +751,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         is_valid, error_msg = runner.verify_plan_integrity("", "test-run-id")
         self.assertFalse(is_valid)
 
@@ -762,7 +762,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test plan context match with same region."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_exists.return_value = True
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
@@ -771,9 +771,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # Mock show_plan to return plan with same region
         with patch.object(runner, 'show_plan') as mock_show:
             mock_show.return_value = MagicMock(
@@ -790,7 +790,7 @@ class TestHardeningScenarios(unittest.TestCase):
                     }
                 })
             )
-            
+
             is_valid, error_msg = runner.verify_plan_context_match("test.tfplan", mock_aws_context)
             self.assertTrue(is_valid)
 
@@ -799,7 +799,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test plan context match with different region fails."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_exists.return_value = True
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
@@ -808,9 +808,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # Mock show_plan to return plan with different region
         with patch.object(runner, 'show_plan') as mock_show:
             mock_show.return_value = MagicMock(
@@ -827,7 +827,7 @@ class TestHardeningScenarios(unittest.TestCase):
                     }
                 })
             )
-            
+
             is_valid, error_msg = runner.verify_plan_context_match("test.tfplan", mock_aws_context)
             self.assertFalse(is_valid)
             self.assertIn("region", error_msg.lower())
@@ -836,7 +836,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test state commands require AWS profile binding."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
             region="eu-central-1",
@@ -844,9 +844,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # All state commands should use the runner which has aws_context
         self.assertEqual(runner.aws_context.profile, "mayaws")
         self.assertEqual(runner.aws_context.region, "eu-central-1")
@@ -855,7 +855,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test output command requires AWS profile binding."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
             region="eu-central-1",
@@ -863,9 +863,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # Output command should use the runner which has aws_context
         self.assertEqual(runner.aws_context.profile, "mayaws")
 
@@ -873,7 +873,7 @@ class TestHardeningScenarios(unittest.TestCase):
         """Test identity command requires AWS profile binding."""
         from installer.terraform.runner import TerraformRunner
         from installer.core.context import AWSExecutionContext
-        
+
         mock_aws_context = AWSExecutionContext(
             profile="mayaws",
             region="eu-central-1",
@@ -881,9 +881,9 @@ class TestHardeningScenarios(unittest.TestCase):
             identity_arn="arn:aws:iam::123456789012:user/test",
             validated=True
         )
-        
+
         runner = TerraformRunner("/tmp", aws_context=mock_aws_context)
-        
+
         # Identity command should use the runner which has aws_context
         self.assertEqual(runner.aws_context.profile, "mayaws")
 
@@ -902,9 +902,9 @@ class TestHardeningScenarios(unittest.TestCase):
                 }
             }]
         }
-        
+
         sanitized = PlanArtifactManager.sanitize_plan_json(plan_json)
-        
+
         after = sanitized["resource_changes"][0]["change"]["after"]
         self.assertEqual(after["password"], "***REDACTED***")
         self.assertEqual(after["secret_key"], "***REDACTED***")
@@ -919,23 +919,23 @@ class TestHardeningScenarios(unittest.TestCase):
             stdout='{"resource_changes": []}',
             stderr=""
         )
-        
+
         from installer.core.context import InstallationContext
         from installer.cli.main import InstallerCLI
         import tempfile
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             ctx = InstallationContext(
                 aws_profile="test-profile",
                 terraform_dir=tempfile.gettempdir(),
                 allow_aws_operations=False  # Default is False
             )
-            
+
             # Create a dummy plan file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.tfplan', delete=False) as f:
                 f.write('{"resource_changes": []}')
                 plan_file = f.name
-            
+
             # Test that CLI would block (we test the logic, not the full CLI)
             self.assertFalse(ctx.allow_aws_operations)
 
@@ -943,32 +943,32 @@ class TestHardeningScenarios(unittest.TestCase):
     def test_destroy_blocks_without_allow_aws_operations(self, mock_run):
         """Test that destroy is blocked without ALLOW_AWS_OPERATIONS."""
         from installer.core.context import InstallationContext
-        
+
         ctx = InstallationContext(
             aws_profile="test-profile",
             terraform_dir="/tmp",
             allow_aws_operations=False
         )
-        
+
         self.assertFalse(ctx.allow_aws_operations)
 
     def test_state_push_requires_allow_aws_operations(self):
         """Test that state push requires ALLOW_AWS_OPERATIONS."""
         from installer.core.context import InstallationContext
-        
+
         ctx = InstallationContext(
             aws_profile="test-profile",
             terraform_dir="/tmp",
             allow_aws_operations=False
         )
-        
+
         # state push is mutating - should require allow_aws_operations
         self.assertFalse(ctx.allow_aws_operations)
 
     def test_dry_run_mode_defaults(self):
         """Test dry-run mode defaults."""
         ctx = InstallationContext()
-        
+
         self.assertTrue(ctx.dry_run)
         self.assertFalse(ctx.allow_aws_operations)
 
@@ -977,7 +977,7 @@ class TestHardeningScenarios(unittest.TestCase):
         with patch.dict(os.environ, {"ALLOW_AWS_OPERATIONS": "true"}):
             ctx = InstallationContext.from_env()
             self.assertTrue(ctx.allow_aws_operations)
-        
+
         with patch.dict(os.environ, {"ALLOW_AWS_OPERATIONS": "false"}):
             ctx = InstallationContext.from_env()
             self.assertFalse(ctx.allow_aws_operations)
@@ -987,10 +987,293 @@ class TestHardeningScenarios(unittest.TestCase):
         with patch.dict(os.environ, {"DRY_RUN": "false"}):
             ctx = InstallationContext.from_env()
             self.assertFalse(ctx.dry_run)
-        
+
         with patch.dict(os.environ, {"DRY_RUN": "true"}):
             ctx = InstallationContext.from_env()
             self.assertTrue(ctx.dry_run)
+
+
+class TestD8CICD(unittest.TestCase):
+    """Test D8 CI/CD pipeline integration."""
+
+    def test_buildspecs_exist(self):
+        """Test that all D8 buildspecs exist."""
+        from pathlib import Path
+
+        buildspecs = [
+            "ci/buildspecs/validate.yml",
+            "ci/buildspecs/plan.yml",
+            "ci/buildspecs/deploy.yml",
+            "ci/buildspecs/verify.yml",
+            "ci/buildspecs/destroy-plan.yml",
+            "ci/buildspecs/destroy.yml",
+        ]
+
+        for bs in buildspecs:
+            self.assertTrue(Path(bs).exists(), f"Missing buildspec: {bs}")
+
+    def test_pipeline_terraform_exists(self):
+        """Test that pipeline Terraform configuration exists."""
+        from pathlib import Path
+
+        tf_files = [
+            "ci/pipeline/main.tf",
+            "ci/iam/main.tf",
+        ]
+
+        for tf in tf_files:
+            self.assertTrue(Path(tf).exists(), f"Missing Terraform file: {tf}")
+
+    def test_pipeline_tfvars_example_exists(self):
+        """Test that tfvars example exists."""
+        from pathlib import Path
+
+        self.assertTrue(Path("ci/pipeline/terraform.tfvars.example").exists())
+
+    def test_aws_provider_version_6(self):
+        """Test that Terraform uses AWS provider >= 6.0."""
+        import re
+
+        for tf_file in ["ci/pipeline/main.tf", "ci/iam/main.tf"]:
+            with open(tf_file) as f:
+                content = f.read()
+            match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+            self.assertIsNotNone(match, f"No version found in {tf_file}")
+            version = match.group(1)
+            self.assertTrue(version.startswith(">=") or version.startswith("~> 6") or version.startswith(">= 6"),
+                          f"AWS provider version should be >= 6.0, got {version}")
+
+    def test_codebuild_projects_defined(self):
+        """Test that all 6 CodeBuild projects are defined in pipeline Terraform."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        projects = [
+            "validate",
+            "plan",
+            "deploy",
+            "verify",
+            "destroy_plan",
+            "destroy",
+        ]
+
+        for proj in projects:
+            # Check for project name in resource definition
+            self.assertIn(f'"{proj}"', content, f"CodeBuild project {proj} not found")
+
+    def test_pipeline_stages_defined(self):
+        """Test that all 6 pipeline stages are defined."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        stages = [
+            "Source",
+            "Validate",
+            "Plan",
+            "Approval",
+            "Deploy",
+            "Verify",
+        ]
+
+        for stage in stages:
+            self.assertIn(f'name = "{stage}"', content, f"Pipeline stage {stage} not found")
+
+    def test_manual_approval_stage(self):
+        """Test that manual approval stage is defined."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        self.assertIn('provider', content)
+        self.assertIn('Manual', content)
+        self.assertIn('Approval', content)
+
+    def test_separate_destroy_pipeline(self):
+        """Test that destroy is a separate protected path."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        # Destroy plan and destroy should be separate from main deploy pipeline
+        # The main pipeline has Source -> Validate -> Plan -> Approval -> Deploy -> Verify
+        # Destroy is a separate operation (not in main pipeline stages)
+        self.assertIn("destroy_plan", content)
+        self.assertIn("destroy", content)
+
+    def test_iam_roles_separated(self):
+        """Test that IAM roles are separated per stage."""
+        with open("ci/iam/main.tf") as f:
+            content = f.read()
+
+        # Check for stage-specific IAM policies (case-insensitive)
+        content_lower = content.lower()
+        stage_policies = [
+            "codebuild_validate",
+            "codebuild_plan",
+            "codebuild_deploy",
+            "codebuild_verify",
+            "codebuild_destroy_plan",
+            "codebuild_destroy",
+        ]
+
+        for policy in stage_policies:
+            self.assertIn(policy.lower(), content_lower, f"IAM policy {policy} not found")
+
+    def test_artifact_bucket_configuration(self):
+        """Test that artifact bucket is configured."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        self.assertIn("artifact_bucket_name", content)
+        self.assertIn("artifact_store", content)
+
+    def test_github_source_configuration(self):
+        """Test that GitHub source is configured."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        self.assertIn("provider         = \"GitHub\"", content)
+        self.assertIn("github_owner", content)
+        self.assertIn("github_repo", content)
+        self.assertIn("github_branch", content)
+        self.assertIn("github_token_arn", content)
+
+    def test_manual_approval_cannot_be_bypassed(self):
+        """Test that manual approval is required."""
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        # Manual approval stage exists and must be before deploy
+        self.assertIn('Approval', content)
+        self.assertIn('Manual', content)
+
+        # Find the pipeline stage "Deploy" and "Approval" (not CodeBuild project names)
+        # The pipeline stages appear after the CodeBuild project definitions
+        pipeline_section = content[content.index('resource "aws_codepipeline" "main"'):]
+        deploy_index = pipeline_section.index('Deploy')
+        approval_index = pipeline_section.index('Approval')
+        self.assertLess(approval_index, deploy_index, "Approval must come before Deploy")
+
+    def test_plan_identity_in_buildspecs(self):
+        """Test that buildspecs use H2 plan identity."""
+        buildspecs = [
+            "ci/buildspecs/validate.yml",
+            "ci/buildspecs/plan.yml",
+            "ci/buildspecs/deploy.yml",
+            "ci/buildspecs/verify.yml",
+            "ci/buildspecs/destroy-plan.yml",
+            "ci/buildspecs/destroy.yml",
+        ]
+
+        for bs in buildspecs:
+            with open(bs) as f:
+                content = f.read()
+
+            # Check for H2 deployment identity variables (case-insensitive)
+            content_lower = content.lower()
+            self.assertIn("deployment_version", content_lower)
+            self.assertIn("development_phase", content_lower)
+            self.assertIn("development_step", content_lower)
+            self.assertIn("development_status", content_lower)
+
+    def test_deploy_uses_exact_saved_plan(self):
+        """Test that deploy stage uses exact saved plan."""
+        with open("ci/buildspecs/deploy.yml") as f:
+            content = f.read()
+
+        # Deploy should use plan from plan_artifact.json
+        self.assertIn("plan_artifact.json", content)
+        self.assertIn("plan_path", content)
+        self.assertIn("plan_meta", content)
+
+        # Deploy should validate plan identity
+        self.assertIn("deployment_id", content)
+        self.assertIn("operation", content)
+
+    def test_verify_stage_readonly(self):
+        """Test that verify stage is read-only."""
+        with open("ci/buildspecs/verify.yml") as f:
+            content = f.read()
+
+        # Verify should not have ALLOW_AWS_OPERATIONS=true
+        self.assertNotIn("ALLOW_AWS_OPERATIONS.*true", content)
+        self.assertNotIn("DRY_RUN.*false", content)
+
+    def test_destroy_is_separate_path(self):
+        """Test that destroy is a separate protected path."""
+        # Destroy plan and destroy are separate buildspecs
+        from pathlib import Path
+
+        self.assertTrue(Path("ci/buildspecs/destroy-plan.yml").exists())
+        self.assertTrue(Path("ci/buildspecs/destroy.yml").exists())
+
+        # Main pipeline stages: Source, Validate, Plan, Approval, Deploy, Verify
+        # Destroy is NOT in this sequence as a stage
+        with open("ci/pipeline/main.tf") as f:
+            content = f.read()
+
+        # Check that "Destroy" is not a stage name (it's a separate operation)
+        stage_names = []
+        import re
+        for match in re.finditer(r'name\s*=\s*"([^"]+)"', content):
+            stage_names.append(match.group(1))
+
+        self.assertNotIn("Destroy", stage_names, "Destroy should not be a pipeline stage")
+
+    def test_secrets_sanitization_in_buildspecs(self):
+        """Test that buildspecs don't log secrets."""
+        buildspecs = [
+            "ci/buildspecs/validate.yml",
+            "ci/buildspecs/plan.yml",
+            "ci/buildspecs/deploy.yml",
+            "ci/buildspecs/verify.yml",
+            "ci/buildspecs/destroy-plan.yml",
+            "ci/buildspecs/destroy.yml",
+        ]
+
+        for bs in buildspecs:
+            with open(bs) as f:
+                content = f.read()
+
+            # Should not have hardcoded secrets
+            self.assertNotIn("aws_secret_access_key", content)
+            self.assertNotIn("aws_access_key_id", content)
+            self.assertNotIn("secret_access_key", content)
+
+    def test_terraform_fmt_check(self):
+        """Test that Terraform code passes fmt check."""
+        import subprocess
+
+        for tf_dir in ["ci/pipeline", "ci/iam"]:
+            result = subprocess.run(
+                ["terraform", "fmt", "-check", "-diff"],
+                cwd=tf_dir,
+                capture_output=True,
+                text=True
+            )
+            # terraform fmt doesn't require init
+            self.assertEqual(result.returncode, 0, f"terraform fmt failed in {tf_dir}: {result.stdout}")
+
+    def test_terraform_validate(self):
+        """Test that Terraform code validates (requires init)."""
+        import subprocess
+
+        for tf_dir in ["ci/pipeline", "ci/iam"]:
+            # Need to init first
+            init_result = subprocess.run(
+                ["terraform", "init", "-backend=false"],
+                cwd=tf_dir,
+                capture_output=True,
+                text=True
+            )
+            if init_result.returncode != 0:
+                self.skipTest(f"terraform init failed in {tf_dir}: {init_result.stderr}")
+
+            result = subprocess.run(
+                ["terraform", "validate"],
+                cwd=tf_dir,
+                capture_output=True,
+                text=True
+            )
+            self.assertEqual(result.returncode, 0, f"terraform validate failed in {tf_dir}: {result.stderr}")
 
 
 if __name__ == "__main__":

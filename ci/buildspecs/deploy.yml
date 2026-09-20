@@ -1,0 +1,131 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-central-1"
+    ALLOW_AWS_OPERATIONS: "true"
+    DRY_RUN: "false"
+  parameter-store:
+    AWS_PROFILE: "/mays-installer/ci/aws-profile"
+    PROJECT_NAME: "/mays-installer/ci/project-name"
+    ENVIRONMENT: "/mays-installer/ci/environment"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --quiet --upgrade pip
+      - pip install --quiet boto3 pytest
+
+  pre_build:
+    commands:
+      - echo "Starting DEPLOY stage..."
+      - echo "Loading deployment context and plan artifact..."
+      - cat deployment_context.json
+      - cat plan_artifact.json
+
+  build:
+    commands:
+      - echo "Running installer deploy with exact saved plan..."
+      - |
+        cat > deploy.py << 'EOF'
+        import json
+        import subprocess
+        import sys
+        from pathlib import Path
+        
+        # Load context and plan artifact
+        with open("deployment_context.json") as f:
+            ctx = json.load(f)
+        
+        with open("plan_artifact.json") as f:
+            plan_info = json.load(f)
+        
+        plan_path = plan_info["plan_path"]
+        plan_meta = plan_info["plan_metadata"]
+        
+        print(f"Deploying plan: {plan_path}")
+        print(f"Plan metadata: {json.dumps(plan_meta, indent=2)}")
+        
+        # Verify plan identity matches deployment context
+        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
+        if plan_meta.get("deployment_id") != expected_id:
+            print(f"ERROR: Plan deployment ID mismatch!")
+            print(f"  Expected: {expected_id}")
+            print(f"  Plan:     {plan_meta.get('deployment_id')}")
+            sys.exit(1)
+        
+        if plan_meta.get("operation") != "deploy":
+            print(f"ERROR: Plan operation mismatch! Expected deploy, got {plan_meta.get('operation')}")
+            sys.exit(1)
+        
+        # Run deploy
+        cmd = [
+            "python3", "-m", "installer.cli.main", "deploy",
+            "--plan", plan_path,
+            "--deployment-version", ctx["deployment_version"],
+            "--development-phase", ctx["development_phase"],
+            "--development-step", str(ctx["development_step"]),
+            "--development-status", ctx["development_status"],
+            "--yes"
+        ]
+        
+        env = os.environ.copy()
+        env["ALLOW_AWS_OPERATIONS"] = "true"
+        env["DRY_RUN"] = "false"
+        env["AWS_PROFILE"] = ctx["aws_profile"]
+        env["AWS_REGION"] = ctx["aws_region"]
+        
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        
+        if result.returncode != 0:
+            sys.exit(result.returncode)
+        
+        EOF
+      - python3 deploy.py
+
+  post_build:
+    commands:
+      - echo "Deploy stage completed successfully"
+      - echo "Generating deployment report..."
+      - |
+        cat > generate_report.py << 'EOF'
+        import json
+        from datetime import datetime
+        
+        with open("deployment_context.json") as f:
+            ctx = json.load(f)
+        
+        with open("plan_artifact.json") as f:
+            plan_info = json.load(f)
+        
+        report = {
+            "stage": "DEPLOY",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "deployment_id": f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}",
+            "version": ctx["deployment_version"],
+            "development_phase": ctx["development_phase"],
+            "development_step": ctx["development_step"],
+            "status": "SUCCESS",
+            "plan_sequence": plan_info.get("plan_metadata", {}).get("sequence_number")
+        }
+        
+        with open("deploy_report.json", "w") as f:
+            json.dump(report, f, indent=2)
+        
+        print(json.dumps(report, indent=2))
+        EOF
+      - python3 generate_report.py
+
+artifacts:
+  files:
+    - deployment_context.json
+    - plan_artifact.json
+    - deploy_report.json
+  discard-paths: no
+  base-directory: '.'

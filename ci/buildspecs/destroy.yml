@@ -1,0 +1,131 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-central-1"
+    ALLOW_AWS_OPERATIONS: "true"
+    DRY_RUN: "false"
+    DEVELOPMENT_STATUS: "development"
+  parameter-store:
+    AWS_PROFILE: "/mays-installer/ci/aws-profile"
+    PROJECT_NAME: "/mays-installer/ci/project-name"
+    ENVIRONMENT: "/mays-installer/ci/environment"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --quiet --upgrade pip
+      - pip install --quiet boto3
+
+  pre_build:
+    commands:
+      - echo "Starting DESTROY stage..."
+      - echo "Loading deployment context and destroy plan artifact..."
+      - cat deployment_context.json
+      - cat destroy_plan_artifact.json
+
+  build:
+    commands:
+      - echo "Running installer destroy with exact saved destroy plan..."
+      - |
+        cat > destroy.py << 'EOF'
+        import json
+        import subprocess
+        import sys
+        import os
+        
+        with open("deployment_context.json") as f:
+            ctx = json.load(f)
+        
+        with open("destroy_plan_artifact.json") as f:
+            plan_info = json.load(f)
+        
+        plan_path = plan_info["plan_path"]
+        plan_meta = plan_info["plan_metadata"]
+        
+        print(f"Destroying with plan: {plan_path}")
+        print(f"Plan metadata: {json.dumps(plan_meta, indent=2)}")
+        
+        # Verify plan identity matches deployment context
+        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
+        if plan_meta.get("deployment_id") != expected_id:
+            print(f"ERROR: Plan deployment ID mismatch!")
+            print(f"  Expected: {expected_id}")
+            print(f"  Plan:     {plan_meta.get('deployment_id')}")
+            sys.exit(1)
+        
+        if plan_meta.get("operation") != "destroy":
+            print(f"ERROR: Plan operation mismatch! Expected destroy, got {plan_meta.get('operation')}")
+            sys.exit(1)
+        
+        # Run destroy
+        cmd = [
+            "python3", "-m", "installer.cli.main", "destroy",
+            "--plan", plan_path,
+            "--deployment-version", ctx["deployment_version"],
+            "--development-phase", ctx["development_phase"],
+            "--development-step", str(ctx["development_step"]),
+            "--development-status", ctx["development_status"],
+            "--yes"
+        ]
+        
+        env = os.environ.copy()
+        env["ALLOW_AWS_OPERATIONS"] = "true"
+        env["DRY_RUN"] = "false"
+        env["AWS_PROFILE"] = ctx["aws_profile"]
+        env["AWS_REGION"] = ctx["aws_region"]
+        
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        
+        if result.returncode != 0:
+            sys.exit(result.returncode)
+        
+        EOF
+      - python3 destroy.py
+
+  post_build:
+    commands:
+      - echo "Destroy stage completed successfully"
+      - echo "Generating destroy report..."
+      - |
+        cat > generate_destroy_report.py << 'EOF'
+        import json
+        from datetime import datetime
+        
+        with open("deployment_context.json") as f:
+            ctx = json.load(f)
+        
+        with open("destroy_plan_artifact.json") as f:
+            plan_info = json.load(f)
+        
+        report = {
+            "stage": "DESTROY",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "deployment_id": f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}",
+            "version": ctx["deployment_version"],
+            "development_phase": ctx["development_phase"],
+            "development_step": ctx["development_step"],
+            "status": "SUCCESS",
+            "plan_sequence": plan_info.get("plan_metadata", {}).get("sequence_number")
+        }
+        
+        with open("destroy_report.json", "w") as f:
+            json.dump(report, f, indent=2)
+        
+        print(json.dumps(report, indent=2))
+        EOF
+      - python3 generate_destroy_report.py
+
+artifacts:
+  files:
+    - deployment_context.json
+    - destroy_plan_artifact.json
+    - destroy_report.json
+  discard-paths: no
+  base-directory: '.'

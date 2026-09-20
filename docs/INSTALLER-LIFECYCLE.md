@@ -487,6 +487,98 @@ All commands use validated `AWSExecutionContext`.
 
 ---
 
+### D8 — CI/CD Deployment Pipeline (✅ COMPLETED)
+
+**Status:** ✅ **COMPLETED**
+
+**Objective:** Implement CI/CD for the Mays Order AWS Installer using the existing installer as the single deployment control plane.
+
+**Components Implemented:**
+
+#### 1. Pipeline Architecture
+- **CodePipeline** with 6 stages: Source → Validate → Plan → Approval → Deploy → Verify
+- **CodeBuild** projects for each stage (6 total)
+- GitHub (ThirdParty) source with webhook trigger
+- S3 artifact store for pipeline artifacts
+
+#### 2. Validation Stage (Read-Only)
+- Resolves AWS execution identity (STS get-caller-identity)
+- Validates AWS account, region, project, environment
+- Validates Terraform configuration
+- Runs installer validation + unit tests + code quality checks
+- NO AWS mutation
+
+#### 3. Plan Stage (Read-Only)
+- Generates Terraform plan using existing installer
+- Produces plan with H2 identity metadata
+- Artifacts: plan file, plan metadata (.meta.json), deployment context (.context.json)
+- Plan auto-discovery with H2 identity filtering
+
+#### 4. Manual Approval Gate
+- Explicit approval required before DEPLOY
+- Approval view exposes: Project, Environment, AWS Account, Region, DeploymentId, Version, Development Phase/Step, Plan sequence, Terraform plan summary
+- Cannot be bypassed by automatic triggers
+- No automatic production deployment path
+
+#### 4. Deploy Stage (Mutation)
+- Uses dedicated deployment IAM role
+- Validates AWS execution context + DeploymentId
+- Validates plan identity (DeploymentId, Version, Phase, Operation, Sequence)
+- Validates plan integrity + context match
+- Executes safety analysis + policy gate
+- Applies exact saved plan (never regenerates)
+- Never uses ambient developer credentials
+
+#### 5. Verify Stage (Read-Only)
+- Post-deployment verification
+- Verifies: AWS identity, Terraform state accessibility, expected resources
+- Produces verification report artifact
+- No AWS mutation
+
+#### 5. Destroy Path (Separate Protected Pipeline)
+- Separate explicit operation: Destroy Plan → Safety Analysis → Manual Approval → Destroy → Verify
+- Uses existing installer `plan-destroy` and `destroy` commands
+- Validates: AWS account, region, project, environment, DeploymentId, Version, Phase, Step, Operation, Sequence
+- H2 OwnershipAnalyzer rules enforced: only OWNED resources destroyable
+- Foreign, ambiguous, unmanaged resources NOT silently adopted
+
+#### 6. AWS IAM Role Separation
+- CodePipeline role (S3, CodeBuild, CloudWatch, SecretsManager)
+- CodeBuild shared role + stage-specific inline policies:
+  - validate: read-only (STS, IAM read)
+  - plan: read-only (Terraform plan resources)
+  - deploy: mutation (full Terraform apply)
+  - verify: read-only (Terraform verify resources)
+  - destroy-plan: read-only (Terraform destroy plan)
+  - destroy: mutation (full Terraform destroy)
+
+#### 7. Plan Artifact Identity
+- Preserves H2 plan identity: DeploymentId, Version, Phase, Operation, Sequence
+- Filename format: `<project>-<env>-<version>-<phase>-<account>-<op>-<seq>.tfplan`
+- Never selects "latest *.tfplan" - uses H2 PlanDiscovery logic
+- Metadata validated before DEPLOY/DESTROY
+
+#### 7. AWS Resource Tagging
+- Uses H2 TagSet canonical model
+- Identity tags: Project, Environment, DeploymentId
+- Version tags: Version, DevelopmentPhase, DevelopmentStep
+- Governance tags: ManagedBy, Owner, Maker
+- Custom tags prefixed with `Custom:`
+- Preserves existing unrelated tags
+
+#### 8. Existing Resource / Upgrade Boundary
+- OwnershipAnalyzer classifies resources: OWNED, FOREIGN, AMBIGUOUS, UNMANAGED
+- Ambiguous ownership surfaced, not silently adopted
+- Migration execution NOT implemented - HARD STOP on MIGRATION_REQUIRED/INCOMPATIBLE
+- No automatic destroy/recreate as workaround
+
+#### 9. Environment Progression Support
+- Architecture supports: development → test → integration → staging → production
+- Environment part of DeploymentId
+- Not hard-coded to "development"
+
+---
+
 ### 📋 REMAINING TASKS
 
 | Task | Priority | Status |

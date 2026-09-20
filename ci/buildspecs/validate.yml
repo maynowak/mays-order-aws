@@ -1,0 +1,91 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-central-1"
+    DEPLOYMENT_VERSION: "0.1.0"
+    DEVELOPMENT_PHASE: "H2"
+    DEVELOPMENT_STEP: "0"
+    DEVELOPMENT_STATUS: "development"
+  parameter-store:
+    AWS_PROFILE: "/mays-installer/ci/aws-profile"
+    PROJECT_NAME: "/mays-installer/ci/project-name"
+    ENVIRONMENT: "/mays-installer/ci/environment"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --quiet --upgrade pip
+      - pip install --quiet -r requirements.txt 2>/dev/null || true
+      - pip install --quiet boto3 pytest
+
+  pre_build:
+    commands:
+      - echo "Starting VALIDATE stage..."
+      - echo "Resolving target context..."
+      - |
+        cat > resolve_context.py << 'EOF'
+        import json
+        import os
+        import subprocess
+        import sys
+        
+        # Get AWS identity
+        result = subprocess.run(
+            ["aws", "sts", "get-caller-identity", "--profile", os.environ.get("AWS_PROFILE", "mayaws")],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print(f"Failed to get AWS identity: {result.stderr}")
+            sys.exit(1)
+        
+        identity = json.loads(result.stdout)
+        account_id = identity.get("Account")
+        
+        # Build deployment context
+        context = {
+            "account_id": account_id,
+            "project": os.environ.get("PROJECT_NAME", "mays-orders"),
+            "environment": os.environ.get("ENVIRONMENT", "Development"),
+            "deployment_version": os.environ.get("DEPLOYMENT_VERSION", "0.1.0"),
+            "development_phase": os.environ.get("DEVELOPMENT_PHASE", "H2"),
+            "development_step": int(os.environ.get("DEVELOPMENT_STEP", "0")),
+            "development_status": os.environ.get("DEVELOPMENT_STATUS", "development"),
+            "aws_region": os.environ.get("AWS_DEFAULT_REGION", "eu-central-1"),
+            "aws_profile": os.environ.get("AWS_PROFILE", "mayaws"),
+            "project_name": os.environ.get("PROJECT_NAME", "mays-orders"),
+        }
+        
+        # Save context for next stages
+        with open("deployment_context.json", "w") as f:
+            json.dump(context, f, indent=2)
+        
+        print(f"Deployment Context: {json.dumps(context, indent=2)}")
+        EOF
+      - python3 resolve_context.py
+
+  build:
+    commands:
+      - echo "Running installer validation..."
+      - python3 -m installer.cli.main validate --output json
+      - echo "Running unit tests..."
+      - PYTHONPATH=lambda/src:scripts python3 -m pytest installer/tests/ lambda/tests/ scripts/tests/ -v --tb=short
+      - echo "Running code quality checks..."
+      - python3 -m py_compile installer/cli/main.py installer/core/context.py installer/core/deployment_identity.py
+      - echo "Running Terraform validation..."
+      - cd terraform && terraform fmt -check -diff && terraform validate
+      - echo "Validation stage completed successfully"
+
+  post_build:
+    commands:
+      - echo "Validation stage completed"
+
+artifacts:
+  files:
+    - deployment_context.json
+    - validation_result.json
+  discard-paths: no
+  base-directory: '.'

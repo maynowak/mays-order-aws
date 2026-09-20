@@ -1,0 +1,26 @@
+# D8 CI/CD Pipeline Configuration
+# 
+# Copy this file to terraform/ci-cd.tfvars and fill in your values.
+
+# Project Configuration
+project_name     = "mays-orders"
+environment      = "development"
+aws_region       = "eu-central-1"
+
+# GitHub Configuration
+github_owner     = "your-github-username"
+github_repo      = "Mays-Orders-AWS"
+github_branch    = "main"
+github_token_arn = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:github-token-xxxxx"
+
+# Artifact Storage
+artifact_bucket_name = "mays-orders-ci-artifacts-dev"
+
+# KMS Key for artifact encryption (optional)
+kms_key_arn = ""
+
+# Pipeline Role ARN (will be created by IAM module)
+pipeline_role_arn = ""
+
+# CodeBuild Role ARN (will be created by IAM module)
+codebuild_role_arn = ""

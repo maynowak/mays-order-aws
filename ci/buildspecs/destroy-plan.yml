@@ -1,0 +1,100 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-central-1"
+    ALLOW_AWS_OPERATIONS: "true"
+    DRY_RUN: "false"
+    DEVELOPMENT_STATUS: "development"
+  parameter-store:
+    AWS_PROFILE: "/mays-installer/ci/aws-profile"
+    PROJECT_NAME: "/mays-installer/ci/project-name"
+    ENVIRONMENT: "/mays-installer/ci/environment"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --quiet --upgrade pip
+      - pip install --quiet boto3 pytest
+
+  pre_build:
+    commands:
+      - echo "Starting DESTROY PLAN stage..."
+      - echo "Loading deployment context..."
+      - cat deployment_context.json
+
+  build:
+    commands:
+      - echo "Running installer plan-destroy..."
+      - |
+        python3 -m installer.cli.main plan-destroy \
+          --deployment-version ${DEPLOYMENT_VERSION} \
+          --development-phase ${DEVELOPMENT_PHASE} \
+          --development-step ${DEVELOPMENT_STEP} \
+          --development-status ${DEVELOPMENT_STATUS}
+      - echo "Destroy plan generation completed"
+
+  post_build:
+    commands:
+      - echo "Locating generated destroy plan artifacts..."
+      - |
+        cat > find_destroy_plan.py << 'EOF'
+        import json
+        import os
+        from pathlib import Path
+        
+        runs_dir = Path(".mays-installer/runs")
+        latest_plan = None
+        latest_meta = None
+        
+        if runs_dir.exists():
+            for run_dir in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                plans_dir = run_dir / "plans"
+                if not plans_dir.exists():
+                    continue
+                
+                for plan_file in plans_dir.glob("*destroy*.tfplan"):
+                    meta_file = plans_dir / f"{plan_file.name}.meta.json"
+                    if meta_file.exists():
+                        with open(meta_file) as f:
+                            meta = json.load(f)
+                        
+                        with open("deployment_context.json") as f:
+                            ctx = json.load(f)
+                        
+                        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
+                        if meta.get("deployment_id") == expected_id and meta.get("operation") == "destroy":
+                            latest_plan = str(plan_file)
+                            latest_meta = meta
+                            break
+                
+                if latest_plan:
+                    break
+        
+        if not latest_plan:
+            print("ERROR: No matching destroy plan found")
+            sys.exit(1)
+        
+        plan_info = {
+            "plan_path": latest_plan,
+            "plan_metadata": latest_meta
+        }
+        
+        with open("destroy_plan_artifact.json", "w") as f:
+            json.dump(plan_info, f, indent=2)
+        
+        print(f"Found destroy plan: {latest_plan}")
+        print(f"Plan metadata: {json.dumps(latest_meta, indent=2)}")
+        EOF
+      - python3 find_destroy_plan.py
+      - echo "Destroy plan stage completed successfully"
+
+artifacts:
+  files:
+    - deployment_context.json
+    - destroy_plan_artifact.json
+  discard-paths: no
+  base-directory: '.'
