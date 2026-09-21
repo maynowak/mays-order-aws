@@ -35,7 +35,7 @@ phases:
         
         # Get AWS identity
         result = subprocess.run(
-            ["aws", "sts", "get-caller-identity", "--profile", os.environ.get("AWS_PROFILE", "mayaws")],
+            ["aws", "sts", "get-caller-identity"],
             capture_output=True, text=True
         )
         if result.returncode != 0:
@@ -55,7 +55,6 @@ phases:
             "development_step": int(os.environ.get("DEVELOPMENT_STEP", "0")),
             "development_status": os.environ.get("DEVELOPMENT_STATUS", "development"),
             "aws_region": os.environ.get("AWS_DEFAULT_REGION", "eu-central-1"),
-            "aws_profile": os.environ.get("AWS_PROFILE", "mayaws"),
             "project_name": os.environ.get("PROJECT_NAME", "mays-orders"),
         }
         
