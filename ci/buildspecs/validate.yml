@@ -20,6 +20,12 @@ phases:
       - pip install --quiet --upgrade pip
       - pip install --quiet -r requirements.txt 2>/dev/null || true
       - pip install --quiet boto3 pytest
+      - echo "Installing Terraform..."
+      - |
+        export release=AmazonLinux
+        dnf install -y dnf-plugins-core
+        dnf config-manager --add-repo https://rpm.releases.hashicorp.com/$release/hashicorp.repo
+        dnf install -y terraform
 
   pre_build:
     commands:
