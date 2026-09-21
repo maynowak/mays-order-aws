@@ -80,7 +80,7 @@ phases:
       - echo "Running code quality checks..."
       - python3 -m py_compile installer/cli/main.py installer/core/context.py installer/core/deployment_identity.py
       - echo "Running Terraform validation..."
-      - cd terraform && terraform fmt -check -diff && terraform validate
+      - cd terraform && terraform init -backend=false && terraform fmt -check -diff && terraform validate
       - echo "Validation stage completed successfully"
 
   post_build:
