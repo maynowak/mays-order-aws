@@ -687,7 +687,7 @@ class TestHardeningScenarios(unittest.TestCase):
 
     @patch("subprocess.run")
     def test_wrong_account_detected(self, mock_run):
-        """Test that wrong AWS account is detected."""
+        """Test that wrong AWS account is detected when aws_account_id is configured."""
         # Mock valid profile but different account
         mock_run.side_effect = [
             MagicMock(returncode=0),  # aws configure list
@@ -698,10 +698,12 @@ class TestHardeningScenarios(unittest.TestCase):
         validation = ValidationLayer(ctx)
         validation._check_aws_profile_validated()
 
-        # The validation creates context with actual account, doesn't compare with expected
-        # This is a design decision - we validate what's there, not what's expected
-        self.assertEqual(len(validation.result.checks), 3)
-        self.assertTrue(all(c.status == "PASS" for c in validation.result.checks))
+        # Account mismatch should be detected and fail
+        self.assertTrue(validation.result.has_errors())
+        account_check = next((c for c in validation.result.checks if c.name == "aws_account_id_validated"), None)
+        self.assertIsNotNone(account_check)
+        self.assertEqual(account_check.status, "FAIL")
+        self.assertIn("Account ID mismatch", account_check.message)
 
     @patch("subprocess.run")
     def test_wrong_region_warning(self, mock_run):

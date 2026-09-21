@@ -47,7 +47,7 @@ class InstallerCLI:
         # Global options
         parser.add_argument(
             "--profile",
-            default=os.environ.get("AWS_PROFILE", "mayaws"),
+            default=os.environ.get("AWS_PROFILE"),
             help="AWS CLI profile (default: mayaws)"
         )
         parser.add_argument(
@@ -278,7 +278,7 @@ class InstallerCLI:
         )
         identity_parser.add_argument(
             "--profile",
-            default=os.environ.get("AWS_PROFILE", "mayaws"),
+            default=os.environ.get("AWS_PROFILE"),
             help="AWS CLI profile"
         )
         identity_parser.add_argument(
@@ -1065,7 +1065,6 @@ class InstallerCLI:
             print(f"Error: {result.stderr}")
             return 1
         return 0
-
     def _cmd_identity(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Show AWS identity information."""
         # Validate AWS context first
@@ -1078,32 +1077,40 @@ class InstallerCLI:
         if result.success:
             import json
             version_info = json.loads(result.stdout)
-            print(f"Terraform Version: {version_info.get('terraform_version', 'unknown')}")
+            print("Terraform Version: {}".format(version_info.get("terraform_version", "unknown")))
 
-        # Show AWS identity
-        import subprocess
-        try:
-            result = subprocess.run(
-                ["aws", "sts", "get-caller-identity", "--profile", context.aws_profile],
-                capture_output=True, text=True, timeout=15
-            )
-            if result.returncode == 0:
-                import json
-                identity = json.loads(result.stdout)
-                print(f"Account: {identity.get('Account')}")
-                print(f"User/Role ARN: {identity.get('Arn')}")
-                print(f"User ID: {identity.get('UserId')}")
-            else:
-                print(f"Error getting identity: {result.stderr}")
-                return 1
-        except Exception as e:
-            print(f"Error getting identity: {e}")
-            return 1
+        # Show AWS identity using validated context
+        aws_ctx = context.aws_execution_context
+        if aws_ctx:
+            print("Account: {}".format(aws_ctx.account_id))
+            print("User/Role ARN: {}".format(aws_ctx.identity_arn))
+            # Get UserId via STS if needed
+            import subprocess
+            try:
+                if context.aws_profile and context.aws_profile.strip():
+                    cmd = ["aws", "sts", "get-caller-identity", "--profile", context.aws_profile]
+                else:
+                    cmd = ["aws", "sts", "get-caller-identity"]
+                if context.aws_region:
+                    cmd.extend(["--region", context.aws_region])
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True, text=True, timeout=15
+                )
+                if result.returncode == 0:
+                    import json
+                    identity = json.loads(result.stdout)
+                    print("User ID: {}".format(identity.get("UserId")))
+            except Exception:
+                pass  # UserId is optional
 
-        print(f"\nProfile: {context.aws_profile}")
-        print(f"Region: {context.aws_region}")
-        print(f"Project: {context.project_name}")
-        print(f"Environment: {context.environment}")
+        profile_display = context.aws_profile if context.aws_profile else "(default credential chain)"
+        print("\nProfile: {}".format(profile_display))
+        print("Region: {}".format(context.aws_region))
+        print("Project: {}".format(context.project_name))
+        print("Environment: {}".format(context.environment))
+        return 0
+
         return 0
 
     def _cmd_gui(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
