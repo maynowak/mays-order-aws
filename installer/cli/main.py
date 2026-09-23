@@ -48,7 +48,7 @@ class InstallerCLI:
         parser.add_argument(
             "--profile",
             default=os.environ.get("AWS_PROFILE"),
-            help="AWS CLI profile (default: mayaws)"
+            help="AWS CLI profile (default: from AWS_PROFILE env var)"
         )
         parser.add_argument(
             "--region",

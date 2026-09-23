@@ -7,7 +7,6 @@ env:
     DRY_RUN: "false"
     DEVELOPMENT_STATUS: "development"
   parameter-store:
-    AWS_PROFILE: "/mays-installer/ci/aws-profile"
     PROJECT_NAME: "/mays-installer/ci/project-name"
     ENVIRONMENT: "/mays-installer/ci/environment"
 

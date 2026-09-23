@@ -531,7 +531,7 @@ class DeploymentContext:
     
     # AWS context
     aws_region: str = "eu-central-1"
-    aws_profile: str = "mayaws"
+    aws_profile: str = ""
     
     # Safety flags
     allow_aws_operations: bool = False
@@ -609,7 +609,7 @@ class DeploymentContext:
             system_name=data.get("system_name"),
             component_name=data.get("component_name"),
             aws_region=data.get("aws_region", "eu-central-1"),
-            aws_profile=data.get("aws_profile", "mayaws"),
+            aws_profile=data.get("aws_profile", ""),
             allow_aws_operations=data.get("allow_aws_operations", False),
             dry_run=data.get("dry_run", True),
             run_id=data.get("run_id", datetime.now().strftime("%Y%m%d-%H%M%S")),
@@ -846,7 +846,7 @@ def create_deployment_context(
     development_step: int = 0,
     development_status: str = "development",
     aws_region: str = "eu-central-1",
-    aws_profile: str = "mayaws",
+    aws_profile: str = "",
     system_name: Optional[str] = None,
     component_name: Optional[str] = None,
     allow_aws_operations: bool = False,

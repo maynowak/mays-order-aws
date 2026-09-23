@@ -5,7 +5,6 @@ env:
     AWS_DEFAULT_REGION: "eu-central-1"
     DEVELOPMENT_STATUS: "development"
   parameter-store:
-    AWS_PROFILE: "/mays-installer/ci/aws-profile"
     PROJECT_NAME: "/mays-installer/ci/project-name"
     ENVIRONMENT: "/mays-installer/ci/environment"
 
@@ -33,52 +32,59 @@ phases:
         import subprocess
         import sys
         import boto3
-        from botocore.config import Config
-        
+        import os
+
         with open("deployment_context.json") as f:
             ctx = json.load(f)
-        
+
         print(f"Verifying deployment: {ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}")
-        
-        # Create AWS session
-        session = boto3.Session(profile_name=ctx["aws_profile"], region_name=ctx["aws_region"])
-        
+
+        # Create AWS session - use profile if provided, otherwise default credential chain (IAM role)
+        if ctx.get("aws_profile"):
+            session = boto3.Session(profile_name=ctx["aws_profile"], region_name=ctx["aws_region"])
+        else:
+            session = boto3.Session(region_name=ctx["aws_region"])
+
         # Verify AWS identity
         sts = session.client("sts")
         identity = sts.get_caller_identity()
         print(f"AWS Identity: {identity['Arn']}")
-        
+
         if identity["Account"] != ctx["account_id"]:
             print(f"ERROR: Account mismatch! Expected {ctx['account_id']}, got {identity['Account']}")
             sys.exit(1)
-        
+
+        # Helper to run installer commands with correct env
+        def run_installer(args):
+            env = os.environ.copy()
+            env["AWS_REGION"] = ctx["aws_region"]
+            if ctx.get("aws_profile"):
+                env["AWS_PROFILE"] = ctx["aws_profile"]
+            return subprocess.run(
+                ["python3", "-m", "installer.cli.main"] + args,
+                capture_output=True, text=True,
+                env=env
+            )
+
         # Verify Terraform state accessibility
         print("Checking Terraform state...")
-        result = subprocess.run(
-            ["python3", "-m", "installer.cli.main", "state", "list"],
-            capture_output=True, text=True,
-            env={**subprocess.os.environ.copy(), "AWS_PROFILE": ctx["aws_profile"], "AWS_REGION": ctx["aws_region"]}
-        )
-        
+        result = run_installer(["state", "list"])
+
         if result.returncode != 0:
             print(f"WARNING: Could not list Terraform state: {result.stderr}")
         else:
             print("✓ Terraform state accessible")
             print(f"Resources in state: {len(result.stdout.strip().split(chr(10)))}")
-        
+
         # Verify AWS identity via installer
-        result = subprocess.run(
-            ["python3", "-m", "installer.cli.main", "identity"],
-            capture_output=True, text=True,
-            env={**subprocess.os.environ.copy(), "AWS_PROFILE": ctx["aws_profile"], "AWS_REGION": ctx["aws_region"]}
-        )
-        
+        result = run_installer(["identity"])
+
         if result.returncode != 0:
             print(f"WARNING: Could not verify identity: {result.stderr}")
         else:
             print("✓ AWS identity verified")
             print(result.stdout)
-        
+
         # Check for expected resources in state
         if result.returncode == 0 and result.stdout.strip():
             state_resources = result.stdout.strip().split('\n')
@@ -88,18 +94,16 @@ phases:
                 "aws_apigatewayv2",
                 "aws_sqs_queue"
             ]
-            
+
             for pattern in expected_patterns:
                 found = any(pattern in r for r in state_resources)
                 if found:
                     print(f"✓ Found expected resource type: {pattern}")
                 else:
                     print(f"⚠ Expected resource type not found: {pattern}")
-        
+
         print("Verification completed successfully")
         return 0
-        
-        import os
         EOF
       - python3 verify.py
 
@@ -110,10 +114,10 @@ phases:
         cat > generate_verify_report.py << 'EOF'
         import json
         from datetime import datetime
-        
+
         with open("deployment_context.json") as f:
             ctx = json.load(f)
-        
+
         report = {
             "stage": "VERIFY",
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -128,10 +132,10 @@ phases:
                 "expected_resources_present"
             ]
         }
-        
+
         with open("verify_report.json", "w") as f:
             json.dump(report, f, indent=2)
-        
+
         print(json.dumps(report, indent=2))
         EOF
       - python3 generate_verify_report.py

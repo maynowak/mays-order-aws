@@ -6,7 +6,6 @@ env:
     ALLOW_AWS_OPERATIONS: "true"
     DRY_RUN: "false"
   parameter-store:
-    AWS_PROFILE: "/mays-installer/ci/aws-profile"
     PROJECT_NAME: "/mays-installer/ci/project-name"
     ENVIRONMENT: "/mays-installer/ci/environment"
 
@@ -75,8 +74,10 @@ phases:
         env = os.environ.copy()
         env["ALLOW_AWS_OPERATIONS"] = "true"
         env["DRY_RUN"] = "false"
-        env["AWS_PROFILE"] = ctx["aws_profile"]
         env["AWS_REGION"] = ctx["aws_region"]
+        # Only set AWS_PROFILE if present (local dev); omit for CI/CD IAM role
+        if ctx.get("aws_profile"):
+            env["AWS_PROFILE"] = ctx["aws_profile"]
         
         result = subprocess.run(cmd, env=env, capture_output=True, text=True)
         print(result.stdout)

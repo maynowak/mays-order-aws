@@ -23,7 +23,7 @@ class TestInstallationContext(unittest.TestCase):
     def test_default_context(self):
         """Test default context creation."""
         ctx = InstallationContext()
-        self.assertEqual(ctx.aws_profile, "mayaws")
+        self.assertEqual(ctx.aws_profile, "")
         self.assertEqual(ctx.aws_region, "eu-central-1")
         self.assertEqual(ctx.project_name, "mays-orders")
         self.assertEqual(ctx.environment, "Development")
@@ -1132,11 +1132,12 @@ class TestD8CICD(unittest.TestCase):
         with open("ci/pipeline/main.tf") as f:
             content = f.read()
 
-        self.assertIn("provider         = \"GitHub\"", content)
+        self.assertIn("provider         = \"CodeStarSourceConnection\"", content)
         self.assertIn("github_owner", content)
         self.assertIn("github_repo", content)
         self.assertIn("github_branch", content)
-        self.assertIn("github_token_arn", content)
+        self.assertIn("CodeStarSourceConnection", content)
+        self.assertIn("ConnectionArn", content)
 
     def test_manual_approval_cannot_be_bypassed(self):
         """Test that manual approval is required."""

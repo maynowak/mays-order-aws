@@ -43,7 +43,7 @@ class InstallationContext:
     """
 
     # AWS Configuration
-    aws_profile: str = "mayaws"
+    aws_profile: str = ""
     aws_region: str = "eu-central-1"
     aws_account_id: Optional[str] = None
     identity_arn: Optional[str] = None
@@ -101,7 +101,7 @@ class InstallationContext:
     def from_env(cls) -> InstallationContext:
         """Create context from environment variables."""
         return cls(
-            aws_profile=os.environ.get("AWS_PROFILE", "mayaws"),
+            aws_profile=os.environ.get("AWS_PROFILE", ""),
             aws_region=os.environ.get("AWS_REGION", "eu-central-1"),
             aws_account_id=os.environ.get("AWS_ACCOUNT_ID"),
             identity_arn=os.environ.get("AWS_IDENTITY_ARN"),

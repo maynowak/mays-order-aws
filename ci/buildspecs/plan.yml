@@ -8,7 +8,6 @@ env:
     DEVELOPMENT_STEP: "0"
     DEVELOPMENT_STATUS: "development"
   parameter-store:
-    AWS_PROFILE: "/mays-installer/ci/aws-profile"
     PROJECT_NAME: "/mays-installer/ci/project-name"
     ENVIRONMENT: "/mays-installer/ci/environment"
 

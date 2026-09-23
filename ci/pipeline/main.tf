@@ -1,5 +1,5 @@
 # D8 CI/CD Pipeline Infrastructure
-# 
+#
 # This module creates the CodePipeline + CodeBuild infrastructure
 # for the Mays-Order-AWS-installer CI/CD pipeline.
 
@@ -52,14 +52,15 @@ variable "github_branch" {
   description = "GitHub branch to deploy"
 }
 
-variable "github_token_arn" {
-  type        = string
-  description = "ARN of GitHub token in Secrets Manager"
-}
-
 variable "artifact_bucket_name" {
   type        = string
   description = "S3 bucket for pipeline artifacts"
+}
+
+variable "kms_key_arn" {
+  type        = string
+  description = "KMS key ARN for encryption (optional)"
+  default     = ""
 }
 
 variable "pipeline_role_arn" {
@@ -73,28 +74,16 @@ variable "codebuild_role_arn" {
 }
 
 # ============================================================
-# Data Sources
-# ============================================================
-
-data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}
-
-data "aws_s3_bucket" "artifact_bucket" {
-  bucket = var.artifact_bucket_name
-}
-
-# ============================================================
 # CodeBuild Projects
 # ============================================================
 
-# ============================================================
-# VALIDATE Stage CodeBuild Project
-# ============================================================
+# Stage 1: Validate
 resource "aws_codebuild_project" "validate" {
-  name         = "${var.project_name}-${var.environment}-ci-validate"
-  description  = "CI/CD Validate Stage - Read-only validation with installer"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-validate"
+  description    = "CI/CD Validate Stage - Read-only validation with installer"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -108,32 +97,33 @@ resource "aws_codebuild_project" "validate" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
-
     environment_variable {
       name  = "DEPLOYMENT_VERSION"
+      type  = "PLAINTEXT"
       value = "0.1.0"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_PHASE"
+      type  = "PLAINTEXT"
       value = "H2"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_STEP"
+      type  = "PLAINTEXT"
       value = "0"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_STATUS"
+      type  = "PLAINTEXT"
       value = "development"
     }
   }
@@ -142,23 +132,15 @@ resource "aws_codebuild_project" "validate" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/validate.yml"
   }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "validate"
-    ManagedBy   = "mays-installer"
-  }
 }
 
-# ============================================================
-# PLAN Stage CodeBuild Project
-# ============================================================
+# Stage 2: Plan
 resource "aws_codebuild_project" "plan" {
-  name         = "${var.project_name}-${var.environment}-ci-plan"
-  description  = "CI/CD Plan Stage - Read-only plan generation with installer"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-plan"
+  description    = "CI/CD Plan Stage - Read-only plan generation with installer"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -172,32 +154,33 @@ resource "aws_codebuild_project" "plan" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
-
     environment_variable {
       name  = "DEPLOYMENT_VERSION"
+      type  = "PLAINTEXT"
       value = "0.1.0"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_PHASE"
+      type  = "PLAINTEXT"
       value = "H2"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_STEP"
+      type  = "PLAINTEXT"
       value = "0"
     }
-
     environment_variable {
       name  = "DEVELOPMENT_STATUS"
+      type  = "PLAINTEXT"
       value = "development"
     }
   }
@@ -206,23 +189,15 @@ resource "aws_codebuild_project" "plan" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/plan.yml"
   }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "plan"
-    ManagedBy   = "mays-installer"
-  }
 }
 
-# ============================================================
-# DEPLOY Stage CodeBuild Project
-# ============================================================
+# Stage 3: Deploy
 resource "aws_codebuild_project" "deploy" {
-  name         = "${var.project_name}-${var.environment}-ci-deploy"
-  description  = "CI/CD Deploy Stage - Mutation with exact saved plan"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-deploy"
+  description    = "CI/CD Deploy Stage - Mutation with exact saved plan"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -236,22 +211,23 @@ resource "aws_codebuild_project" "deploy" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
-
     environment_variable {
       name  = "ALLOW_AWS_OPERATIONS"
+      type  = "PLAINTEXT"
       value = "true"
     }
-
     environment_variable {
       name  = "DRY_RUN"
+      type  = "PLAINTEXT"
       value = "false"
     }
   }
@@ -260,23 +236,15 @@ resource "aws_codebuild_project" "deploy" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/deploy.yml"
   }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "deploy"
-    ManagedBy   = "mays-installer"
-  }
 }
 
-# ============================================================
-# VERIFY Stage CodeBuild Project
-# ============================================================
+# Stage 4: Verify
 resource "aws_codebuild_project" "verify" {
-  name         = "${var.project_name}-${var.environment}-ci-verify"
-  description  = "CI/CD Verify Stage - Read-only post-deploy verification"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-verify"
+  description    = "CI/CD Verify Stage - Read-only post-deploy verification"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -290,12 +258,13 @@ resource "aws_codebuild_project" "verify" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
   }
@@ -304,23 +273,15 @@ resource "aws_codebuild_project" "verify" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/verify.yml"
   }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "verify"
-    ManagedBy   = "mays-installer"
-  }
 }
 
-# ============================================================
-# DESTROY PLAN Stage CodeBuild Project
-# ============================================================
+# Stage 5: Destroy Plan
 resource "aws_codebuild_project" "destroy_plan" {
-  name         = "${var.project_name}-${var.environment}-ci-destroy-plan"
-  description  = "CI/CD Destroy Plan Stage - Read-only destroy plan generation"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-destroy-plan"
+  description    = "CI/CD Destroy Plan Stage - Read-only destroy plan generation"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -334,22 +295,23 @@ resource "aws_codebuild_project" "destroy_plan" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
-
     environment_variable {
       name  = "ALLOW_AWS_OPERATIONS"
+      type  = "PLAINTEXT"
       value = "true"
     }
-
     environment_variable {
       name  = "DRY_RUN"
+      type  = "PLAINTEXT"
       value = "false"
     }
   }
@@ -358,23 +320,15 @@ resource "aws_codebuild_project" "destroy_plan" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/destroy-plan.yml"
   }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "destroy-plan"
-    ManagedBy   = "mays-installer"
-  }
 }
 
-# ============================================================
-# DESTROY Stage CodeBuild Project
-# ============================================================
+# Stage 6: Destroy
 resource "aws_codebuild_project" "destroy" {
-  name         = "${var.project_name}-${var.environment}-ci-destroy"
-  description  = "CI/CD Destroy Stage - Mutation with exact saved destroy plan"
-  service_role = var.codebuild_role_arn
+  name           = "${var.project_name}-${var.environment}-ci-destroy"
+  description    = "CI/CD Destroy Stage - Mutation with exact saved destroy plan"
+  service_role   = var.codebuild_role_arn
+  build_timeout  = 60
+  queued_timeout = 480
 
   artifacts {
     type = "CODEPIPELINE"
@@ -388,22 +342,23 @@ resource "aws_codebuild_project" "destroy" {
   environment {
     compute_type                = "BUILD_GENERAL1_SMALL"
     image                       = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = false
+    type                        = "LINUX_CONTAINER"
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
+      type  = "PLAINTEXT"
       value = var.aws_region
     }
-
     environment_variable {
       name  = "ALLOW_AWS_OPERATIONS"
+      type  = "PLAINTEXT"
       value = "true"
     }
-
     environment_variable {
       name  = "DRY_RUN"
+      type  = "PLAINTEXT"
       value = "false"
     }
   }
@@ -411,14 +366,6 @@ resource "aws_codebuild_project" "destroy" {
   source {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/destroy.yml"
-  }
-
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    Stage       = "destroy"
-    ManagedBy   = "mays-installer"
   }
 }
 
@@ -429,37 +376,31 @@ resource "aws_codebuild_project" "destroy" {
 resource "aws_codepipeline" "main" {
   name     = "${var.project_name}-${var.environment}-ci-cd"
   role_arn = var.pipeline_role_arn
-
   artifact_store {
-    type     = "S3"
     location = var.artifact_bucket_name
+    type     = "S3"
   }
 
-  # Stage 1: Source
   stage {
     name = "Source"
 
     action {
       name             = "Source"
       category         = "Source"
-      owner            = "ThirdParty"
-      provider         = "GitHub"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"
       version          = "1"
       output_artifacts = ["source_output"]
 
       configuration = {
-        Owner                = var.github_owner
-        Repo                 = var.github_repo
-        Branch               = var.github_branch
-        OAuthToken           = var.github_token_arn
-        PollForSourceChanges = "false"
+        ConnectionArn        = "arn:aws:codeconnections:eu-central-1:240571105849:connection/b0fa25d8-874f-4639-8e91-3ed87b2bb59b"
+        FullRepositoryId     = "maynowak/mays-order-aws"
+        BranchName           = var.github_branch
+        OutputArtifactFormat = "CODEBUILD_CLONE_REF"
       }
-
-      run_order = 1
     }
   }
 
-  # Stage 2: Validate
   stage {
     name = "Validate"
 
@@ -471,16 +412,13 @@ resource "aws_codepipeline" "main" {
       version          = "1"
       input_artifacts  = ["source_output"]
       output_artifacts = ["validate_output"]
-
       configuration = {
         ProjectName = aws_codebuild_project.validate.name
       }
-
       run_order = 1
     }
   }
 
-  # Stage 3: Plan
   stage {
     name = "Plan"
 
@@ -492,37 +430,29 @@ resource "aws_codepipeline" "main" {
       version          = "1"
       input_artifacts  = ["validate_output"]
       output_artifacts = ["plan_output"]
-
       configuration = {
         ProjectName = aws_codebuild_project.plan.name
       }
-
       run_order = 1
     }
   }
 
-  # Stage 4: Manual Approval
   stage {
     name = "Approval"
 
     action {
-      name            = "ManualApproval"
-      category        = "Approval"
-      owner           = "AWS"
-      provider        = "Manual"
-      version         = "1"
-      input_artifacts = ["plan_output"]
-
+      name     = "ManualApproval"
+      category = "Approval"
+      owner    = "AWS"
+      provider = "Manual"
+      version  = "1"
       configuration = {
-        NotificationArn = "" # Optional: SNS topic for notifications
-        CustomData      = "Review Terraform plan before deployment. Check plan summary, safety analysis, and policy gate results."
+        CustomData = "Review Terraform plan before deployment. Check plan summary, safety analysis, and policy gate results."
       }
-
       run_order = 1
     }
   }
 
-  # Stage 5: Deploy
   stage {
     name = "Deploy"
 
@@ -534,16 +464,13 @@ resource "aws_codepipeline" "main" {
       version          = "1"
       input_artifacts  = ["plan_output"]
       output_artifacts = ["deploy_output"]
-
       configuration = {
         ProjectName = aws_codebuild_project.deploy.name
       }
-
       run_order = 1
     }
   }
 
-  # Stage 6: Verify
   stage {
     name = "Verify"
 
@@ -555,19 +482,11 @@ resource "aws_codepipeline" "main" {
       version          = "1"
       input_artifacts  = ["deploy_output"]
       output_artifacts = ["verify_output"]
-
       configuration = {
         ProjectName = aws_codebuild_project.verify.name
       }
-
       run_order = 1
     }
-  }
-
-  tags = {
-    Project     = var.project_name
-    Environment = var.environment
-    ManagedBy   = "mays-installer"
   }
 }
 
@@ -575,42 +494,34 @@ resource "aws_codepipeline" "main" {
 # Outputs
 # ============================================================
 
-output "pipeline_name" {
-  value       = aws_codepipeline.main.name
-  description = "Name of the CI/CD pipeline"
+output "pipeline_arn" {
+  value = aws_codepipeline.main.arn
 }
 
-output "pipeline_arn" {
-  value       = aws_codepipeline.main.arn
-  description = "ARN of the CI/CD pipeline"
+output "pipeline_name" {
+  value = aws_codepipeline.main.name
 }
 
 output "validate_project_name" {
-  value       = aws_codebuild_project.validate.name
-  description = "Name of the validate CodeBuild project"
+  value = aws_codebuild_project.validate.name
 }
 
 output "plan_project_name" {
-  value       = aws_codebuild_project.plan.name
-  description = "Name of the plan CodeBuild project"
+  value = aws_codebuild_project.plan.name
 }
 
 output "deploy_project_name" {
-  value       = aws_codebuild_project.deploy.name
-  description = "Name of the deploy CodeBuild project"
+  value = aws_codebuild_project.deploy.name
 }
 
 output "verify_project_name" {
-  value       = aws_codebuild_project.verify.name
-  description = "Name of the verify CodeBuild project"
+  value = aws_codebuild_project.verify.name
 }
 
 output "destroy_plan_project_name" {
-  value       = aws_codebuild_project.destroy_plan.name
-  description = "Name of the destroy plan CodeBuild project"
+  value = aws_codebuild_project.destroy_plan.name
 }
 
 output "destroy_project_name" {
-  value       = aws_codebuild_project.destroy.name
-  description = "Name of the destroy CodeBuild project"
+  value = aws_codebuild_project.destroy.name
 }
