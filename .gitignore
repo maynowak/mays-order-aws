@@ -38,3 +38,9 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Installer runtime
+.mays-installer/
+
+# Terraform plans
+terraform/*.tfplan
