@@ -30,7 +30,7 @@ GitHub (v1 action)
 ### Secret Configuration
 | Secret | ARN | Value |
 |--------|-----|-------|
-| github token xxxxx | arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken | `github_pat_token` (fine-grained PAT) |
+| githubtokenxxxxx | arn:aws:secretsmanager:<region>:<awsid>:secret:<nameOfToken | `githubpattoken` (fine-grained PAT) |
 
 ### CodeBuild Projects
 | Project | Buildspec | GitHub Credentials |
