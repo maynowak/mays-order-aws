@@ -30,7 +30,7 @@ GitHub (v1 action)
 ### Secret Configuration
 | Secret | ARN | Value |
 |--------|-----|-------|
-| github-token-xxxxx | arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken | `github_pat_token` (fine-grained PAT) |
+| github token xxxxx | arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken | `github_pat_token` (fine-grained PAT) |
 
 ### CodeBuild Projects
 | Project | Buildspec | GitHub Credentials |
@@ -75,7 +75,7 @@ Message: Could not access the GitHub repository: "mays-order-aws".
          The access token might be invalid or has been revoked.
 ```
 
-**Cause:** The fine-grained PAT in `github-token-xxxxx` is invalid/revoked. GitHub returns 403 when CodePipeline attempts to fetch the repository.
+**Cause:** The fine-grained PAT in <token-xxxxx> is invalid/revoked. GitHub returns 403 when CodePipeline attempts to fetch the repository.
 
 ### Plan Failure (Downstream)
 ```
