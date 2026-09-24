@@ -24,6 +24,22 @@ phases:
     commands:
       - echo "Starting PLAN stage..."
       - echo "Loading deployment context from validation stage..."
+      - |
+        # Look for deployment_context.json in various locations
+        if [ -f "deployment_context.json" ]; then
+          echo "Found deployment_context.json in working directory"
+        elif [ -f "/codebuild/input/validation_output/deployment_context.json" ]; then
+          cp /codebuild/input/validation_output/deployment_context.json .
+          echo "Copied from validation_output"
+        elif [ -f "./deployment_context.json" ]; then
+          echo "Found in ./ directory"
+        else
+          echo "ERROR: deployment_context.json not found!"
+          echo "Listing current directory:"
+          ls -la .
+          echo "Looking for deployment_context.json in repository:"
+          find . -name "deployment_context.json" 2>/dev/null || true
+        fi
       - cat deployment_context.json
 
   build:
@@ -43,8 +59,29 @@ phases:
       - |
         cat > find_plan.py << 'EOF'
         import json
+        import sys
         import os
         from pathlib import Path
+        
+        # Find deployment_context.json in various locations
+        ctx_file = Path("deployment_context.json")
+        if not ctx_file.exists():
+            alt_paths = [
+                Path("/codebuild/input/validation_output/deployment_context.json"),
+                Path("/codebuild/output/src/deployment_context.json"),
+            ]
+            for alt_path in alt_paths:
+                if alt_path.exists():
+                    ctx_file = alt_path
+                    break
+        
+        # Load context for identity verification
+        if not ctx_file.exists():
+            print("ERROR: deployment_context.json not found")
+            sys.exit(1)
+        
+        with open(ctx_file) as f:
+            ctx = json.load(f)
         
         # Find the latest plan with H2 identity
         runs_dir = Path(".mays-installer/runs")

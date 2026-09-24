@@ -22,7 +22,7 @@ GitHub (v1 action)
   ├── Owner: maynowak
   ├── Repo: mays-order-aws
   ├── Branch: main
-  ├── OAuthToken: arn:aws:secretsmanager:eu-central-1:240571105849:secret:github-token-xxxxx
+  ├── OAuthToken: arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken
   ├── PollForSourceChanges: false
   └── Output: source_output
 ```
@@ -30,7 +30,7 @@ GitHub (v1 action)
 ### Secret Configuration
 | Secret | ARN | Value |
 |--------|-----|-------|
-| github-token-xxxxx | arn:aws:secretsmanager:eu-central-1:240571105849:secret:github-token-xxxxx-L02sI7 | `<REDACTED_GITHUB_PAT>` (fine-grained PAT) |
+| github-token-xxxxx | arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken | `github_pat_token` (fine-grained PAT) |
 
 ### CodeBuild Projects
 | Project | Buildspec | GitHub Credentials |
@@ -50,7 +50,7 @@ No CodeBuild project uses GitHub credentials directly.
 | File | Reference |
 |------|-----------|
 | ci/pipeline/main.tf | `OAuthToken = var.github_token_arn` |
-| ci/pipeline/terraform.tfvars | `github_token_arn = "arn:aws:secretsmanager:eu-central-1:240571105849:secret:github-token-xxxxx"` |
+| ci/pipeline/terraform.tfvars | `github_token_arn = "arn:aws:secretsmanager:eu-central-1:<awsid>:secret:<nameOfToken"` |
 | ci/iam/main.tf | `variable "github_token_arn"` + pipeline policy allows `secretsmanager:GetSecretValue` on the secret |
 
 ### Repository CI Configuration
