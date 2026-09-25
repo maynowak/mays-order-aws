@@ -261,6 +261,8 @@ Checks:
 
 To prevent the Plan stage from receiving only the primary repository source, the pipeline definition wires `source_output` as PrimarySource and `validate_output` as secondary input. `ci/buildspecs/plan.yml` copies `deployment_context.json` from `CODEBUILD_SRC_DIR_validate_output` (fallback: `/codebuild/input/validate_output`) into the primary working directory before running the installer.
 
+The Source stage keeps `OutputArtifactFormat = "CODE_ZIP"`. Switching it to `CODEBUILD_CLONE_REF` made CodeBuild fail during `DOWNLOAD_SOURCE` with `CLIENT_ERROR: authorization failed for primary source`, before Validate or Plan could execute their buildspecs.
+
 ---
 
 ## No Milestone Tag Created

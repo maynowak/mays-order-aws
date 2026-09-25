@@ -77,6 +77,14 @@ variable "codebuild_role_arn" {
 # CodeBuild Projects
 # ============================================================
 
+locals {
+  codebuild_common_tags = {
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "mays-installer"
+  }
+}
+
 # Stage 1: Validate
 resource "aws_codebuild_project" "validate" {
   name           = "${var.project_name}-${var.environment}-ci-validate"
@@ -132,6 +140,10 @@ resource "aws_codebuild_project" "validate" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/validate.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "validate"
+  })
 }
 
 # Stage 2: Plan
@@ -189,6 +201,10 @@ resource "aws_codebuild_project" "plan" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/plan.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "plan"
+  })
 }
 
 # Stage 3: Deploy
@@ -236,6 +252,10 @@ resource "aws_codebuild_project" "deploy" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/deploy.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "deploy"
+  })
 }
 
 # Stage 4: Verify
@@ -273,6 +293,10 @@ resource "aws_codebuild_project" "verify" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/verify.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "verify"
+  })
 }
 
 # Stage 5: Destroy Plan
@@ -320,6 +344,10 @@ resource "aws_codebuild_project" "destroy_plan" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/destroy-plan.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "destroy-plan"
+  })
 }
 
 # Stage 6: Destroy
@@ -367,6 +395,10 @@ resource "aws_codebuild_project" "destroy" {
     type      = "CODEPIPELINE"
     buildspec = "ci/buildspecs/destroy.yml"
   }
+
+  tags = merge(local.codebuild_common_tags, {
+    Stage = "destroy"
+  })
 }
 
 # ============================================================
@@ -393,10 +425,14 @@ resource "aws_codepipeline" "main" {
       output_artifacts = ["source_output"]
 
       configuration = {
-        ConnectionArn        = "arn:aws:codeconnections:eu-central-1:240571105849:connection/b0fa25d8-874f-4639-8e91-3ed87b2bb59b"
-        FullRepositoryId     = "maynowak/mays-order-aws"
-        BranchName           = var.github_branch
-        OutputArtifactFormat = "CODEBUILD_CLONE_REF"
+        ConnectionArn    = "arn:aws:codeconnections:eu-central-1:240571105849:connection/b0fa25d8-874f-4639-8e91-3ed87b2bb59b"
+        FullRepositoryId = "maynowak/mays-order-aws"
+        BranchName       = var.github_branch
+
+        # CODE_ZIP is required here: with CODEBUILD_CLONE_REF the CodeBuild
+        # service role failed during DOWNLOAD_SOURCE with
+        # "authorization failed for primary source".
+        OutputArtifactFormat = "CODE_ZIP"
       }
     }
   }

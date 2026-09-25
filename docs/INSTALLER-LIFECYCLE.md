@@ -499,6 +499,7 @@ All commands use validated `AWSExecutionContext`.
 - **CodePipeline** with 6 stages: Source → Validate → Plan → Approval → Deploy → Verify
 - **CodeBuild** projects for each stage (6 total)
 - GitHub (ThirdParty) source with webhook trigger
+- Source uses `CODE_ZIP` artifact format (CodeBuild clone-ref source authorization is not used)
 - S3 artifact store for pipeline artifacts
 
 #### 2. Validation Stage (Read-Only)
