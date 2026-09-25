@@ -31,10 +31,18 @@ phases:
         if [ -n "${CODEBUILD_SRC_DIR_plan_output:-}" ] && [ -f "${CODEBUILD_SRC_DIR_plan_output}/deployment_context.json" ]; then
           cp "${CODEBUILD_SRC_DIR_plan_output}/deployment_context.json" .
           cp "${CODEBUILD_SRC_DIR_plan_output}/plan_artifact.json" .
+          if [ -d "${CODEBUILD_SRC_DIR_plan_output}/.mays-installer" ]; then
+            cp -r "${CODEBUILD_SRC_DIR_plan_output}/.mays-installer" .
+            echo "Copied .mays-installer from plan_output"
+          fi
           echo "Copied deployment_context.json and plan_artifact.json from plan_output"
         elif [ -f "/codebuild/input/plan_output/deployment_context.json" ]; then
           cp /codebuild/input/plan_output/deployment_context.json .
           cp /codebuild/input/plan_output/plan_artifact.json .
+          if [ -d "/codebuild/input/plan_output/.mays-installer" ]; then
+            cp -r "/codebuild/input/plan_output/.mays-installer" .
+            echo "Copied .mays-installer from /codebuild/input/plan_output"
+          fi
           echo "Copied deployment_context.json and plan_artifact.json from /codebuild/input/plan_output"
         else
           echo "ERROR: deployment_context.json or plan_artifact.json not found!"
