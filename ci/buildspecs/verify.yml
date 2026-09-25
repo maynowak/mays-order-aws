@@ -21,6 +21,18 @@ phases:
     commands:
       - echo "Starting VERIFY stage..."
       - echo "Loading deployment context..."
+      - |
+        if [ -n "${CODEBUILD_SRC_DIR_deploy_output:-}" ] && [ -f "${CODEBUILD_SRC_DIR_deploy_output}/deployment_context.json" ]; then
+          cp "${CODEBUILD_SRC_DIR_deploy_output}/deployment_context.json" .
+          echo "Copied deployment_context.json from deploy_output"
+        elif [ -f "/codebuild/input/deploy_output/deployment_context.json" ]; then
+          cp /codebuild/input/deploy_output/deployment_context.json .
+          echo "Copied deployment_context.json from /codebuild/input/deploy_output"
+        else
+          echo "ERROR: deployment_context.json not found!"
+          ls -la "${CODEBUILD_SRC_DIR_deploy_output:-/codebuild/input/deploy_output}" 2>/dev/null || true
+          exit 1
+        fi
       - cat deployment_context.json
 
   build:

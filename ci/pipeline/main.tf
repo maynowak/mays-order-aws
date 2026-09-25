@@ -518,10 +518,11 @@ resource "aws_codepipeline" "main" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["deploy_output"]
+      input_artifacts  = ["source_output", "deploy_output"]
       output_artifacts = ["verify_output"]
       configuration = {
-        ProjectName = aws_codebuild_project.verify.name
+        ProjectName   = aws_codebuild_project.verify.name
+        PrimarySource = "source_output"
       }
       run_order = 1
     }
