@@ -83,8 +83,8 @@ class InstallerCLI:
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            default=True,
-            help="Run in dry-run mode (default: True)"
+            default=False,
+            help="Run in dry-run mode (default: False)"
         )
 
         # H2: Deployment identity and versioning
