@@ -82,12 +82,13 @@ phases:
         
         # Run deploy
         cmd = [
-            "python3", "-m", "installer.cli.main", "deploy",
-            "--plan", plan_path,
+            "python3", "-m", "installer.cli.main",
             "--deployment-version", ctx["deployment_version"],
             "--development-phase", ctx["development_phase"],
             "--development-step", str(ctx["development_step"]),
             "--development-status", ctx["development_status"],
+            "deploy",
+            "--plan", plan_path,
             "--yes"
         ]
         
