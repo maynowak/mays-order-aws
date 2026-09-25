@@ -117,7 +117,12 @@ class RunDirectoryManager:
         run_dir = Path(run_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
         
-        dest = run_dir / "plans" / f"{mode}.tfplan"
+        # Preserve original filename to keep metadata parseable
+        orig_name = Path(plan_file).name
+        # If original filename is not parseable, fall back to mode name
+        if not orig_name.endswith('.tfplan'):
+            orig_name = f"{mode}.tfplan"
+        dest = run_dir / "plans" / orig_name
         shutil.copy2(plan_file, dest)
         return dest
     
