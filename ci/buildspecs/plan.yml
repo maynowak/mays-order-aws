@@ -127,8 +127,9 @@ phases:
                         dep_id_str = deployment_id_obj
                     expected_id = f"{ctx['account_id']}:{str(ctx.get('project_name','')).lower()}:{str(ctx.get('environment','')).lower()}"
                     if dep_id_str == expected_id:
-                        # Plan file name matches meta file stem
-                        plan_path = plans_dir / meta_file.stem
+                        # Plan file name matches meta file stem without .meta
+                        plan_name = meta_file.name.removesuffix('.meta.json')
+                        plan_path = plans_dir / plan_name
                         if plan_path.exists():
                             latest_plan = str(plan_path)
                             latest_meta = meta
