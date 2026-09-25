@@ -124,8 +124,13 @@ phases:
                         with open("deployment_context.json") as f:
                             ctx = json.load(f)
                         
+                        deployment_id_obj = meta.get("deployment_id")
+                        if isinstance(deployment_id_obj, dict):
+                            dep_id_str = f"{deployment_id_obj['account_id']}:{deployment_id_obj['project']}:{deployment_id_obj['environment']}"
+                        else:
+                            dep_id_str = deployment_id_obj
                         expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}"
-                        if meta.get("deployment_id") == expected_id:
+                        if dep_id_str == expected_id:
                             latest_plan = str(plan_file)
                             latest_meta = meta
                             break
