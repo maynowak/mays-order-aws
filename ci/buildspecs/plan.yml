@@ -109,29 +109,26 @@ phases:
                 if not plans_dir.exists():
                     continue
                 
-                for plan_file in plans_dir.glob("*.tfplan"):
-                    # Skip metadata files
-                    if plan_file.suffix == ".json":
-                        continue
+                for meta_file in plans_dir.glob("*.meta.json"):
+                    with open(meta_file) as f:
+                        meta = json.load(f)
                     
-                    # Check for matching metadata
-                    meta_file = plans_dir / f"{plan_file.name}.meta.json"
-                    if meta_file.exists():
-                        with open(meta_file) as f:
-                            meta = json.load(f)
-                        
-                        # Verify deployment identity matches
-                        with open("deployment_context.json") as f:
-                            ctx = json.load(f)
-                        
-                        deployment_id_obj = meta.get("deployment_id")
-                        if isinstance(deployment_id_obj, dict):
-                            dep_id_str = f"{deployment_id_obj['account_id']}:{deployment_id_obj['project']}:{deployment_id_obj['environment']}"
-                        else:
-                            dep_id_str = deployment_id_obj
-                        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}"
-                        if dep_id_str == expected_id:
-                            latest_plan = str(plan_file)
+                    # Verify deployment identity matches
+                    with open("deployment_context.json") as f:
+                        ctx = json.load(f)
+                    
+                    deployment_id_obj = meta.get("deployment_id")
+                    if isinstance(deployment_id_obj, dict):
+                        dep_id_str = f"{deployment_id_obj['account_id']}:{deployment_id_obj['project']}:{deployment_id_obj['environment']}"
+                    else:
+                        dep_id_str = deployment_id_obj
+                    expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}"
+                    if dep_id_str == expected_id:
+                        # Plan file is saved as <operation>.tfplan by RunDirectoryManager.save_plan_file
+                        operation = meta.get("operation", "deploy")
+                        plan_path = plans_dir / f"{operation}.tfplan"
+                        if plan_path.exists():
+                            latest_plan = str(plan_path)
                             latest_meta = meta
                             break
                 
