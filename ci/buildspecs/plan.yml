@@ -124,7 +124,7 @@ phases:
                         with open("deployment_context.json") as f:
                             ctx = json.load(f)
                         
-                        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
+                        expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}"
                         if meta.get("deployment_id") == expected_id:
                             latest_plan = str(plan_file)
                             latest_meta = meta
