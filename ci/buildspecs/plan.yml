@@ -117,16 +117,16 @@ phases:
                     with open("deployment_context.json") as f:
                         ctx = json.load(f)
                     
-            deployment_id_obj = meta.get("deployment_id")
-            if isinstance(deployment_id_obj, dict):
-                dep_account = deployment_id_obj.get('account_id')
-                dep_project = str(deployment_id_obj.get('project','')).lower()
-                dep_env = str(deployment_id_obj.get('environment','')).lower()
-                dep_id_str = f"{dep_account}:{dep_project}:{dep_env}"
-            else:
-                dep_id_str = deployment_id_obj
-            expected_id = f"{ctx['account_id']}:{str(ctx.get('project_name','')).lower()}:{str(ctx.get('environment','')).lower()}"
-            if dep_id_str == expected_id:
+                    deployment_id_obj = meta.get("deployment_id")
+                    if isinstance(deployment_id_obj, dict):
+                        dep_account = deployment_id_obj.get('account_id')
+                        dep_project = str(deployment_id_obj.get('project','')).lower()
+                        dep_env = str(deployment_id_obj.get('environment','')).lower()
+                        dep_id_str = f"{dep_account}:{dep_project}:{dep_env}"
+                    else:
+                        dep_id_str = deployment_id_obj
+                    expected_id = f"{ctx['account_id']}:{str(ctx.get('project_name','')).lower()}:{str(ctx.get('environment','')).lower()}"
+                    if dep_id_str == expected_id:
                         # Plan file name matches meta file stem
                         plan_path = plans_dir / meta_file.stem
                         if plan_path.exists():
