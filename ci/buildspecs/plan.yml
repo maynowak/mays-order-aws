@@ -124,9 +124,8 @@ phases:
                         dep_id_str = deployment_id_obj
                     expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment']}"
                     if dep_id_str == expected_id:
-                        # Plan file is saved as <operation>.tfplan by RunDirectoryManager.save_plan_file
-                        operation = meta.get("operation", "deploy")
-                        plan_path = plans_dir / f"{operation}.tfplan"
+                        # Plan file name matches meta file stem
+                        plan_path = plans_dir / meta_file.stem
                         if plan_path.exists():
                             latest_plan = str(plan_path)
                             latest_meta = meta
