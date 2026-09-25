@@ -64,10 +64,15 @@ phases:
         
         # Verify plan identity matches deployment context
         expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
-        if plan_meta.get("deployment_id") != expected_id:
+        dep_id_obj = plan_meta.get("deployment_id")
+        if isinstance(dep_id_obj, dict):
+            plan_id = f"{dep_id_obj['account_id']}:{dep_id_obj['project']}:{dep_id_obj['environment']}"
+        else:
+            plan_id = dep_id_obj
+        if plan_id != expected_id:
             print(f"ERROR: Plan deployment ID mismatch!")
             print(f"  Expected: {expected_id}")
-            print(f"  Plan:     {plan_meta.get('deployment_id')}")
+            print(f"  Plan:     {plan_id}")
             sys.exit(1)
         
         if plan_meta.get("operation") != "deploy":
