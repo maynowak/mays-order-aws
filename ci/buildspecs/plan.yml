@@ -25,20 +25,25 @@ phases:
       - echo "Starting PLAN stage..."
       - echo "Loading deployment context from validation stage..."
       - |
-        # Look for deployment_context.json in various locations
-        if [ -f "deployment_context.json" ]; then
+        # Prefer the validation output artifact from the Validate stage.
+        if [ -n "${CODEBUILD_SRC_DIR_validate_output:-}" ] && [ -f "${CODEBUILD_SRC_DIR_validate_output}/deployment_context.json" ]; then
+          cp "${CODEBUILD_SRC_DIR_validate_output}/deployment_context.json" .
+          echo "Copied deployment_context.json from validate_output"
+        elif [ -f "/codebuild/input/validate_output/deployment_context.json" ]; then
+          cp /codebuild/input/validate_output/deployment_context.json .
+          echo "Copied deployment_context.json from /codebuild/input/validate_output"
+        elif [ -f "deployment_context.json" ]; then
           echo "Found deployment_context.json in working directory"
         elif [ -f "/codebuild/input/validation_output/deployment_context.json" ]; then
           cp /codebuild/input/validation_output/deployment_context.json .
-          echo "Copied from validation_output"
-        elif [ -f "./deployment_context.json" ]; then
-          echo "Found in ./ directory"
+          echo "Copied deployment_context.json from legacy validation_output path"
         else
           echo "ERROR: deployment_context.json not found!"
           echo "Listing current directory:"
           ls -la .
-          echo "Looking for deployment_context.json in repository:"
-          find . -name "deployment_context.json" 2>/dev/null || true
+          echo "Checking validate output paths:"
+          ls -la "${CODEBUILD_SRC_DIR_validate_output:-/codebuild/input/validate_output}" 2>/dev/null || true
+          exit 1
         fi
       - cat deployment_context.json
 
@@ -63,10 +68,13 @@ phases:
         import os
         from pathlib import Path
         
-        # Find deployment_context.json in various locations
+        # Find deployment_context.json copied into the primary source directory,
+        # then fall back to the validate_output artifact paths for compatibility.
         ctx_file = Path("deployment_context.json")
         if not ctx_file.exists():
             alt_paths = [
+                Path(os.environ.get("CODEBUILD_SRC_DIR_validate_output", "/codebuild/input/validate_output")) / "deployment_context.json",
+                Path("/codebuild/input/validate_output/deployment_context.json"),
                 Path("/codebuild/input/validation_output/deployment_context.json"),
                 Path("/codebuild/output/src/deployment_context.json"),
             ]

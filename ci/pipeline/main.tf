@@ -428,10 +428,11 @@ resource "aws_codepipeline" "main" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["validate_output"]
+      input_artifacts  = ["source_output", "validate_output"]
       output_artifacts = ["plan_output"]
       configuration = {
-        ProjectName = aws_codebuild_project.plan.name
+        ProjectName   = aws_codebuild_project.plan.name
+        PrimarySource = "source_output"
       }
       run_order = 1
     }

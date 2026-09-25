@@ -509,6 +509,7 @@ All commands use validated `AWSExecutionContext`.
 - NO AWS mutation
 
 #### 3. Plan Stage (Read-Only)
+- Consumes `source_output` (repository/buildspec) plus `validate_output` (`deployment_context.json`)
 - Generates Terraform plan using existing installer
 - Produces plan with H2 identity metadata
 - Artifacts: plan file, plan metadata (.meta.json), deployment context (.context.json)
