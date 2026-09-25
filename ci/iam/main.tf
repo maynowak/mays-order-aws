@@ -1,5 +1,5 @@
 # D8 CI/CD IAM Roles
-#
+# 
 # This module creates the IAM roles for CodePipeline and CodeBuild
 # with least-privilege permissions per stage.
 
@@ -39,6 +39,11 @@ variable "aws_region" {
 variable "artifact_bucket_name" {
   type        = string
   description = "S3 bucket for pipeline artifacts"
+}
+
+variable "github_token_arn" {
+  type        = string
+  description = "ARN of GitHub token in Secrets Manager"
 }
 
 variable "kms_key_arn" {
@@ -148,16 +153,15 @@ resource "aws_iam_role_policy" "pipeline_policy" {
           "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codepipeline/${var.project_name}-${var.environment}-ci-cd*"
         ]
       },
-      # CodeStar Connections for GitHub source (CodeStarSourceConnection)
+      # GitHub token access
       {
-        Sid    = "AllowCodeStarConnections"
+        Sid    = "AllowSecretsManagerRead"
         Effect = "Allow"
         Action = [
-          "codestar-connections:UseConnection",
-          "codeconnections:UseConnection"
+          "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          "arn:aws:codeconnections:eu-central-1:240571105849:connection/b0fa25d8-874f-4639-8e91-3ed87b2bb59b"
+          var.github_token_arn
         ]
       },
       # KMS decryption for artifact encryption
@@ -195,6 +199,7 @@ resource "aws_iam_role" "codebuild" {
   }
 }
 
+# Base policy shared by all stages
 resource "aws_iam_role_policy" "codebuild_base" {
   name = "${var.project_name}-${var.environment}-ci-codebuild-base"
   role = aws_iam_role.codebuild.id
@@ -276,6 +281,7 @@ resource "aws_iam_role_policy" "codebuild_base" {
           "kms:GenerateDataKey*",
           "kms:DescribeKey"
         ]
+        Resource = var.kms_key_arn != "" ? [var.kms_key_arn] : ["*"]
         Condition = {
           StringEquals = {
             "kms:ViaService" = [
@@ -284,36 +290,101 @@ resource "aws_iam_role_policy" "codebuild_base" {
             ]
           }
         }
-        Effect = "Allow"
-        Resource = [
-          "*"
-        ]
-      },
-      # CodePipeline artifact access for CODEPIPELINE source type
+      }
+    ]
+  })
+}
+
+# Stage-specific inline policies
+
+# VALIDATE stage - read-only
+resource "aws_iam_role_policy" "codebuild_validate" {
+  name = "${var.project_name}-${var.environment}-ci-codebuild-validate"
+  role = aws_iam_role.codebuild.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # STS for identity validation
       {
-        Sid    = "AllowCodePipelineArtifactAccess"
+        Sid    = "AllowSTSGetCallerIdentity"
         Effect = "Allow"
         Action = [
-          "codepipeline:GetPipelineExecution",
-          "codepipeline:GetPipelineState",
-          "codepipeline:GetPipeline",
-          "codepipeline:ListPipelineExecutions"
+          "sts:GetCallerIdentity"
         ]
-        Resource = [
-          "arn:aws:codepipeline:eu-central-1:240571105849:mays-orders-development-ci-cd"
-        ]
+        Resource = ["*"]
       },
-      # SSM Parameter Store for buildspec parameter-store
+      # IAM read-only for validation
       {
-        Sid    = "AllowSSMParameterStoreRead"
+        Sid    = "AllowIAMReadOnly"
         Effect = "Allow"
         Action = [
-          "ssm:GetParameters",
-          "ssm:GetParametersByPath"
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListPolicyVersions"
         ]
         Resource = [
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/mays-installer/ci/*"
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-*"
         ]
+      },
+      # Terraform provider read access
+      {
+        Sid    = "AllowTerraformProviderRead"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeRegions",
+          "ec2:DescribeAvailabilityZones",
+          "sts:GetCallerIdentity"
+        ]
+        Resource = ["*"]
+      }
+    ]
+  })
+}
+
+# PLAN stage - read-only
+resource "aws_iam_role_policy" "codebuild_plan" {
+  name = "${var.project_name}-${var.environment}-ci-codebuild-plan"
+  role = aws_iam_role.codebuild.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Terraform plan read access
+      {
+        Sid    = "AllowTerraformPlanRead"
+        Effect = "Allow"
+        Action = [
+          "ec2:Describe*",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "lambda:ListFunctions",
+          "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration",
+          "dynamodb:DescribeTable",
+          "dynamodb:ListTables",
+          "apigateway:GET",
+          "sqs:ListQueues",
+          "sqs:GetQueueAttributes",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListMetrics",
+          "logs:DescribeLogGroups",
+          "s3:ListBuckets",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketEncryption",
+          "s3:GetBucketPublicAccessBlock",
+          "cloudtrail:DescribeTrails",
+          "cloudtrail:GetTrailStatus",
+          "kms:DescribeKey",
+          "kms:ListAliases"
+        ]
+        Resource = ["*"]
       }
     ]
   })
@@ -327,7 +398,7 @@ resource "aws_iam_role_policy" "codebuild_deploy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Full Terraform apply permissions - explicit service ARNs
+      # Full Terraform apply permissions
       {
         Sid    = "AllowTerraformApply"
         Effect = "Allow"
@@ -349,26 +420,10 @@ resource "aws_iam_role_policy" "codebuild_deploy" {
           "cognito-identity:*"
         ]
         Resource = [
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-*",
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project_name}-*",
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/*",
-          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-*",
-          "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.project_name}",
-          "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.project_name}/*",
-          "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-*",
-          "arn:aws:s3:::${var.project_name}-cloudtrail-*",
-          "arn:aws:s3:::*",
-          "arn:aws:apigateway:${var.aws_region}::/restapis/*",
-          "arn:aws:apigateway:${var.aws_region}::/tags/*",
-          "arn:aws:apigateway:${var.aws_region}::/apis/*",
-          "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:*",
-          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-*",
-          "arn:aws:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/*",
-          "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*",
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}-*",
-          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-*",
-          "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/*",
-          "arn:aws:cognito-identity:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identitypool/*"
+          "arn:aws:*:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/${var.project_name}-${var.environment}-*"
         ]
       }
     ]
@@ -408,109 +463,7 @@ resource "aws_iam_role_policy" "codebuild_verify" {
           "kms:DescribeKey",
           "sts:GetCallerIdentity"
         ]
-        Effect = "Allow"
-        Resource = [
-          "*"
-        ]
-      }
-    ]
-  })
-}
-
-# PLAN stage - read-only
-resource "aws_iam_role_policy" "codebuild_plan" {
-  name = "${var.project_name}-${var.environment}-ci-codebuild-plan"
-  role = aws_iam_role.codebuild.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowTerraformPlanRead"
-        Effect = "Allow"
-        Action = [
-          "ec2:Describe*",
-          "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListRolePolicies",
-          "iam:ListAttachedRolePolicies",
-          "lambda:ListFunctions",
-          "lambda:GetFunction",
-          "lambda:GetFunctionConfiguration",
-          "dynamodb:DescribeTable",
-          "dynamodb:ListTables",
-          "apigateway:GET",
-          "sqs:ListQueues",
-          "sqs:GetQueueAttributes",
-          "cloudwatch:DescribeAlarms",
-          "cloudwatch:ListMetrics",
-          "logs:DescribeLogGroups",
-          "s3:ListBuckets",
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning",
-          "s3:GetBucketEncryption",
-          "s3:GetBucketPublicAccessBlock",
-          "cloudtrail:DescribeTrails",
-          "cloudtrail:GetTrailStatus",
-          "kms:DescribeKey",
-          "kms:ListAliases"
-        ]
-        Effect = "Allow"
-        Resource = [
-          "*"
-        ]
-      }
-    ]
-  })
-}
-
-# DESTROY stage - mutation
-resource "aws_iam_role_policy" "codebuild_destroy" {
-  name = "${var.project_name}-${var.environment}-ci-codebuild-destroy"
-  role = aws_iam_role.codebuild.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowTerraformDestroy"
-        Effect = "Allow"
-        Action = [
-          "ec2:*",
-          "iam:*",
-          "lambda:*",
-          "dynamodb:*",
-          "apigateway:*",
-          "sqs:*",
-          "s3:*",
-          "cloudwatch:*",
-          "logs:*",
-          "cloudtrail:*",
-          "kms:*",
-          "ssm:*",
-          "secretsmanager:*",
-          "cognito-idp:*",
-          "cognito-identity:*"
-        ]
-        Resource = [
-          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-${var.environment}-*",
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-*",
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project_name}-${var.environment}-*",
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/${var.project_name}-${var.environment}-*",
-          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-${var.environment}-*",
-          "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.project_name}-${var.environment}-*",
-          "arn:aws:apigateway:${var.aws_region}::/restapis/*",
-          "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-${var.environment}-*",
-          "arn:aws:s3:::${var.project_name}-${var.environment}-*",
-          "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${var.project_name}-${var.environment}-*",
-          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project_name}-${var.environment}-*",
-          "arn:aws:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-${var.environment}-*",
-          "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*",
-          "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}-${var.environment}-*",
-          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.project_name}-${var.environment}-*",
-          "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/*",
-          "arn:aws:cognito-identity:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identitypool/*"
-        ]
+        Resource = ["*"]
       }
     ]
   })
@@ -549,64 +502,46 @@ resource "aws_iam_role_policy" "codebuild_destroy_plan" {
           "kms:DescribeKey",
           "sts:GetCallerIdentity"
         ]
-        Effect = "Allow"
-        Resource = [
-          "*"
-        ]
+        Resource = ["*"]
       }
     ]
   })
 }
 
-# VALIDATE stage - read-only
-resource "aws_iam_role_policy" "codebuild_validate" {
-  name = "${var.project_name}-${var.environment}-ci-codebuild-validate"
+# DESTROY stage - mutation
+resource "aws_iam_role_policy" "codebuild_destroy" {
+  name = "${var.project_name}-${var.environment}-ci-codebuild-destroy"
   role = aws_iam_role.codebuild.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowSTSGetCallerIdentity"
+        Sid    = "AllowTerraformDestroy"
         Effect = "Allow"
         Action = [
-          "sts:GetCallerIdentity"
+          "ec2:*",
+          "iam:*",
+          "lambda:*",
+          "dynamodb:*",
+          "apigateway:*",
+          "sqs:*",
+          "s3:*",
+          "cloudwatch:*",
+          "logs:*",
+          "cloudtrail:*",
+          "kms:*",
+          "ssm:*",
+          "secretsmanager:*",
+          "cognito-idp:*",
+          "cognito-identity:*"
         ]
-        Effect = "Allow"
         Resource = [
-          "*"
+          "arn:aws:*:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project_name}-${var.environment}-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/${var.project_name}-${var.environment}-*"
         ]
-        Sid = "AllowSTSGetCallerIdentity"
-      },
-      {
-        Sid    = "AllowIAMReadOnly"
-        Effect = "Allow"
-        Action = [
-          "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListRolePolicies",
-          "iam:GetPolicy",
-          "iam:GetPolicyVersion",
-          "iam:ListPolicyVersions"
-        ]
-        Effect = "Allow"
-        Resource = [
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-*"
-        ]
-      },
-      {
-        Sid    = "AllowTerraformProviderRead"
-        Effect = "Allow"
-        Action = [
-          "ec2:DescribeRegions",
-          "ec2:DescribeAvailabilityZones",
-          "sts:GetCallerIdentity"
-        ]
-        Effect = "Allow"
-        Resource = [
-          "*"
-        ]
-        Sid = "AllowTerraformProviderRead"
       }
     ]
   })
@@ -616,18 +551,22 @@ resource "aws_iam_role_policy" "codebuild_validate" {
 # Outputs
 # ============================================================
 
-output "codebuild_role_arn" {
-  value = aws_iam_role.codebuild.arn
-}
-
-output "codebuild_role_name" {
-  value = aws_iam_role.codebuild.name
-}
-
 output "pipeline_role_arn" {
-  value = aws_iam_role.pipeline.arn
+  value       = aws_iam_role.pipeline.arn
+  description = "ARN of the CodePipeline role"
 }
 
 output "pipeline_role_name" {
-  value = aws_iam_role.pipeline.name
+  value       = aws_iam_role.pipeline.name
+  description = "Name of the CodePipeline role"
+}
+
+output "codebuild_role_arn" {
+  value       = aws_iam_role.codebuild.arn
+  description = "ARN of the CodeBuild role"
+}
+
+output "codebuild_role_name" {
+  value       = aws_iam_role.codebuild.name
+  description = "Name of the CodeBuild role"
 }
