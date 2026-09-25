@@ -47,6 +47,7 @@ phases:
         import json
         import subprocess
         import sys
+        import os
         from pathlib import Path
         
         # Load context and plan artifact
