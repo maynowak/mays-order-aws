@@ -51,6 +51,8 @@ phases:
         fi
       - cat deployment_context.json
       - cat plan_artifact.json
+      - echo "Initializing Terraform for provider plugins..."
+      - terraform init -input=false
 
   build:
     commands:
