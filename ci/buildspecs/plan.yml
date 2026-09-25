@@ -57,11 +57,12 @@ phases:
     commands:
       - echo "Running installer plan generation..."
       - |
-        python3 -m installer.cli.main plan \
+        python3 -m installer.cli.main \
           --deployment-version ${DEPLOYMENT_VERSION} \
           --development-phase ${DEVELOPMENT_PHASE} \
           --development-step ${DEVELOPMENT_STEP} \
-          --development-status ${DEVELOPMENT_STATUS}
+          --development-status ${DEVELOPMENT_STATUS} \
+          plan
       - echo "Plan generation completed"
 
   post_build:
