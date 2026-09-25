@@ -66,7 +66,7 @@ phases:
         expected_id = f"{ctx['account_id']}:{ctx['project_name']}:{ctx['environment'].lower()}"
         dep_id_obj = plan_meta.get("deployment_id")
         if isinstance(dep_id_obj, dict):
-            plan_id = f"{dep_id_obj['account_id']}:{dep_id_obj['project']}:{dep_id_obj['environment']}"
+            plan_id = f"{dep_id_obj['account_id']}:{dep_id_obj['project']}:{str(dep_id_obj['environment']).lower()}"
         else:
             plan_id = dep_id_obj
         if plan_id != expected_id:
