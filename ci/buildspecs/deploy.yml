@@ -18,10 +18,9 @@ phases:
       - pip install --quiet --upgrade pip
       - pip install --quiet boto3 pytest
       - echo "Installing Terraform..."
-      - apt-get update
-      - apt-get install -y unzip curl
-      - curl -fsSL https://releases.hashicorp.com/terraform/1.11.0/terraform_1.11.0_linux_amd64.zip -o /tmp/terraform.zip
-      - unzip /tmp/terraform.zip -d /usr/local/bin/
+      - dnf install -y dnf-plugins-core
+      - dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+      - dnf -y install terraform
       - terraform version
 
   pre_build:
