@@ -105,7 +105,8 @@ class TerraformRunner:
         working_dir: str,
         aws_context: "AWSExecutionContext",
         terraform_bin: str = "terraform",
-        env: Optional[dict] = None
+        env: Optional[dict] = None,
+        workspace: str = "default"
     ):
         """
         Initialize TerraformRunner.
@@ -115,6 +116,7 @@ class TerraformRunner:
             aws_context: Validated AWS execution context (required)
             terraform_bin: Path to terraform binary
             env: Additional environment variables
+            workspace: Terraform workspace name for parallel deployments
         """
         if not aws_context.validated:
             raise ValueError("AWSExecutionContext must be validated")
@@ -123,6 +125,12 @@ class TerraformRunner:
         self.terraform_bin = "terraform"
         self.aws_context = aws_context
         self.env = {}
+        # Use environment variable override for parallel deployments
+        env_workspace = os.environ.get("TERRAFORM_WORKSPACE")
+        if env_workspace:
+            self.workspace = env_workspace
+        else:
+            self.workspace = workspace
     
     def _get_terraform_env(self) -> dict:
         """Get environment with AWS profile and region set."""
@@ -453,6 +461,30 @@ class TerraformRunner:
         """Run command and return structured result."""
         start_time = time.time()
         working_directory = str(self.working_dir)
+        
+        # Ensure workspace selected for parallel deployments
+        if self.workspace and self.workspace != "default":
+            try:
+                result = subprocess.run(
+                    [self.terraform_bin, "workspace", "select", self.workspace],
+                    cwd=self.working_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=self._get_terraform_env()
+                )
+                # If select fails, try to create workspace
+                if result.returncode != 0:
+                    subprocess.run(
+                        [self.terraform_bin, "workspace", "new", self.workspace],
+                        cwd=self.working_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        env=self._get_terraform_env()
+                    )
+            except Exception:
+                pass
         
         try:
             process = subprocess.run(
