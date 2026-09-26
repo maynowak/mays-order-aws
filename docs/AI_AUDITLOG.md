@@ -446,3 +446,42 @@ PITR schützt Daten vor Verlust, Restore-Test nicht durchgeführt, Schema-Migrat
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## R10 — KORREKTUR DER SEMANTIK PARALLEL DEPLOY NAMING - 2026-09-26
+
+**Status:** Analyse abgeschlossen, GREEN  
+**Branch:** main  
+**Ausgangs-HEAD:** a58bad5
+
+**Scope:** Analyse Parallel Deploy Logik DynamoDB Namensgebung, Erhalt bestehender Naming-/Prefix-Mechanismus
+
+**Befund:**
+- DynamoDB Tabellenname = var.project_name
+- project_name ist eindeutiger Deployment-Identifikator
+- Workspace Isolation via project_name = Terraform Workspace
+- Parallel Deployment funktioniert durch eindeutigen project_name pro Deployment
+- Keine statische Namensgebung eingeführt
+- Keine neue Naming Convention
+
+**var.dynamodb_table_name Status:**
+- Variable existiert nicht im Modul
+- Namenslogik ist bereits korrekt über var.project_name
+- Keine Reparatur erforderlich
+
+**R10 Acceptance:**
+✓ bestehende Naming Convention erhalten
+✓ Parallel Deployments weiterhin möglich
+✓ keine Ressourcenkollision
+✓ keine fehlende Variable
+✓ kein Name erfunden
+✓ keine statische Vereinfachung
+✓ Semantik erhalten
+
+**Erzeugter Bericht:**
+`docs/reports/R10-PARALLEL-DEPLOY-NAMING-ANALYSIS.md`
+
+**Status:** GREEN — Semantik erhalten, keine Änderung erforderlich
+
+**Git Status nach Commit:** Clean
+
+==================================================
