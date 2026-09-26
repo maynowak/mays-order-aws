@@ -94,4 +94,35 @@ kept accurate even if the audit remains completely read-only.
 
 **Next:** Schritt 3 CI/CD Source Auth prüfen
 
+## Schritt 3 CI/CD Source Auth Audit - 2026-09-26
+
+**Status:** Abgeschlossen  
+**Branch:** main
+
+**Scope:** Prüfung aktueller Source-Authentifizierung, Klärung PAT Status
+
+**Prüfung:**
+- `ci/pipeline/main.tf` Source Action geprüft
+- Provider: `CodeStarSourceConnection`
+- ConnectionArn: `arn:aws:codeconnections:eu-central-1:240571105849:connection/b0fa25d8-874f-4639-8e91-3ed87b2bb59b`
+- Kein `OAuthToken`, kein Secrets Manager Referenz
+- `grep OAuthToken ci/**/*.tf` → keine Treffer
+
+**Findings:**
+- GitHub PAT ist kein aktiver Bestandteil der produktiven Source-Konfiguration
+- Historischer Bericht `GITHUB-AUTH-CI-INTEGRATION-01.md` ist SUPERSEDED
+- Quelle ist AWS CodeConnections
+- Aktuelle CI/CD Baustelle ist Deploy-Berechtigung / Policy-Kette, nicht Source Auth
+
+**Dokumentation:**
+- Audit erstellt: `docs/reports/KONSOLIDIERUNG-CICD-SOURCE-AUTH-AUDIT.md`
+
+**Tests/Checks:**
+- Code Review durchgeführt
+- Keine Code-Änderung
+
+**Git Status:** Clean
+
+**Next:** Abschlussbericht
+
 ==================================================
