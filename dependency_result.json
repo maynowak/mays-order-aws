@@ -1,0 +1,32 @@
+{
+  "status": "DEPENDENCY_CHANGE_DETECTED",
+  "run_id": "sec01-20260925-171413",
+  "timestamp": "2026-09-25T17:14:13.998248+00:00Z",
+  "summary": "2 dependency constraint(s) unsatisfied",
+  "dependencies": [
+    {
+      "name": "aws",
+      "type": "terraform_provider",
+      "source": "terraform/main.tf",
+      "current_version": ">= 6.0",
+      "current_reference": "hashicorp/aws",
+      "available_version": "5.39.0",
+      "available_reference": null,
+      "status": "CONSTRAINT_UNSATISFIED",
+      "details": "Terraform provider aws from hashicorp/aws; Latest stable: 5.39.0",
+      "detected_at": "2026-09-25T17:14:13.632367+00:00Z"
+    },
+    {
+      "name": "time",
+      "type": "terraform_provider",
+      "source": "terraform/main.tf",
+      "current_version": "~> 0.11",
+      "current_reference": "hashicorp/time",
+      "available_version": "0.14.0",
+      "available_reference": null,
+      "status": "CONSTRAINT_UNSATISFIED",
+      "details": "Terraform provider time from hashicorp/time; Latest stable: 0.14.0",
+      "detected_at": "2026-09-25T17:14:13.632388+00:00Z"
+    }
+  ]
+}

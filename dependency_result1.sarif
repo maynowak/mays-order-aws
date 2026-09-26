@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Mays-Orders-AWS Security Dependency Detector",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/maynowak/mays-order-aws",
+          "rules": [
+            {
+              "id": "SEC01-TERRAFORM_PROVIDER-CONSTRAINT_UNSATISFIED",
+              "name": "terraform_provider CONSTRAINT_UNSATISFIED",
+              "shortDescription": {
+                "text": "terraform_provider constraint unsatisfied"
+              },
+              "fullDescription": {
+                "text": "The latest version of terraform_provider does not satisfy the declared constraint in Terraform configuration."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "SEC01-TERRAFORM_PROVIDER-CONSTRAINT_UNSATISFIED",
+          "level": "error",
+          "message": {
+            "text": "aws (terraform_provider): CONSTRAINT_UNSATISFIED - available: 5.39.0. Current: >= 6.0. Terraform provider aws from hashicorp/aws; Latest stable: 5.39.0"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "terraform/main.tf"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "dependency_name": "aws",
+            "dependency_type": "terraform_provider",
+            "current_version": ">= 6.0",
+            "available_version": "5.39.0",
+            "deployment_id": ""
+          }
+        },
+        {
+          "ruleId": "SEC01-TERRAFORM_PROVIDER-CONSTRAINT_UNSATISFIED",
+          "level": "error",
+          "message": {
+            "text": "time (terraform_provider): CONSTRAINT_UNSATISFIED - available: 0.14.0. Current: ~> 0.11. Terraform provider time from hashicorp/time; Latest stable: 0.14.0"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "terraform/main.tf"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "dependency_name": "time",
+            "dependency_type": "terraform_provider",
+            "current_version": "~> 0.11",
+            "available_version": "0.14.0",
+            "deployment_id": ""
+          }
+        }
+      ],
+      "columnKind": "utf16CodeUnits",
+      "automationDetails": {
+        "id": "security-01-dependency-check",
+        "description": {
+          "text": "SECURITY-01 Dependency Change Detection"
+        }
+      }
+    }
+  ]
+}
