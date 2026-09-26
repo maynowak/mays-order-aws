@@ -490,6 +490,9 @@ class InstallerCLI:
                         if "=" in v:
                             k, v_val = v.split("=", 1)
                             var[k] = v_val
+                # Auto-inject project_name for parallel project support
+                if "project_name" not in var:
+                    var["project_name"] = context.project_name
 
                 plan_result = runner.plan(
                     out_file=out_filename,

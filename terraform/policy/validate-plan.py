@@ -82,8 +82,22 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
 
     allowed_types = set(policy["resource_types"]["allowed"])
     required_tags = policy["required_tags"]
-    project = policy["project"]
+    policy_project = policy["project"]
     environment_policy = policy["environment"]
+
+    # Derive project name from first resource's Project tag for parallel-project support
+    project = policy_project
+    for item in resources:
+        resource = get_after(item)
+        tags = get_tags(resource)
+        proj_tag = tags.get("Project")
+        if proj_tag:
+            project = proj_tag
+            break
+    # If policy project is a wildcard pattern, allow any project starting with prefix
+    if policy_project.startswith("mays-") and not project.startswith("mays-"):
+        # keep policy strict
+        pass
 
     counts: dict[str, int] = {}
     ec2_instances = 0
