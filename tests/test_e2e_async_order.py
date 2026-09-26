@@ -7,11 +7,16 @@ Cognito → API Gateway → Producer Lambda → DynamoDB + SQS → Worker → Dy
 Environment:
 - AWS profile: mayaws
 - AWS region: eu-central-1
+- PROJECT_NAME: project name, defaults to mays-orders
+- API_BASE_URL: API Gateway base URL, defaults to mays-orders deployment
+- SQS_QUEUE_URL: SQS queue URL, defaults to {PROJECT_NAME}-orders-queue
 - TEST_USER_PASSWORD: environment variable for test user password
 
 Usage:
     export AWS_PROFILE=mayaws
+    export PROJECT_NAME=mays-orders
     export TEST_USER_PASSWORD="test_password_123!"
+    export API_BASE_URL="https://..."
     python3 -m pytest tests/test_e2e_async_order.py -v
 """
 import json
@@ -24,11 +29,12 @@ import urllib3
 
 http = urllib3.PoolManager()
 
+PROJECT_NAME = os.environ.get("PROJECT_NAME", "mays-orders")
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://ki2rbzvk99.execute-api.eu-central-1.amazonaws.com")
 TEST_USER_EMAIL = os.environ.get("TEST_USER_EMAIL", "test-user@example.com")
 TEST_USER_PASSWORD = os.environ.get("TEST_USER_PASSWORD", "")
 
-SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL", "")
+SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL", f"https://sqs.eu-central-1.amazonaws.com/240571105849/{PROJECT_NAME}-orders-queue")
 
 
 def get_access_token():
@@ -182,7 +188,7 @@ class TestWorkerIntegration(unittest.TestCase):
         """Verify SQS worker was invoked."""
         client = self.boto3.client("sqs", region_name="eu-central-1")
 
-        queue_url = os.environ.get("SQS_QUEUE_URL", "https://sqs.eu-central-1.amazonaws.com/240571105849/mays-orders-orders-queue")
+        queue_url = SQS_QUEUE_URL
 
         response = client.get_queue_attributes(
             QueueUrl=queue_url,

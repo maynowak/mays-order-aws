@@ -68,4 +68,30 @@ kept accurate even if the audit remains completely read-only.
 
 **Next:** Schritt 2 E2E Tests parametrisieren
 
+## Schritt 2 E2E Tests Parametrisierung - 2026-09-26
+
+**Status:** Abgeschlossen  
+**Branch:** main
+
+**Scope:** `tests/test_e2e_async_order.py` auf PROJECT_NAME-Konzept umstellen, ohne Architekturänderung
+
+**Erledigt:**
+- PROJECT_NAME Env Var eingeführt, Default `mays-orders`
+- SQS_QUEUE_URL Default dynamisch aus PROJECT_NAME: `https://sqs.eu-central-1.amazonaws.com/240571105849/{PROJECT_NAME}-orders-queue`
+- `test_sqs_message_processed` nutzt jetzt Modul-Variable SQS_QUEUE_URL
+- Docstring aktualisiert mit PROJECT_NAME Nutzung
+- Keine Änderung der Testsemantik, bestehende Defaults erhalten
+
+**Tests/Checks:**
+- Syntax Check: `python3 -m py_compile tests/test_e2e_async_order.py` → OK
+- Unit Tests Lambda: 51/51 PASS
+
+**Findings:**
+- Test ist nun reproduzierbar für unterschiedliche Projekt-Namen über Env Var
+- Keine Regression
+
+**Git Status:** Clean nach Commit
+
+**Next:** Schritt 3 CI/CD Source Auth prüfen
+
 ==================================================
