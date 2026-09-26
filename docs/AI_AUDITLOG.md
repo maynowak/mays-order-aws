@@ -485,3 +485,79 @@ PITR schützt Daten vor Verlust, Restore-Test nicht durchgeführt, Schema-Migrat
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B6 — REMOTE TERRAFORM STATE / STATE PROTECTION - 2026-09-26
+
+**Status:** Design abgeschlossen, GREEN  
+**Branch:** main  
+**Ausgangs-HEAD:** 4b5b032f57398dc7c40b98c458f89b49fe0cfc15
+
+**Scope:** Design & Schutzgrundlage für Remote Terraform State im Multi-Project System
+
+**Current State:**
+- Kein Remote Backend
+- Lokaler State unter terraform/...
+- Workspace States unter terraform/terraform.tfstate.d/
+- State Dateien git-ignored
+- Kein Backup, keine Versionierung, kein Locking
+
+**Existing Multi-Project Model:**
+- project_name → Terraform Workspace → State Isolation → Resource Naming
+- mays-orders → Workspace mays-orders → State A
+- mays-order-par → Workspace mays-order-par → State B
+
+**Remote Backend Design:**
+- S3 Remote Backend mit Encryption AES256
+- Versionierung aktiv
+- DynamoDB Locking
+- State Isolation via Key Prefix + Workspace
+
+**State Bucket:**
+- Vorschlag zentral: mays-orders-tfstate-central-240571105849
+- Region eu-central-1
+- SSE-S3, Versionierung, Public Access Block
+
+**State Key / Workspace Isolation:**
+- Terraform S3 Backend mit workspace_key_prefix = true
+- Key Convention: <environment>/<project_name>/terraform.tfstate
+- Isolation durch Key Prefix + Workspace Name
+- Projekt A darf niemals State von Projekt B verwenden
+
+**State Backup:**
+- Lokale State Dateien sichern vor Migration
+- Integrität prüfen
+- Keine State-Inhalte in Auditlog
+
+**Migration Plan:**
+Phasen 0-9 definiert, KEINE MIGRATION durchgeführt in B6
+
+**Rollback:**
+Definiert für S3 nicht erreichbar, falscher State Key, etc.
+Lokale State-Basis wird nicht verloren
+
+**IAM:**
+Local Development vs CI/CD getrennt
+Minimale Rechte, kein AdministratorAccess
+
+**Multi-Project Test Plan:**
+Projekt A mays-orders, Projekt B mays-order-par
+Tests: init, workspace selection, plan, isolation, parallel plan, kein Cross-Project State, CI/CD Zugriff, Recovery, Rollback
+
+**CI/CD Impact:**
+Backend Änderung, IAM Anpassung, Workspace Selection bleibt
+
+**Tatsächliche Änderungen:**
+- Design Dokument erstellt
+- Keine Backend Aktivierung
+- Kein terraform init -migrate-state
+- Kein Apply
+- Kein State Löschen
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-06-REMOTE-TERRAFORM-STATE-PROTECTION.md`
+
+**Status:** GREEN — Design abgeschlossen, Migration nicht durchgeführt
+
+**Git Status nach Commit:** Clean
+
+==================================================
