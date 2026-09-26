@@ -384,3 +384,65 @@ PITR schützt Daten vor Verlust, Restore-Test nicht durchgeführt, Schema-Migrat
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B6 — REMOTE STATE MIGRATION PLAN - 2026-09-26
+
+**Status:** Planung abgeschlossen  
+**Branch:** main  
+**Ausgangs-HEAD:** 99e80b1ce712ac83c5f52bd832c3d5b65cdb02cf
+
+**Aktuelles State Inventar:**
+- terraform/terraform.tfstate — default, leer
+- terraform/terraform.tfstate.d/mays-order-par/terraform.tfstate — Workspace mays-order-par, leer
+- Kein Remote Backend
+- Kein Locking
+- Kein Backup
+
+**Target State Design:**
+- S3 Backend mit Versionierung, Server-Side Encryption
+- DynamoDB Lock Table
+- State Key Convention: <environment>/<project_name>/terraform.tfstate
+- Multi-Project Isolation via Prefix
+
+**Migrationsphasen:**
+0 Vorbereitung
+1 Backup
+2 Backend Konfiguration
+3 Migration pro Workspace
+4 Verifikation
+5 Cleanup
+
+**Risiken:**
+- State Korruption
+- Falscher Workspace
+- Concurrent Änderungen
+- IAM Berechtigungen
+- Bucket Kollision
+
+**Rollback Plan:**
+- Lokales Backend wiederherstellen
+- State aus Backup zurückspielen
+- Plan verifizieren
+- Keine Apply
+
+**Pre-Checks:**
+- Workspaces dokumentiert
+- State gesichert
+- S3 Bucket und DynamoDB vorhanden
+- IAM Zugriff vorhanden
+- Kein laufender Apply
+
+**Offene Entscheidungen:**
+- Zentrales Bucket vs pro Projekt
+- State Key Convention final
+- Bucket Name final
+- Migration Zeitpunkt
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-06-REMOTE-STATE-MIGRATION-PLAN.md`
+
+**Status:** YELLOW — Planung abgeschlossen, Implementierung ausstehend
+
+**Git Status nach Commit:** Clean
+
+==================================================
