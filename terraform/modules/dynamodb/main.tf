@@ -1,5 +1,13 @@
 # T011-02 — DynamoDB-Tabelle + GSI1
 # Fachquelle: database/dynamodb-design.md, database/access-patterns.md, ADR-002, ADR-007
+#
+# ⚠️ UPGRADE NOTE — DATA TRANSFORMATION REQUIRED
+# Änderungen an bestehendem DynamoDB Datenmodell, Schema,
+# Partition-/Sort-Key-Struktur oder inkompatiblen Attributmodellen
+# können eine versionierte Datenmigration/Transformation erfordern.
+# PITR/Backup schützt Daten vor Verlust, ersetzt aber keine
+# Schema-/Datenmigration.
+#
 resource "aws_dynamodb_table" "orders" {
   name         = var.project_name
   billing_mode = "PAY_PER_REQUEST" # ADR-007: On-Demand
@@ -40,6 +48,10 @@ resource "aws_dynamodb_table" "orders" {
       attribute_name = "gsi1sk"
       key_type       = "RANGE"
     }
+  }
+
+  point_in_time_recovery {
+    enabled = true
   }
 
   tags = merge({ "Project" = var.project_name }, var.tags)

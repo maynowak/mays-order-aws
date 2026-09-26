@@ -270,3 +270,50 @@ DynamoDB, S3 CloudTrail Bucket, Cognito User Pool, API Gateway, SQS, Lambda, IAM
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B4 — MULTI-PROJECT DYNAMODB PROTECTION - 2026-09-26
+
+**Status:** Konfiguration implementiert, Apply nicht ausgeführt  
+**Branch:** main  
+**Ausgangs-HEAD:** c1953ef5ae1b45ea6d1b4f50668ac6c3989d3d81
+
+**Scope:** DynamoDB Point-in-Time Recovery aktivieren, Multi-Project kompatibel
+
+**Betroffene Terraform Resource:**
+`terraform/modules/dynamodb/main.tf` — `aws_dynamodb_table.orders`
+
+**Multi-Project Mechanismus:**
+- project_name → Terraform Workspace → projektbezogene Tabelle
+- PITR Block hinzugefügt ohne Hardcoding
+- Gilt für alle Projekte automatisch
+
+**PITR Änderung:**
+- `point_in_time_recovery { enabled = true }` hinzugefügt
+- Keine bestehenden Parameter verändert
+- Upgrade Note dokumentiert
+
+**Validation:**
+- terraform fmt -check: PASS
+- terraform validate: Success
+- terraform plan mit project_name=mays-orders: PITR enabled
+- terraform plan mit project_name=mays-order-par: PITR enabled
+- Multi-Project Nachweis erbracht
+
+**Plan-Ergebnis:**
+PLAN VERIFIED
+APPLY REQUIRED BUT NOT EXECUTED
+
+**Betroffene Projektkontexte:**
+mays-orders, mays-order-par
+
+**Recovery-Abgrenzung:**
+PITR schützt Daten vor Verlust, Restore-Test nicht durchgeführt, Schema-Migration nicht ersetzt
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-04-MULTI-PROJECT-DYNAMODB-PROTECTION.md`
+
+**Commit:** folgt
+
+**Git Status nach Commit:** Clean
+
+==================================================
