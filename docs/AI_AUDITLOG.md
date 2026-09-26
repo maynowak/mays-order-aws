@@ -164,3 +164,51 @@ DynamoDB, S3 CloudTrail, Cognito, API Gateway, SQS, Lambda, IAM, Terraform State
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## BACKUP-02 — RECOVERY STRATEGY & RESOURCE CLASSIFICATION - 2026-09-26
+
+**Status:** Analyse abgeschlossen  
+**Branch:** main  
+**Ausgangs-HEAD:** 36a6957022ffb697adc69418f61ae9567deb44d7
+
+**Scope:** Recovery-Strategie und Ressourcenk извлечение aus BACKUP-01, keine Implementierung
+
+**Untersuchte Ressourcen:**
+DynamoDB, S3 CloudTrail Bucket, Cognito User Pool, API Gateway HTTP API, SQS, Lambda, IAM, Terraform State, CloudWatch Logs, CloudTrail
+
+**Klassifikation:**
+- Resource Recovery Matrix erstellt mit 15 Dimensionen je Ressource
+- Data/Config/Code/State Klassifikation dokumentiert
+- Recovery Methoden: A Reprovision, B Backup/Restore, C PITR, D Rebuild, E Reconcile, F Manual, G Not Required
+- Recovery Reihenfolge definiert: Phase 1 State → Phase 9 Verification
+
+**Wichtigste Recovery-Gaps:**
+- DynamoDB PITR fehlt, Daten-Backup fehlt
+- Terraform State lokal ohne Backup/Locking
+- Cognito User Data Backup fehlt
+- S3 CloudTrail Bucket keine Versionierung
+- Keine dokumentierten Restore-Prozeduren, keine Restore-Tests
+
+**AWS Backup Bewertung:**
+- DynamoDB: OPTIONAL, native PITR bevorzugt
+- S3: NOT REQUIRED, native Versionierung ausreichend
+- Cognito: NOT REQUIRED
+- Terraform State: NOT REQUIRED, S3 Versionierung ausreichend
+- Gesamt: Kein pauschaler AWS Backup Bedarf
+
+**Offene Entscheidungen:**
+- RPO/RTO NOT DEFINED im Repository
+- Restore-Test Strategie noch zu definieren
+- Migration/Transformation Abgrenzung dokumentiert als OPEN FOLLOW-UP
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-02-RECOVERY-STRATEGY.md`
+
+**Nächste Schritte:**
+- Restore-Runbooks dokumentieren
+- Terraform State Remote Backend Evaluierung
+- DynamoDB PITR Entscheidung
+
+**Git Status nach Commit:** Clean
+
+==================================================
