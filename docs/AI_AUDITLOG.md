@@ -317,3 +317,70 @@ PITR schützt Daten vor Verlust, Restore-Test nicht durchgeführt, Schema-Migrat
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B5 — MULTI-PROJECT TERRAFORM STATE PROTECTION - 2026-09-26
+
+**Status:** Analyse abgeschlossen, Design definiert  
+**Branch:** main  
+**Ausgangs-HEAD:** aeb0b9c414d59e7d5e6247883b7f16ede5205216
+
+**Scope:** Terraform State Schutzstrategie für Multi-Project System
+
+**Aktueller State-Mechanismus:**
+- Kein Remote Backend definiert
+- Lokaler State in terraform/terraform.tfstate
+- Workspace States in terraform.tfstate.d/<workspace>/
+- Workspace Selection via TERRAFORM_WORKSPACE Env Var
+- Workspace Name = project_name
+- Keine Locking
+- Keine Versionierung
+- State Dateien git-ignored
+
+**Workspace Isolation:**
+- Funktioniert lokal via Terraform Workspaces
+- Mehrere Projekte → separate State Dateien
+- Kein zentrales Backup
+
+**Remote-State-Befund:**
+- Backend nicht konfiguriert
+- S3 Backend geeignet, noch nicht implementiert
+
+**Locking-Befund:**
+- Kein Locking vorhanden
+- Für Remote State DynamoDB Locking erforderlich
+
+**Backup/Versionierungs-Befund:**
+- Kein Backup
+- Kein Versionierung
+- S3 Versionierung wäre ausreichend
+
+**Multi-Project-Risiken:**
+- Lokaler Stateverlust
+- Keine Concurrency Kontrolle
+- Keine zentrale Recovery
+
+**Target State:**
+- Remote S3 Backend mit Versionierung
+- DynamoDB Locking
+- Per-Project State Keys
+- Multi-Project Isolation
+
+**Migration Risks:**
+- State Migration erforderlich
+- Backup vor Migration zwingend
+- Mehrere Workspaces erhöhen Komplexität
+
+**Offene Entscheidungen:**
+- Remote Backend Zeitpunkt
+- S3 Bucket Naming Standard
+- IAM Policies für State Zugriff
+- Migration Plan
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-05-MULTI-PROJECT-TERRAFORM-STATE-PROTECTION.md`
+
+**Status:** YELLOW — Analyse abgeschlossen, Implementierung offen
+
+**Git Status nach Commit:** Clean
+
+==================================================
