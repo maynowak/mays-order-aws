@@ -71,4 +71,36 @@ Ergebnisse:
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
+## COGNITO-ORPHAN-CLEANUP-01
+
+Datum: 2026-09-27
+Branch: main
+HEAD: fc8e54bbdae9e08b58965ad268f968323855371a
+
+Untersuchte Pool IDs:
+- eu-central-1_BKXksSwJI
+- eu-central-1_CwDJAbTiS
+- eu-central-1_QOJoc7nfZ
+
+Ergebnis:
+- Pools nicht im aktuellen Terraform Remote State
+- Keine aktive AWS Abhängigkeit festgestellt
+- User count 0 pro Pool
+- App Clients vorhanden pro Pool
+- Historische Herkunft plausibel als Installer Test Artefakte vom 25.09.2026
+
+Decision:
+- eu-central-1_BKXksSwJI → REQUIRES_MANUAL_DECISION
+- eu-central-1_CwDJAbTiS → REQUIRES_MANUAL_DECISION
+- eu-central-1_QOJoc7nfZ → REQUIRES_MANUAL_DECISION
+
+Gelöscht: NEIN
+Report: docs/reports/COGNITO-ORPHAN-CLEANUP-01-OWNERSHIP-AUDIT.md
+
+Status: Audit abgeschlossen, keine Löschung durchgeführt
+
+==================================================
+
+Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
+
 ==================================================
