@@ -127,6 +127,36 @@ Report: docs/reports/COGNITO-ORPHAN-CLEANUP-02-EXECUTION.md
 
 Status: GREEN - Orphan Cleanup komplett, keine Terraform-Änderung
 
+## COGNITO-BACKUP-01
+
+Datum: 2026-09-27
+Branch: main
+HEAD: fc8e54bbdae9e08b58965ad268f968323855371a
+
+Scope: Backup/Recovery Audit für Cognito User Pools
+
+Untersuchte Ressourcen:
+- aws_cognito_user_pool.users
+- aws_cognito_user_pool_client.app
+- aws_cognito_user_group.staff
+
+Ergebnisse:
+- Infrastructure Recovery via Terraform möglich
+- Configuration Recovery via Terraform möglich
+- User Data Recovery nicht nativ durch AWS Backup abgedeckt
+- Keine AWS Backup Integration für Cognito
+- User Export via Admin APIs möglich, Passwörter nicht exportierbar
+- Multi-Project Trennung über project_name gewährleistet
+- RPO/RTO nicht definiert
+- Produktionsfähiger Recovery Flow erfordert zusätzliche Implementierung
+
+Offene Punkte:
+- Backup-Frequenz, Storage, RPO/RTO Definition, User Export/Import Prozess
+
+Report: docs/reports/COGNITO-BACKUP-01-BACKUP-RECOVERY-AUDIT.md
+
+Status: Audit abgeschlossen, keine Infrastrukturänderungen
+
 ==================================================
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
