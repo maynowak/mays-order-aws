@@ -86,6 +86,11 @@ class InstallerCLI:
             default=False,
             help="Run in dry-run mode (default: False)"
         )
+        parser.add_argument(
+            "--notification-email",
+            default=None,
+            help="Optional email for Cognito backup SNS notifications"
+        )
 
         # H2: Deployment identity and versioning
         parser.add_argument(
@@ -493,6 +498,9 @@ class InstallerCLI:
                 # Auto-inject project_name for parallel project support
                 if "project_name" not in var:
                     var["project_name"] = context.project_name
+                # Auto-inject notification_email if provided via CLI
+                if parsed.notification_email and "notification_email" not in var:
+                    var["notification_email"] = parsed.notification_email
 
                 plan_result = runner.plan(
                     out_file=out_filename,
