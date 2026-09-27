@@ -754,3 +754,53 @@ Backend Änderung, IAM Anpassung, Workspace Selection bleibt
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B8.3 — INSTALLER-REMOTE-STATE-LIFECYCLE-MINIMAL-IMPLEMENTATION-01 - 2026-09-27
+
+**Status:** GREEN  
+**Branch:** main  
+**Ausgangs-HEAD:** f6b31b2
+
+**Scope:** Minimale Installer-Erweiterungen für Remote-State-Lifecycle
+
+**Implementierte Dateien:**
+- `installer/core/remote_state_lifecycle.py` — Detection Modul
+- `installer/core/context.py` — ValidationLayer erweitert
+
+**Detection:**
+- Remote Infrastructure vorhanden?
+- Remote Backend konfiguriert?
+- Lokaler State vorhanden?
+- Migration erforderlich?
+- Modus: LOCAL / REMOTE_READY / REMOTE_MIGRATED / MIGRATION_REQUIRED
+
+**Prinzipien eingehalten:**
+- Native Terraform unabhängig
+- Local Mode funktionsfähig
+- Keine automatische Migration
+- project_name → Workspace erhalten
+- Keine neue State-Verzeichnisarchitektur
+- AWS_PROFILE bleibt Benutzerentscheidung
+
+**Tests:**
+- Python Syntax OK
+- Validation Check integriert
+- mays-orders Detection OK
+- mays-order-par Detection OK
+- Terraform validate PASS
+- Native Terraform funktionsfähig
+
+**Ergebnisse:**
+- mays-orders: Mode REMOTE_READY, Warning
+- mays-order-par: Mode REMOTE_READY, Warning
+- Keine State-Kollision
+- Keine Workspace-Kollision
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-08.3-INSTALLER-REMOTE-STATE-LIFECYCLE.md`
+
+**Status:** GREEN — Minimale Detection implementiert, Local Mode erhalten, keine Migration
+
+**Git Status nach Commit:** Clean
+
+==================================================

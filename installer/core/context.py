@@ -299,6 +299,7 @@ class ValidationLayer:
         self._check_terraform_working_dir()
         self._check_terraform_config()
         self._check_installer_config()
+        self._check_remote_state_lifecycle()
 
         return self.result
 
@@ -544,4 +545,53 @@ class ValidationLayer:
                 "environment",
                 "WARNING",
                 "Environment not set, defaulting to Development"
+            )
+
+    def _check_remote_state_lifecycle(self) -> None:
+        """Check remote state lifecycle status."""
+        try:
+            from installer.core.remote_state_lifecycle import get_remote_state_status
+            status = get_remote_state_status(
+                terraform_dir=self.context.terraform_dir,
+                project_name=self.context.project_name
+            )
+            mode = status.mode
+            if mode == "LOCAL":
+                self._add_check(
+                    "remote_state_lifecycle",
+                    "PASS",
+                    "Local mode: Remote state infrastructure not detected"
+                )
+            elif mode == "REMOTE_READY":
+                self._add_check(
+                    "remote_state_lifecycle",
+                    "WARNING",
+                    "Remote state infrastructure exists, backend not configured for project",
+                    details=status.to_dict()
+                )
+            elif mode == "MIGRATION_REQUIRED":
+                self._add_check(
+                    "remote_state_lifecycle",
+                    "WARNING",
+                    "Remote state infrastructure exists, migration required",
+                    details=status.to_dict()
+                )
+            elif mode == "REMOTE_MIGRATED":
+                self._add_check(
+                    "remote_state_lifecycle",
+                    "PASS",
+                    "Remote mode: Project using remote state",
+                    details=status.to_dict()
+                )
+            else:
+                self._add_check(
+                    "remote_state_lifecycle",
+                    "WARNING",
+                    f"Unknown remote state mode: {mode}"
+                )
+        except Exception as e:
+            self._add_check(
+                "remote_state_lifecycle",
+                "WARNING",
+                f"Could not detect remote state lifecycle: {e}"
             )
