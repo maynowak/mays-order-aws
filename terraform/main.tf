@@ -206,3 +206,15 @@ module "cognito_backup" {
   environment  = "Development"
   tags         = var.tags
 }
+
+# Cognito Backup Automation
+module "cognito_backup_automation" {
+  source         = "./modules/cognito_backup_automation"
+  project_name   = var.project_name
+  environment    = "Development"
+  aws_region     = var.aws_region
+  user_pool_id   = module.cognito.user_pool_id
+  user_pool_name = "${var.project_name}-users"
+  bucket_name    = module.cognito_backup.bucket_name
+  tags           = var.tags
+}
