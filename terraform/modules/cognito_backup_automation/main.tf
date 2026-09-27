@@ -78,7 +78,7 @@ resource "aws_lambda_function" "backup" {
       PROJECT_NAME    = var.project_name
       ENVIRONMENT     = var.environment
       AWS_ACCOUNT_ID  = data.aws_caller_identity.current.account_id
-      AWS_REGION      = var.aws_region
+      MY_AWS_REGION   = var.aws_region
       USER_POOL_ID    = var.user_pool_id
       USER_POOL_NAME  = var.user_pool_name
       BUCKET_NAME     = var.bucket_name
@@ -143,4 +143,37 @@ resource "aws_lambda_permission" "allow_scheduler" {
   function_name = aws_lambda_function.backup.function_name
   principal     = "scheduler.amazonaws.com"
   source_arn    = aws_scheduler_schedule.backup_schedule.arn
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  alarm_name          = "${local.name}-lambda-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Cognito Backup Lambda errors"
+  dimensions = {
+    FunctionName = aws_lambda_function.backup.function_name
+  }
+  treat_missing_data = "notBreaching"
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_invocations" {
+  alarm_name          = "${local.name}-invocations-failed"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Invocations"
+  namespace           = "AWS/Lambda"
+  period              = 86400
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Cognito Backup Lambda invocations monitoring"
+  dimensions = {
+    FunctionName = aws_lambda_function.backup.function_name
+  }
+  treat_missing_data = "missing"
+  alarm_actions       = []
 }
