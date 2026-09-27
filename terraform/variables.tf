@@ -113,3 +113,9 @@ variable "dynamodb_throttled_threshold" {
   type        = number
   default     = 1
 }
+
+variable "notification_email" {
+  description = "Optional email address for Cognito backup SNS notifications. If not set, no SNS subscription is created."
+  type        = string
+  default     = "nowakbewerbung@gmail.com"
+}

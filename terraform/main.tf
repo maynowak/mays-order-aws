@@ -217,4 +217,5 @@ module "cognito_backup_automation" {
   user_pool_name = "${var.project_name}-users"
   bucket_name    = module.cognito_backup.bucket_name
   tags           = var.tags
+  notification_email = var.notification_email
 }

@@ -31,3 +31,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "notification_email" {
+  type    = string
+  default = null
+  description = "Optional email address for SNS notifications. If null, no subscription is created."
+}
