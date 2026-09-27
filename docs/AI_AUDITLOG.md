@@ -622,3 +622,72 @@ Backend Änderung, IAM Anpassung, Workspace Selection bleibt
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B8.1 — REMOTE-STATE-BOOTSTRAP-DEPLOYMENT-01 - 2026-09-27
+
+**Status:** GREEN  
+**Branch:** main  
+**Ausgangs-HEAD:** 5c5f4d4
+
+**Scope:** Bootstrap-Infrastruktur tatsächlich in AWS bereitstellen und verifizieren, KEINE Migration
+
+**AWS Account:** 240571105849  
+**Region:** eu-central-1  
+**Profile:** mayaws
+
+**Timestamped Baseline:**
+- 2026-09-27T07-45-33Z
+- terraform/terraform.tfstate.2026-09-27T07-45-33Z
+- terraform/terraform.tfstate.d/mays-order-par/archive/terraform.tfstate.2026-09-27T07-45-33Z
+
+**Bootstrap:**
+- terraform/bootstrap lokal validiert
+- terraform fmt -check PASS
+- terraform validate PASS
+- terraform plan: 5 resources to add
+- terraform apply: 5 added, 0 changed, 0 destroyed
+
+**S3 Bucket:**
+- mays-orders-tfstate-central-240571105849
+- Region eu-central-1 ✓
+- Versioning Enabled ✓
+- SSE AES256 ✓
+- Public Access Block vollständig ✓
+- Tags gesetzt ✓
+
+**DynamoDB Locking:**
+- mays-orders-terraform-locks
+- Status ACTIVE ✓
+- PAY_PER_REQUEST ✓
+- Hash Key LockID ✓
+- Tags korrekt ✓
+
+**Multi-Project:**
+- Semantik unverändert
+- project_name → Workspace → isolierter State
+- mays-orders Workspace erhalten
+- mays-order-par Workspace erhalten
+
+**Lokale States:**
+- Unverändert erhalten
+- Kein Löschen, kein Verschieben
+
+**Backend:**
+- NICHT aktiviert
+- Kein terraform init -migrate-state
+- backend.example.tf vorhanden, nicht aktiv
+
+**Tests:**
+- terraform validate PASS
+- AWS CLI Readback erfolgreich
+- Bucket, Versioning, Encryption, Public Access, Tags verifiziert
+- DynamoDB Tabelle verifiziert
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-08.1-REMOTE-STATE-BOOTSTRAP-DEPLOYMENT.md`
+
+**Status:** GREEN — Bootstrap deployed, Remote State Infrastruktur bereit, Migration ausstehend
+
+**Git Status nach Commit:** Clean
+
+==================================================
