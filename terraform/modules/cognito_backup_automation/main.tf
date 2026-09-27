@@ -159,6 +159,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
     FunctionName = aws_lambda_function.backup.function_name
   }
   treat_missing_data = "notBreaching"
+  alarm_actions       = [aws_sns_topic.notifications.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "lambda_invocations" {
@@ -176,4 +177,26 @@ resource "aws_cloudwatch_metric_alarm" "lambda_invocations" {
   }
   treat_missing_data = "missing"
   alarm_actions       = []
+}
+
+resource "aws_sns_topic" "notifications" {
+  name = "${local.name}-notifications"
+  tags = var.tags
+}
+
+resource "aws_sns_topic_policy" "notifications" {
+  arn = aws_sns_topic.notifications.arn
+  policy = data.aws_iam_policy_document.sns_policy.json
+}
+
+data "aws_iam_policy_document" "sns_policy" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+    actions   = ["SNS:Publish"]
+    resources = [aws_sns_topic.notifications.arn]
+  }
 }
