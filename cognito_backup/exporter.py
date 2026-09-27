@@ -11,7 +11,7 @@ class CognitoExporter:
         pagination_token = None
         while True:
             try:
-                kwargs = {"UserPoolId": user_pool_id, "MaxResults": max_results}
+                kwargs = {"UserPoolId": user_pool_id, "Limit": max_results}
                 if pagination_token:
                     kwargs["PaginationToken"] = pagination_token
                 response = self.client.list_users(**kwargs)

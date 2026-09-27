@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from typing import Dict
 from .manifest import Manifest
 from .exporter import CognitoExporter
 from .storage import S3BackupStorage
