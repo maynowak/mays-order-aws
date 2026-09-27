@@ -189,6 +189,12 @@ resource "aws_sns_topic_policy" "notifications" {
   policy = data.aws_iam_policy_document.sns_policy.json
 }
 
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.notifications.arn
+  protocol  = "email"
+  endpoint  = "nowakbewerbung@gmail.com"
+}
+
 data "aws_iam_policy_document" "sns_policy" {
   statement {
     effect = "Allow"
