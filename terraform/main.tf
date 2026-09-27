@@ -198,3 +198,11 @@ module "sqs_worker" {
   monitoring_enabled  = var.monitoring_enabled
   log_retention_days  = var.log_retention_days
 }
+
+# Cognito User Data Backup Storage
+module "cognito_backup" {
+  source       = "./modules/cognito_backup"
+  project_name = var.project_name
+  environment  = "Development"
+  tags         = var.tags
+}
