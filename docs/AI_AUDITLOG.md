@@ -157,6 +157,32 @@ Report: docs/reports/COGNITO-BACKUP-01-BACKUP-RECOVERY-AUDIT.md
 
 Status: Audit abgeschlossen, keine Infrastrukturänderungen
 
+## COGNITO-BACKUP-02
+
+Datum: 2026-09-27
+Branch: main
+HEAD: fc8e54bbdae9e08b58965ad268f968323855371a
+
+Scope: Multi-Project User Data Backup Design
+
+Ergebnisse:
+- Backup Scope definiert: Infrastructure vs User Data
+- Multi-Project Identität über project_name/environment
+- Backup Storage Design: separater Bucket empfohlen
+- Backup Format versioniert mit Manifest
+- Export via Cognito Admin APIs, Passwörter nicht exportierbar
+- Restore Design mit Terraform + Admin APIs + Password Reset
+- Cross-Project Protection via Preflight Checks
+- RPO/RTO offen
+- Keine Infrastrukturänderungen
+
+Design Decisions DD-01 bis DD-12 dokumentiert
+Offene Punkte: RPO/RTO, Frequenz, Retention, Storage Name
+
+Report: docs/reports/COGNITO-BACKUP-02-MULTI-PROJECT-USER-DATA-BACKUP-DESIGN.md
+
+Status: Design abgeschlossen, Implementation offen
+
 ==================================================
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
