@@ -207,6 +207,29 @@ Destructive Actions: NONE
 
 Status: Implementation skeleton completed
 
+## COGNITO-BACKUP-03A
+
+Datum: 2026-09-27
+Scope: IAM / Terraform Validation
+
+Problem: AccessDenied durch falsches AWS Profile
+Ursache: Terraform ohne AWS_PROFILE=mayaws ausgeführt, User maymilly in Account 992382612204 ohne DynamoDB Rechte
+Lösung: Korrektes Profile AWS_PROFILE=mayaws verwenden, Account 240571105849
+
+Ergebnisse:
+- terraform init: PASS
+- terraform validate: PASS
+- terraform plan: PASS
+- Plan zeigt erwartete Backup-Infrastruktur
+
+IAM Änderung: Keine, bestehende Deployment Rechte ausreichend
+Multi-Project Isolation: unverändert
+Remote State: unverändert
+
+Report: docs/reports/COGNITO-BACKUP-03A-IAM-TERRAFORM-VALIDATION.md
+
+Status: Validation abgeschlossen, Apply noch ausstehend
+
 ==================================================
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
