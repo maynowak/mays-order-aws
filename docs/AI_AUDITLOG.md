@@ -273,6 +273,26 @@ Report: docs/reports/COGNITO-BACKUP-03C-FIRST-REAL-BACKUP.md
 
 Status: Backup nicht durchführbar, Infrastruktur fehlt
 
+## COGNITO-INFRA-RECREATE-01
+
+Datum: 2026-09-27
+Scope: Precheck vor Cognito Infrastruktur Recreation
+
+Configuration: PRESENT
+Terraform Module cognito definiert User Pool, App Client, Group
+Plan zeigt Erstellung von:
+- aws_cognito_user_pool.users name mays-orders-users
+- aws_cognito_user_pool_client.app name mays-orders-client
+- aws_cognito_user_group.staff name staff
+
+Aktueller AWS Pool: NONE
+Workspace: mays-orders
+Kein Apply durchgeführt
+
+Report: docs/reports/COGNITO-INFRA-RECREATE-01-PRECHECK.md
+
+Status: Configuration vorhanden, Infrastruktur fehlt, Recreation erforderlich
+
 ==================================================
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
