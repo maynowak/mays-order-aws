@@ -1,5 +1,5 @@
 locals {
-  bucket_name = "${var.bucket_name_prefix}-${var.environment}-${var.project_name}"
+  bucket_name = lower("${var.bucket_name_prefix}-${var.environment}-${var.project_name}")
 }
 
 resource "aws_s3_bucket" "cognito_backup" {
