@@ -691,3 +691,66 @@ Backend Änderung, IAM Anpassung, Workspace Selection bleibt
 **Git Status nach Commit:** Clean
 
 ==================================================
+
+## B8.2 — INSTALLER-REMOTE-STATE-LIFECYCLE-AUDIT-01 - 2026-09-27
+
+**Status:** YELLOW  
+**Branch:** main  
+**Ausgangs-HEAD:** 8d8622f
+
+**Scope:** Audit bestehender Installer- und Terraform-State-Lifecycle im Hinblick auf Remote-State-Infrastruktur
+
+**Repository Struktur:**
+- terraform/terraform.tfstate vorhanden
+- terraform/terraform.tfstate.d/mays-order-par/terraform.tfstate vorhanden
+- Keine mays-orders Workspace Directory, nutzt Default State
+- Installer core/context.py, terraform/runner.py vorhanden
+
+**Parallel-Semantik:**
+- project_name → terraform_workspace Mapping implementiert
+- __post_init__ setzt workspace = project_name
+- TERRAFORM_WORKSPACE Env Export
+- TerraformRunner nutzt Env Var für Workspace Selection
+- Automatische workspace select/new vor jedem Command
+
+**Projekte:**
+- mays-orders: project_name mays-orders, Workspace mays-orders, Lokaler State terraform/terraform.tfstate, Remote Key mays-orders/terraform.tfstate
+- mays-order-par: project_name mays-order-par, Workspace mays-order-par, Lokaler State terraform/terraform.tfstate.d/mays-order-par/terraform.tfstate, Remote Key mays-order-par/terraform.tfstate
+
+**State-Archivierung:**
+- Keine automatische Archivierung im Installer implementiert
+- B8.1 Timestamped Baseline manuell erstellt: 2026-09-27T07-45-33Z
+- Keine Timestamp-Mechanik im Code gefunden
+
+**Remote Backend Lifecycle:**
+- Zustand A: Infrastruktur existiert nicht → OK
+- Zustand B: Infrastruktur existiert, Projekt nicht migriert → Installer erkennt nicht
+- Zustand C: Projekt migriert → Nicht implementiert
+- Zustand D: Lokaler + Remote gleichzeitig → Kein Schutz
+
+**Gaps:**
+- Keine Remote Backend Detection
+- Keine State Migration Detection
+- Keine automatische Timestamped State Archivierung
+- Keine Authoritative Source Definition
+- Keine Divergenz-Erkennung
+
+**Notwendige minimale Änderungen:**
+- Remote Backend Detection
+- Automatische State Archivierung vor Migration
+- Migration Flag / Metadaten
+- Warnung bei gemischtem Zustand
+
+**Explizit nicht notwendig:**
+- Keine Änderung Parallel-Project-Semantik
+- Keine automatische Migration
+- Keine neue State-Verzeichnisarchitektur
+
+**Erzeugter Bericht:**
+`docs/reports/BACKUP-08.2-INSTALLER-REMOTE-STATE-LIFECYCLE-AUDIT.md`
+
+**Status:** YELLOW — Semantik erhalten, Lifecycle nicht implementiert, Gaps dokumentiert
+
+**Git Status nach Commit:** Clean
+
+==================================================
