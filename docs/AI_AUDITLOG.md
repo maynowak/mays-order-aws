@@ -293,6 +293,29 @@ Report: docs/reports/COGNITO-INFRA-RECREATE-01-PRECHECK.md
 
 Status: Configuration vorhanden, Infrastruktur fehlt, Recreation erforderlich
 
+## COGNITO-INFRA-RECREATE-02
+
+Datum: 2026-09-27
+Scope: Apply Cognito Infrastructure
+
+Terraform Apply target module.cognito: SUCCESS
+Resources created:
+- User Pool eu-central-1_xhjl0PxEH name mays-orders-users
+- App Client 5tac9c0uh5q6d5tjdse94jpf8s name mays-orders-client
+- Group staff
+
+User Count: 0
+Terraform Plan after apply: No changes
+Terraform Validate: Success
+Backup Bucket: Unchanged
+Remote State: Unchanged
+No users created
+No destructive actions
+
+Report: docs/reports/COGNITO-INFRA-RECREATE-02-APPLY.md
+
+Status: Cognito infrastructure recreated successfully
+
 ==================================================
 
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
