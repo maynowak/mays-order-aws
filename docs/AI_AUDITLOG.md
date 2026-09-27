@@ -45,3 +45,30 @@ The execution log itself is part of the audit workflow and must be
 kept accurate even if the audit remains completely read-only.
 
 ==================================================
+
+## B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01
+
+Audit-Datum: 2026-09-27
+Branch: main
+HEAD: fc8e54bbdae9e08b58965ad268f968323855371a
+Terraform: 1.16.1
+AWS Account: 240571105849
+Region: eu-central-1
+Profile: mayaws
+
+Ergebnisse:
+- B8 Remote-State-Lifecycle abgeschlossen
+- Multi-Project getestet, beide Projekte remote
+- mays-orders und mays-order-par parallel auf AWS betrieben und zerstört
+- State-Infrastruktur erhalten: S3 Bucket mays-orders-tfstate-central-240571105849, DynamoDB mays-orders-terraform-locks
+- Remote State History vorhanden für env:/mays-orders und env:/mays-order-par
+- Local State Baselines 2026-09-27T07-45-33Z vorhanden
+- Recovery Readiness geprüft, Pfad project_name → Workspace → Config → Remote State → AWS Resources nachvollziehbar
+- Locking Audit: force-unlock während B8.5 dokumentiert
+- Installer Mode REMOTE_READY für beide Projekte
+- Dokumentation konsolidiert in docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
+- Offener Punkt: Cognito User Pools mays-orders-users mit IDs eu-central-1_BKXksSwJI, eu-central-1_CwDJAbTiS, eu-central-1_QOJoc7nfZ existieren orphaned
+
+Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
+
+==================================================
