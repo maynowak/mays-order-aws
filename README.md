@@ -65,14 +65,15 @@ mays-orders/
 
 ## Projektstatus
 
-| Status | Bedeutung |
-|--------|-----------|
-| `WEEK 1` | Analyse, Requirements, API, Architektur (dokumentiert) |
-| `WEEK 2` | Core Implementation (Lambda/API Gateway/DynamoDB) |
-| `WEEK 3` | Business Rules, Reliability, Security |
-| `WEEK 4` | Professionalization (Skalierung, Kosten, Well-Architected) |
+Aktueller Status: **Architektur dokumentiert, Installer Core stabil**
 
-Aktueller Status: **WEEK 2 — COMPLETE** (Core Implementation: Terraform Infrastructure modularisiert in 6 Child Modules; Lambda/API Gateway/DynamoDB/Cognito/Monitoring implementiert).
+Abgeschlossene Bereiche:
+- Terraform foundation mit Remote State & Multi-Project Workspace Isolation
+- Cognito User Data Backup mit Automatisierung, Monitoring & SNS Alerting
+- Installer Core mit Command Service & Command Result Model
+- Architektur- und Product-Surface-Dokumentation
+
+Der ursprüngliche Wochen-Roadmap Status ist historisch. Aktuelle Arbeit erfolgt über das Modularitäts- und Installer-Core-Programm.
 
 ## Wochen-Struktur
 
