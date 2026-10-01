@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import uuid
+from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from errors import OrderError, error_body, internal_error, validation_error
@@ -14,6 +15,11 @@ from validation import validate_list_params, validate_order_id, validate_status_
 JSON_HEADERS = {"Content-Type": "application/json"}
 
 SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+
+def _json_default(o: Any) -> Any:
+    if isinstance(o, Decimal):
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 def _get_sqs_client():
     import boto3
@@ -66,7 +72,7 @@ def ok(status_code: int, payload: Any) -> Dict[str, Any]:
     return {
         "statusCode": status_code,
         "headers": JSON_HEADERS,
-        "body": json.dumps(payload, separators=(",", ":")),
+        "body": json.dumps(payload, separators=(",", ":"), default=_json_default),
     }
 
 
@@ -75,14 +81,14 @@ def fail(error: Any) -> Dict[str, Any]:
         return {
             "statusCode": error.http_status,
             "headers": JSON_HEADERS,
-            "body": json.dumps(error_body(error), separators=(",", ":")),
+            "body": json.dumps(error_body(error), separators=(",", ":"), default=_json_default),
         }
     print(f"Unexpected error: {error}", file=sys.stderr)
     err = internal_error()
     return {
         "statusCode": err.http_status,
         "headers": JSON_HEADERS,
-        "body": json.dumps(error_body(err), separators=(",", ":")),
+        "body": json.dumps(error_body(err), separators=(",", ":"), default=_json_default),
     }
 
 

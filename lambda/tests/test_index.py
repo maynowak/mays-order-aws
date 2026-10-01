@@ -2,6 +2,7 @@ import base64
 import json
 import unittest
 from contextlib import contextmanager
+from decimal import Decimal
 from unittest import mock
 
 import index
@@ -191,6 +192,22 @@ class TestHandlerRoutes(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(json.loads(response["body"])["error"]["code"], "VALIDATION_ERROR")
 
+
+class TestDecimalSerialization(unittest.TestCase):
+    def test_ok_serializes_decimal_as_float(self):
+        payload = {"orderId": "ord_1", "totalAmount": Decimal("29.99"), "quantity": Decimal("2")}
+        result = index.ok(200, payload)
+        body = json.loads(result["body"])
+        self.assertEqual(body["orderId"], "ord_1")
+        self.assertEqual(body["totalAmount"], 29.99)
+        self.assertEqual(body["quantity"], 2.0)
+
+    def test_ok_serializes_nested_decimal(self):
+        payload = {"order": {"amount": Decimal("10.5")}, "list": [Decimal("1"), Decimal("2")]}
+        result = index.ok(200, payload)
+        body = json.loads(result["body"])
+        self.assertEqual(body["order"]["amount"], 10.5)
+        self.assertEqual(body["list"], [1.0, 2.0])
 
 class TestHandlerErrors(unittest.TestCase):
     def test_order_error_mapped_to_status_code(self):
