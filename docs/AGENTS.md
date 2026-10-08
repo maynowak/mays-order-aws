@@ -39,8 +39,11 @@ mays-orders/
 ├── monitoring/       Monitoring-Design
 ├── reliability/      Konsistenz & Failure Handling
 ├── cost/             Kostenanalyse
-├── terraform/        Infrastructure as Code (geplant, W2)
-├── tests/            Test-Ergebnisse
+├── terraform/        Infrastructure as Code (aktiv, 7 Child Modules + Policy Gate)
+├── lambda/           Order Handler (Python 3.14, aktiv)
+├── installer/        Deployment-Lifecycle-CLI (Core)
+├── scripts/          Seed-/Cleanup-Tools + Tests
+├── tests/            E2E-Tests + Test-Ergebnisse
 ├── docs/             Projektakte (Status, Portfolio, Features, Reports)
 └── docs/features/    Feature-Dokumentation F001–F011
 ```
@@ -111,6 +114,5 @@ mays-orders/
 
 ## Future Roadmap
 
-- Woche 2: Core Implementation (Terraform, Cognito, API GW, Lambda, DynamoDB) — ⏳ PLANNED
-- Woche 3: State Machine, Reliability, Security, Monitoring — ⏳ PLANNED
-- Woche 4: Skalierung, Kosten, Well-Architected, Präsentation — ⏳ PLANNED
+Historischer Ausblick — der aktuelle Stand steht in `docs/PROJECT_STATUS.md`
+(Single Source of Truth), nicht hier.
