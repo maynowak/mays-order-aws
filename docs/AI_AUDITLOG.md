@@ -515,6 +515,22 @@ Completed:
 Status: GREEN
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-INSTALLER-TEST-PLAN-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: de96ffd
+Scope: Installer Testplan Vorbereitung
+
+Findings:
+- Installer vorhanden, parallele Installation unterstützt
+- Isolation nicht zweifelsfrei nachgewiesen
+- Plan-Ausführung BLOCKED
+
+Status: BLOCKED
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
