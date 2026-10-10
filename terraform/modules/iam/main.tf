@@ -16,7 +16,7 @@ data "aws_iam_policy_document" "handler_trust" {
 
 data "aws_iam_policy_document" "handler" {
   statement {
-    sid    = "DynamoDBOrders"
+    sid    = "DynamoDBTable"
     effect = "Allow"
     actions = [
       "dynamodb:PutItem",
@@ -27,6 +27,16 @@ data "aws_iam_policy_document" "handler" {
     ]
     resources = [
       var.dynamodb_table_arn,
+    ]
+  }
+
+  statement {
+    sid    = "DynamoDBGSI"
+    effect = "Allow"
+    actions = [
+      "dynamodb:Query",
+    ]
+    resources = [
       var.dynamodb_gsi1_arn,
       var.dynamodb_gsi2_arn,
     ]

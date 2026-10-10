@@ -498,6 +498,23 @@ Completed:
 Status: GREEN
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-IAM-LEAST-PRIVILEGE-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 167b214
+Scope: IAM Least Privilege Trennung Table/GSI
+
+Completed:
+- IAM Policy aufgeteilt: Tabelle volle CRUD+Query, GSI nur Query
+- Privacy Execution Role verifiziert: Lambda Handler Rolle
+- Tests 67/67 PASS
+- Terraform validate PASS
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
