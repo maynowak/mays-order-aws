@@ -63,7 +63,7 @@ resource "aws_dynamodb_table" "orders" {
   global_secondary_index {
     name               = "gsi2"
     projection_type    = "INCLUDE"
-    non_key_attributes = ["orderId", "pk", "sk", "subjectId", "version", "createdAt", "status", "updatedAt", "customer", "totalAmount", "currency"]
+    non_key_attributes = ["orderId", "subjectId", "version", "createdAt", "status", "updatedAt", "customer", "totalAmount", "currency"]
 
     key_schema {
       attribute_name = "gsi2pk"

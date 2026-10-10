@@ -427,6 +427,23 @@ Completed:
 Status: GREEN
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-GSI2-PROJECTION-FIX-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 7ca8c04
+Scope: GSI2 Projection Fix
+
+Completed:
+- pk/sk aus non_key_attributes entfernt
+- Python Code angepasst für Derivation
+- Terraform validate PASS
+- Tests 67/67 PASS
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
