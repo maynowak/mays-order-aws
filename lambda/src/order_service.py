@@ -372,20 +372,17 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,subjectId,version,createdAt",
+                    "ProjectionExpression": "orderId,pk,sk,subjectId,version,createdAt",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
                 items = result.get("Items", [])
                 for item in items:
-                    order_id = item.get("orderId")
-                    pk = item.get("pk") or f"{ORDER_ID_PREFIX}{order_id}" if order_id else None
-                    sk = item.get("sk") or ORDER_SK
                     affected.append({
-                        "pk": pk,
-                        "sk": sk,
-                        "orderId": order_id,
+                        "pk": item.get("pk"),
+                        "sk": item.get("sk"),
+                        "orderId": item.get("orderId"),
                         "subjectId": item.get("subjectId"),
                         "version": item.get("version"),
                     })
