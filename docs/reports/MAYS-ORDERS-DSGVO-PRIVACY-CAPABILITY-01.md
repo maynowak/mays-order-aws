@@ -1,412 +1,520 @@
 # MAYS-ORDERS-DSGVO-PRIVACY-CAPABILITY-01
-## Privacy Capability Design – Mays-Orders-AWS
+## Wiederverwendbare Privacy Capability für Mays-Orders-AWS
 
 **Datum:** 2026-10-10  
-**Task-ID:** MAYS-ORDERS-DSGVO-PRIVACY-CAPABILITY-01  
-**Modus:** DESIGN + CONTRACT + TEST SPECIFICATION – READ ONLY  
+**Branch:** main  
+**HEAD:** 0b689ee22273c172bfd8b11d9950428506042e7d  
+**Status:** DESIGN + CONTRACT + TEST SPECIFICATION – READ ONLY  
 **AWS Mutationen:** NONE
 
 ---
 
 ## 1. Architekturentscheidung
 
-### Prinzipien
-* Trennung Business vs Privacy Operations
-* Interne, privilegierte Funktionen, keine öffentliche API
-* Keine neue Authentifizierungsplattform
-* Wiederverwendbar pro Installation, projektbezogen
-* Keine Abhängigkeit von Mays-RIS / Mays-Jobsearch
-* Bestehende Infrastruktur nutzen: DynamoDB, Lambda, SQS, Cognito/IAM
+### Kontext
+Mays-Orders-AWS ist eigenständige Auftragsverarbeitung. Privacy-Operationen müssen intern, autorisiert und projekt-isoliert verfügbar sein, ohne neue Benutzerverwaltung, ohne Compliance-Plattform, ohne Abhängigkeit zu Mays-RIS / Mays-Jobsearch.
 
-Privacy Capability ist eine interne Schicht über bestehendem Order-Layer:
-- Business: `order.create / get / update_status / cancel`
-- Privacy: `privacy.inspect / export / erase [rectify / restrict]`
+### Entscheidung
+Privacy Capability als intern aufrufbare Funktionen `privacy.inspect`, `privacy.export`, `privacy.erase` im Auftragsdatenbereich implementieren.  
+Trennung Business vs. Privacy:
 
-CANCELLED ≠ gelöscht. Privacy-Operationen funktionieren unabhängig vom Order-Lifecycle.
+* **Business Operations:** `order.create`, `order.get`, `order.update_status`, `order.cancel`
+* **Privacy Operations:** `privacy.inspect`, `privacy.export`, `privacy.erase`
+
+Privacy Capability arbeitet unabhängig vom Order-Lifecycle. Ein `CANCELLED` Auftrag ist nicht automatisch gelöscht.
+
+**ADR-Prinzipien**
+* Fail closed
+* Server-side authorisation, keine Client-Provided Authority
+* Projekt-Kontext `project_name` + `environment` erzwingt Isolation
+* Keine neue Auth Plattform; bestehende Cognito/IAM Mechanismen nutzen
+* Keine neue AWS Ressourcen
 
 ---
 
 ## 2. Bestehendes Datenmodell
 
-**DynamoDB Single Table** `project_name`
-- PK: `ORDER#<orderId>`
-- SK: `#ORDER`
-- Attribute: `orderId`, `status`, `customer.{name,email}`, `items[]`, `currency`, `totalAmount`, `createdAt`, `updatedAt`, `version`, `gsi1pk=LIST`, `gsi1sk=createdAt`
+**Datenbank:** Single-Table DynamoDB `mays-orders`
 
-**Personenbezogene Daten**
-- `customer.name`
-- `customer.email`
-- Indirekt: `orderId` als Referenz in SQS Nachrichten, CloudWatch Logs
+Item Shape Order:
+* `pk = ORDER#<orderId>`
+* `sk = #ORDER`
+* `orderId`
+* `status`
+* `customer: { name, email }`
+* `items`
+* `currency`
+* `totalAmount`
+* `createdAt`, `updatedAt`
+* `version`
+* `gsi1pk = LIST`, `gsi1sk = createdAt`
 
-**Fehlend**
-- `subjectId` / persistente Personenreferenz
-- Index für Suche nach Person
-- Pseudonymisierung
+Indexe: Table PK/SK, GSI1 für Listing.
 
-Quelle: `database/dynamodb-design.md`, `api/endpoints.md`
+**Personenbezogene Attribute bestätigt:**
+* `customer.name`
+* `customer.email`
+
+**Fehlend:**
+* `subjectId`
+* Objektbezogene Autorisierung
+* TTL/Retention
+* Delete API
+
+Evidenz: `database/dynamodb-design.md`, `api/endpoints.md`
 
 ---
 
 ## 3. Subject Identification
 
-### Problemstellung
-Aktuell keine stabile Personen-ID. Zuordnung nur über `customer.name` + `customer.email`. Name ist nicht eindeutig, E-Mail kann sich ändern.
+### Analyse
+Aktuell existiert keine stabile Personenreferenz. Zuordnung erfolgt nur über `customer.name` + `customer.email` innerhalb einer Order.
 
-### Vorgeschlagene Strategie
-**subjectId** als stabile, projektinterne Referenz.
+### Strategie
+**Preferred: subjectId**
 
-Eigenschaften:
-- Wird von aufrufender Anwendung bereitgestellt
-- Enthält keine personenbezogenen Informationen
-- Eindeutig innerhalb Projekt-/Installationskontext
-- Immutabel nach Vergabe
-- Technisch: UUID v4 oder deterministischer Hash über externe IdP-Subject
+`subjectId` wird von aufrufender Anwendung bereitgestellt. Sie ist:
+* Projekt-/Installationskontext-gebunden
+* Enthält keine unnötigen personenbezogenen Informationen
+* Eindeutig innerhalb eines Projekts
 
-### Datenmodell-Ergänzung
-Neues Attribut im Order-Item:
-- `subjectId` String, optional
-- GSI2 für personbezogene Suche:
-  - GSI2PK = `SUBJECT#<subjectId>`
-  - GSI2SK = `ORDER#<orderId>#<createdAt>`
+Mapping:
+* Neue Orders: `subjectId` optional im Request, falls vorhanden persistieren
+* Bestehende Orders ohne `subjectId`: keine automatische Migration, keine Zuordnung ausschließlich über Name/E-Mail
+* Mehrere Orders pro Person möglich
+* Gemeinsame Bestellungen / Dritte: explizite Dokumentation erforderlich
 
-Vorteile:
-- Effiziente Suche aller Orders einer Person
-- Trennung von Kontakt-Daten und technischer Referenz
-- Migration bestehender Daten möglich, nicht zwingend für Grundfunktion
+**Indexierung:**
+* Empfehlung: GSI2 `subjectIndex` mit `gsi2pk = SUBJECT#<subjectId>` und `gsi2sk = ORDER#<orderId>` für effiziente Suche.  
+  *Hinweis: Design-Option, keine Umsetzung im Rahmen dieser Spezifikation.*
 
-### Umgang mit bestehenden Daten
-- Orders ohne `subjectId` bleiben auffindbar über Fallback-Mapping `customer.email` → nur für Inspect/Export mit expliziter Freigabe
-- Keine automatische Migration in diesem Auftrag
-- Unvollständige Zuordnungen werden im Inspect-Ergebnis gemeldet
-
-### Risiken
-- Gemeinsame Bestellungen: mehrere Personen beteiligt → `subjectId` Array oder getrennte Items
-- Dritte Personen in `customer.name` → nur über Freigabe
-- Duplikate bei fehlender subjectId
+**Einschränkungen**
+* Keine automatische Rückschlussbildung von Name/E-Mail auf `subjectId`
+* Widersprüchliche Zuordnungen -> Inspect markiert als unvollständig
+* Fehlende `subjectId` -> Order nicht über Privacy Capability adressierbar
 
 ---
 
 ## 4. Privacy Capability Contract
 
-Allgemeines Ergebnisformat:
+**Aufrufkontext**
+Alle Operationen erfordern:
+* Aufruferidentität
+* Projektkontext `project_name` / `environment`
+* Berechtigung `privacy.*`
+* Ziel `subjectId`
+* Audit-Kontext
+
+**Allgemeiner Response-Schema**
+
 ```json
 {
   "operationId": "uuid",
-  "capability": "privacy.inspect|export|erase",
+  "capability": "privacy.inspect|privacy.export|privacy.erase",
   "status": "PREVIEW|PENDING|PROCESSING|COMPLETED|PARTIALLY_COMPLETED|BLOCKED|FAILED",
-  "subjectId": "string",
-  "project": "string",
-  "requestedBy": "principal",
-  "authorizedBy": "policy",
+  "subjectId": "...",
+  "project": "...",
   "affectedRecords": 0,
-  "details": {},
+  "deletedRecords": 0,
+  "retainedRecords": 0,
   "errors": [],
-  "completedAt": "ISO8601"
+  "completedAt": "ISO-8601"
 }
 ```
 
-Statuswerte eindeutig definiert:
-- PREVIEW: Dry-Run
-- PENDING: Wartet auf Freigabe
-- PROCESSING: Laufend
-- COMPLETED: Erfolg ohne Einschränkung
-- PARTIALLY_COMPLETED: Teilweise ausgeführt, Rest blockiert
-- BLOCKED: Aufbewahrungspflicht / fehlende Freigabe
-- FAILED: Fehler
+**Statuswerte**
+* `PREVIEW` – Dry-Run Ergebnis
+* `PENDING` – Eingereiht
+* `PROCESSING` – Laufend
+* `COMPLETED` – Erfolgreich, Umfang spezifiziert
+* `PARTIALLY_COMPLETED` – Teilweise Erfolg
+* `BLOCKED` – Retention / Freigabe fehlt
+* `FAILED` – Fehler
 
 ---
 
-## 5. Privacy.inspect Contract
+## 5. Inspect Contract
 
-**Signatur**
-`privacy.inspect(subjectId, context)`
+**Funktion:** `privacy.inspect(subjectId, context)`
+
+**Ziel:** Auffinden aller personenbezogenen Daten der Person im autorisierten Datenbestand.
 
 **Eingabe**
-- `subjectId`: String
-- `context`: `{ project, callerPrincipal, authorizationToken, includeMetadata }`
+* `subjectId` string, required
+* `context`: aufrufer, projekt, berechtigung
 
 **Ausgabe**
-- `affectedOrders`: Anzahl
-- `dataCategories`: [`order_master`, `customer_contact`, `items`]
-- `references`: Liste `{ orderId, status, createdAt }`
-- `missingSubjectId`: Anzahl Orders ohne Zuordnung
-- `deletionObstacles`: [`retention_lock`, `legal_hold`, `backup_pending`]
-- `technicalLimitations`: Hinweis auf SQS/Logs/Backups
+```json
+{
+  "operationId": "...",
+  "capability": "privacy.inspect",
+  "status": "COMPLETED",
+  "subjectId": "...",
+  "affectedRecords": 3,
+  "dataCategories": ["order_master","customer_contact"],
+  "references": [
+    {"orderId":"ord_...","pk":"ORDER#...","sk":"#ORDER"},
+    ...
+  ],
+  "deletionObstacles": [
+    {"orderId":"...","reason":"retention_lock","until":"2027-01-01"}
+  ],
+  "incompleteMappings": [
+    {"orderId":"...","reason":"missing_subjectId"}
+  ],
+  "technicalLimitations": [
+    "SQS messages retain orderId for 4 days","CloudWatch Logs may contain PII"
+  ]
+}
+```
 
-**Prüfungen**
-- Autorisierung prüfen
-- Existenz subjectId prüfen
-- GSI2 Query falls vorhanden, sonst Fallback Scan mit Freigabe
-- Keine personenbezogenen Inhalte in Logs speichern
-
-**Sicherheit**
-Nur interne Aufrufe, Audit-Trail Pflicht.
+**Regeln**
+* Keine personenbezogenen Inhalte in Prüfprotokollen speichern
+* Fail closed bei fehlender Berechtigung
+* Keine Cross-Project Operationen
 
 ---
 
-## 6. Privacy.export Contract
+## 6. Export Contract
 
-**Signatur**
-`privacy.export(subjectId, context)`
+**Funktion:** `privacy.export(subjectId, context)`
 
-**Ausgabeformat**
-JSON, definiertes Schema:
+**Ziel:** Strukturierte Bereitstellung zugeordneter personenbezogener Daten.
+
+**Anforderungen**
+* Maschinenlesbares JSON
+* Definiertes Schema
+* Vollständigkeitsprüfung
+* Sichere Autorisierung
+* Keine Daten anderer Personen
+* Keine unkontrollierte Protokollierung
+* Klare Fehlerbehandlung
+* Keine unbeabsichtigte dauerhafte Kopie
+
+**Schema Vorschlag**
+
 ```json
 {
   "exportId": "...",
   "subjectId": "...",
-  "project": "...",
-  "exportedAt": "...",
-  "orders": [
+  "generatedAt": "...",
+  "data": [
     {
       "orderId": "...",
       "status": "...",
       "createdAt": "...",
-      "customer": { "name": "...", "email": "..." },
+      "customer": {"name":"...","email":"..."},
       "items": [...]
     }
   ],
-  "metadata": { "recordCount": 0, "schemaVersion": "1.0" }
+  "metadata": {
+    "recordCount": 3,
+    "schemaVersion": "1.0"
+  }
 }
 ```
 
-**Anforderungen**
-- Maschinenlesbar, vollständige Daten
-- Keine Daten anderer Personen
-- Keine Protokollierung personenbezogener Inhalte
-- Sichere Autorisierung
-- Klare Fehlerbehandlung
-- Keine dauerhafte Kopie
+Unterscheidung Datenschutz:
+* Auskunft / Export / Datenübertragbarkeit sind rechtlich unterschiedlich. Technisch wird Export als Datenbereitstellung umgesetzt. Rechtliche Einordnung bleibt Betreiberverantwortung.
 
-Unterscheidung:
-- Auskunft: menschenlesbar, vollständig
-- Export: strukturiert
-- Datenübertragbarkeit: strukturiert + standardisiert
+**Fehler**
+* 403 bei fehlender Berechtigung
+* 404 wenn subjectId unbekannt
+* 409 bei laufender Erasure Operation
 
 ---
 
-## 7. Privacy.erase Contract
+## 7. Erase Contract
 
-**Signatur**
-`privacy.erase(subjectId, context, options)`
+**Funktion:** `privacy.erase(subjectId, context, options)`
 
-Options:
-- `dryRun`: boolean
-- `mode`: `delete` | `anonymize` | `pseudonymize`
-- `retentionPolicy`: Betreiberdefinierte Regeln
-- `force`: boolean
+**Optionen**
+* `dryRun`: bool
+* `force`: bool – zur Freigabe von Retention-Blocks
+* `retentionPolicyId`: string
 
-**Ablauf**
-1. Autorisierung prüfen
-2. Betroffene Datensätze ermitteln via GSI2 / Fallback
-3. Dry-Run → Vorschau ohne Mutation
-4. Aufbewahrungspflichten prüfen
-5. Ausführung:
-   - DynamoDB: Update/Delete Items
-   - SQS/DLQ: Nachrichten identifizieren, keine Löschung garantiert
-   - Logs/CloudTrail: getrennte Verfahren
-6. Ergebnisbericht
+**Ziel:** Kontrollierte Löschung personenbezogener Daten innerhalb autorisierten Bestands.
 
-**Unterschiede**
-- Vollständige Löschung: Item entfernen
-- Partielle Löschung: `customer` Felder leeren, `subjectId` entfernen
-- Anonymisierung: nicht-reversibel ersetzen
-- Aufschub: Datensatz markieren `deletionPending` bis Retention abgelaufen
+**Mechanismen**
+* Vollständige Löschung: Order Item entfernen
+* Partielle Löschung: `customer.name`/`email` maskieren, `items` behalten falls nicht personenbezogen
+* Anonymisierung: Ersetzung durch Pseudonyme, falls Aufbewahrungspflicht besteht
+* Zurückstellung wegen Aufbewahrungspflicht
 
-**Wichtig**
-Capability entscheidet nicht über Recht. Sie wendet Betreiber-Regeln an und bricht bei fehlenden Freigaben sicher ab.
+**Dry-Run Vorschau**
+```json
+{
+  "operationId":"...",
+  "capability":"privacy.erase",
+  "status":"PREVIEW",
+  "subjectId":"...",
+  "affectedRecords":5,
+  "plannedOperations":[
+    {"orderId":"...","action":"delete|mask|retain"}
+  ],
+  "nonDeletable":[
+    {"orderId":"...","reason":"legal_hold","until":"2027-01-01"}
+  ],
+  "requiredApprovals":["legal_retention_override"]
+}
+```
 
----
+**Ergebnis**
+```json
+{
+  "operationId":"...",
+  "status":"PARTIALLY_COMPLETED",
+  "deletedRecords":3,
+  "maskedRecords":1,
+  "retainedRecords":1,
+  "errors":[]
+}
+```
 
-## 8. Dry-Run
-
-Jede destruktive Operation unterstützt `dryRun=true`.
-
-Vorschau enthält:
-- Anzahl betroffener Datensätze
-- Vorgesehene Operationen pro Datensatz
-- Nicht löschbare Datensätze mit Grund
-- Erforderliche Freigaben
-- Erkannte Risiken
-
-Kein Schreibzugriff bei Dry-Run.
-
-Schutz gegen Änderungen zwischen Dry-Run und Ausführung via `operationId` + Konsistenzprüfung.
-
----
-
-## 9. Authorization
-
-Privacy-Operationen sind privilegiert.
-
-Kontrollen:
-- Aufruferidentität via Cognito/IAM Principal
-- Berechtigung: dedizierte Policy `privacy:*`
-- Projektkontext: `project_name` aus Kontext, keine Cross-Project Operationen
-- Zielperson: `subjectId` muss im selben Projekt liegen
-- Audit Kontext: Aufruf erfassen, kein personenbezogener Inhalt in Logs
-
-Verhindern:
-- Fremdzugriffe
-- Projektübergreifende Operationen
-- Unberechtigte Exporte/Löschungen
-- Manipulierte subjectIds
-
-Interne Funktionsaufrufe sind nicht automatisch vertrauenswürdig.
+**Regeln**
+* Berechtigungsprüfung vor Ausführung
+* Eindeutige Personenreferenz via `subjectId`
+* Wiederholbarkeit / Idempotenz
+* Nachvollziehbares Ergebnis
+* Kein Löschen wenn Regeln fehlen – Operation abbricht oder explizite Entscheidung verlangt
 
 ---
 
-## 10. Retention Handling
+## 8. Authorization
 
-Berücksichtigt werden:
-- DynamoDB Active Data
-- SQS / DLQ
-- CloudWatch Logs
-- CloudTrail
-- S3
-- PITR / Backups
+Privacy-Operationen sind privilegierte interne Funktionen.
 
-Kategorien:
-- ACTIVE DATA: unmittelbar manipulierbar
-- RETAINED DATA: Lifecycle gesteuert
-- BACKUP DATA: gesondertes Verfahren
-- AUDIT DATA: unveränderlich
+**Kontrollen**
+* Aufruferidentität via bestehendem Cognito JWT oder IAM Role
+* Berechtigung `privacy.*` auf Funktions-Ebene
+* Projektkontext Erzwingung
+* Zielperson `subjectId` muss zum Projekt gehören
+* Audit Logging
 
-Privacy-Operationen können ACTIVE DATA bearbeiten. BACKUP DATA erfordert separaten Prozess. Keine vollständige Löschung bestätigen, solange Backups betroffen sind.
+**Verhindern**
+* Fremdzugriffe
+* Projektübergreifende Operationen
+* Manipulierte `subjectId`
+* Unberechtigte Exporte/Löschungen
 
----
-
-## 11. Backup Considerations
-
-DynamoDB PITR, On-Demand Backups, Cognito Backup.
-
-Löschung aus aktiven Daten ≠ Löschung aus Backups.
-
-Empfehlung:
-- Backups mit Retention Policy
-- Löschanfrage in Backups als Marker, keine sofortige physische Löschung
-- Dokumentation der Restrisiken
+**Hinweis:** Interne Funktionsaufrufe dürfen nicht allein des Vertrauens wegen akzeptiert werden.
 
 ---
 
-## 12. Async Processing
+## 9. Retention Handling
 
-Privacy-Operationen können asynchron laufen.
+**Bereiche**
+* ACTIVE DATA: DynamoDB Orders
+* RETAINED DATA: DynamoDB PITR, Backups
+* BACKUP DATA: DynamoDB PITR, S3 ggf.
+* AUDIT DATA: CloudTrail, CloudWatch Logs
+* TRANSIENT: SQS/DLQ
 
-Gründe:
-- Viele Orders pro Person
-- Retry-Verhalten
-- Idempotenz
-- Statusabfrage
+**DynamoDB**
+* Aktuelle Daten können gelöscht/ maskiert werden
+* PITR und Backups bleiben bestehen, Löschung erst nach Backup-Retention
 
-Nutze bestehende SQS Infrastruktur.
+**CloudWatch Logs**
+* Retention konfigurierbar via `var.log_retention_days`
+* Löschung nur auf Log-Group Ebene
 
-Vorschlag:
-- `privacy.erase` startet Job, gibt `operationId` zurück
-- Job verarbeitet via Worker, schreibt Ergebnis in DynamoDB Job Table
-- Statusabfrage via `operationId`
+**CloudTrail**
+* Unbegrenzt, kein Lifecycle definiert
+* Keine unmittelbare Bearbeitung durch Privacy Capability
 
-Keine neuen AWS Ressourcen.
+**SQS/DLQ**
+* Standard Retention 4 Tage
+* Nachrichten werden nach Konsum gelöscht
 
----
-
-## 13. Error Handling
-
-Fehlerkategorien:
-- AUTHORIZATION_FAILED
-- SUBJECT_NOT_FOUND
-- PARTIAL_FAILURE
-- RETENTION_BLOCKED
-- BACKUP_CONFLICT
-- INTERNAL_ERROR
-
-Jeder Fehler liefert maschinenlesbaren Code, human lesbare Nachricht, keine personenbezogenen Daten in Fehlermeldungen.
+**Ergebnis**
+Keine vollständige Löschung bestätigen solange relevante Datenkopien nicht berücksichtigt.
 
 ---
 
-## 14. Test Strategy
+## 10. Backup Considerations
 
-Testfälle ohne produktive Daten:
-- Eine Person mit einer Bestellung
-- Eine Person mit mehreren Bestellungen
-- Zwei Personen mit gemeinsamen Daten
-- Unbekannte subjectId
-- Fehlende Berechtigung
-- Projektübergreifender Zugriff
-- Vollständiger / unvollständiger Export
-- Dry-Run ohne Mutation
-- Vollständige Löschung
-- Partielle Löschung / Anonymisierung
-- Gesetzlich aufzubewahrende Daten
-- Wiederholter Löschaufruf – Idempotenz
-- Unterbrochene Löschung – Wiederaufnahme
-- Gleichzeitige Änderungen
-- Daten in SQS/DLQ
-- Backup-Wiederherstellung
+DynamoDB PITR, Backups, CloudTrail S3, Terraform State.
+
+Privacy-Operationen betreffen nur aktive Daten. Backup-Daten erfordern separate Verfahren:
+* PITR Restore mit Filter -> nicht praktikabel
+* Erwartetes Verhalten: Löschung aus aktiven Systemen, Backups behalten personenbezogene Daten bis Backup-Rotation
+
+Dokumentation dieser Einschränkung im Inspect Ergebnis `technicalLimitations`.
 
 ---
 
-## 15. Migration Considerations
+## 11. Async Processing
 
-Bestehende Orders ohne `subjectId`:
-- Fallback über E-Mail Hash nur mit Freigabe
-- Migration ist optional und Betreiberentscheidung
-- Keine automatische Migration in diesem Auftrag
-- Dokumentation der Lücke im Inspect Ergebnis
+Größe und Anzahl der Orders pro Person kann groß sein.
 
----
+**Empfehlung**
+* Privacy-Operationen asynchron über SQS ausführen
+* Statusabfrage via `operationId`
+* Idempotenz über `operationId` / Idempotency Key
+* Retry-Verhalten, Dead Letter Queue
+* Wiederaufnahme nach Fehler
 
-## 16. Risks
-
-- Fehlende subjectId führt zu unvollständiger Erfassung
-- Log-Retention kann PII länger speichern als Order-Daten
-- Backups verhindern sofortige vollständige Löschung
-- Gemeinsame Bestellungen erfordern Mehrfachzuordnung
-- Falsche subjectId Zuordnung → Löschung falscher Person
+Bestehende Infrastruktur bevorzugen. Keine neuen AWS Ressourcen im Design.
 
 ---
 
-## 17. Implementation Roadmap
+## 12. Error Handling
 
-1. Subject Identification Schema definieren
-2. Privacy Capability Contracts spezifizieren
-3. Autorisierung Modell definieren
-4. Inspect / Export / Erase Schnittstellen designen
-5. Retention & Backup Handling definieren
-6. Test Spezifikation finalisieren
-7. Dokumentation konsolidieren
-8. Review & Freigabe
+Standard Fehlerformat:
+```json
+{"error":{"code":"...","message":"...","details":{}}}
+```
 
-Keine Implementierung in diesem Auftrag.
+Codes:
+* `UNAUTHORIZED` 401
+* `FORBIDDEN` 403
+* `VALIDATION_ERROR` 400
+* `NOT_FOUND` 404
+* `CONFLICT` 409
+* `SERVICE_UNAVAILABLE` 503
 
----
-
-## 18. Acceptance Criteria
-
-[✓] Governance geprüft
-[✓] Datenmodell analysiert
-[✓] Subject-ID Strategie definiert
-[✓] Inspect spezifiziert
-[✓] Export spezifiziert
-[✓] Erase spezifiziert
-[✓] Autorisierung definiert
-[✓] Retention berücksichtigt
-[✓] Backups berücksichtigt
-[✓] Dry-Run spezifiziert
-[✓] Fehlerbehandlung definiert
-[✓] Teststrategie erstellt
-[✓] Migration berücksichtigt
-[✓] Implementierungsroadmap erstellt
-[✓] Auditlog-Konformität geprüft
-[✓] Keine Runtime-Änderungen
-[✓] Keine AWS-Mutationen
+Alle Security Failures fail closed.
 
 ---
 
-CHECKPOINT: MAYS-ORDERS-DSGVO-PRIVACY-CAPABILITY-01  
-STATUS: GREEN – Design abgeschlossen, Implementierung offen  
-AWS MUTATIONS: NONE  
-BRANCH: main  
-HEAD: 874d3f0 → Commit pending
+## 13. Test Strategy
 
-NEXT STEP: Git Checkpoint
+Tests ohne produktive personenbezogene Daten.
+
+**Szenarien**
+* Eine Person mit einer Bestellung
+* Eine Person mit mehreren Bestellungen
+* Zwei Personen mit gemeinsamen Daten
+* Unbekannte `subjectId`
+* Fehlende Berechtigung
+* Projektübergreifender Zugriff
+* Vollständiger Export
+* Unvollständiger Export
+* Dry-Run ohne Mutation
+* Vollständige Löschung
+* Partielle Löschung
+* Gesetzlich aufzubewahrende Daten
+* Wiederholter Löschaufruf
+* Unterbrochene Löschung
+* Gleichzeitige Änderungen
+* Daten in SQS/DLQ
+* Backup-Wiederherstellung
+
+Acceptance Criteria: Fail closed, keine Datenlecks, Dry-Run verändert nichts, Audit Trail vorhanden.
+
+---
+
+## 14. Migration Considerations
+
+* Bestehende Orders ohne `subjectId` bleiben unadressierbar
+* Keine automatische Datenmigration
+* Keine Rückschlussbildung Name/E-Mail -> `subjectId`
+* Optionaler manueller Mapping Prozess außerhalb dieser Capability
+
+---
+
+## 15. Risks
+
+* Fehlende `subjectId` -> Privacy Rechte technisch nicht umsetzbar
+* Logging enthält PII -> Maskierung erforderlich
+* Backup-Retention verhindert vollständige Löschung
+* Objektbezogene Autorisierung fehlt im Basis-System
+* Gemeinsame Bestellungen -> Dritte betroffen
+
+---
+
+## 16. Implementation Roadmap
+
+**Phase 1 – Design & Contract**
+* ✅ Archivierte Analyse MAYS-ORDERS-DSGVO-CONSOLIDATION-01
+* ✅ Privacy Capability Contract
+
+**Phase 2 – Data Model Extension**
+* GSI für `subjectId` evaluieren
+* Subject Mapping Regeln definieren
+
+**Phase 3 – Core Functions**
+* `privacy.inspect` implementieren
+* `privacy.export` implementieren
+* `privacy.erase` mit Dry-Run
+
+**Phase 4 – Security & Audit**
+* Autorisierung, Audit Logging
+* Test Suite
+
+**Phase 5 – Retention & Backup**
+* Dokumentation Backup-Limitierungen
+* Installer Optionen für Retention
+
+Kein Start ohne Freigabe.
+
+---
+
+## 17. Acceptance Criteria
+
+- [x] Governance geprüft
+- [x] Bestehendes Datenmodell analysiert
+- [x] Subject-ID Strategie definiert
+- [x] Inspect spezifiziert
+- [x] Export spezifiziert
+- [x] Erase spezifiziert
+- [x] Autorisierung definiert
+- [x] Retention berücksichtigt
+- [x] Backups berücksichtigt
+- [x] Dry-Run spezifiziert
+- [x] Fehlerbehandlung definiert
+- [x] Teststrategie erstellt
+- [x] Migration berücksichtigt
+- [x] Implementierungsroadmap erstellt
+- [x] Auditlog-Konformität geprüft
+- [x] Keine Runtime-Änderungen
+- [x] Keine AWS-Mutationen
+- [ ] Git-Checkpoint abgeschlossen
+
+---
+
+## 18. Final Checkpoint
+
+CHECKPOINT: MAYS-ORDERS-DSGVO-PRIVACY-CAPABILITY-01
+
+STATUS: YELLOW
+
+BRANCH: main
+
+HEAD: 0b689ee22273c172bfd8b11d9950428506042e7d
+
+ARCHITECTURE: DESIGN COMPLETE
+
+SUBJECT IDENTIFICATION: subjectId STRATEGY DEFINED
+
+INSPECT: SPECIFIED
+
+EXPORT: SPECIFIED
+
+ERASE: SPECIFIED
+
+AUTHORIZATION: DEFINED
+
+RETENTION: DOCUMENTED
+
+BACKUPS: DOCUMENTED
+
+TEST STRATEGY: DEFINED
+
+ROADMAP: DEFINED
+
+AUDITLOG: COMPLIANT
+
+AWS MUTATIONS: NONE
+
+FILES CHANGED: docs/reports/MAYS-ORDERS-DSGVO-PRIVACY-CAPABILITY-01.md
+
+GIT COMMIT: pending
+
+PUSH: pending
+
+NEXT STEP: Await orchestration review, no implementation.
+
+---
+
+*Dokument erstellt im Design + Contract + Test Specification Modus. Keine Implementierung autorisiert.*
