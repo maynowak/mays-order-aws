@@ -480,6 +480,22 @@ class TestPrivacyErase(unittest.TestCase):
         self.assertEqual(result["anonymizedRecords"], 1)
         self.assertEqual(len(updated), 1)
 
+    def test_privacy_requires_internal_secret(self):
+        # Missing secret must block
+        original = os.environ.pop("PRIVACY_INTERNAL_SECRET", None)
+        try:
+            service = create_order_service(table_name="mays-orders", client=make_client({}))
+            with self.assertRaises(OrderError):
+                service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True, "internal_token": "test-secret"})
+        finally:
+            if original is not None:
+                os.environ["PRIVACY_INTERNAL_SECRET"] = original
+
+    def test_privacy_requires_internal_token(self):
+        service = create_order_service(table_name="mays-orders", client=make_client({}))
+        with self.assertRaises(OrderError):
+            service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True, "internal_token": "wrong-secret"})
+
 
 if __name__ == "__main__":
     unittest.main()

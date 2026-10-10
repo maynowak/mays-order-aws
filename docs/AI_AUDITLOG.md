@@ -374,6 +374,23 @@ Completed:
 Status: GREEN
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-TRUST-FIX-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: f494c1c
+Scope: Trust Boundary Fix
+
+Completed:
+- Secret muss gesetzt sein, sonst BLOCKED
+- Token Vergleich via secrets.compare_digest
+- Tests für fehlendes/falsches Secret und Token
+- Dokumentation erstellt
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================

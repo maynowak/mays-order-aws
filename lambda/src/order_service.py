@@ -110,12 +110,17 @@ class OrderService:
             raise validation_error("Unauthorized privacy operation")
         if not context.get(permission):
             raise validation_error(f"Missing permission {permission}")
-        # Internal trust boundary: token must match server secret
+        # Internal trust boundary: secret must be configured and token must match
         internal_secret = os.environ.get("PRIVACY_INTERNAL_SECRET")
-        if internal_secret:
-            token = context.get("internal_token")
-            if not token or token != internal_secret:
-                raise validation_error("Internal trust boundary violation")
+        if not internal_secret:
+            raise validation_error("Internal secret not configured")
+        token = context.get("internal_token")
+        if not token:
+            raise validation_error("Internal token missing")
+        # Use constant-time compare
+        import secrets
+        if not secrets.compare_digest(str(token), str(internal_secret)):
+            raise validation_error("Internal trust boundary violation")
 
     def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
         input_data = validate_create_order(raw_body)
