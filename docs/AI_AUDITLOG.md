@@ -672,6 +672,22 @@ Findings:
 Status: YELLOW
 
 ==================================================
+
+## MAYS-ORDERS-INSTALLER-METADATA-LIFECYCLE-FIX-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 217310f
+Scope: Installer Metadaten Lifecycle Fix
+
+Findings:
+- FIX-A TerraformRunner workspace safety implementiert
+- FIX-B Minimal metadata consistency tests hinzugefügt
+- Workspace Safety GREEN, Plan-State Consistency YELLOW
+
+Status: YELLOW
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
