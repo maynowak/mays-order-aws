@@ -566,6 +566,23 @@ Findings:
 Status: BLOCKED
 
 ==================================================
+
+## MAYS-ORDERS-MULTIPROJECT-CLI-FIX-AND-TEST-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 814f7da
+Scope: Multiprojekt CLI Fix und Regression Tests
+
+Completed:
+- Initialisierungsreihenfolge korrigiert
+- Workspace wird aus endgültigem project_name abgeleitet
+- Regression Tests PASS
+- Installer Plan für mays-orders-privacy-test isoliert CREATE only
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================

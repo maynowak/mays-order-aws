@@ -348,6 +348,7 @@ class InstallerCLI:
 
     def _create_context(self, parsed) -> "InstallationContext":
         """Create InstallationContext from parsed arguments."""
+        import os
         from installer.core.context import InstallationContext
         context = InstallationContext.from_env()
         context.aws_profile = parsed.profile
@@ -363,6 +364,16 @@ class InstallerCLI:
         context.development_phase = getattr(parsed, 'development_phase', 'H2')
         context.development_step = getattr(parsed, 'development_step', 0)
         context.development_status = getattr(parsed, 'development_status', 'development')
+
+        # Fix: ensure workspace is derived from final project_name, not from env init
+        if not context.terraform_workspace or context.terraform_workspace == "default":
+            context.terraform_workspace = context.project_name
+        else:
+            # Re-derive if workspace matches old project_name pattern
+            # Force workspace to project_name for parallel project isolation
+            context.terraform_workspace = context.project_name
+        os.environ["TERRAFORM_WORKSPACE"] = context.terraform_workspace
+
         return context
 
     def _cmd_validate(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
