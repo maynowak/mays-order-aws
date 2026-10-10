@@ -318,6 +318,25 @@ Status: Cognito infrastructure recreated successfully
 
 ==================================================
 
+## MAYS-ORDERS-DSGVO-PRIVACY-ERASURE-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 88f2059
+Scope: Implementation privacy.erase with PREVIEW/EXECUTE, Retention Entscheidungen, Conditional Writes, Idempotenz
+
+Completed:
+- OrderService.erase_subject implementiert
+- PREVIEW ohne Mutation
+- EXECUTE mit ERASE/ANONYMIZE/RETAIN
+- Conditional Writes subjectId Prüfung
+- Tests 65/65 PASS
+- Dokumentation docs/reports/MAYS-ORDERS-DSGVO-PRIVACY-ERASURE-01.md erstellt
+- Keine AWS Mutationen
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================

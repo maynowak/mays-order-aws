@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-08-19)
+## Aktueller Stand (zuletzt aktualisiert: 2026-10-10)
 
 ```text
 May's Orders — AWS Serverless Order Management System

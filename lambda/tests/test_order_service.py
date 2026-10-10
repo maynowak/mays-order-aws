@@ -29,6 +29,10 @@ class FakeTable:
         handler = self._handlers.get("update_item")
         return {} if handler is None else handler(**kwargs)
 
+    def delete_item(self, **kwargs):
+        handler = self._handlers.get("delete_item")
+        return {} if handler is None else handler(**kwargs)
+
 
 class FakeClientError(Exception):
     """Stub für boto3 ClientError (reicht für die Fehler-Erkennung)."""
@@ -417,6 +421,60 @@ class TestPrivacyExport(unittest.TestCase):
             self.assertNotIn("pk", order)
             self.assertNotIn("gsi1pk", order)
             self.assertNotIn("subjectId", order)
+
+
+class TestPrivacyErase(unittest.TestCase):
+    def test_erase_preview_no_mutation(self):
+        items = [make_order(orderId="ord_1")]
+
+        def on_query(**kwargs):
+            return {"Items": items}
+
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "PREVIEW", "policy": "ERASE"})
+        self.assertEqual(result["status"], "PREVIEW")
+        self.assertEqual(result["affectedRecords"], 1)
+        self.assertEqual(result["plannedDeletes"], 1)
+
+    def test_erase_execute_deletes(self):
+        items = [make_order(orderId="ord_1", subjectId="user-123")]
+
+        deleted = []
+
+        def on_query(**kwargs):
+            return {"Items": items}
+
+        def on_delete(**kwargs):
+            deleted.append(kwargs)
+            return {}
+
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query, "delete_item": on_delete}))
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "EXECUTE", "policy": "ERASE"})
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["deletedRecords"], 1)
+        self.assertEqual(len(deleted), 1)
+
+    def test_erase_requires_authorization(self):
+        service = create_order_service(table_name="mays-orders", client=make_client({}))
+        with self.assertRaises(OrderError):
+            service.erase_subject("user-123", context={"project": "mays-orders", "authorized": False}, options={"mode": "PREVIEW"})
+
+    def test_erase_anonymize(self):
+        items = [make_order(orderId="ord_1", subjectId="user-123")]
+
+        updated = []
+
+        def on_query(**kwargs):
+            return {"Items": items}
+
+        def on_update(**kwargs):
+            updated.append(kwargs)
+            return {}
+
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query, "update_item": on_update}))
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "EXECUTE", "policy": "ANONYMIZE"})
+        self.assertEqual(result["anonymizedRecords"], 1)
+        self.assertEqual(len(updated), 1)
 
 
 if __name__ == "__main__":

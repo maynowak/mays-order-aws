@@ -334,6 +334,142 @@ class OrderService:
             "limitations": limitations,
         }
 
+    def erase_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Authorization and project isolation – fail closed
+        if not context or not context.get("project"):
+            raise validation_error("Missing project context")
+        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
+        if expected_project and context.get("project") != expected_project:
+            raise validation_error("Project mismatch")
+        if not context.get("authorized"):
+            raise validation_error("Unauthorized privacy operation")
+
+        if not subject_id or not isinstance(subject_id, str):
+            raise validation_error("Invalid subjectId")
+
+        opts = options or {}
+        mode = opts.get("mode", "PREVIEW").upper()
+        policy = opts.get("policy", "ERASE").upper()
+
+        if mode not in ("PREVIEW", "EXECUTE"):
+            raise validation_error("Invalid mode")
+        if policy not in ("ERASE", "ANONYMIZE", "RETAIN"):
+            raise validation_error("Invalid policy")
+
+        operation_id = str(uuid.uuid4())
+        affected = []
+        last_evaluated_key = None
+
+        # Collect items via GSI2
+        try:
+            while True:
+                query_kwargs = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
+                    "ProjectionExpression": "orderId,pk,sk,subjectId,createdAt",
+                }
+                if last_evaluated_key:
+                    query_kwargs["ExclusiveStartKey"] = last_evaluated_key
+                result = self._table.query(**query_kwargs)
+                items = result.get("Items", [])
+                for item in items:
+                    affected.append({
+                        "pk": item.get("pk"),
+                        "sk": item.get("sk"),
+                        "orderId": item.get("orderId"),
+                        "subjectId": item.get("subjectId"),
+                    })
+                last_evaluated_key = result.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
+        except Exception:
+            return {
+                "operationId": operation_id,
+                "subjectId": subject_id,
+                "status": "BLOCKED",
+                "affectedRecords": 0,
+                "deletedRecords": 0,
+                "anonymizedRecords": 0,
+                "retainedRecords": 0,
+                "failedRecords": 0,
+                "limitations": ["GSI2 not available"],
+                "completedAt": now_iso(),
+            }
+
+        if mode == "PREVIEW":
+            planned_deletes = 0
+            planned_retentions = 0
+            if policy == "ERASE":
+                planned_deletes = len(affected)
+            elif policy == "ANONYMIZE":
+                planned_deletes = 0  # anonymize counts separately
+            elif policy == "RETAIN":
+                planned_retentions = len(affected)
+            return {
+                "operationId": operation_id,
+                "subjectId": subject_id,
+                "status": "PREVIEW",
+                "affectedRecords": len(affected),
+                "plannedDeletes": planned_deletes if policy == "ERASE" else 0,
+                "plannedAnonymizations": len(affected) if policy == "ANONYMIZE" else 0,
+                "plannedRetentions": planned_retentions,
+                "limitations": [],
+                "completedAt": now_iso(),
+            }
+
+        # EXECUTE mode
+        deleted = 0
+        anonymized = 0
+        retained = 0
+        failed = 0
+        for item in affected:
+            pk = item.get("pk")
+            sk = item.get("sk")
+            if not pk or not sk:
+                failed += 1
+                continue
+            try:
+                if policy == "RETAIN":
+                    retained += 1
+                    continue
+                if policy == "ERASE":
+                    self._table.delete_item(
+                        Key={"pk": pk, "sk": sk},
+                        ConditionExpression="subjectId = :sid",
+                        ExpressionAttributeValues={":sid": subject_id},
+                    )
+                    deleted += 1
+                elif policy == "ANONYMIZE":
+                    self._table.update_item(
+                        Key={"pk": pk, "sk": sk},
+                        UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk",
+                        ConditionExpression="subjectId = :sid",
+                        ExpressionAttributeNames={"#c": "customer", "#n": "name", "#e": "email"},
+                        ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", ":sid": subject_id},
+                    )
+                    anonymized += 1
+            except Exception:
+                failed += 1
+
+        status = "COMPLETED"
+        if failed > 0 or retained > 0:
+            status = "PARTIALLY_COMPLETED"
+
+        return {
+            "schemaVersion": "1.0",
+            "operationId": operation_id,
+            "subjectId": subject_id,
+            "status": status,
+            "affectedRecords": len(affected),
+            "deletedRecords": deleted,
+            "anonymizedRecords": anonymized,
+            "retainedRecords": retained,
+            "failedRecords": failed,
+            "limitations": [],
+            "completedAt": now_iso(),
+        }
+
 
 def create_order_service(table_name: str, client: Any = None) -> OrderService:
     return OrderService(table_name, client)
