@@ -110,6 +110,12 @@ class OrderService:
             raise validation_error("Unauthorized privacy operation")
         if not context.get(permission):
             raise validation_error(f"Missing permission {permission}")
+        # Internal trust boundary: token must match server secret
+        internal_secret = os.environ.get("PRIVACY_INTERNAL_SECRET")
+        if internal_secret:
+            token = context.get("internal_token")
+            if not token or token != internal_secret:
+                raise validation_error("Internal trust boundary violation")
 
     def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
         input_data = validate_create_order(raw_body)
@@ -361,7 +367,7 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,pk,sk,subjectId,createdAt",
+                    "ProjectionExpression": "orderId,pk,sk,subjectId,version,createdAt",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
@@ -373,6 +379,7 @@ class OrderService:
                         "sk": item.get("sk"),
                         "orderId": item.get("orderId"),
                         "subjectId": item.get("subjectId"),
+                        "version": item.get("version"),
                     })
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -442,19 +449,31 @@ class OrderService:
                     retained += 1
                     continue
                 if policy == "ERASE":
+                    version = item.get("version")
+                    cond_values = {":sid": subject_id}
+                    cond_expr = "subjectId = :sid"
+                    if version is not None:
+                        cond_values[":ver"] = version
+                        cond_expr += " AND version = :ver"
                     self._table.delete_item(
                         Key={"pk": pk, "sk": sk},
-                        ConditionExpression="subjectId = :sid",
-                        ExpressionAttributeValues={":sid": subject_id},
+                        ConditionExpression=cond_expr,
+                        ExpressionAttributeValues=cond_values,
                     )
                     deleted += 1
                 elif policy == "ANONYMIZE":
+                    version = item.get("version")
+                    cond_values = {":sid": subject_id}
+                    cond_expr = "subjectId = :sid"
+                    if version is not None:
+                        cond_values[":ver"] = version
+                        cond_expr += " AND version = :ver"
                     self._table.update_item(
                         Key={"pk": pk, "sk": sk},
                         UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk",
-                        ConditionExpression="subjectId = :sid",
+                        ConditionExpression=cond_expr,
                         ExpressionAttributeNames={"#c": "customer", "#n": "name", "#e": "email"},
-                        ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", ":sid": subject_id},
+                        ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", **cond_values},
                     )
                     anonymized += 1
             except Exception:
