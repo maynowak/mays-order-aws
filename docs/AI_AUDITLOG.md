@@ -462,6 +462,25 @@ Findings:
 Status: YELLOW
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-AWS-TEST-PREFLIGHT-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 550506d
+Scope: AWS Test Preflight Read-Only
+
+Findings:
+- Projektisolierung NOT VERIFIED
+- IAM Policy fehlt GSI2 ARN → BLOCKED
+- GSI2 konfiguriert, nicht deployed
+- Terraform Plan nicht ausgeführt
+- Testfälle definiert, nicht ausgeführt
+- Keine AWS Mutationen
+
+Status: BLOCKED
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
