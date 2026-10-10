@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import secrets
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -203,6 +204,10 @@ class OrderService:
         # Authorization and project isolation – fail closed
         if not context or not context.get("project"):
             raise validation_error("Missing project context")
+        # Project must match runtime environment
+        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
+        if expected_project and context.get("project") != expected_project:
+            raise validation_error("Project mismatch")
         if not context.get("authorized"):
             raise validation_error("Unauthorized privacy operation")
 
@@ -253,6 +258,80 @@ class OrderService:
             "orderReferences": order_refs,
             "dataCategories": data_categories,
             "limitations": [],
+        }
+
+    def export_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Authorization and project isolation – fail closed
+        if not context or not context.get("project"):
+            raise validation_error("Missing project context")
+        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
+        if expected_project and context.get("project") != expected_project:
+            raise validation_error("Project mismatch")
+        if not context.get("authorized"):
+            raise validation_error("Unauthorized privacy operation")
+
+        if not subject_id or not isinstance(subject_id, str):
+            raise validation_error("Invalid subjectId")
+
+        operation_id = str(uuid.uuid4())
+        orders = []
+        last_evaluated_key = None
+        limitations = []
+        # Pagination loop
+        try:
+            while True:
+                query_kwargs = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
+                    "ProjectionExpression": "orderId,status,createdAt,updatedAt,customer,totalAmount,currency",
+                }
+                if last_evaluated_key:
+                    query_kwargs["ExclusiveStartKey"] = last_evaluated_key
+                result = self._table.query(**query_kwargs)
+                items = result.get("Items", [])
+                for item in items:
+                    # Build minimal export view, exclude internal fields
+                    export_item = {
+                        "orderId": item.get("orderId"),
+                        "status": item.get("status"),
+                        "createdAt": item.get("createdAt"),
+                        "customer": {
+                            "name": item.get("customer", {}).get("name"),
+                            "email": item.get("customer", {}).get("email"),
+                        },
+                    }
+                    # Optional fields
+                    if "totalAmount" in item:
+                        export_item["totalAmount"] = item["totalAmount"]
+                    if "currency" in item:
+                        export_item["currency"] = item["currency"]
+                    orders.append(export_item)
+                last_evaluated_key = result.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
+        except Exception as err:
+            # If GSI2 not available, return empty with limitation
+            return {
+                "schemaVersion": "1.0",
+                "operationId": operation_id,
+                "subjectId": subject_id,
+                "status": "PARTIALLY_COMPLETED",
+                "exportedAt": now_iso(),
+                "recordCount": 0,
+                "orders": [],
+                "limitations": ["GSI2 not available or query failed"],
+            }
+
+        return {
+            "schemaVersion": "1.0",
+            "operationId": operation_id,
+            "subjectId": subject_id,
+            "status": "COMPLETED" if not limitations else "PARTIALLY_COMPLETED",
+            "exportedAt": now_iso(),
+            "recordCount": len(orders),
+            "orders": orders,
+            "limitations": limitations,
         }
 
 

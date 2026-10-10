@@ -367,5 +367,57 @@ class TestPrivacyInspect(unittest.TestCase):
         self.assertEqual(result["orderReferences"], [])
 
 
+class TestPrivacyExport(unittest.TestCase):
+    def test_export_returns_orders_for_subject(self):
+        items = [
+            make_order(orderId="ord_1", customer={"name": "A", "email": "a@example.com"}),
+            make_order(orderId="ord_2", customer={"name": "B", "email": "b@example.com"}),
+        ]
+
+        def on_query(**kwargs):
+            self.assertEqual(kwargs.get("IndexName"), "gsi2")
+            return {"Items": items}
+
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        self.assertEqual(result["schemaVersion"], "1.0")
+        self.assertEqual(result["subjectId"], "user-123")
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["recordCount"], 2)
+        self.assertEqual(len(result["orders"]), 2)
+        self.assertEqual(result["orders"][0]["orderId"], "ord_1")
+        self.assertNotIn("pk", result["orders"][0])
+        self.assertNotIn("subjectId", result["orders"][0])
+
+    def test_export_requires_authorization(self):
+        service = create_order_service(table_name="mays-orders", client=make_client({}))
+        with self.assertRaises(OrderError):
+            service.export_subject("user-123", context={"project": "mays-orders", "authorized": False})
+
+    def test_export_pagination(self):
+        items_page1 = [make_order(orderId="ord_1")]
+        items_page2 = [make_order(orderId="ord_2")]
+
+        def on_query(**kwargs):
+            # Simulate pagination
+            if kwargs.get("ExclusiveStartKey"):
+                return {"Items": items_page2}
+            return {"Items": items_page1, "LastEvaluatedKey": {"dummy": "key"}}
+
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        self.assertEqual(result["recordCount"], 2)
+
+    def test_export_no_pii_in_logs(self):
+        # Ensure export does not raise and returns data without internal fields
+        items = [make_order(orderId="ord_1")]
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": lambda **kw: {"Items": items}}))
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        for order in result["orders"]:
+            self.assertNotIn("pk", order)
+            self.assertNotIn("gsi1pk", order)
+            self.assertNotIn("subjectId", order)
+
+
 if __name__ == "__main__":
     unittest.main()
