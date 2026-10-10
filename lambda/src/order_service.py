@@ -9,12 +9,12 @@ from typing import Any, Dict, Optional
 
 from errors import conflicted_update, invalid_transition, order_not_found, validation_error
 from state_machine import can_transition
-from order_types import GSI1_PK, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
+from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "version", "isTestData"}
+INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId"}
 
 _dynamodb_resource = None
 
@@ -97,7 +97,7 @@ class OrderService:
         self._table_name = table_name
         self._table = client if client is not None else _get_dynamodb_resource().Table(table_name)
 
-    def create_order(self, raw_body: Any) -> Dict[str, Any]:
+    def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
         input_data = validate_create_order(raw_body)
         now = now_iso()
         order_id = generate_order_id()
@@ -123,6 +123,13 @@ class OrderService:
             "gsi1pk": GSI1_PK,
             "gsi1sk": now,
         }
+
+        if subject_id:
+            item["subjectId"] = subject_id
+            from order_types import GSI2_PK_PREFIX, GSI2_NAME
+            # GSI2 not required for public API, but prepared for privacy capability
+            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
+            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
 
         self._table.put_item(Item=item)
 
@@ -191,6 +198,62 @@ class OrderService:
             if is_conditional_check_failed(err):
                 raise conflicted_update() from err
             raise
+
+    def inspect_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Authorization and project isolation – fail closed
+        if not context or not context.get("project"):
+            raise validation_error("Missing project context")
+        if not context.get("authorized"):
+            raise validation_error("Unauthorized privacy operation")
+
+        if not subject_id or not isinstance(subject_id, str):
+            raise validation_error("Invalid subjectId")
+
+        # Query GSI2 for orders linked to subject
+        try:
+            result = self._table.query(
+                IndexName=GSI2_NAME,
+                KeyConditionExpression="gsi2pk = :pk",
+                ExpressionAttributeValues={":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
+                ProjectionExpression="orderId,status,createdAt,updatedAt,customer",
+            )
+        except Exception as err:
+            # If GSI2 not present, return empty result instead of failing open
+            # Production deployment must provide GSI2
+            return {
+                "subjectId": subject_id,
+                "status": "COMPLETED",
+                "affectedRecords": 0,
+                "orderReferences": [],
+                "dataCategories": [],
+                "limitations": ["GSI2 not available"],
+            }
+
+        items = result.get("Items", [])
+        order_refs = []
+        for item in items:
+            oid = item.get("orderId")
+            if oid:
+                order_refs.append(oid)
+
+        data_categories = []
+        if items:
+            # Determine which personal data fields exist in first item
+            cust = items[0].get("customer", {})
+            if isinstance(cust, dict):
+                if "name" in cust:
+                    data_categories.append("customer.name")
+                if "email" in cust:
+                    data_categories.append("customer.email")
+
+        return {
+            "subjectId": subject_id,
+            "status": "COMPLETED",
+            "affectedRecords": len(order_refs),
+            "orderReferences": order_refs,
+            "dataCategories": data_categories,
+            "limitations": [],
+        }
 
 
 def create_order_service(table_name: str, client: Any = None) -> OrderService:

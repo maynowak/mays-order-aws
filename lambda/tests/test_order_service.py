@@ -326,5 +326,46 @@ class TestUpdateOrderStatus(unittest.TestCase):
         self.assertEqual(ctx.exception.http_status, 409)
 
 
+class TestPrivacyInspect(unittest.TestCase):
+    def test_inspect_returns_orders_for_subject(self):
+        items = [
+            make_order(orderId="ord_1", customer={"name": "A", "email": "a@example.com"}),
+            make_order(orderId="ord_2", customer={"name": "A", "email": "a@example.com"}),
+        ]
+
+        def on_query(**kwargs):
+            self.assertEqual(kwargs.get("IndexName"), "gsi2")
+            return {"Items": items}
+
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"query": on_query}),
+        )
+        result = service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        self.assertEqual(result["subjectId"], "user-123")
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["affectedRecords"], 2)
+        self.assertCountEqual(result["orderReferences"], ["ord_1", "ord_2"])
+        self.assertIn("customer.name", result["dataCategories"])
+
+    def test_inspect_requires_project_context(self):
+        service = create_order_service(table_name="mays-orders", client=make_client({}))
+        with self.assertRaises(OrderError):
+            service.inspect_subject("user-123", context={})
+
+    def test_inspect_requires_authorization(self):
+        service = create_order_service(table_name="mays-orders", client=make_client({}))
+        with self.assertRaises(OrderError):
+            service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": False})
+
+    def test_inspect_returns_empty_when_no_items(self):
+        def on_query(**kwargs):
+            return {"Items": []}
+        service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
+        result = service.inspect_subject("user-999", context={"project": "mays-orders", "authorized": True})
+        self.assertEqual(result["affectedRecords"], 0)
+        self.assertEqual(result["orderReferences"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

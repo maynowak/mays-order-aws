@@ -21,6 +21,9 @@ GSI1_PK = "LIST"
 
 TABLE_INDEX_NAME = "gsi1"
 
+GSI2_NAME = "gsi2"
+GSI2_PK_PREFIX = "SUBJECT#"
+
 
 class Customer(TypedDict):
     name: str
@@ -51,6 +54,9 @@ class OrderDynamoItem(Order, total=False):
     gsi1pk: str
     gsi1sk: str
     version: int
+    subjectId: str
+    gsi2pk: str
+    gsi2sk: str
     # isTestData: ausschließlich von Demo-Seed-Items gesetzt (orders_seed_demo_50.json).
     # KEIN Teil des produktiven Order-Modells; wird von create_order nie gesetzt und
     # über order_service.INTERNAL_FIELDS aus API-Antworten entfernt.
