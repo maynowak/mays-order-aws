@@ -391,6 +391,24 @@ Completed:
 Status: GREEN
 
 ==================================================
+
+## MAYS-ORDERS-DSGVO-PRIVACY-INTEGRATION-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: e602ca1
+Scope: Integration Preflight
+
+Findings:
+- GSI2 fehlt in Terraform → BLOCKED
+- Internal Trust WARNING
+- Erase Safety PASS mit WARNING
+- Anonymization WARNING
+- SQS NOT TESTED
+
+Status: BLOCKED
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
