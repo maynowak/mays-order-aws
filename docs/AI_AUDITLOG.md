@@ -409,6 +409,24 @@ Findings:
 Status: BLOCKED
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-GSI2-INTEGRATION-FIX-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 27dfd64
+Scope: GSI2 Terraform Integration
+
+Completed:
+- GSI2 Attribute und Index in dynamodb Modul hinzugefügt
+- Projection auf Privacy-Bedarf abgestimmt
+- Terraform validate PASS
+- Tests 67/67 PASS
+- Dokumentation erstellt
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================

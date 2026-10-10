@@ -34,6 +34,16 @@ resource "aws_dynamodb_table" "orders" {
     type = "S"
   }
 
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+
   global_secondary_index {
     name               = "gsi1"
     projection_type    = "INCLUDE"
@@ -46,6 +56,22 @@ resource "aws_dynamodb_table" "orders" {
 
     key_schema {
       attribute_name = "gsi1sk"
+      key_type       = "RANGE"
+    }
+  }
+
+  global_secondary_index {
+    name               = "gsi2"
+    projection_type    = "INCLUDE"
+    non_key_attributes = ["orderId", "pk", "sk", "subjectId", "version", "createdAt", "status", "updatedAt", "customer", "totalAmount", "currency"]
+
+    key_schema {
+      attribute_name = "gsi2pk"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "gsi2sk"
       key_type       = "RANGE"
     }
   }
