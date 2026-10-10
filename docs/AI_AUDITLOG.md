@@ -481,6 +481,23 @@ Findings:
 Status: BLOCKED
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-INTEGRATION-FIX-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 5452389
+Scope: GSI2 IAM und DeleteItem Integration
+
+Completed:
+- GSI2 ARN Output + IAM Verdrahtung
+- dynamodb:DeleteItem zur IAM Policy hinzugefügt
+- Tests 67/67 PASS
+- Terraform validate PASS
+
+Status: GREEN
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================

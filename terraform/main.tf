@@ -65,6 +65,7 @@ module "iam" {
   tags               = var.tags
   dynamodb_table_arn = module.dynamodb.table_arn
   dynamodb_gsi1_arn  = module.dynamodb.gsi1_arn
+  dynamodb_gsi2_arn  = module.dynamodb.gsi2_arn
   sqs_queue_arn      = module.sqs.queue_arn
 }
 
@@ -209,13 +210,13 @@ module "cognito_backup" {
 
 # Cognito Backup Automation
 module "cognito_backup_automation" {
-  source         = "./modules/cognito_backup_automation"
-  project_name   = var.project_name
-  environment    = "Development"
-  aws_region     = var.aws_region
-  user_pool_id   = module.cognito.user_pool_id
-  user_pool_name = "${var.project_name}-users"
-  bucket_name    = module.cognito_backup.bucket_name
-  tags           = var.tags
+  source             = "./modules/cognito_backup_automation"
+  project_name       = var.project_name
+  environment        = "Development"
+  aws_region         = var.aws_region
+  user_pool_id       = module.cognito.user_pool_id
+  user_pool_name     = "${var.project_name}-users"
+  bucket_name        = module.cognito_backup.bucket_name
+  tags               = var.tags
   notification_email = var.notification_email
 }

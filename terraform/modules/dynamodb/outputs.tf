@@ -23,3 +23,13 @@ output "gsi1_arn" {
   description = "ARN des Global Secondary Index (GSI1)."
   value       = "${aws_dynamodb_table.orders.arn}/index/gsi1"
 }
+
+output "gsi2_name" {
+  description = "Name des Global Secondary Index (GSI2)."
+  value       = "gsi2"
+}
+
+output "gsi2_arn" {
+  description = "ARN des Global Secondary Index (GSI2)."
+  value       = "${aws_dynamodb_table.orders.arn}/index/gsi2"
+}

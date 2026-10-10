@@ -22,11 +22,13 @@ data "aws_iam_policy_document" "handler" {
       "dynamodb:PutItem",
       "dynamodb:GetItem",
       "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
       "dynamodb:Query",
     ]
     resources = [
       var.dynamodb_table_arn,
       var.dynamodb_gsi1_arn,
+      var.dynamodb_gsi2_arn,
     ]
   }
 
