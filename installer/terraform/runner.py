@@ -166,49 +166,8 @@ class TerraformRunner:
             raise TerraformError(f"Command timed out: {e.cmd}") from e
         except Exception as e:
             raise TerraformError(f"Failed to execute command: {e}") from e
-    
-    def run_and_get_result(self, args: List[str]) -> "TerraformResult":
-        """Run command and return structured result."""
-        start_time = time.time()
-        working_directory = str(self.working_dir)
-        
-        try:
-            process = subprocess.run(
-                [self.terraform_bin] + args,
-                cwd=self.working_dir,
-                capture_output=True,
-                text=True,
-                timeout=180,
-                env=self._get_terraform_env()
-            )
-            return TerraformResult.from_completed_process(
-                process, 
-                [self.terraform_bin] + args, 
-                time.time(),
-                profile=self.aws_context.profile,
-                region=self.aws_context.region,
-                working_directory=str(self.working_dir)
-            )
-        except subprocess.TimeoutExpired as e:
-            return TerraformResult(
-                command=[self.terraform_bin] + args,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Command timed out: {e}",
-                duration=time.time() - start_time,
-                success=False
-            )
-        except Exception as e:
-            return TerraformResult(
-                command=[self.terraform_bin] + args,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Failed to execute: {e}",
-                duration=0,
-                success=False
-            )
-    
-    def _get_terraform_env(self) -> dict:
+
+    def _ensure_workspace(self) -> None:
         """Get environment with AWS profile and region set."""
         env = {**os.environ}
         env.update(self.aws_context.to_env())
@@ -457,82 +416,72 @@ class TerraformRunner:
         
         return True, ""
 
-    def run_and_get_result(self, args: List[str]) -> "TerraformResult":
-        """Run command and return structured result."""
-        start_time = time.time()
-        working_directory = str(self.working_dir)
-        
-        # Ensure workspace selected for parallel deployments
-        if self.workspace and self.workspace != "default":
-            try:
-                result = subprocess.run(
-                    [self.terraform_bin, "workspace", "select", self.workspace],
-                    cwd=self.working_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    env=self._get_terraform_env()
-                )
-                # If select fails, try to create workspace
-                if result.returncode != 0:
-                    subprocess.run(
-                        [self.terraform_bin, "workspace", "new", self.workspace],
-                        cwd=self.working_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                        env=self._get_terraform_env()
-                    )
-            except Exception:
-                pass
-        
-        try:
-            process = subprocess.run(
-                [self.terraform_bin] + args,
+    def _ensure_workspace(self) -> None:
+        """Select workspace, create if missing, verify selection."""
+        if self.workspace == "default":
+            return
+        # Select workspace
+        result = subprocess.run(
+            [self.terraform_bin, "workspace", "select", self.workspace],
+            cwd=self.working_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=self._get_terraform_env()
+        )
+        if result.returncode == 0:
+            # Verify selection
+            show = subprocess.run(
+                [self.terraform_bin, "workspace", "show"],
                 cwd=self.working_dir,
                 capture_output=True,
                 text=True,
-                timeout=180,
+                timeout=30,
                 env=self._get_terraform_env()
             )
-            return TerraformResult.from_completed_process(
-                process, 
-                [self.terraform_bin] + args, 
-                time.time(),
-                profile=self.aws_context.profile,
-                region=self.aws_context.region,
-                working_directory=str(self.working_dir)
-            )
-        except subprocess.TimeoutExpired as e:
-            return TerraformResult(
-                command=[self.terraform_bin] + args,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Command timed out: {e}",
-                duration=time.time() - start_time,
-                success=False
-            )
-        except Exception as e:
-            return TerraformResult(
-                command=[self.terraform_bin] + args,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Failed to execute: {e}",
-                duration=0,
-                success=False
-            )
-    
-    def _get_terraform_env(self) -> dict:
-        """Get environment with AWS profile and region set."""
-        env = {**os.environ}
-        env.update(self.aws_context.to_env())
-        return env
-    
+            if show.returncode != 0:
+                raise TerraformError(f"workspace show failed: {show.stderr.strip()}")
+            current = show.stdout.strip()
+            if current != self.workspace:
+                raise TerraformError(f"workspace mismatch: expected {self.workspace}, got {current}")
+            return
+        # Select failed, check if missing
+        output = f"{result.stdout}\n{result.stderr}".lower()
+        missing_signals = ("doesn't exist", "does not exist", "not found", "no such workspace")
+        if not any(sig in output for sig in missing_signals):
+            raise TerraformError(f"terraform workspace select failed for '{self.workspace}': {result.stderr.strip()}")
+        # Create workspace
+        created = subprocess.run(
+            [self.terraform_bin, "workspace", "new", self.workspace],
+            cwd=self.working_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=self._get_terraform_env()
+        )
+        if created.returncode != 0:
+            raise TerraformError(f"terraform workspace new failed for '{self.workspace}': {created.stderr.strip()}")
+        # Verify creation
+        show = subprocess.run(
+            [self.terraform_bin, "workspace", "show"],
+            cwd=self.working_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=self._get_terraform_env()
+        )
+        if show.returncode != 0:
+            raise TerraformError(f"workspace show after create failed: {show.stderr.strip()}")
+        current = show.stdout.strip()
+        if current != self.workspace:
+            raise TerraformError(f"workspace mismatch after create: expected {self.workspace}, got {current}")
+
     def run_and_get_result(self, args: List[str]) -> "TerraformResult":
-        """Run command and return structured result."""
+        """Run command and return structured result with workspace safety."""
         start_time = time.time()
-        working_directory = str(self.working_dir)
-        
+        # Workspace safety for non-init commands
+        if not (len(args) > 0 and args[0] == "init"):
+            self._ensure_workspace()
         try:
             process = subprocess.run(
                 [self.terraform_bin] + args,
