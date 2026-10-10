@@ -620,6 +620,23 @@ Findings:
 Status: BLOCKED
 
 ==================================================
+
+## MAYS-ORDERS-COGNITO-STATE-FORENSICS-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: e5849fc
+Scope: Cognito State Forensics
+
+Findings:
+- Plan nutzte falschen Workspace mays-orders statt mays-orders-privacy-test
+- Cognito User Pool eu-central-1_xhjl0PxEH wurde für UPDATE geplant
+- Root Cause: Workspace nicht vorhanden bei Plan-Erzeugung
+- Workspace jetzt manuell angelegt, State existiert
+
+Status: YELLOW
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
