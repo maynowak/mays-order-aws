@@ -85,6 +85,7 @@ module "lambda" {
   monitoring_enabled  = var.monitoring_enabled
   log_retention_days  = var.log_retention_days
   filename            = "${path.root}/../lambda/dist/lambda.zip"
+  runtime             = "python3.14"
 }
 
 # T011-05 — Cognito: User Pool + App Client + Gruppe `staff`

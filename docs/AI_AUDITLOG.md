@@ -602,6 +602,24 @@ Findings:
 Status: YELLOW
 
 ==================================================
+
+## MAYS-ORDERS-PRIVACY-E2E-INSTALL-01
+
+Datum: 2026-10-10
+Branch: main
+HEAD: 206c235
+Scope: Privacy E2E Install Vorbereitung
+
+Findings:
+- Lambda Runtime auf python3.14 korrigiert
+- ORDERS_PROJECT_NAME ergänzt
+- PRIVACY_INTERNAL_SECRET nicht verdrahtet
+- Installer Plan zeigt UPDATE an Cognito Ressourcen
+- Isolation nicht gewährleistet
+
+Status: BLOCKED
+
+==================================================
 Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
 ==================================================
