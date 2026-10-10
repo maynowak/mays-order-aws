@@ -1,6 +1,9 @@
 import base64
 import json
+import os
 import unittest
+
+os.environ.setdefault("ORDERS_PROJECT_NAME", "mays-orders")
 
 from errors import OrderError
 from order_service import create_order_service
@@ -345,7 +348,7 @@ class TestPrivacyInspect(unittest.TestCase):
             table_name="mays-orders",
             client=make_client({"query": on_query}),
         )
-        result = service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        result = service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True})
         self.assertEqual(result["subjectId"], "user-123")
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(result["affectedRecords"], 2)
@@ -366,7 +369,7 @@ class TestPrivacyInspect(unittest.TestCase):
         def on_query(**kwargs):
             return {"Items": []}
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
-        result = service.inspect_subject("user-999", context={"project": "mays-orders", "authorized": True})
+        result = service.inspect_subject("user-999", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True})
         self.assertEqual(result["affectedRecords"], 0)
         self.assertEqual(result["orderReferences"], [])
 
@@ -383,7 +386,7 @@ class TestPrivacyExport(unittest.TestCase):
             return {"Items": items}
 
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
-        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_export": True})
         self.assertEqual(result["schemaVersion"], "1.0")
         self.assertEqual(result["subjectId"], "user-123")
         self.assertEqual(result["status"], "COMPLETED")
@@ -409,14 +412,14 @@ class TestPrivacyExport(unittest.TestCase):
             return {"Items": items_page1, "LastEvaluatedKey": {"dummy": "key"}}
 
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
-        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_export": True})
         self.assertEqual(result["recordCount"], 2)
 
     def test_export_no_pii_in_logs(self):
         # Ensure export does not raise and returns data without internal fields
         items = [make_order(orderId="ord_1")]
         service = create_order_service(table_name="mays-orders", client=make_client({"query": lambda **kw: {"Items": items}}))
-        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True})
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_export": True})
         for order in result["orders"]:
             self.assertNotIn("pk", order)
             self.assertNotIn("gsi1pk", order)
@@ -431,7 +434,7 @@ class TestPrivacyErase(unittest.TestCase):
             return {"Items": items}
 
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query}))
-        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "PREVIEW", "policy": "ERASE"})
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_erase": True}, options={"mode": "PREVIEW", "policy": "ERASE"})
         self.assertEqual(result["status"], "PREVIEW")
         self.assertEqual(result["affectedRecords"], 1)
         self.assertEqual(result["plannedDeletes"], 1)
@@ -449,7 +452,7 @@ class TestPrivacyErase(unittest.TestCase):
             return {}
 
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query, "delete_item": on_delete}))
-        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "EXECUTE", "policy": "ERASE"})
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_erase": True}, options={"mode": "EXECUTE", "policy": "ERASE"})
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(result["deletedRecords"], 1)
         self.assertEqual(len(deleted), 1)
@@ -472,7 +475,7 @@ class TestPrivacyErase(unittest.TestCase):
             return {}
 
         service = create_order_service(table_name="mays-orders", client=make_client({"query": on_query, "update_item": on_update}))
-        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True}, options={"mode": "EXECUTE", "policy": "ANONYMIZE"})
+        result = service.erase_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_erase": True}, options={"mode": "EXECUTE", "policy": "ANONYMIZE"})
         self.assertEqual(result["anonymizedRecords"], 1)
         self.assertEqual(len(updated), 1)
 

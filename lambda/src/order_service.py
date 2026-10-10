@@ -98,6 +98,19 @@ class OrderService:
         self._table_name = table_name
         self._table = client if client is not None else _get_dynamodb_resource().Table(table_name)
 
+    def _require_privacy_auth(self, context: Optional[Dict[str, Any]], permission: str) -> None:
+        if not context or not context.get("project"):
+            raise validation_error("Missing project context")
+        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
+        if not expected_project:
+            raise validation_error("Project not configured")
+        if context.get("project") != expected_project:
+            raise validation_error("Project mismatch")
+        if not context.get("authorized"):
+            raise validation_error("Unauthorized privacy operation")
+        if not context.get(permission):
+            raise validation_error(f"Missing permission {permission}")
+
     def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
         input_data = validate_create_order(raw_body)
         now = now_iso()
@@ -201,15 +214,7 @@ class OrderService:
             raise
 
     def inspect_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        # Authorization and project isolation – fail closed
-        if not context or not context.get("project"):
-            raise validation_error("Missing project context")
-        # Project must match runtime environment
-        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
-        if expected_project and context.get("project") != expected_project:
-            raise validation_error("Project mismatch")
-        if not context.get("authorized"):
-            raise validation_error("Unauthorized privacy operation")
+        self._require_privacy_auth(context, "privacy_inspect")
 
         if not subject_id or not isinstance(subject_id, str):
             raise validation_error("Invalid subjectId")
@@ -222,16 +227,15 @@ class OrderService:
                 ExpressionAttributeValues={":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
                 ProjectionExpression="orderId,status,createdAt,updatedAt,customer",
             )
-        except Exception as err:
-            # If GSI2 not present, return empty result instead of failing open
-            # Production deployment must provide GSI2
+        except Exception:
+            # Technical failure must not be reported as successful empty result
             return {
                 "subjectId": subject_id,
-                "status": "COMPLETED",
+                "status": "BLOCKED",
                 "affectedRecords": 0,
                 "orderReferences": [],
                 "dataCategories": [],
-                "limitations": ["GSI2 not available"],
+                "limitations": ["GSI2 query failed"],
             }
 
         items = result.get("Items", [])
@@ -261,14 +265,7 @@ class OrderService:
         }
 
     def export_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        # Authorization and project isolation – fail closed
-        if not context or not context.get("project"):
-            raise validation_error("Missing project context")
-        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
-        if expected_project and context.get("project") != expected_project:
-            raise validation_error("Project mismatch")
-        if not context.get("authorized"):
-            raise validation_error("Unauthorized privacy operation")
+        self._require_privacy_auth(context, "privacy_export")
 
         if not subject_id or not isinstance(subject_id, str):
             raise validation_error("Invalid subjectId")
@@ -311,16 +308,16 @@ class OrderService:
                 if not last_evaluated_key:
                     break
         except Exception as err:
-            # If GSI2 not available, return empty with limitation
+            # Technical failure must be explicit, do not return partial data as complete
             return {
                 "schemaVersion": "1.0",
                 "operationId": operation_id,
                 "subjectId": subject_id,
-                "status": "PARTIALLY_COMPLETED",
+                "status": "BLOCKED",
                 "exportedAt": now_iso(),
                 "recordCount": 0,
                 "orders": [],
-                "limitations": ["GSI2 not available or query failed"],
+                "limitations": ["GSI2 query failed"],
             }
 
         return {
@@ -335,25 +332,22 @@ class OrderService:
         }
 
     def erase_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        # Authorization and project isolation – fail closed
-        if not context or not context.get("project"):
-            raise validation_error("Missing project context")
-        expected_project = os.environ.get("ORDERS_PROJECT_NAME")
-        if expected_project and context.get("project") != expected_project:
-            raise validation_error("Project mismatch")
-        if not context.get("authorized"):
-            raise validation_error("Unauthorized privacy operation")
+        self._require_privacy_auth(context, "privacy_erase")
 
         if not subject_id or not isinstance(subject_id, str):
             raise validation_error("Invalid subjectId")
 
         opts = options or {}
         mode = opts.get("mode", "PREVIEW").upper()
-        policy = opts.get("policy", "ERASE").upper()
+        policy = opts.get("policy")
+        if policy:
+            policy = policy.upper()
+        else:
+            policy = None
 
         if mode not in ("PREVIEW", "EXECUTE"):
             raise validation_error("Invalid mode")
-        if policy not in ("ERASE", "ANONYMIZE", "RETAIN"):
+        if policy and policy not in ("ERASE", "ANONYMIZE", "RETAIN"):
             raise validation_error("Invalid policy")
 
         operation_id = str(uuid.uuid4())
@@ -418,6 +412,20 @@ class OrderService:
                 "completedAt": now_iso(),
             }
 
+        # EXECUTE mode - policy must be explicitly provided
+        if not policy:
+            return {
+                "operationId": operation_id,
+                "subjectId": subject_id,
+                "status": "BLOCKED",
+                "affectedRecords": len(affected),
+                "deletedRecords": 0,
+                "anonymizedRecords": 0,
+                "retainedRecords": 0,
+                "failedRecords": 0,
+                "limitations": ["Missing explicit retention policy"],
+                "completedAt": now_iso(),
+            }
         # EXECUTE mode
         deleted = 0
         anonymized = 0
