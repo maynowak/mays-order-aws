@@ -125,31 +125,31 @@ class TerraformRunner:
         self.terraform_bin = "terraform"
         self.aws_context = aws_context
         self.env = {}
-        # Use environment variable override for parallel deployments
-        env_workspace = os.environ.get("TERRAFORM_WORKSPACE")
-        if env_workspace:
-            self.workspace = env_workspace
-        else:
-            self.workspace = workspace
+        self.workspace = workspace
     
     def _get_terraform_env(self) -> dict:
-        """Get environment with AWS profile and region set."""
+        """Build explicit subprocess env from validated context.
+
+        No os.environ mutation. Uses AWSExecutionContext.get_environment()
+        so static-credential conflicts cannot leak into Terraform.
+        """
+        get_env = getattr(self.aws_context, "get_environment", None)
+        if callable(get_env):
+            return get_env()
         env = {**os.environ}
         env.update(self.aws_context.to_env())
         return env
-    
+
     def _run(
-        self, 
-        args: List[str], 
+        self,
+        args: List[str],
         capture_output: bool = True,
         timeout: int = 300,
         cwd: Optional[Path] = None
     ) -> subprocess.CompletedProcess:
         """Run Terraform command with structured arguments."""
         cmd = [self.terraform_bin] + args
-        
-        env = self._get_terraform_env()
-        
+
         start_time = time.time()
         
         try:
@@ -167,12 +167,6 @@ class TerraformRunner:
         except Exception as e:
             raise TerraformError(f"Failed to execute command: {e}") from e
 
-    def _ensure_workspace(self) -> None:
-        """Get environment with AWS profile and region set."""
-        env = {**os.environ}
-        env.update(self.aws_context.to_env())
-        return env
-    
     def version(self) -> "TerraformResult":
         """Get Terraform version."""
         return self.run_and_get_result(["version", "-json"])
@@ -518,13 +512,6 @@ class TerraformRunner:
                 success=False
             )
     
-    def _get_terraform_env(self) -> dict:
-        """Get environment with AWS profile and region set."""
-        env = {**os.environ}
-        env.update(self.aws_context.to_env())
-        return env
-
-
 class TerraformError(Exception):
     """Terraform execution error."""
     pass

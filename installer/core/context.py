@@ -86,8 +86,6 @@ class InstallationContext:
         if not self.terraform_workspace or self.terraform_workspace == "default":
             # Use project_name as workspace name for parallel isolation
             self.terraform_workspace = self.project_name
-        # Export workspace for TerraformRunner
-        os.environ["TERRAFORM_WORKSPACE"] = self.terraform_workspace
 
     def to_dict(self) -> dict:
         """Serialize to dictionary."""

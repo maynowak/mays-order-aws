@@ -281,14 +281,16 @@ class InstallerCLI:
             "identity",
             help="Show AWS identity information"
         )
+        # NOTE: defaults are SUPPRESS so identity-level flags do not clobber
+        # the global --profile/--region when the user passes them globally.
         identity_parser.add_argument(
             "--profile",
-            default=os.environ.get("AWS_PROFILE"),
+            default=argparse.SUPPRESS,
             help="AWS CLI profile"
         )
         identity_parser.add_argument(
             "--region",
-            default=os.environ.get("AWS_REGION", "eu-central-1"),
+            default=argparse.SUPPRESS,
             help="AWS region"
         )
 
@@ -365,16 +367,21 @@ class InstallerCLI:
         context.development_step = getattr(parsed, 'development_step', 0)
         context.development_status = getattr(parsed, 'development_status', 'development')
 
-        # Fix: ensure workspace is derived from final project_name, not from env init
-        if not context.terraform_workspace or context.terraform_workspace == "default":
-            context.terraform_workspace = context.project_name
-        else:
-            # Re-derive if workspace matches old project_name pattern
-            # Force workspace to project_name for parallel project isolation
-            context.terraform_workspace = context.project_name
-        os.environ["TERRAFORM_WORKSPACE"] = context.terraform_workspace
+        # Ensure workspace is derived from final project_name, not from env init.
+        # No global os.environ mutation: workspace travels on the context and
+        # is passed explicitly to TerraformRunner.
+        context.terraform_workspace = context.project_name
 
         return context
+
+    @staticmethod
+    def _make_runner(context, terraform_dir=None) -> "TerraformRunner":
+        """Create TerraformRunner with explicit workspace (no env globals)."""
+        return TerraformRunner(
+            terraform_dir if terraform_dir is not None else context.terraform_dir,
+            context.aws_execution_context,
+            workspace=context.terraform_workspace,
+        )
 
     def _cmd_validate(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Run validation checks."""
@@ -453,7 +460,7 @@ class InstallerCLI:
             print("AWS context validation failed. Cannot proceed with plan.")
             return 1
 
-        runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner = self._make_runner(context)
 
         # Check if backend should be configured
         init_result = runner.init(backend=not context.dry_run)
@@ -640,7 +647,7 @@ class InstallerCLI:
 
         # Plan integrity check (includes AWS context matching)
         run_manager = RunDirectoryManager()
-        runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner = self._make_runner(context)
 
         # Use resolved plan_file path for verification
         plan_path = str(plan_file)
@@ -711,7 +718,7 @@ class InstallerCLI:
         print()
 
         # Show plan summary
-        runner_dummy = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner_dummy = self._make_runner(context)
         plan_json_result = runner_dummy.show_plan(terraform_plan_file)
         if plan_json_result.success:
             import json
@@ -744,7 +751,7 @@ class InstallerCLI:
             import json
 
             # Get plan JSON using terraform show -json
-            plan_json_result = TerraformRunner(context.terraform_dir, context.aws_execution_context).show_plan(terraform_plan_file)
+            plan_json_result = self._make_runner(context).show_plan(terraform_plan_file)
 
             if not plan_json_result.success:
                 print(f"Warning: Could not get plan JSON for policy gate: {plan_json_result.stderr}")
@@ -787,7 +794,7 @@ class InstallerCLI:
 
         # Apply the plan
         print("\nApplying plan...")
-        runner = TerraformRunner("terraform", context.aws_execution_context)
+        runner = self._make_runner(context, "terraform")
         apply_result = runner.apply(str(Path.cwd() / parsed.plan))
 
         if not apply_result.success:
@@ -805,7 +812,7 @@ class InstallerCLI:
             print("⚠ Could not verify Terraform state")
 
         # Verify AWS identity
-        verify_identity = TerraformRunner("terraform", context.aws_execution_context).version()
+        verify_identity = self._make_runner(context, "terraform").version()
         if verify_identity.success:
             print("✓ AWS identity verified")
         else:
@@ -894,7 +901,7 @@ class InstallerCLI:
 
         # Plan integrity check (includes AWS context matching)
         run_manager = RunDirectoryManager()
-        runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner = self._make_runner(context)
 
         # Use resolved plan_file path for verification
         plan_path = str(plan_file)
@@ -957,7 +964,7 @@ class InstallerCLI:
         print()
 
         # Show destroy plan summary
-        runner_dummy = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner_dummy = self._make_runner(context)
         plan_json_result = runner_dummy.show_plan(terraform_plan_file)
         if plan_json_result.success:
             import json
@@ -970,7 +977,7 @@ class InstallerCLI:
         print()
 
         # Safety evaluation
-        plan_json_result = TerraformRunner(context.terraform_dir, context.aws_execution_context).show_plan(terraform_plan_file)
+        plan_json_result = self._make_runner(context).show_plan(terraform_plan_file)
         if plan_json_result.success:
             import json
             plan_json = json.loads(plan_json_result.stdout)
@@ -995,7 +1002,7 @@ class InstallerCLI:
 
         # Apply the destroy plan
         print("\nApplying destroy plan...")
-        runner = TerraformRunner("terraform", context.aws_execution_context)
+        runner = self._make_runner(context, "terraform")
         destroy_result = runner.destroy(str(Path.cwd() / parsed.plan))
 
         if not destroy_result.success:
@@ -1022,7 +1029,7 @@ class InstallerCLI:
             print("AWS context validation failed. Cannot proceed with state operations.")
             return 1
 
-        runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner = self._make_runner(context)
 
         if parsed.state_command == "list":
             result = runner.state_list(parsed.state_file)
@@ -1079,7 +1086,7 @@ class InstallerCLI:
             print("AWS context validation failed. Cannot proceed with output operations.")
             return 1
 
-        runner = TerraformRunner(context.terraform_dir, context.aws_execution_context)
+        runner = self._make_runner(context)
         result = runner.output(parsed.name, parsed.state_file)
         if result.success:
             print(result.stdout)
@@ -1094,7 +1101,7 @@ class InstallerCLI:
             print("AWS context validation failed. Cannot proceed.")
             return 1
 
-        runner = TerraformRunner("terraform", context.aws_execution_context)
+        runner = self._make_runner(context, "terraform")
         result = runner.version()
         if result.success:
             import json

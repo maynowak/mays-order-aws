@@ -27,6 +27,21 @@ class AWSValidationError(Exception):
     pass
 
 
+# Static credentials override AWS_PROFILE for Terraform/boto3.
+# If a profile is explicitly selected, these must not silently win.
+STATIC_CREDENTIAL_VARS = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+)
+
+
+def find_static_credentials(env: Optional[dict] = None) -> list:
+    """Return static credential vars present and non-empty in env (default: os.environ)."""
+    source = env if env is not None else os.environ
+    return [v for v in STATIC_CREDENTIAL_VARS if source.get(v)]
+
+
 @dataclass
 class AWSExecutionContext:
     """
@@ -57,8 +72,8 @@ class AWSExecutionContext:
             raise ValueError("Context must be validated")
     
     def to_env(self) -> dict:
-        """Return environment variables for Terraform execution."""
-        env = {"AWS_REGION": self.region}
+        """Return explicit environment fragment for Terraform execution."""
+        env = {"AWS_REGION": self.region, "AWS_DEFAULT_REGION": self.region}
         if self.profile:
             env["AWS_PROFILE"] = self.profile
         return env
@@ -75,8 +90,17 @@ class AWSExecutionContext:
         return cls(**data)
     
     def get_environment(self, extra_env: Optional[dict] = None) -> dict:
-        """Get complete environment for Terraform execution."""
+        """Build explicit subprocess environment without mutating os.environ.
+
+        Defense in depth: when a profile is selected, static credentials
+        from the parent process are stripped so Terraform/boto3 cannot
+        silently use a different identity than the validated profile.
+        """
         env = {**os.environ}
+        if self.profile:
+            for var in STATIC_CREDENTIAL_VARS:
+                env.pop(var, None)
+            env.pop("AWS_DEFAULT_PROFILE", None)
         env.update(self.to_env())
         if extra_env:
             env.update(extra_env)
@@ -118,6 +142,15 @@ class AWSProfileValidator:
     
     def _validate_with_profile(self) -> AWSExecutionContext:
         """Validate using AWS CLI with explicit profile."""
+        # 0. Fail closed on conflicting static credentials (they override
+        # AWS_PROFILE for Terraform/boto3 and would cause a wrong identity).
+        conflicts = find_static_credentials()
+        if conflicts:
+            raise AWSValidationError(
+                f"Conflicting AWS credentials: static {conflicts} set while "
+                f"profile '{self.profile}' selected. Static credentials override "
+                f"AWS_PROFILE. Unset {conflicts} or run without --profile. STOP."
+            )
         # 1. Check profile exists
         self._check_profile_exists()
         

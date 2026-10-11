@@ -15,7 +15,8 @@ class CommandService:
         self.context = context
         self.runner = TerraformRunner(
             context.terraform_dir,
-            context.aws_execution_context
+            context.aws_execution_context,
+            workspace=context.terraform_workspace,
         )
 
     def init(self, backend: bool = True) -> CommandResult:
