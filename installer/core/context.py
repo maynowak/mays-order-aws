@@ -298,6 +298,7 @@ class ValidationLayer:
         self._check_terraform_config()
         self._check_installer_config()
         self._check_remote_state_lifecycle()
+        self._check_lambda_artifact()
 
         return self.result
 
@@ -592,4 +593,33 @@ class ValidationLayer:
                 "remote_state_lifecycle",
                 "WARNING",
                 f"Could not detect remote state lifecycle: {e}"
+            )
+
+    def _check_lambda_artifact(self) -> None:
+        """Fail closed wenn dist/lambda.zip nicht dem freigegebenen src/ entspricht."""
+        try:
+            from installer.core.artifact_integrity import (
+                lambda_dir_for_context,
+                verify_lambda_zip,
+            )
+            lambda_dir = lambda_dir_for_context(self.context.terraform_dir)
+            if lambda_dir is None:
+                self._add_check(
+                    "lambda_artifact",
+                    "SKIP",
+                    "Lambda source directory not found, artifact check skipped",
+                )
+                return
+            ok, message = verify_lambda_zip(lambda_dir)
+            self._add_check(
+                "lambda_artifact",
+                "PASS" if ok else "FAIL",
+                message,
+                details={"lambda_dir": str(lambda_dir)},
+            )
+        except Exception as e:
+            self._add_check(
+                "lambda_artifact",
+                "FAIL",
+                f"Could not verify lambda artifact: {e}",
             )
