@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from errors import conflicted_update, invalid_transition, order_not_found, validation_error
+from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
@@ -63,7 +63,7 @@ def to_list_item(item: Dict[str, Any]) -> Dict[str, Any]:
 def encode_next_token(last_evaluated_key: Optional[Dict[str, Any]]) -> Optional[str]:
     if not last_evaluated_key:
         return None
-    raw = json.dumps(last_evaluated_key, separators=(",", ":"))
+    raw = json.dumps(last_evaluated_key, separators=(",", ":"), default=json_default)
     return base64.b64encode(raw.encode("utf-8")).decode("utf-8")
 
 
@@ -236,7 +236,8 @@ class OrderService:
                 IndexName=GSI2_NAME,
                 KeyConditionExpression="gsi2pk = :pk",
                 ExpressionAttributeValues={":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                ProjectionExpression="orderId,status,createdAt,updatedAt,customer",
+                ProjectionExpression="orderId,#status,createdAt,updatedAt,customer",
+                ExpressionAttributeNames={"#status": "status"},
             )
         except Exception:
             # Technical failure must not be reported as successful empty result
@@ -292,7 +293,8 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,status,createdAt,updatedAt,customer,totalAmount,currency",
+                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency",
+                    "ExpressionAttributeNames": {"#status": "status"},
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key

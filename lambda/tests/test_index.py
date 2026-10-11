@@ -240,3 +240,24 @@ class TestHandlerErrors(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestHandlerDecimalRegression(unittest.TestCase):
+    """MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01: GET/LIST mit DynamoDB-Decimal."""
+
+    def test_get_order_with_decimal_returns_200(self):
+        fake = FakeService(get=lambda order_id: {"orderId": order_id, "status": "PENDING", "totalAmount": Decimal("39.98")})
+        with patch_service(fake):
+            response = index.handler(
+                {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_1"}},
+                None,
+            )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["totalAmount"], 39.98)
+
+    def test_list_orders_with_decimal_returns_200(self):
+        fake = FakeService(list_orders=lambda limit, next_token=None: {"orders": [{"orderId": "ord_1", "totalAmount": Decimal("10")}], "count": 1})
+        with patch_service(fake):
+            response = index.handler({"routeKey": "GET /orders", "queryStringParameters": {}}, None)
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["orders"][0]["totalAmount"], 10.0)

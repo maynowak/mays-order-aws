@@ -91,6 +91,7 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-PRIVACY-DEPLOY-RETRY-01 → docs/reports/MAYS-ORDERS-PRIVACY-DEPLOY-RETRY-01.md
 - MAYS-ORDERS-PRIVACY-BACKUP-OPTIONAL-01 → docs/reports/MAYS-ORDERS-PRIVACY-BACKUP-OPTIONAL-01.md
 - MAYS-ORDERS-PRIVACY-E2E-VERIFY-01 → docs/reports/MAYS-ORDERS-PRIVACY-E2E-VERIFY-01.md
+- MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01 → docs/reports/MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01.md
 
 Overall Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 

@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Dict, Optional
+
+
+def json_default(o: Any) -> Any:
+    """Zentrale JSON-Serialisierung für DynamoDB-Werte.
+
+    Decimal → float (Geldbeträge/Mengen sind dokumentierte Zahlen, keine Strings).
+    Alles andere: TypeError (kein pauschales default=str, keine stillen
+    Formatänderungen im API-Vertrag).
+    """
+    if isinstance(o, Decimal):
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 VALIDATION_ERROR = "VALIDATION_ERROR"
 ORDER_NOT_FOUND = "ORDER_NOT_FOUND"

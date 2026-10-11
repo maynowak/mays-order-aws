@@ -5,10 +5,9 @@ import json
 import os
 import sys
 import uuid
-from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from errors import OrderError, error_body, internal_error, validation_error
+from errors import OrderError, error_body, internal_error, json_default, validation_error
 from order_service import create_order_service
 from validation import validate_list_params, validate_order_id, validate_status_update_body
 
@@ -16,10 +15,8 @@ JSON_HEADERS = {"Content-Type": "application/json"}
 
 SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
 
-def _json_default(o: Any) -> Any:
-    if isinstance(o, Decimal):
-        return float(o)
-    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+# Bestehenden Helper wiederverwenden (zentral in errors.json_default).
+_json_default = json_default
 
 def _get_sqs_client():
     import boto3

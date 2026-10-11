@@ -2,12 +2,13 @@ import base64
 import json
 import os
 import unittest
+from decimal import Decimal
 
 os.environ.setdefault("ORDERS_PROJECT_NAME", "mays-orders")
 os.environ.setdefault("PRIVACY_INTERNAL_SECRET", "test-secret")
 
-from errors import OrderError
-from order_service import create_order_service
+from errors import OrderError, json_default
+from order_service import create_order_service, decode_next_token
 from order_types import GSI1_PK, ORDER_ID_PREFIX
 
 
@@ -499,3 +500,65 @@ class TestPrivacyErase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestRuntimeFixRegression(unittest.TestCase):
+    """MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01: Decimal + reserviertes Wort 'status'."""
+
+    def test_get_order_with_decimal_serializes(self):
+        item = make_order(totalAmount=Decimal("39.98"))
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"get_item": lambda **kw: {"Item": item}}),
+        )
+        order = service.get_order(ORDER_ID)
+        body = json.loads(json.dumps(order, default=json_default))
+        self.assertEqual(body["totalAmount"], 39.98)
+
+    def test_list_orders_with_decimal_and_token(self):
+        lek = {"pk": f"{ORDER_ID_PREFIX}abc", "sk": "#ORDER", "totalAmount": Decimal("10")}
+
+        def on_query(**kwargs):
+            return {"Items": [make_order()], "LastEvaluatedKey": lek}
+
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"query": on_query}),
+        )
+        result = service.list_orders(20)
+        self.assertIn("nextToken", result)
+        # Token muss dekodierbar sein (Decimal im LEK darf nicht scheitern)
+        decoded = decode_next_token(result["nextToken"])
+        self.assertEqual(decoded["pk"], lek["pk"])
+
+    def test_inspect_aliases_reserved_status(self):
+        captured = {}
+
+        def on_query(**kwargs):
+            captured.update(kwargs)
+            return {"Items": [make_order(orderId="ord_1", customer={"name": "A", "email": "a@example.com"})]}
+
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"query": on_query}),
+        )
+        result = service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True, "internal_token": "test-secret"})
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["affectedRecords"], 1)
+        self.assertEqual(captured.get("ExpressionAttributeNames"), {"#status": "status"})
+        self.assertIn("#status", captured.get("ProjectionExpression", ""))
+
+    def test_export_aliases_reserved_status(self):
+        captured = {}
+
+        def on_query(**kwargs):
+            captured.update(kwargs)
+            return {"Items": [make_order(orderId="ord_1")]}
+
+        service = create_order_service(
+            table_name="mays-orders",
+            client=make_client({"query": on_query}),
+        )
+        result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_export": True, "internal_token": "test-secret"})
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(captured.get("ExpressionAttributeNames"), {"#status": "status"})
+        self.assertIn("#status", captured.get("ProjectionExpression", ""))
