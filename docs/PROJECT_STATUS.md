@@ -4,20 +4,23 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-10-10)
+## Aktueller Stand (zuletzt aktualisiert: 2026-10-11)
 
 ```text
 May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Week 2 — IN PROGRESS (Terraform)
+Release Candidate — v0.2.0-rc.1 (Härtung abgeschlossen, Dokumentation finalisiert)
 
 Current Feature:
-F011 — Terraform Infrastructure
+Privacy Capability intern, Installer Härtung, Release Candidate Dokumentation
 
 Current Task:
-T011-11 — CloudWatch Monitoring as Code (Dashboard mays-orders-overview, 6 Alarme, Log-Retention 7 Tage; IaC terraform/monitoring.tf; kein apply; Report docs/reports/T011-11-CLOUDWATCH-MONITORING.md)
+MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 — Produkt- und Installer-Dokumentation technisch prüfen und konsistent veröffentlichen
+
+Hinweis Release Candidate:
+v0.2.0-rc.1, Commit f6e737b, Tag v0.2.0-rc.1 gepusht. Release Candidate GREEN unter dokumentierter Einschränkung: produktive Privacy-Aktivierung BLOCKED bis Secret-Management implementiert ist. Isolierte Privacy-Testinstallation vollständig abgebaut, Destroy verifiziert.
 T011-10 — DynamoDB Demo-Seed Finalisierung COMPLETE (50 Demo-Orders, version/isTestData, seed_example_data opt-in; Report docs/reports/DYNAMODB-SEED-DEMO-50.md)
 T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
 

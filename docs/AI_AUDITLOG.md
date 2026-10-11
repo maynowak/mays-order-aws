@@ -97,7 +97,8 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-PRIVACY-SECRET-E2E-01 → docs/reports/MAYS-ORDERS-PRIVACY-SECRET-E2E-01.md
 - MAYS-ORDERS-PRIVACY-FINAL-EVIDENCE-AND-DESTROY-01 → docs/reports/MAYS-ORDERS-PRIVACY-FINAL-EVIDENCE-AND-DESTROY-01.md
 - MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01 → docs/reports/MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01.md
+- MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 → docs/reports/MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01.md
 
-Overall Status: YELLOW - Destroy verifiziert, Release Candidate vorbereitet, offene Secret-Verwaltung/Rotation und uncommitted Änderungen
+Overall Status: GREEN - Dokumentation technisch geprüft, Release Candidate v0.2.0-rc.1 getaggt, Produktion Privacy BLOCKED dokumentiert
 
 ==================================================
