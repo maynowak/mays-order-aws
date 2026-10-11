@@ -119,3 +119,18 @@ variable "notification_email" {
   type        = string
   default     = "nowakbewerbung@gmail.com"
 }
+
+# Cognito-Backup-Module sind opt-in deaktivierbar (Standard: aktiviert).
+# Bestehende Installationen bleiben unverändert ( moved-Blöcke in main.tf
+# erhalten den State beim Wechsel auf count-basierte Module).
+variable "enable_cognito_backup" {
+  description = "Erstellt den Cognito-Backup-S3-Bucket. false deaktiviert das Backup-Modul (z. B. isolierte Testprojekte)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_cognito_backup_automation" {
+  description = "Erstellt die Cognito-Backup-Automatisierung (Lambda, Scheduler, SNS). Nur wirksam wenn enable_cognito_backup = true."
+  type        = bool
+  default     = true
+}

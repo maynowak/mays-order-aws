@@ -89,6 +89,7 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-INSTALLER-METADATA-Vergleich-Orders-RIS → docs/reports/MAYS-INSTALLER-METADATA-Vergleich-Orders-RIS.md
 - MAYS-ORDERS-INSTALLER-AWS-PROFILE-CONTEXT-FIX-01 → docs/reports/MAYS-ORDERS-INSTALLER-AWS-PROFILE-CONTEXT-FIX-01.md
 - MAYS-ORDERS-PRIVACY-DEPLOY-RETRY-01 → docs/reports/MAYS-ORDERS-PRIVACY-DEPLOY-RETRY-01.md
+- MAYS-ORDERS-PRIVACY-BACKUP-OPTIONAL-01 → docs/reports/MAYS-ORDERS-PRIVACY-BACKUP-OPTIONAL-01.md
 
 Overall Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 

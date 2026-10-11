@@ -201,23 +201,36 @@ module "sqs_worker" {
   log_retention_days  = var.log_retention_days
 }
 
-# Cognito User Data Backup Storage
+# Cognito User Data Backup Storage (optional via var.enable_cognito_backup,
+# Standard true = bisheriges Verhalten; moved-Block erhält bestehenden State).
 module "cognito_backup" {
+  count        = var.enable_cognito_backup ? 1 : 0
   source       = "./modules/cognito_backup"
   project_name = var.project_name
   environment  = "Development"
   tags         = var.tags
 }
 
-# Cognito Backup Automation
+moved {
+  from = module.cognito_backup
+  to   = module.cognito_backup[0]
+}
+
+# Cognito Backup Automation (optional; niemals aktiv ohne Backup-Modul).
 module "cognito_backup_automation" {
+  count              = (var.enable_cognito_backup && var.enable_cognito_backup_automation) ? 1 : 0
   source             = "./modules/cognito_backup_automation"
   project_name       = var.project_name
   environment        = "Development"
   aws_region         = var.aws_region
   user_pool_id       = module.cognito.user_pool_id
   user_pool_name     = "${var.project_name}-users"
-  bucket_name        = module.cognito_backup.bucket_name
+  bucket_name        = try(module.cognito_backup[0].bucket_name, "")
   tags               = var.tags
   notification_email = var.notification_email
+}
+
+moved {
+  from = module.cognito_backup_automation
+  to   = module.cognito_backup_automation[0]
 }
