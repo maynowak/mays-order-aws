@@ -261,3 +261,49 @@ class TestHandlerDecimalRegression(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
         self.assertEqual(body["orders"][0]["totalAmount"], 10.0)
+
+
+class TestInternalPrivacyDispatch(unittest.TestCase):
+    """Interner Aufrufweg: direkter Invoke, keine öffentliche Route."""
+
+    def test_unknown_internal_action_rejected(self):
+        fake = FakeService()
+        with patch_service(fake):
+            response = index.handler({"internalAction": "privacy/drop-all"}, None)
+        self.assertEqual(response["statusCode"], 400)
+
+    def test_inspect_dispatches_with_auth_context(self):
+        seen = {}
+
+        class Svc(FakeService):
+            def inspect_subject(self, subject_id, context=None):
+                seen["subject"] = subject_id
+                seen["context"] = context
+                return {"subjectId": subject_id, "status": "COMPLETED", "affectedRecords": 0}
+
+        with patch_service(Svc()):
+            response = index.handler(
+                {"internalAction": "privacy/inspect",
+                 "payload": {"subjectId": "user-1"},
+                 "authContext": {"project": "mays-orders", "authorized": True}},
+                None,
+            )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(seen["subject"], "user-1")
+        self.assertEqual(json.loads(response["body"])["status"], "COMPLETED")
+
+    def test_auth_failure_maps_to_error(self):
+        def inspect_boom(subject_id, context=None):
+            from errors import validation_error as ve
+            raise ve("Unauthorized privacy operation")
+
+        fake = FakeService()
+        fake.inspect_subject = inspect_boom
+        with patch_service(fake):
+            response = index.handler(
+                {"internalAction": "privacy/inspect",
+                 "payload": {"subjectId": "user-1"},
+                 "authContext": {}},
+                None,
+            )
+        self.assertEqual(response["statusCode"], 400)

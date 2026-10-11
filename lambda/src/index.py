@@ -98,12 +98,43 @@ def route_key(event: Dict[str, Any]) -> str:
     return f"{method} {path}"
 
 
+# Interne Privacy-Aktionen — ausschließlich per direktem Lambda-Invoke
+# (IAM lambda:InvokeFunction) erreichbar. Es wird KEINE öffentliche
+# API-Gateway-Route hinzugefügt. Jede Aktion läuft durch
+# OrderService._require_privacy_auth (fail-closed).
+_INTERNAL_PRIVACY_ACTIONS = ("privacy/inspect", "privacy/export", "privacy/erase")
+
+
+def _handle_internal(service: Any, event: Dict[str, Any]) -> Dict[str, Any]:
+    action = event.get("internalAction")
+    if action not in _INTERNAL_PRIVACY_ACTIONS:
+        return fail(validation_error(f"Unsupported internal action: {action}"))
+    payload = event.get("payload") or {}
+    auth_context = event.get("authContext")
+    subject_id = payload.get("subjectId")
+    options = payload.get("options")
+    try:
+        if action == "privacy/inspect":
+            result = service.inspect_subject(subject_id, context=auth_context)
+        elif action == "privacy/export":
+            result = service.export_subject(subject_id, context=auth_context)
+        else:
+            result = service.erase_subject(subject_id, context=auth_context, options=options)
+        return ok(200, result)
+    except Exception as err:
+        return fail(err)
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     table_name = os.environ.get("ORDERS_TABLE")
     if not table_name:
         return fail(internal_error("Lambda is not configured (ORDERS_TABLE missing)"))
 
     service = create_order_service(table_name=table_name)
+
+    # Interner Aufrufweg (direkter Invoke, keine HTTP-Route).
+    if isinstance(event, dict) and isinstance(event.get("internalAction"), str):
+        return _handle_internal(service, event)
 
     try:
         route = route_key(event)

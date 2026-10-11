@@ -94,6 +94,7 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01 → docs/reports/MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01.md
 - MAYS-ORDERS-LAMBDA-ARTIFACT-INTEGRITY-01 → docs/reports/MAYS-ORDERS-LAMBDA-ARTIFACT-INTEGRITY-01.md
 - MAYS-ORDERS-PRIVACY-FINAL-E2E-ACCEPTANCE-01 → docs/reports/MAYS-ORDERS-PRIVACY-FINAL-E2E-ACCEPTANCE-01.md
+- MAYS-ORDERS-PRIVACY-SECRET-E2E-01 → docs/reports/MAYS-ORDERS-PRIVACY-SECRET-E2E-01.md
 
 Overall Status: YELLOW - konsistent, recoverable, Dokumentation vollständig, Orphaned Cognito Pools offen
 
