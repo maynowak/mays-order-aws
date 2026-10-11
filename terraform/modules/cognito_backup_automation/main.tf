@@ -65,23 +65,23 @@ resource "aws_iam_role_policy_attachment" "backup_attach" {
 }
 
 resource "aws_lambda_function" "backup" {
-  function_name = "${local.name}-lambda"
-  role          = aws_iam_role.backup_lambda.arn
-  handler       = "cognito_backup_handler.handler"
-  runtime       = "python3.11"
-  filename      = "${path.root}/../lambda/dist/cognito_backup.zip"
+  function_name    = "${local.name}-lambda"
+  role             = aws_iam_role.backup_lambda.arn
+  handler          = "cognito_backup_handler.handler"
+  runtime          = "python3.11"
+  filename         = "${path.root}/../lambda/dist/cognito_backup.zip"
   source_code_hash = filebase64sha256("${path.root}/../lambda/dist/cognito_backup.zip")
-  timeout       = 300
+  timeout          = 300
 
   environment {
     variables = {
-      PROJECT_NAME    = var.project_name
-      ENVIRONMENT     = var.environment
-      AWS_ACCOUNT_ID  = data.aws_caller_identity.current.account_id
-      MY_AWS_REGION   = var.aws_region
-      USER_POOL_ID    = var.user_pool_id
-      USER_POOL_NAME  = var.user_pool_name
-      BUCKET_NAME     = var.bucket_name
+      PROJECT_NAME   = var.project_name
+      ENVIRONMENT    = var.environment
+      AWS_ACCOUNT_ID = data.aws_caller_identity.current.account_id
+      MY_AWS_REGION  = var.aws_region
+      USER_POOL_ID   = var.user_pool_id
+      USER_POOL_NAME = var.user_pool_name
+      BUCKET_NAME    = var.bucket_name
     }
   }
 
@@ -91,7 +91,7 @@ resource "aws_lambda_function" "backup" {
 data "aws_caller_identity" "current" {}
 
 resource "aws_scheduler_schedule" "backup_schedule" {
-  name       = "${local.name}-schedule"
+  name                = "${local.name}-schedule"
   schedule_expression = var.backup_schedule
   flexible_time_window {
     mode = "OFF"
@@ -121,8 +121,8 @@ resource "aws_iam_role" "scheduler_role" {
 
 data "aws_iam_policy_document" "scheduler_policy" {
   statement {
-    effect = "Allow"
-    actions = ["lambda:InvokeFunction"]
+    effect    = "Allow"
+    actions   = ["lambda:InvokeFunction"]
     resources = [aws_lambda_function.backup.arn]
   }
 }
@@ -159,7 +159,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
     FunctionName = aws_lambda_function.backup.function_name
   }
   treat_missing_data = "notBreaching"
-  alarm_actions       = [aws_sns_topic.notifications.arn]
+  alarm_actions      = [aws_sns_topic.notifications.arn]
 }
 
 resource "aws_cloudwatch_metric_alarm" "lambda_invocations" {
@@ -176,7 +176,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_invocations" {
     FunctionName = aws_lambda_function.backup.function_name
   }
   treat_missing_data = "missing"
-  alarm_actions       = []
+  alarm_actions      = []
 }
 
 resource "aws_sns_topic" "notifications" {
@@ -185,7 +185,7 @@ resource "aws_sns_topic" "notifications" {
 }
 
 resource "aws_sns_topic_policy" "notifications" {
-  arn = aws_sns_topic.notifications.arn
+  arn    = aws_sns_topic.notifications.arn
   policy = data.aws_iam_policy_document.sns_policy.json
 }
 

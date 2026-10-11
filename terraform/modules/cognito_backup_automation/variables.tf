@@ -33,7 +33,7 @@ variable "tags" {
 }
 
 variable "notification_email" {
-  type    = string
-  default = null
+  type        = string
+  default     = null
   description = "Optional email address for SNS notifications. If null, no subscription is created."
 }
