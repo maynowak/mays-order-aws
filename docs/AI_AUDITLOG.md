@@ -99,6 +99,6 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01 → docs/reports/MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01.md
 - MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 → docs/reports/MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01.md
 
-Overall Status: GREEN - Dokumentation technisch geprüft, Release Candidate v0.2.0-rc.1 getaggt, Produktion Privacy BLOCKED dokumentiert
+Overall Status: GREEN - Dokumentation technisch geprüft, Release Candidate v0.5.0-rc.1 getaggt, Produktion Privacy BLOCKED dokumentiert
 
 ==================================================

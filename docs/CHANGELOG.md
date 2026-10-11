@@ -2,10 +2,10 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
-## 2026-10-11 — Release Candidate v0.2.0-rc.1 (MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01)
+## 2026-10-11 — Release Candidate v0.5.0-rc.1 (MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01)
 
 ### Release
-- Tag `v0.2.0-rc.1` auf Commit `f6e737b` erstellt und gepusht
+- Tag `v0.5.0-rc.1` auf Commit `f6e737b` erstellt und gepusht
 - Release Candidate Dokumentation finalisiert: `MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01`
 - Privacy Capability intern implementiert, Installer Härtung, Artifact Integrity Gate
 - Produktion Privacy Activation BLOCKED, dokumentiert
@@ -13,7 +13,7 @@
 ### Änderungen
 - `docs/PRODUCT_OVERVIEW.md` technisch geprüft und aktualisiert
 - `docs/INSTALLER_GUIDE.md` gegen CLI validiert, Beispiele korrigiert
-- `README.md` modernisiert für v0.2.0-rc.1
+- `README.md` modernisiert für v0.5.0-rc.1
 - `docs/RELEASE_NOTES.md` aktualisiert
 - `docs/PROJECT_STATUS.md` auf Release Candidate Stand gebracht
 - `docs/AI_AUDITLOG.md` fortlaufend aktualisiert

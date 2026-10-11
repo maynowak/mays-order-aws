@@ -5,7 +5,7 @@
 **Baseline:** ce41de2 (remote main)
 **AWS Context:** profile mayaws, account 240571105849, region eu-central-1
 **Project:** mays-orders-privacy-test
-**Release Candidate:** v0.2.0-rc.1 (proposal)
+**Release Candidate:** v0.5.0-rc.1 (proposal)
 
 ## 1. Pre-Destroy Safety Gate
 
@@ -123,7 +123,7 @@ Asynchrone Löschungen: keine beobachtet. Verbleibende Ressourcen: keine.
 ## 6. Release Version
 
 Bestehende Version: 0.1.0
-Vorgeschlagener Kandidat: **v0.2.0-rc.1**
+Vorgeschlagener Kandidat: **v0.5.0-rc.1**
 
 Begründung:
 - Neue Privacy-Funktionen inspect/export/erase intern
@@ -170,4 +170,4 @@ Begründung:
 
 **Commit SHA for this report:** wird nach Commit gesetzt
 **Destroy Plan:** destroy-0002, 37 Deletes, isoliert
-**Next Step:** Offene Punkte beheben, dann finaler Release-Tag v0.2.0-rc.1 prüfen
+**Next Step:** Offene Punkte beheben, dann finaler Release-Tag v0.5.0-rc.1 prüfen

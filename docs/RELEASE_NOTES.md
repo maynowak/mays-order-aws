@@ -1,8 +1,8 @@
 # Release Notes — Mays Orders
 
-RELEASE: v0.2.0-rc.1
+RELEASE: v0.5.0-rc.1
 Date: 2026-10-11
-Baseline: 186c4e9
+Baseline: f6e737b
 
 FEATURES:
 - Privacy inspect_subject (intern, GSI2)

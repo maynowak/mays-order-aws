@@ -1,6 +1,6 @@
 # May's Orders — AWS Serverless Order & Work Processing
 
-**Release:** `v0.2.0-rc.1` · **Status:** geprüfter Release Candidate · **Production Privacy Activation:** **BLOCKED**
+**Release:** `v0.5.0-rc.1` · **Status:** geprüfter Release Candidate · **Production Privacy Activation:** **BLOCKED**
 
 Mays-Orders-AWS ist ein eigenständiges serverloses AWS-Backend für Bestellungen und Work Items. Die Plattform verbindet eine JWT-geschützte HTTP-API mit einer regelbasierten Statusmaschine, DynamoDB, SQS-Worker-Verarbeitung und einem kontrollierten Terraform-Installer.
 
@@ -27,7 +27,7 @@ Terraform + Installer + Policy Gate | IAM | CloudWatch | CloudTrail
 
 | Bereich | Ergebnis |
 |---|---|
-| Tag / Commit | `v0.2.0-rc.1` / `f6e737b` |
+| Tag / Commit | `v0.5.0-rc.1` / `f6e737b` |
 | Lambda-Unit-Tests | 76 PASS |
 | Installer-Unit-Tests | 81 PASS |
 | Artifact-Integrity-Tests | 5 PASS |
@@ -52,7 +52,7 @@ Terraform + Installer + Policy Gate | IAM | CloudWatch | CloudTrail
 ```bash
 git clone https://github.com/maynowak/mays-order-aws.git
 cd mays-order-aws
-git checkout v0.2.0-rc.1
+git checkout v0.5.0-rc.1
 ./Mays-Order-AWS-installer --help
 ./Mays-Order-AWS-installer validate
 ```

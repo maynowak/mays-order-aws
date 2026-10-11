@@ -1,6 +1,6 @@
 # Mays-Orders-AWS — Installer-Handbuch
 
-**Stand:** 11.10.2026 · **Referenz:** `v0.2.0-rc.1`  
+**Stand:** 11.10.2026 · **Referenz:** `v0.5.0-rc.1`  
 **CLI:** `./Mays-Order-AWS-installer` (Repository-Root)
 
 ## 1. Zweck
@@ -114,7 +114,7 @@ cd lambda
 python3 build_zip.py
 ```
 
-Der dokumentierte Release-Hash für `v0.2.0-rc.1` lautet:
+Der dokumentierte Release-Hash für `v0.5.0-rc.1` lautet:
 
 ```text
 b1018a3bd03455ede329ffaa3c66ca8115c6077741c8aad5282ee5f5fbd00e2b

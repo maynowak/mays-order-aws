@@ -1,6 +1,6 @@
 # Mays-Orders-AWS — Produktbeschreibung und Architektur
 
-**Stand:** 11.10.2026 · **Release Candidate:** `v0.2.0-rc.1` · **Commit:** `f6e737b`  
+**Stand:** 11.10.2026 · **Release Candidate:** `v0.5.0-rc.1` · **Commit:** `f6e737b`  
 **Produktive Privacy-Aktivierung:** **BLOCKED** (dauerhaftes Secret-Management und Rotation fehlen).
 
 ## 1. Produktidee
@@ -77,7 +77,7 @@ Optionale Cognito-Backup-Komponenten lassen sich je nach Installationskontext ko
 
 | Prüfung | Ergebnis laut Release-Checkpoint |
 |---|---|
-| Release-Tag | `v0.2.0-rc.1` → `f6e737b`, gepusht |
+| Release-Tag | `v0.5.0-rc.1` → `f6e737b`, gepusht |
 | Lambda-Unit-Tests | 76 PASS |
 | Installer-Unit-Tests | 81 PASS |
 | Artifact-Integrity-Tests | 5 PASS |
