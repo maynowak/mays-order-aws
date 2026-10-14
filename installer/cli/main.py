@@ -41,6 +41,7 @@ class InstallerCLI:
                   mays-installer plan
                   mays-installer plan --destroy
                   mays-installer validate --profile mayaws --region eu-central-1
+                  Mays-Order-AWS-installer --guide
             """)
         )
 
@@ -114,6 +115,13 @@ class InstallerCLI:
             default=os.environ.get("DEVELOPMENT_STATUS", "development"),
             choices=["development", "testing", "staging", "production", "archived"],
             help="Development status (default: development)"
+        )
+        # Documentation pointer: prints guide location + TOC, then exits
+        parser.add_argument(
+            "--guide",
+            action="store_true",
+            default=False,
+            help="Show the Installer Guide (docs/INSTALLER_GUIDE.md) path and table of contents, then exit"
         )
 
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -310,6 +318,11 @@ class InstallerCLI:
     def run(self, args: Optional[list] = None) -> int:
         """Run the CLI."""
         parsed = self.parser.parse_args(args)
+
+        if getattr(parsed, "guide", False):
+            from installer.cli.guide import render_guide_info
+            print(render_guide_info())
+            return 0
 
         if not parsed.command:
             self.parser.print_help()

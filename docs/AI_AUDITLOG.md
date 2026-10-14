@@ -101,7 +101,8 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 → docs/reports/MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01.md
 - MAYS-ORDERS-V050-RC1-RELEASE-FINALIZATION-01 → GitHub-Pre-Release v0.5.0-rc.1: Tag/Docs/PDF-Platzhalter fertig; Veröffentlichung NICHT durchgeführt (keine GitHub-Credentials in der Sandbox) — Release offen, manuell via `gh release create` möglich
 - MAYS-ORDERS-INSTALLER-COLLISION-PREFLIGHT-01 → docs/reports/MAYS-ORDERS-INSTALLER-COLLISION-PREFLIGHT-01.md
+- MAYS-ORDERS-LEFTOVER-STATE-CLEANUP-01 → docs/reports/MAYS-ORDERS-LEFTOVER-STATE-CLEANUP-01.md (inkl. Installer-Guide-Detailupdate + --guide Flag, 129/129 Installer-Tests)
 
-Overall Status: YELLOW - RC v0.5.0-rc.1 getaggt; GitHub-Release noch offen; Namenskollision mays-orders im Konto 240571105849 jetzt per Installer-Preflight sichtbar (aws_project_collision), State-Cleanup des kollidierenden Backup-Stacks (S3-Workspace mays-orders, Serial 18) noch ausstehend
+Overall Status: GREEN - Unser mays-orders-Rest (Backup-Stack, S3-Workspace Serial 18) vollständig aufgeräumt (20 Deletes, State leer, Kollisions-Duplikat beseitigt); RIS-Installation unangetastet (anderes Team); Collision-Preflight + --guide im Installer aktiv; GitHub-Pre-Release v0.5.0-rc.1 noch offen (manuell via gh release create)
 
 ==================================================
