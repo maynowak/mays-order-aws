@@ -49,7 +49,7 @@ kept accurate even if the audit remains completely read-only.
 ## AUDIT LOG INDEX
 
 Current Branch: main
-Latest HEAD: b5f698f
+Latest HEAD: 450ad94 (Baseline Collision-Preflight-Checkpoint; aktueller Stand via `git log -1`)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -97,8 +97,11 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-PRIVACY-SECRET-E2E-01 → docs/reports/MAYS-ORDERS-PRIVACY-SECRET-E2E-01.md
 - MAYS-ORDERS-PRIVACY-FINAL-EVIDENCE-AND-DESTROY-01 → docs/reports/MAYS-ORDERS-PRIVACY-FINAL-EVIDENCE-AND-DESTROY-01.md
 - MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01 → docs/reports/MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01.md
+- MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01 → docs/reports/MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01.md (Nachtrag: Eintrag fehlte im Index)
 - MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 → docs/reports/MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01.md
+- MAYS-ORDERS-V050-RC1-RELEASE-FINALIZATION-01 → GitHub-Pre-Release v0.5.0-rc.1: Tag/Docs/PDF-Platzhalter fertig; Veröffentlichung NICHT durchgeführt (keine GitHub-Credentials in der Sandbox) — Release offen, manuell via `gh release create` möglich
+- MAYS-ORDERS-INSTALLER-COLLISION-PREFLIGHT-01 → docs/reports/MAYS-ORDERS-INSTALLER-COLLISION-PREFLIGHT-01.md
 
-Overall Status: GREEN - Dokumentation technisch geprüft, Release Candidate v0.5.0-rc.1 getaggt, Produktion Privacy BLOCKED dokumentiert
+Overall Status: YELLOW - RC v0.5.0-rc.1 getaggt; GitHub-Release noch offen; Namenskollision mays-orders im Konto 240571105849 jetzt per Installer-Preflight sichtbar (aws_project_collision), State-Cleanup des kollidierenden Backup-Stacks (S3-Workspace mays-orders, Serial 18) noch ausstehend
 
 ==================================================

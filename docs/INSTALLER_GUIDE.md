@@ -122,6 +122,34 @@ b1018a3bd03455ede329ffaa3c66ca8115c6077741c8aad5282ee5f5fbd00e2b
 
 Dieser Hash gilt für den dokumentierten Release Candidate, nicht für beliebige spätere Builds.
 
+## 9a. AWS-Namenskollisions-Check (`aws_project_collision`)
+
+**Hintergrund (Incident 2026-10):** Zwei unabhängige Deployments verwendeten
+dasselbe `project_name` (`mays-orders`) im selben AWS-Konto. Das Ergebnis waren
+zwei Cognito User Pools mit identischem Namen `mays-orders-users` — eines aus
+dem S3-State-Workspace dieses Repos, eines aus einer parallel betriebenen,
+lokal verwalteten Installation. Kein Tooling machte das sichtbar; die Fehlersuche
+kostete erheblich Zeit.
+
+Der Preflight-Check (`validate` und Plan-Vorprüfung) listet deshalb read-only
+die Ressourcen des Kontos (Cognito-Pools, DynamoDB-Tabellen, Lambda-Funktionen,
+SQS-Queues, S3-Buckets) und meldet:
+
+- **Doppelte Namen innerhalb eines Service** (z. B. zwei Pools gleichen Namens)
+  → `WARNING` mit IDs — stärkstes Kollisionssignal.
+- **Vorhandene Ressourcen, die den Projektnamen enthalten** → `WARNING` mit
+  Ownership-Hinweis: prüfen, ob sie zu *diesem* State gehören oder zu einer
+  Parallel-Installation (z. B. RIS-verwaltete Installation).
+- **Keine Treffer** → `PASS` (Konto für dieses Projekt sauber).
+
+Der Check ist **best-effort**: ohne validierten AWS-Kontext oder bei CLI-Fehlern
+degradiert er auf `WARNING` (Skip), niemals auf `FAIL`. Er führt ausschließlich
+List-Aufrufe aus (`list-user-pools`, `list-tables`, `list-functions`,
+`list-queues`, `list-buckets`) und verändert nichts.
+
+**Wichtig:** Ein `WARNING` hier blockiert nicht, ist aber vor jedem `plan`/`apply`
+zu klären — genau wie Workspace, State und Policy Gate.
+
 ## 10. Kontrollierter Destroy
 
 **Pflicht-Gates:** AWS-Identität, Region, Projekt, Workspace, Backend-State, unveränderter aktueller Plan, ausschließlich freigegebene Ressourcen, keine fremden Projektressourcen, gesicherte Evidence und explizite menschliche Freigabe.

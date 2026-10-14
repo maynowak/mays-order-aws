@@ -416,15 +416,15 @@ class InstallerCLI:
                     for k, v in check.details.items():
                         print(f"    {k}: {v}")
 
-                if result.errors:
-                    print(f"\nErrors:")
-                    for err in result.errors:
-                        print(f"  ✗ {err}")
+            if result.errors:
+                print(f"\nErrors:")
+                for err in result.errors:
+                    print(f"  ✗ {err}")
 
-                if result.warnings:
-                    print(f"\nWarnings:")
-                    for warn in result.warnings:
-                        print(f"  ⚠ {warn}")
+            if result.warnings:
+                print(f"\nWarnings:")
+                for warn in result.warnings:
+                    print(f"  ⚠ {warn}")
 
         return 0 if not result.has_errors() else 1
 

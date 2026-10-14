@@ -299,6 +299,7 @@ class ValidationLayer:
         self._check_installer_config()
         self._check_remote_state_lifecycle()
         self._check_lambda_artifact()
+        self._check_aws_project_collisions()
 
         return self.result
 
@@ -622,4 +623,97 @@ class ValidationLayer:
                 "lambda_artifact",
                 "FAIL",
                 f"Could not verify lambda artifact: {e}",
+            )
+
+    def _check_aws_project_collisions(self) -> None:
+        """Read-only AWS scan for name collisions with the project name.
+
+        Incident background (2026-10, account 240571105849): two independent
+        deployments used project name 'mays-orders' in the same account,
+        producing two Cognito user pools with the identical name
+        'mays-orders-users' (one per deployment). Nothing surfaced this.
+
+        This check lists account resources (Cognito pools, DynamoDB tables,
+        Lambda functions, SQS queues, S3 buckets) and reports:
+        - DUPLICATE names within a service (strong collision signal), or
+        - existing resources matching the project name (verify ownership:
+          this state vs. parallel deployment e.g. RIS-managed install).
+        Best-effort: AWS/CLI problems degrade to WARNING, never FAIL.
+        """
+        aws_ctx = getattr(self.context, "aws_execution_context", None)
+        if aws_ctx is None:
+            self._add_check(
+                "aws_project_collision",
+                "WARNING",
+                "Skipped: no validated AWS context (cannot scan for name collisions)",
+            )
+            return
+        try:
+            from installer.core.collision_scan import (
+                find_name_duplicates,
+                match_project_resources,
+                scan_project_inventory,
+            )
+            env = aws_ctx.get_environment()
+            project_name = self.context.project_name
+            inventory = scan_project_inventory(env, project_name)
+            duplicates = find_name_duplicates(inventory)
+            matches = match_project_resources(inventory, project_name)
+            needle = project_name.lower()
+            details = {
+                "cognito_pools_matching_project": len(
+                    [p for p in inventory.get("cognito_pools", [])
+                     if needle in str(p.get("name", "")).lower()]
+                ),
+                "dynamodb_tables_matching_project": len(
+                    [t for t in inventory.get("dynamodb_tables", [])
+                     if needle in str(t).lower()]
+                ),
+                "lambda_functions_matching_project": len(
+                    [f for f in inventory.get("lambda_functions", [])
+                     if needle in str(f).lower()]
+                ),
+                "sqs_queues_matching_project": len(
+                    [q for q in inventory.get("sqs_queues", [])
+                     if needle in str(q).lower()]
+                ),
+                "s3_buckets_matching_project": len(
+                    [b for b in inventory.get("s3_buckets", [])
+                     if needle in str(b).lower()]
+                ),
+            }
+            if duplicates:
+                dup_desc = "; ".join(
+                    f"{d['service']} '{d['name']}' x{d['count']}" for d in duplicates
+                )
+                self._add_check(
+                    "aws_project_collision",
+                    "WARNING",
+                    f"Name collision detected: {dup_desc} — parallel deployment "
+                    f"or orphan likely; verify ownership before plan/apply",
+                    details={**details, "duplicates": duplicates},
+                )
+            elif matches:
+                total = sum(len(v) for v in matches.values())
+                self._add_check(
+                    "aws_project_collision",
+                    "WARNING",
+                    f"{total} existing AWS resource(s) match project name "
+                    f"'{project_name}' — confirm they belong to this project's "
+                    f"state or document the parallel owner (e.g. RIS-managed "
+                    f"installation) before plan/apply",
+                    details={**details, "matching_resources": matches},
+                )
+            else:
+                self._add_check(
+                    "aws_project_collision",
+                    "PASS",
+                    f"No existing AWS resources match project name '{project_name}'",
+                    details=details,
+                )
+        except Exception as e:
+            self._add_check(
+                "aws_project_collision",
+                "WARNING",
+                f"Collision scan skipped: {e}",
             )
