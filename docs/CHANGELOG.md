@@ -2,6 +2,32 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-10-14 — Release Candidate v0.5.0-rc.2 (MAYS-ORDERS-V050-RC2-RELEASE-PREPARATION-01)
+
+### Release
+- Tag `v0.5.0-rc.2` auf den finalen Release-Commit (inkl. Doku) erstellt und gepusht
+- Vorgänger `v0.5.0-rc.1` → `f6e737b` unverändert; `v0.2.0-rc.1` bleibt gelöscht
+- Release-Dossier `docs/release/RELEASE-v0.5.0-rc.2.md` + echtes PDF (LibreOffice, 6 Seiten A4)
+
+### Änderungen seit rc.1
+- `f387b3e` — **Feature:** AWS-Namenskollisions-Preflight `aws_project_collision`
+  (read-only Inventar-Scan, Duplikat-/Ownership-Warnung, 19 Tests) + CLI-Ausgabe-Fix
+- `adddca8` — **Cleanup:** mays-orders Backup-Stack-Rest abgebaut (20 Deletes,
+  Plan-Isolation, RIS unangetastet); Installer-Handbuch detailliert aktualisiert;
+  **Feature:** `--guide` Flag (9 Tests)
+- `514c808`/`450ad94`/`26db092` — Doku-Finalisierung, RC-Umbenennung, Release-Beschreibung
+
+### Verification
+- Installer Unit Tests 129/129 PASS · Lambda 76/76 PASS · Artifact Integrity 5/5 PASS
+- Terraform fmt/validate PASS · git diff --check CLEAN · Secret-Audit CLEAN
+- Incident 2026-10 (zwei `mays-orders-users`-Pools aus Parallel-Installation) aufgearbeitet;
+  Duplikat beseitigt, RIS-Installation nachweislich unangetastet
+
+### Known Limitations
+- Produktion Privacy BLOCKED (Secret-Management/Rotation offen)
+- Ownership-Klassifikation namensbasiert (Phase-2-State-Cross-Check offen)
+- GitHub-Pre-Release manuell zu veröffentlichen (keine Sandbox-Credentials)
+
 ## 2026-10-11 — Release Candidate v0.5.0-rc.1 (MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01)
 
 ### Release

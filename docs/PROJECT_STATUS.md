@@ -11,7 +11,7 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Release Candidate — v0.5.0-rc.1 (Härtung abgeschlossen, Dokumentation finalisiert)
+Release Candidate — v0.5.0-rc.2 (Incident-Aufarbeitung: Collision-Preflight, State-Cleanup, Guide-Update)
 
 Current Feature:
 Privacy Capability intern, Installer Härtung, Release Candidate Dokumentation
@@ -20,7 +20,7 @@ Current Task:
 MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 — Produkt- und Installer-Dokumentation technisch prüfen und konsistent veröffentlichen
 
 Hinweis Release Candidate:
-v0.5.0-rc.1, Commit f6e737b, Tag v0.5.0-rc.1 gepusht. Release Candidate GREEN unter dokumentierter Einschränkung: produktive Privacy-Aktivierung BLOCKED bis Secret-Management implementiert ist. Isolierte Privacy-Testinstallation vollständig abgebaut, Destroy verifiziert.
+v0.5.0-rc.2, Tag auf Release-Commit (inkl. Doku), Baseline adddca8. Kollisions-Incident aufgearbeitet: unser mays-orders-Backup-Stack-Rest (20 Ressourcen) kontrolliert abgebaut, RIS-Installation unangetastet, Collision-Preflight + --guide im Installer. Vorgänger v0.5.0-rc.1 → f6e737b unverändert. Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
 T011-10 — DynamoDB Demo-Seed Finalisierung COMPLETE (50 Demo-Orders, version/isTestData, seed_example_data opt-in; Report docs/reports/DYNAMODB-SEED-DEMO-50.md)
 T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
 
