@@ -1,8 +1,13 @@
+![Mays-Orders-AWS – Infrastruktur und Neugier](RELEASE-v0.5.0-rc.2-COVER.png)
+
+> **Engineering Release Dossier · v0.5.0-rc.2**  
+> *Neugier trifft auf Infrastruktur. Kollisionswarnungen, klare Zuständigkeiten und ein nachvollziehbarer Release-Prozess.*
+
 # Release v0.5.0-rc.2 — Mays-Orders-AWS
 
 **Release:** v0.5.0-rc.2 (Pre-Release Candidate)
 **Datum:** 2026-10-14
-**Basline:** v0.5.0-rc.1 → `f6e737b` · Remote main `adddca8` + dieser Release-Commit
+**Release-Basis:** v0.5.0-rc.1 → `f6e737b` · Release-Commit `5cf50a0a8e4221348c264c59432ff4c8dc580c8b`
 **Projekt:** Mays-Orders-AWS · Repository `maynowak/mays-order-aws`
 **Produktive Privacy-Aktivierung:** **BLOCKED** (unverändert)
 
@@ -152,8 +157,7 @@ Alle Prüfungen für diesen Release am 2026-10-14 real ausgeführt:
    WARNING, solange RIS diesen Namen nutzt.
 4. **S3 `mays-orders-ci-artifacts-dev`** (+ CodeBuild-Projekte): Ownership
    ungeklärt (vermutlich D8-CI-CD), nicht im State — separater Review offen.
-5. **GitHub-Pre-Release** muss manuell veröffentlicht werden (keine
-   GitHub-Credentials in der Autarkie-Umgebung).
+5. **GitHub-Veröffentlichung:** Der Tag wurde vorbereitet; der tatsächliche Veröffentlichungsstatus ist separat auf GitHub zu prüfen.
 6. Lambda-ZIP-Hash `b1018a3b…` gilt für den RC-Stand, nicht für beliebige Builds.
 
 ## 13. Nächste Entwicklungsziele
@@ -169,6 +173,4 @@ Alle Prüfungen für diesen Release am 2026-10-14 real ausgeführt:
 
 ---
 
-**Dokumentenstatus:** Dieses Markdown ist die inhaltliche Quelle; das PDF
-(`docs/release/RELEASE-v0.5.0-rc.2.pdf`) wurde aus diesem Markdown generiert
-(LibreOffice-Konvertierung) und inhaltlich konsistent erzeugt.
+**Dokumentenstatus:** Diese gestaltete Markdown-Ausgabe basiert auf dem Release-Dossier; das zugehörige PDF wurde aus demselben Inhalt neu gesetzt.
