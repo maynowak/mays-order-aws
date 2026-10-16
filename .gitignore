@@ -42,5 +42,7 @@ Thumbs.db
 # Installer runtime
 .mays-installer/
 
-# Terraform plans
+# Terraform plans (auch extensionlose Installer-Kopien) + Modul-Lock-Artefakte
 terraform/*.tfplan
+terraform/tfplan*
+terraform/modules/*/.terraform.lock.hcl
