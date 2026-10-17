@@ -46,3 +46,6 @@ Thumbs.db
 terraform/*.tfplan
 terraform/tfplan*
 terraform/modules/*/.terraform.lock.hcl
+
+# Module Builder: generierte Bereitstellungen
+/generated/

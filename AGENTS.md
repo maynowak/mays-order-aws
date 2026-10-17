@@ -79,6 +79,9 @@ Only four top-level dirs contain executable code — the rest (`api/`, `database
 - `lambda/` — active order handler, entrypoint `src/index.py` (`index.handler`)
 - `installer/` + `Mays-Order-AWS-installer` — deployment lifecycle CLI
   (layers: `cli/`, `core/`, `validation/`, `terraform/`, `run/`)
+- `module_builder/` — Terraform Module Builder CLI (`python -m module_builder`);
+  erzeugt eigenständige Terraform-Bereitstellungen aus den bestehenden Komponenten
+  (Preset `complete`, fail-closed, keine AWS-Mutationen)
 - `terraform/` — root module orchestrating 7 child modules in `terraform/modules/`
   (dynamodb, iam, lambda, cognito, api, monitoring, cloudtrail); `bootstrap/` provisions the
   state bucket/lock table; `policy/` is the Policy Gate
