@@ -104,7 +104,8 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-LEFTOVER-STATE-CLEANUP-01 → docs/reports/MAYS-ORDERS-LEFTOVER-STATE-CLEANUP-01.md (inkl. Installer-Guide-Detailupdate + --guide Flag, 129/129 Installer-Tests)
 - MAYS-ORDERS-V050-RC2-RELEASE-PREPARATION-01 → docs/release/RELEASE-v0.5.0-rc.2.md (+ echtes PDF, LibreOffice-generiert, 6 Seiten)
 - MAYS-ORDERS-RIS-HANDOFF-MO-INSTALLATION-01 → docs/reports/MAYS-ORDERS-RIS-HANDOFF-MO-INSTALLATION-01.md (Übergabe-Bericht an Team RIS: Vorgehen + Lösungsvarianten A/B/C für die MO-Installation mit lokalem State; Produktiv-Abhängigkeit GATE-6 dokumentiert; eigene Positionen: keine AWS-Mutation, kein Zugriff auf RIS)
+- MAYS-ORDERS-MODULE-USAGE-ASSESSMENT-01 → docs/reports/MAYS-ORDERS-MODULE-USAGE-ASSESSMENT-01.md (Modul-Verwendungsbewertung: Ist-Analyse Modulreife, 4 Szenarien S1–S4, Aufwandsschätzung Stufe 1 2–4 PT / Stufe 2 8–14 PT / S3 5–8 PT, Aufbau-Zielarchitektur Tenant-isolierter Shared Service)
 
-Overall Status: GREEN - Release Candidate v0.5.0-rc.2 vorbereitet (Audit/Verifikation/Doku/Tag), alle Gates GREEN: 129 Installer- + 76 Lambda-Tests, kein Secret, rc.1 unverändert; GitHub-Pre-Release rc.2 zur manuellen Veröffentlichung bereit (gh-Befehl im Report); lokale Terraform-Artefakte entsorgt + .gitignore gehärtet (6fd76e4); RIS-Handoff-Bericht bereit zur Vorlage
+Overall Status: GREEN - Release Candidate v0.5.0-rc.2 vorbereitet (Audit/Verifikation/Doku/Tag), alle Gates GREEN: 129 Installer- + 76 Lambda-Tests, kein Secret, rc.1 unverändert; GitHub-Pre-Release rc.2 zur manuellen Veröffentlichung bereit (gh-Befehl im Report); lokale Terraform-Artefakte entsorgt + .gitignore gehärtet (6fd76e4); RIS-Handoff-Bericht + Modul-Verwendungsassessment ausgeliefert; Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
 
 ==================================================
