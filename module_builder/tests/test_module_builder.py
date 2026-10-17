@@ -160,6 +160,97 @@ class TestGeneratedProject(unittest.TestCase):
             "Rebuild im generierten Projekt weicht vom Quell-Artefakt ab.",
         )
 
+    # ---------- F2 (HARDENING-01): Policy-Gate im generierten Projekt ----------
+
+    def _run_gate(self, plan: dict):
+        import subprocess
+        import tempfile
+        gate = self.target / "terraform" / "policy" / "validate-plan.py"
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False, dir="/tmp/opencode"
+        ) as fh:
+            json.dump(plan, fh)
+            plan_path = fh.name
+        result = subprocess.run(
+            ["python3", str(gate), plan_path],
+            capture_output=True, text=True, timeout=60,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    @staticmethod
+    def _plan(region: str = "eu-central-1", resource_type: str = "aws_dynamodb_table",
+              tags: dict | None = None, billing_mode: str = "PAY_PER_REQUEST") -> dict:
+        tags = tags if tags is not None else {
+            "Project": "my-orders",
+            "Maker": "Maymilly Nowak",
+            "Environment": "Development",
+        }
+        return {
+            "format_version": "1.2",
+            "terraform_version": "1.16.1",
+            "resource_changes": [
+                {
+                    "address": f"{resource_type}.orders",
+                    "type": resource_type,
+                    "name": "orders",
+                    "change": {
+                        "actions": ["create"],
+                        "after": {
+                            "name": "my-orders",
+                            "billing_mode": billing_mode,
+                            "tags_all": tags,
+                        },
+                    },
+                }
+            ],
+            "configuration": {
+                "provider_config": {
+                    "aws": {"expressions": {"region": {"constant_value": region}}}
+                }
+            },
+        }
+
+    def test_policy_files_present_in_target(self):
+        tree = self._tree()
+        self.assertIn("terraform/policy/validate-plan.py", tree)
+        self.assertIn("terraform/policy/resource-policy.json", tree)
+
+    def test_policy_project_substituted(self):
+        policy = json.loads(
+            (self.target / "terraform" / "policy" / "resource-policy.json").read_text()
+        )
+        self.assertEqual(policy["project"], "my-orders")
+        # Kern-Regeln bleiben erhalten (keine stille Aufweichung):
+        self.assertIn("eu-central-*", policy["region"]["allowed_patterns"])
+        self.assertEqual(policy["required_tags"], ["Project", "Maker", "Environment"])
+        self.assertFalse(policy["environment"]["production"]["allowed"])
+
+    def test_policy_gate_positive(self):
+        """Positivtest: valider Plan gegen das GENERIERTE Gate → Exit 0."""
+        code, output = self._run_gate(self._plan())
+        self.assertEqual(code, 0, f"Gate hätte PASS sein müssen: {output}")
+
+    def test_policy_gate_negative_region(self):
+        """Negativtest: verbotene Region → Exit 1 (FAIL, nicht umgangen)."""
+        code, output = self._run_gate(self._plan(region="us-east-1"))
+        self.assertEqual(code, 1)
+        self.assertIn("region", output.lower())
+
+    def test_policy_gate_negative_resource_type(self):
+        """Negativtest: nicht erlaubter Ressourcentyp → Exit 1."""
+        code, output = self._run_gate(
+            self._plan(resource_type="aws_redshift_cluster")
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("not allowed", output)
+
+    def test_policy_gate_negative_missing_tag(self):
+        """Negativtest: Pflicht-Tag fehlt → Exit 1."""
+        code, output = self._run_gate(
+            self._plan(tags={"Project": "my-orders", "Environment": "Development"})
+        )
+        self.assertEqual(code, 1)
+
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "terraform" / "versions.tf").read_text()
         main_tf = (self.target / "terraform" / "main.tf").read_text()

@@ -64,6 +64,17 @@ COMPLETE_COGNITO_BACKUP_SOURCE: List[str] = [
     "lambda/build_cognito_backup_zip.py",
 ]
 
+# Policy-Gate (F2, HARDENING-01): selbstenthaltenes, stdlib-only, offline
+# lauffähiges Paar (validate-plan.py liest resource-policy.json relativ zur
+# eigenen Datei). Der Builder substituiert "project" in resource-policy.json
+# auf den gewählten Projektnamen → das generierte Gate erzwingt den
+# Namespace DES KONSUMENTEN. Keine Repo-Kopplung, keine stillschweigende
+# Umgehung: FAIL blockiert (Exit 1), dokumentiert im generierten README.
+COMPLETE_POLICY_FILES: List[str] = [
+    "terraform/policy/validate-plan.py",
+    "terraform/policy/resource-policy.json",
+]
+
 # Seed tooling (opt-in via var.seed_example_data, default false).
 COMPLETE_SEED_FILES: List[str] = [
     "scripts/seed_orders.py",
@@ -82,6 +93,7 @@ PRESETS: Dict[str, Dict] = {
         "artifacts": COMPLETE_ARTIFACTS,
         "lambda_source": COMPLETE_LAMBDA_SOURCE,
         "cognito_backup_source": COMPLETE_COGNITO_BACKUP_SOURCE,
+        "policy_files": COMPLETE_POLICY_FILES,
         "seed_files": COMPLETE_SEED_FILES,
     },
 }

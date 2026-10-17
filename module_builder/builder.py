@@ -158,6 +158,28 @@ terraform plan   # erfordert AWS-Credentials + eigenes Backend
   (Secret-Management/Rotation fehlen) — Produktion Privacy Activation: **BLOCKED**.
 - **Seed:** `seed_example_data = false` (Standard) — kein Demo-Import.
 - **Provenance:** Siehe `module-builder.manifest.json` (Dateien + Artefakt-Hashes).
+
+## Policy-Gate (Pflicht vor jedem apply)
+
+Das Projekt enthält das Policy-Gate (`terraform/policy/`): ein selbstenthaltenes,
+offline lauffähiges Python-Prüfskript (stdlib-only) mit der zugehörigen
+`resource-policy.json` — bereits auf **deinen Projektnamen `{project_name}`**
+eingestellt (Namespace-, Regions-, Tag- und Ressourcenlimits).
+
+```bash
+cd terraform
+terraform plan -out=tfplan                 # benötigt AWS-Credentials (read-only)
+terraform show -json tfplan > tfplan.json
+python3 policy/validate-plan.py tfplan.json
+```
+
+Exit-Codes: `0` = PASS · `1` = **FAIL** (Deployment blockieren, niemals umgehen) · `2` = Usage-Fehler.
+
+Erzwungen werden u. a.: Region `eu-central-*`, Environment `Development`,
+Pflicht-Tags (`Project`, `Maker`, `Environment`), Ressourcen-Typ-Allowlist,
+Projekt-Namespace bei S3/IAM/API-GW/Cognito, PAY_PER_REQUEST-DynamoDB,
+Lambda-Limits. Anpassungen der Policy sind eine bewusste Governance-Entscheidung
+des Konsumenten — dokumentieren, nicht umgehen.
 """
 
 
@@ -280,6 +302,28 @@ def build(
         _render_tfvars_example(project_name), encoding="utf-8"
     )
     written.append(str(tf_dir / "terraform.tfvars.example"))
+
+    # F2 (HARDENING-01): Policy-Gate übernehmen — validate-plan.py verbatim,
+    # resource-policy.json mit dem Projektnamen des Konsumenten. POLICY_PATH
+    # in validate-plan.py ist dateirelativ → das Paar funktioniert unverändert
+    # an jedem Ort (research-befund). Fail-closed bleibt gewahrt: FAIL (Exit 1)
+    # blockiert Deployments; das generierte README dokumentiert die Nutzung.
+    policy_dir = tf_dir / "policy"
+    policy_dir.mkdir(parents=True, exist_ok=True)
+    for policy_file in preset["policy_files"]:
+        dst = target_dir / policy_file
+        if dst.name == "resource-policy.json":
+            policy_json = json.loads(
+                (source_root / policy_file).read_text(encoding="utf-8")
+            )
+            policy_json["project"] = project_name
+            dst.write_text(
+                json.dumps(policy_json, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            written.append(str(dst))
+        else:
+            _copy_file(source_root / policy_file, dst, written)
 
     # Lambda artifacts + source + seed tooling
     artifact_hashes: Dict[str, str] = {}
