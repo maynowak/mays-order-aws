@@ -54,6 +54,16 @@ COMPLETE_ARTIFACTS: List[str] = [
 # Lambda source + build script → artifacts stay reproducible in the target.
 COMPLETE_LAMBDA_SOURCE: List[str] = ["lambda/src", "lambda/build_zip.py"]
 
+# Cognito-Backup-Lambda: Quelle + Build-Skript (F1, HARDENING-01) — der Build
+# ist deterministisch (feste Zip-Timestamps) und läuft identisch im Quell-Repo
+# und in generierten Projekten. Package-Tests bleiben bewusst außen vor
+# (Artefakt-Konvention wie lambda.zip).
+COMPLETE_COGNITO_BACKUP_SOURCE: List[str] = [
+    "cognito_backup",
+    "lambda/cognito_backup_handler.py",
+    "lambda/build_cognito_backup_zip.py",
+]
+
 # Seed tooling (opt-in via var.seed_example_data, default false).
 COMPLETE_SEED_FILES: List[str] = [
     "scripts/seed_orders.py",
@@ -71,6 +81,7 @@ PRESETS: Dict[str, Dict] = {
         "doc_files": COMPLETE_DOC_FILES,
         "artifacts": COMPLETE_ARTIFACTS,
         "lambda_source": COMPLETE_LAMBDA_SOURCE,
+        "cognito_backup_source": COMPLETE_COGNITO_BACKUP_SOURCE,
         "seed_files": COMPLETE_SEED_FILES,
     },
 }

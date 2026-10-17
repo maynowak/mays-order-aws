@@ -221,8 +221,9 @@ def build(
         if any("lambda/dist" in m for m in missing):
             hint = (
                 "\nHinweis: Lambda-Artefakte fehlen — im Quell-Repo ausführen: "
-                "cd lambda && python3 build_zip.py (betrifft lambda.zip). "
-                "cognito_backup.zip muss aus der bestehenden Freigabe vorliegen."
+                "cd lambda && python3 build_zip.py (lambda.zip) bzw. "
+                "python3 build_cognito_backup_zip.py (cognito_backup.zip). "
+                "Beide Builds sind deterministisch aus der Repo-Quelle reproduzierbar."
             )
         _fail(
             "Erforderliche Quell-Bestandteile fehlen (fail-closed, nichts wurde "
@@ -287,7 +288,11 @@ def build(
         dst = target_dir / artifact
         _copy_file(src, dst, written)
         artifact_hashes[artifact] = _sha256(dst)
-    for entry in preset["lambda_source"] + preset["seed_files"]:
+    for entry in (
+        preset["lambda_source"]
+        + preset.get("cognito_backup_source", [])
+        + preset["seed_files"]
+    ):
         src = source_root / entry
         if src.is_dir():
             for py_file in sorted(src.glob("*.py")):

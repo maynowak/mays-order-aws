@@ -128,12 +128,37 @@ class TestGeneratedProject(unittest.TestCase):
             "lambda/build_zip.py", "scripts/seed_orders.py",
             "database/seed/orders_seed_demo_50.json",
             "README.md", "module-builder.manifest.json",
+            # F1 (HARDENING-01): Cognito-Backup-Quelle + Build-Skript im Ziel
+            "lambda/cognito_backup_handler.py",
+            "lambda/build_cognito_backup_zip.py",
+            "cognito_backup/__init__.py", "cognito_backup/backup.py",
         ]:
             self.assertIn(expected, tree, f"Fehlt: {expected}")
         for module in PRESETS["complete"]["modules"]:
             mod_files = [f for f in tree if f.startswith(f"terraform/modules/{module}/")]
             self.assertTrue(mod_files and all(f.endswith(".tf") for f in mod_files),
                             f"Modul {module} ohne .tf-Dateien")
+        # Package-Tests gehören NICHT ins generierte Projekt (Artefakt-Konvention)
+        self.assertNotIn("cognito_backup/tests/test_manifest.py", tree)
+
+    def test_cognito_backup_artifact_reproducible_in_target(self):
+        """F1-Kern: Das generierte Projekt kann das Cognito-Backup-Artefakt
+        selbst deterministisch neu bauen — gleicher sha256 wie das Quell-Repo."""
+        import hashlib
+        import subprocess
+        script = self.target / "lambda" / "build_cognito_backup_zip.py"
+        result = subprocess.run(
+            ["python3", str(script)], cwd=self.target / "lambda",
+            capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-400:])
+        target_zip = self.target / "lambda" / "dist" / "cognito_backup.zip"
+        source_zip = REPO_ROOT / "lambda" / "dist" / "cognito_backup.zip"
+        self.assertEqual(
+            hashlib.sha256(target_zip.read_bytes()).hexdigest(),
+            hashlib.sha256(source_zip.read_bytes()).hexdigest(),
+            "Rebuild im generierten Projekt weicht vom Quell-Artefakt ab.",
+        )
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "terraform" / "versions.tf").read_text()

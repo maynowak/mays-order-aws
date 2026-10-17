@@ -6,7 +6,7 @@ def handler(event, context):
     project_name = os.environ.get('PROJECT_NAME')
     environment = os.environ.get('ENVIRONMENT')
     aws_account_id = os.environ.get('AWS_ACCOUNT_ID')
-    aws_region = os.environ.get('AWS_REGION')
+    aws_region = os.environ.get('MY_AWS_REGION')
     user_pool_id = os.environ.get('USER_POOL_ID')
     user_pool_name = os.environ.get('USER_POOL_NAME')
     bucket_name = os.environ.get('BUCKET_NAME')
