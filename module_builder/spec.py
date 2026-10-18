@@ -75,6 +75,33 @@ COMPLETE_POLICY_FILES: List[str] = [
     "terraform/policy/resource-policy.json",
 ]
 
+# Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): unveränderliche
+# Zusammensetzung des wiederverwendbaren Mays-Orders-AWS-Terraform-Moduls.
+# Diese 7 Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
+# Orders-Tabelle, Orders-IAM) — api benötigt die vom Modul verwaltete
+# Cognito-Ressource (JWT-Authorizer). Monitoring/CloudTrail/Cognito-Backups
+# und Seed sind NICHT Teil des Orders-Service-Vertrags (Root-Projekt-Extras).
+ORDERS_SERVICE_MODULES: List[str] = [
+    "api",
+    "cognito",
+    "dynamodb",
+    "iam",
+    "lambda",
+    "sqs",
+    "sqs_worker",
+]
+
+# Modul-Eingaben des Orders-Service-Vertrags (auditiert, WP4): die 7 Module
+# verbrauchen genau diese Root-Variablen (aws_region entfällt — Region liefert
+# der Provider des aufrufenden Projekts; Seed-/Backup-/Alarm-Variablen entfallen,
+# da die zugehörigen Bestandteile nicht Vertragsbestandteil sind).
+ORDERS_SERVICE_VARIABLES: List[str] = [
+    "project_name",
+    "tags",
+    "monitoring_enabled",
+    "log_retention_days",
+]
+
 # Seed tooling (opt-in via var.seed_example_data, default false).
 COMPLETE_SEED_FILES: List[str] = [
     "scripts/seed_orders.py",
@@ -95,6 +122,14 @@ PRESETS: Dict[str, Dict] = {
         "cognito_backup_source": COMPLETE_COGNITO_BACKUP_SOURCE,
         "policy_files": COMPLETE_POLICY_FILES,
         "seed_files": COMPLETE_SEED_FILES,
+    },
+    "orders-service": {
+        "description": "Wiederverwendbares Mays-Orders-AWS-Terraform-MODUL "
+                       "(Orders-Service-Vertrag): API+Handler, Worker, SQS, eigene "
+                       "Orders-Tabelle, Orders-IAM, Cognito (JWT) — als lokales "
+                       "Modul referenzierbar; feste Zusammensetzung ohne Auswahl.",
+        "modules": ORDERS_SERVICE_MODULES,
+        "variables": ORDERS_SERVICE_VARIABLES,
     },
 }
 

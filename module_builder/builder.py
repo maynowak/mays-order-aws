@@ -636,3 +636,271 @@ def build(
     )
 
     return BuildResult(target=target_dir, files=written, artifacts=artifact_hashes)
+
+
+# ---------------------------------------------------------------------------
+# Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): Modul-Generator
+# ---------------------------------------------------------------------------
+
+ORDERS_SERVICE_README_TEMPLATE = """# Mays-Order-AWS — Orders-Service Terraform-Modul
+
+**Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01):** Dieses Verzeichnis ist ein
+vollständiges, wiederverwendbares Terraform-Modul, das den **Orders-Service**
+bereitstellt. Feste Zusammensetzung (nicht abwählbar):
+
+- Orders-API (HTTP API v2, JWT-Autorisierung) + Orders-Handler-Lambda
+- Orders-Worker-Lambda (SQS-Consumer, Status-Verarbeitung)
+- Orders-SQS-Queue (asynchrone Verarbeitung)
+- Eigene Orders-DynamoDB-Tabelle (GSI1/GSI2)
+- Erforderliche Orders-IAM-Rollen/Policies (Least Privilege; SQS-Berechtigung
+  nur mit angebundener Queue — count-gated)
+- Cognito User Pool/Client/Gruppe `staff` (JWT-Grundlage der Orders-API)
+
+Nicht Bestandteil des Vertrags (Verantwortung des integrierenden Projekts):
+Monitoring, CloudTrail, Cognito-Backups, Seed-Daten, Remote-Backend,
+Policy-Gate-Ausführung (Root-Ebene), externe Infrastruktur.
+
+## Nutzung (lokales Modul)
+
+```hcl
+provider "aws" {{
+  region = "eu-central-1" # Region liefert der Aufrufer — das Modul setzt keine Region
+}}
+
+module "orders" {{
+  source = "../module/Mays-Order-AWS"
+
+  project_name = "{project_name}"     # Pflicht (Ressourcen-Namen + Project-Tag)
+  # tags                 = {{ ManagedBy = "terraform" }}  # optional
+  # monitoring_enabled  = true                              # optional (Default true)
+  # log_retention_days   = 7                                 # optional (Default 7)
+}}
+
+output "orders_api" {{
+  value = module.orders.api_gateway_endpoint
+}}
+```
+
+## Variablen (vollständiger Input-Vertrag)
+
+| Variable | Typ | Default | Bedeutung |
+|---|---|---|---|
+| `project_name` | string | `"{project_name}"` | Präfix aller Orders-Ressourcen + `Project`-Tag |
+| `tags` | map(string) | `{{}}` | Zusatz-Tags; `Maker`/`Environment` werden intern ergänzt (Tag-Parität zum Stamm-Deploy) |
+| `monitoring_enabled` | bool | `true` | Log-Group/Retention-Steuerung in Lambda-/Worker-Modulen |
+| `log_retention_days` | number | `7` | CloudWatch-Log-Retention |
+
+## Outputs (vollständiger Output-Vertrag)
+
+`dynamodb_table_name`, `dynamodb_table_arn`, `iam_handler_role_name`,
+`iam_handler_role_arn`, `lambda_function_name`, `lambda_function_arn`,
+`lambda_invoke_arn`, `cognito_user_pool_id`, `cognito_user_pool_arn`,
+`cognito_user_pool_endpoint`, `cognito_user_pool_client_id`,
+`cognito_user_pool_group_name`, `api_gateway_endpoint`, `api_gateway_id`,
+`api_gateway_stage_name`, `api_gateway_authorizer_id`, `sqs_queue_url`,
+`sqs_queue_arn`, `sqs_worker_lambda_arn`
+
+## Betriebs- und Vertragsnotizen
+
+- **Artefakte:** `lambda/dist/lambda.zip` liegt im Modul (`${{path.module}}`),
+  Rebuild über `cd lambda && python3 build_zip.py` (Quelle in `lambda/src/`).
+- **Keine AWS-Dienste über den Orders-Service hinaus**; keine Provider-Region,
+  kein Backend, keine Tags-Dritter im Modul.
+- **Upgrades:** Adressen (`module.orders.*`) und Outputs bleiben stabil;
+  Ressourcen-Identitäten/Naming-Konventionen unverändert. Nach einem Modul-
+  Austausch prüft das integrierende Projekt seinen Plan (keine automatische
+  State-Migration).
+- **Governance:** Policy-Gate ist Root-Sache des Aufrufers; das MO-Gate liegt
+  im Quell-Repo (`terraform/policy/`).
+- **Privacy:** interne Privacy-Funktionen sind nicht produktiv aktiviert
+  (BLOCKED — Secret-Management fehlt).
+"""
+
+
+def build_module(
+    target_dir: Path,
+    project_name: str,
+    source_root: Optional[Path] = None,
+    force: bool = False,
+) -> BuildResult:
+    """Orders-Service-Modul generieren (WP2–WP5, MAYS-ORDERS-MODULE-CONTRACT-01).
+
+    Wiederverwendung der Foundation-Generatorfunktionen; feste 7-Modul-
+    Zusammensetzung; Dateien liegen DIREKT im Zielordner (lokales Modul).
+    """
+    from module_builder.spec import ORDERS_SERVICE_MODULES, ORDERS_SERVICE_VARIABLES
+
+    validate_project_name(project_name)
+    if source_root is None:
+        source_root = Path(__file__).resolve().parents[1]
+    source_root = Path(source_root).resolve()
+    target_dir = Path(target_dir).resolve()
+    core = set(ORDERS_SERVICE_MODULES)
+
+    # ---------- Phase A: verify ----------
+    missing: List[str] = []
+    if not (source_root / "terraform").is_dir():
+        _fail(f"Quelle ungültig: kein terraform/ unter {source_root}")
+    for name in ("main.tf", "variables.tf", "outputs.tf"):
+        if not (source_root / "terraform" / name).is_file():
+            missing.append(f"terraform/{name}")
+    for module in ORDERS_SERVICE_MODULES:
+        from module_builder.catalog import MODULE_CATALOG
+        mod_dir = source_root / "terraform" / "modules" / MODULE_CATALOG[module]["dir"]
+        if not mod_dir.is_dir() or not any(mod_dir.glob("*.tf")):
+            missing.append(f"terraform/modules/{MODULE_CATALOG[module]['dir']}/")
+    for artifact in ("lambda/dist/lambda.zip",) + tuple(
+        ["lambda/src", "lambda/build_zip.py"]
+    ):
+        if not (source_root / artifact).exists():
+            missing.append(artifact)
+    if missing:
+        _fail(
+            "Erforderliche Quell-Bestandteile fehlen (fail-closed, nichts wurde "
+            f"geschrieben):\n  - " + "\n  - ".join(missing)
+        )
+    if target_dir.exists() and any(target_dir.iterdir()) and not force:
+        _fail(
+            f"Zielordner ist nicht leer: {target_dir}\n"
+            f"Bestehende Inhalte werden ohne --force nicht überschrieben."
+        )
+
+    # ---------- Phase B: execute ----------
+    written: List[str] = []
+    for module in ORDERS_SERVICE_MODULES:
+        from module_builder.catalog import MODULE_CATALOG
+        _copy_tf_tree(
+            source_root / "terraform" / "modules" / MODULE_CATALOG[module]["dir"],
+            target_dir / "modules" / MODULE_CATALOG[module]["dir"],
+            written,
+        )
+
+    # main.tf: locals (erweitert um default_tags) + die 7 Modulblöcke mit
+    # Modus-Transforms (path.module-Artefakte, Tag-Parität); versions.tf aus
+    # dem terraform-Block. Provider-/Seed-/moved-/Nicht-Kern-Blöcke entfallen.
+    main_tf_text = (source_root / "terraform" / "main.tf").read_text(encoding="utf-8")
+    blocks = _split_blocks(main_tf_text)
+    terraform_blocks = [b for b in blocks if b["kind"] == "terraform"]
+    if len(terraform_blocks) != 1:
+        _fail("Erwartete genau einen terraform-Block in main.tf.")
+    locals_blocks = [b for b in blocks if b["kind"] == "locals"]
+    if len(locals_blocks) != 1:
+        _fail("Erwartete genau einen locals-Block in main.tf.")
+    locals_text = locals_blocks[0]["text"].rstrip()
+    if not locals_text.endswith("}"):
+        _fail("locals-Block nicht korrekt geschlossen.")
+    locals_text = (
+        locals_text[:-1].rstrip("\n")
+        + "\n\n  # Tag-Parität zum Stamm-Deploy (WP3): Maker/Environment bleiben"
+        + "\n  # auch ohne Provider-default_tags an jeder Orders-Ressource."
+        + "\n  default_tags = merge({ \"Maker\" = local.maker, \"Environment\" = local.environment }, var.tags)\n}"
+    )
+    kept_blocks = [{"kind": "locals", "name": "", "header": "", "text": locals_text}]
+    for block in blocks:
+        if block["kind"] != "module" or block["name"] not in core:
+            continue
+        text = block["text"]
+        text = text.replace(
+            "${path.root}/../lambda/dist/lambda.zip",
+            "${path.module}/lambda/dist/lambda.zip",
+        )
+        text = re.sub(r"tags(\s*)=\s*var\.tags", r"tags\1= local.default_tags", text)
+        kept_blocks.append(dict(block, text=text))
+    (target_dir / "versions.tf").write_text(
+        terraform_blocks[0]["text"] + "\n", encoding="utf-8"
+    )
+    written.append(target_dir / "versions.tf")
+    (target_dir / "main.tf").write_text(_render_blocks(kept_blocks), encoding="utf-8")
+    written.append(target_dir / "main.tf")
+
+    # variables.tf: auditierte 4 Vertrags-Eingaben + Projektnamen-Substitution
+    variables_text = _render_blocks(
+        _filter_named_blocks(
+            _split_blocks(
+                (source_root / "terraform" / "variables.tf").read_text(encoding="utf-8")
+            ),
+            set(ORDERS_SERVICE_VARIABLES),
+            "variable",
+        )
+    )
+    variables_text = substitute_project_name(variables_text, project_name)
+    (target_dir / "variables.tf").write_text(variables_text, encoding="utf-8")
+    written.append(target_dir / "variables.tf")
+
+    # outputs.tf: referenzgefilterte Quell-Outputs (die 3 neuen Vertrag-Outputs
+    # sind in der Quelle enthalten und werden über den Filter automatisch
+    # übernommen — refs: module.sqs / module.sqs_worker ∈ Kern).
+    outputs_text = _render_blocks(
+        _filter_named_blocks(
+            _split_blocks(
+                (source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")
+            ),
+            core,
+            "output",
+        )
+    )
+    (target_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
+    written.append(target_dir / "outputs.tf")
+
+    # README (Vertrag + Nutzung + vollständige Variablen-/Output-Listen)
+    readme = target_dir / "README.md"
+    readme.write_text(
+        ORDERS_SERVICE_README_TEMPLATE.format(project_name=project_name),
+        encoding="utf-8",
+    )
+    written.append(readme)
+
+    # Artefakte: lambda.zip + Quelle + Build-Skript (modulsrelativ, path.module)
+    artifact_hashes: Dict[str, str] = {}
+    _copy_file(
+        source_root / "lambda/dist/lambda.zip",
+        target_dir / "lambda/dist/lambda.zip",
+        written,
+    )
+    artifact_hashes["lambda/dist/lambda.zip"] = _sha256(
+        target_dir / "lambda/dist/lambda.zip"
+    )
+    _copy_file(source_root / "lambda/build_zip.py",
+               target_dir / "lambda/build_zip.py", written)
+    for py_file in sorted((source_root / "lambda/src").glob("*.py")):
+        _copy_file(py_file, target_dir / "lambda/src" / py_file.name, written)
+
+    # Manifest
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=source_root, capture_output=True, text=True, timeout=10,
+        ).stdout.strip()
+    except Exception:
+        commit = "unknown"
+    manifest = {
+        "builder_version": __version__,
+        "preset": "orders-service",
+        "modules": sorted(core),
+        "project_name": project_name,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
+        "artifacts_sha256": artifact_hashes,
+        "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
+        "notes": {
+            "contract": "MAYS-ORDERS-MODULE-CONTRACT-01: fixed 7-module Orders-Service composition",
+            "module_mode": "local Terraform module (no provider block, path.module artifacts)",
+            "policy_gate": "root-level responsibility of the integrating project",
+            "privacy_production_activation": "BLOCKED (secret management missing)",
+            "aws_mutations_by_builder": "none",
+        },
+    }
+    (target_dir / "module-builder.manifest.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    # Deterministische Formatierung: terraform fmt (Write) fixt die Ausrichtung
+    # der transformierten Zeilen; ohne terraform bleibt der Stand unformatiert
+    # (dann scheitert --validate an fmt -check mit klarer Meldung).
+    if shutil.which("terraform"):
+        subprocess.run(
+            ["terraform", "fmt", str(target_dir)],
+            capture_output=True, text=True, timeout=120,
+        )
+
+    return BuildResult(target=target_dir, files=written, artifacts=artifact_hashes)

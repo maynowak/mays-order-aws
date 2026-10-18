@@ -100,6 +100,35 @@ def main(argv: Optional[List[str]] = None) -> int:
         final_modules: List[str] = []
         added_modules: List[str] = []
         requested_modules: List[str] = []
+
+        if preset_name == "orders-service":
+            # Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01):
+            # festes 7-Modul-Terraform-MODUL, keine Auswahl, keine Deps-Auflösung.
+            from module_builder.builder import build_module
+            from module_builder.validation import validate_generated_project
+
+            target = Path(parsed.target)
+            source = Path(parsed.source) if parsed.source else _default_source_root()
+            result = build_module(
+                target_dir=target,
+                project_name=parsed.project_name,
+                source_root=source,
+                force=parsed.force,
+            )
+            print(f"Build OK: {result.target}")
+            print(f"  Preset:      orders-service (Terraform-Modul)")
+            print("  Vertrag:     Orders-Service = API+Handler, Worker, SQS, "
+                  "DynamoDB, IAM, Cognito (fest, nicht abwählbar)")
+            print(f"  Projekt:     {parsed.project_name}")
+            if parsed.validate:
+                validate_generated_project(result.target)
+                print("Validierung:  terraform fmt -check / init -backend=false / "
+                      "validate PASS")
+            print("\nNutzung als lokales Modul:")
+            print(f'  module "orders" {{ source = "{result.target}" project_name = "{parsed.project_name}" }}')
+            print("Apply/Destroy ausschließlich nach menschlicher Freigabe.")
+            return 0
+
         if parsed.modules:
             from module_builder.catalog import parse_and_resolve
             requested_modules = [n.strip() for n in parsed.modules.split(",") if n.strip()]

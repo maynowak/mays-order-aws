@@ -454,6 +454,9 @@ class TestModuleSelectionB1(unittest.TestCase):
                 "dynamodb_table_name", "dynamodb_table_arn",
                 "iam_handler_role_name", "iam_handler_role_arn",
                 "lambda_function_name", "lambda_function_arn", "lambda_invoke_arn",
+                # Neu seit MODULE-CONTRACT-01: Queue-Outputs referenzieren module.sqs
+                # (in dieser Auswahl enthalten) und werden mitgefiltert:
+                "sqs_queue_url", "sqs_queue_arn",
             })
 
     def test_missing_dependencies_fail_closed(self):
@@ -811,6 +814,189 @@ class TestWithDepsB2(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertNotIn("Automatically added dependencies:", out)
             self.assertIn("Module:      dynamodb, iam, sqs", out)
+
+
+class TestOrdersServiceModule(unittest.TestCase):
+    """MAYS-ORDERS-MODULE-CONTRACT-01: orders-service-Modul-Generierung."""
+
+    @classmethod
+    def setUpClass(cls):
+        from module_builder.builder import build_module
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.target = Path(cls._tmp.name) / "Mays-Order-AWS"
+        cls.result = build_module(
+            target_dir=cls.target,
+            project_name="contract-orders",
+            source_root=REPO_ROOT,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _tree(self) -> set:
+        return {str(p.relative_to(self.target)) for p in self.target.rglob("*") if p.is_file()}
+
+    def test_module_layout(self):
+        tree = self._tree()
+        for expected in [
+            "main.tf", "variables.tf", "outputs.tf", "versions.tf", "README.md",
+            "modules/dynamodb/main.tf", "modules/sqs/main.tf", "modules/iam/main.tf",
+            "modules/lambda/main.tf", "modules/cognito/main.tf", "modules/api/main.tf",
+            "modules/sqs-worker/main.tf",
+            "lambda/dist/lambda.zip", "lambda/build_zip.py", "lambda/src/index.py",
+            "module-builder.manifest.json",
+        ]:
+            self.assertIn(expected, tree, f"Fehlt: {expected}")
+        # Vertrag: KEINE Bestandteile außerhalb des Orders-Service
+        for absent in [
+            "modules/monitoring", "modules/cloudtrail", "modules/cognito_backup",
+            "modules/cognito_backup_automation", "scripts", "database",
+            "terraform", "terraform.tfvars.example",
+            "policy/validate-plan.py", "policy/resource-policy.json",
+            "dist/cognito_backup.zip", "cognito_backup",
+        ]:
+            self.assertFalse(any(f.startswith(absent) for f in tree),
+                            f"Vertragsfremd im Modul: {absent}")
+
+    def test_main_composition(self):
+        main_tf = (self.target / "main.tf").read_text()
+        # Genau die 7 Vertragsmodule
+        modules = set(re.findall(r'^module\s+"([a-z_]+)"', main_tf, re.M))
+        self.assertEqual(modules, {"api", "cognito", "dynamodb", "iam",
+                                  "lambda", "sqs", "sqs_worker"})
+        # Kindmodul-Vertrag: kein Provider-/terraform-Block im Modul-main
+        self.assertNotRegex(main_tf, r'^provider\s', "Provider-Block im Modul verboten")
+        self.assertNotRegex(main_tf, r'^terraform\s', "terraform-Block gehört in versions.tf")
+        # Kein Seed (kein Bestandteil des Orders-Service-Vertrags)
+        self.assertNotIn("terraform_data", main_tf)
+        self.assertNotIn("seed", main_tf)
+        # Artefakte modulrelativ (path.module statt path.root)
+        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 2)
+        self.assertNotIn("path.root", main_tf)
+        # Tag-Parität: alle 7 Modulblöcke nutzen local.default_tags (Maker/Environment)
+        self.assertEqual(main_tf.count("tags         = local.default_tags")
+                         + len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)) >= 1
+                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 7)
+
+    def test_variables_contract(self):
+        variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
+                          (self.target / "variables.tf").read_text(), re.M))
+        self.assertEqual(variables, {"project_name", "tags",
+                                     "monitoring_enabled", "log_retention_days"})
+        text = (self.target / "variables.tf").read_text()
+        self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
+
+    def test_outputs_contract(self):
+        """WP5: alle Integrations-Outputs vorhanden (16 Bestand + 3 Vertrag)."""
+        outputs_text = (self.target / "outputs.tf").read_text()
+        outputs = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
+        for required in [
+            "api_gateway_endpoint", "api_gateway_id", "api_gateway_stage_name",
+            "api_gateway_authorizer_id",
+            "dynamodb_table_name", "dynamodb_table_arn",
+            "sqs_queue_url", "sqs_queue_arn",
+            "sqs_worker_lambda_arn",
+            "lambda_function_name", "lambda_function_arn", "lambda_invoke_arn",
+            "iam_handler_role_name", "iam_handler_role_arn",
+            "cognito_user_pool_id", "cognito_user_pool_arn",
+            "cognito_user_pool_endpoint", "cognito_user_pool_client_id",
+            "cognito_user_pool_group_name",
+        ]:
+            self.assertIn(required, outputs, f"Output fehlt: {required}")
+        # Alle Referenzen bleiben im Vertragsbestand
+        refs = set(re.findall(r"module\.([a-z_]+)", outputs_text))
+        self.assertTrue(refs.issubset({"api", "cognito", "dynamodb", "iam",
+                                       "lambda", "sqs", "sqs_worker"}))
+
+    def test_versions_tf_contains_terraform_block(self):
+        versions = (self.target / "versions.tf").read_text()
+        main_tf = (self.target / "main.tf").read_text()
+        self.assertIn("required_providers", versions)
+        self.assertIn('source  = "hashicorp/aws"', versions)
+        self.assertNotIn("required_providers", main_tf)
+
+    def test_manifest_contract(self):
+        manifest = json.loads(
+            (self.target / "module-builder.manifest.json").read_text()
+        )
+        self.assertEqual(manifest["preset"], "orders-service")
+        self.assertEqual(manifest["modules"],
+                         ["api", "cognito", "dynamodb", "iam", "lambda",
+                          "sqs", "sqs_worker"])
+        self.assertEqual(manifest["project_name"], "contract-orders")
+        self.assertIn("lambda/dist/lambda.zip", manifest["artifacts_sha256"])
+
+    def test_readme_contract_and_example(self):
+        readme = (self.target / "README.md").read_text()
+        self.assertIn('module "orders"', readme)
+        self.assertIn("source =", readme)
+        self.assertIn("project_name", readme)
+        self.assertIn("sqs_queue_url", readme)          # Outputs dokumentiert
+        self.assertIn("sqs_worker_lambda_arn", readme)
+        self.assertIn("BLOCKED", readme)                # Privacy-Hinweis
+        self.assertIn("Orders-Service", readme)         # Vertrag benannt
+
+    def test_module_mode_deterministic(self):
+        from module_builder.builder import build_module
+        with tempfile.TemporaryDirectory() as tmp:
+            second = build_module(
+                target_dir=Path(tmp) / "Mays-Order-AWS",
+                project_name="contract-orders",
+                source_root=REPO_ROOT,
+            )
+            def tree_files(root: Path) -> dict:
+                return {
+                    str(p.relative_to(root)): p.read_bytes()
+                    for p in root.rglob("*")
+                    if p.is_file() and p.name != "module-builder.manifest.json"
+                }
+            self.assertEqual(tree_files(self.target), tree_files(second.target))
+
+    def test_module_mode_fail_closed_missing_artifact(self):
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as out:
+            src_root = Path(src)
+            (src_root / "terraform").mkdir()
+            (src_root / "terraform" / "main.tf").write_text("terraform {\n}\n")
+            from module_builder.builder import build_module
+            with self.assertRaises(SystemExit) as ctx:
+                build_module(target_dir=Path(out) / "m", project_name="fail-test",
+                            source_root=src_root)
+            self.assertIn("fail-closed", str(ctx.exception))
+
+    def test_module_mode_respects_force_protection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            foreign = self.target.parent / "force-test"
+            foreign.mkdir(exist_ok=True)
+            (foreign / "keep.txt").write_text("foreign")
+            from module_builder.builder import build_module
+            with self.assertRaises(SystemExit) as ctx:
+                build_module(target_dir=foreign, project_name="force-test",
+                             source_root=REPO_ROOT)
+            self.assertIn("--force", str(ctx.exception))
+            self.assertEqual((foreign / "keep.txt").read_text(), "foreign")
+            (foreign / "keep.txt").unlink()
+
+    def test_cli_orders_service_preset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "Mays-Order-AWS"
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main([
+                    "build", "--preset", "orders-service",
+                    "--target", str(target),
+                    "--project-name", "cli-module",
+                ])
+            self.assertEqual(code, 0)
+            out = stdout.getvalue()
+            self.assertIn("orders-service (Terraform-Modul)", out)
+            self.assertTrue((target / "main.tf").is_file())
+
+    def test_cli_orders_service_rejects_modules(self):
+        with self.assertRaises(SystemExit) as ctx:
+            main(["build", "--preset", "orders-service", "--target", "/tmp/opencode/x",
+                  "--project-name", "abc", "--modules", "dynamodb"])
+        self.assertEqual(ctx.exception.code, 2)  # Mutual-Exclusion (argparse)
 
 
 if __name__ == "__main__":
