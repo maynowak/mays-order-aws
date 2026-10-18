@@ -268,15 +268,21 @@ def sorted_module_catalog() -> List[str]:
     return sorted(MODULE_CATALOG)
 
 
-def _render_readme(project_name: str, modules: Optional[List[str]] = None) -> str:
+def _render_readme(project_name: str, modules: Optional[List[str]] = None,
+                   added: Optional[List[str]] = None) -> str:
     module_section = ""
     if modules is not None:
         module_section = (
             f"\n- **Ausgewählte Module (--modules):** {', '.join(sorted(modules))}\n"
-            f"  Alle Pflichtabhängigkeiten sind explizit Teil der Auswahl; der Builder\n"
-            f"  ergänzt nichts automatisch (bewusste B1-Regel — automatische Auflösung\n"
-            f"  folgt in B2)."
+            f"  Alle Pflichtabhängigkeiten sind Teil der Auswahl; der Builder\n"
+            f"  ergänzt nichts automatisch, wenn `--with-deps` nicht gesetzt ist\n"
+            f"  (bewusste B1-Regel)."
         )
+        if added:
+            module_section += (
+                f"\n- **Automatisch ergänzte Pflichtabhängigkeiten (--with-deps):** "
+                f"{', '.join(sorted(added))}"
+            )
         if "sqs" not in modules and ({"iam", "lambda"} & set(modules)):
             module_section += (
                 "\n- **SQS nicht ausgewählt (PHASE2):** Der Handler erhält KEINE\n"
@@ -379,11 +385,14 @@ def build(
     source_root: Optional[Path] = None,
     force: bool = False,
     modules: Optional[List[str]] = None,
+    with_deps: bool = False,
 ) -> BuildResult:
     """Plan → verify → execute a build. Fail-closed; never mutates AWS.
 
     modules=None → Preset-Verhalten (complete, byte-identisch zum Foundation-Stand).
     modules=[...] → B1: freie Modulauswahl (fail-closed validiert, keine Ergänzung).
+    with_deps=True → B2: fehlende Pflichtabhängigkeiten werden transitiv ergänzt
+    (optionale Deps bleiben optional; B1-Fehler bleibt ohne Flag erhalten).
     """
     validate_project_name(project_name)
     preset = get_preset(preset_name)
@@ -393,8 +402,10 @@ def build(
     source_root = Path(source_root).resolve()
     target_dir = Path(target_dir).resolve()
 
-    # ---------- B1: Auswahl-Plan berechnen ----------
+    # ---------- B1/B2: Auswahl-Plan berechnen ----------
     selection: Optional[set] = None
+    requested: Optional[List[str]] = None
+    added: List[str] = []
     module_dirs: List[str] = preset["modules"]
     keep_vars: Optional[set] = None
     artifacts: List[str] = preset["artifacts"]
@@ -410,9 +421,16 @@ def build(
             MODULE_CATALOG,
             SEED_MODULES,
             required_variables,
-            validate_module_list,
+            resolve_with_deps,
+            validate_module_names,
+            validate_selection_closure,
         )
-        validate_module_list(list(modules))
+        requested = list(modules)
+        validate_module_names(requested)
+        if with_deps:
+            modules, added = resolve_with_deps(requested)
+        else:
+            validate_selection_closure(requested)
         selection = set(modules)
         module_dirs = [MODULE_CATALOG[name]["dir"] for name in modules]
         keep_vars = required_variables(list(modules))
@@ -581,7 +599,7 @@ def build(
     # Generated README
     readme = target_dir / "README.md"
     readme.write_text(
-        _render_readme(project_name, modules), encoding="utf-8"
+        _render_readme(project_name, modules, added), encoding="utf-8"
     )
     written.append(str(readme))
 
@@ -608,6 +626,10 @@ def build(
             "aws_mutations_by_builder": "none",
         },
     }
+    if requested is not None:
+        # B2-Transparenz: angefragte Auswahl vs. ergänzte Pflichtabhängigkeiten
+        manifest["modules_requested"] = sorted(requested)
+        manifest["modules_added"] = sorted(added)
     manifest_path = target_dir / "module-builder.manifest.json"
     manifest_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

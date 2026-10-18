@@ -73,10 +73,11 @@ BACKUP_SOURCE_MODULES = {"cognito_backup_automation"}
 SEED_MODULES = {"dynamodb"}  # terraform_data.seed_orders referenziert module.dynamodb
 
 
-def validate_module_list(names: List[str]) -> None:
-    """Liste prüfen: doppelte/unbekannte Module + Pflichtabhängigkeiten.
+def validate_module_names(names: List[str]) -> None:
+    """Basis-Validierung: leer / doppelte / unbekannte Module (KEINE Closure-Prüfung).
 
-    Fail-closed; KEINE stille Ergänzung (B1-Regel, Auflösung folgt in B2).
+    Basis für B1 (anschließend validate_selection_closure) und B2 (--with-deps,
+    anschließend resolve_with_deps).
     """
     if not names:
         raise SystemExit("module-builder: FEHLER: keine Module angegeben.")
@@ -97,16 +98,86 @@ def validate_module_list(names: List[str]) -> None:
             f"module-builder: FEHLER: unbekannte Module: {', '.join(unknown)}.\n"
             f"Verfügbare Module: {available}"
         )
+
+
+def validate_module_list(names: List[str]) -> None:
+    """Liste prüfen: doppelte/unbekannte Module + Pflichtabhängigkeiten.
+
+    Fail-closed; KEINE stille Ergänzung (B1-Regel; Auflösung nur via --with-deps/B2).
+    """
+    validate_module_names(names)
     validate_selection_closure(names)
 
 
-def parse_module_selection(spec: str) -> List[str]:
-    """Komma-Liste -> bereinigte Auswahl (inkl. vollständiger Validierung)."""
+def resolve_with_deps(requested: List[str]) -> "tuple[List[str], List[str]]":
+    """B2 (--with-deps): fehlende Pflichtabhängigkeiten transitiv ergänzen.
+
+    Regeln:
+    - NUR Pflichtabhängigkeiten (deps); optionale Deps (optional_deps, z. B. sqs
+      für iam/lambda) werden NIEMALS automatisch ergänzt.
+    - Deterministisch: Ergebnis alphabetisch sortiert, jedes Modul genau einmal.
+    - Zyklen im Katalog → fail-closed mit Zyklus-Pfad.
+    - Inkonsistente Katalogeinträge (fehlendes deps-Feld) → fail-closed.
+    - Ungültige Namen müssen zuvor via validate_module_names geprüft sein.
+    """
+    resolved: set = set()
+    path: List[str] = []
+
+    def visit(name: str) -> None:
+        entry = MODULE_CATALOG.get(name)
+        if entry is None:
+            raise SystemExit(
+                f"module-builder: FEHLER: Modul '{name}' fehlt im Katalog "
+                f"(inkonsistenter Zustand — Abbruch)."
+            )
+        if "deps" not in entry:
+            raise SystemExit(
+                f"module-builder: FEHLER: inkonsistenter Katalogeintrag für "
+                f"'{name}' (Pflichtabhängigkeiten fehlen) — Abbruch."
+            )
+        if name in path:
+            cycle = " -> ".join(path[path.index(name):] + [name])
+            raise SystemExit(
+                f"module-builder: FEHLER: Abhängigkeitszyklus im Modulkatalog: "
+                f"{cycle}. Der Katalog muss azyklisch sein — Abbruch."
+            )
+        if name in resolved:
+            return
+        path.append(name)
+        for dep in entry["deps"]:
+            visit(dep)
+        path.pop()
+        resolved.add(name)
+
+    for name in requested:
+        visit(name)
+
+    final = sorted(resolved)
+    requested_set = set(requested)
+    added = [name for name in final if name not in requested_set]
+    return final, added
+
+
+def parse_and_resolve(spec: str, with_deps: bool) -> "tuple[List[str], List[str]]":
+    """--modules-String → (final_selection, added).
+
+    with_deps=False: B1-Verhalten (Closure-Prüfung, fail-closed, added=[]).
+    with_deps=True:  B2 — transitive Ergänzung der Pflichtabhängigkeiten.
+    """
     if not spec or not spec.strip():
         raise SystemExit("module-builder: FEHLER: --modules ist leer.")
     names = [name.strip() for name in spec.split(",") if name.strip()]
-    validate_module_list(names)
-    return names
+    validate_module_names(names)
+    if with_deps:
+        return resolve_with_deps(names)
+    validate_selection_closure(names)
+    return names, []
+
+
+def parse_module_selection(spec: str) -> List[str]:
+    """Komma-Liste -> bereinigte Auswahl (B1, inkl. vollständiger Validierung)."""
+    final, _ = parse_and_resolve(spec, with_deps=False)
+    return final
 
 
 def validate_selection_closure(selected: List[str]) -> None:

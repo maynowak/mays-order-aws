@@ -641,5 +641,177 @@ class TestModuleSelectionCliB1(unittest.TestCase):
         self.assertIn("unbekannte Module", str(ctx.exception))
 
 
+class TestWithDepsB2(unittest.TestCase):
+    """B2: --with-deps — transitive Pflichtabhängigkeits-Ergänzung."""
+
+    def _build(self, target: Path, modules, with_deps=True, project_name="b2-test"):
+        return build(
+            target_dir=target,
+            project_name=project_name,
+            preset_name="complete",
+            source_root=REPO_ROOT,
+            modules=modules,
+            with_deps=with_deps,
+        )
+
+    def _manifest(self, target: Path) -> dict:
+        return json.loads((target / "module-builder.manifest.json").read_text())
+
+    def test_wp3_a_iam_direct_dependency(self):
+        """A) iam --with-deps → dynamodb + iam."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "a"
+            self._build(target, ["iam"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"], ["dynamodb", "iam"])
+            self.assertEqual(m["modules_requested"], ["iam"])
+            self.assertEqual(m["modules_added"], ["dynamodb"])
+
+    def test_wp3_b_lambda_transitive_without_sqs(self):
+        """B) lambda --with-deps → dynamodb, iam, lambda — KEIN SQS (optional bleibt optional)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "b"
+            self._build(target, ["lambda"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"], ["dynamodb", "iam", "lambda"])
+            self.assertNotIn("sqs", m["modules"])
+            self.assertEqual(m["modules_added"], ["dynamodb", "iam"])
+
+    def test_wp3_c_sqs_worker_full_chain(self):
+        """C) sqs_worker --with-deps → dynamodb, sqs, sqs_worker."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "c"
+            self._build(target, ["sqs_worker"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"], ["dynamodb", "sqs", "sqs_worker"])
+
+    def test_wp3_d_api_all_transitive(self):
+        """D) api --with-deps → alle transitiven Pflichtabhängigkeiten."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "d"
+            self._build(target, ["api"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"],
+                             ["api", "cognito", "dynamodb", "iam", "lambda"])
+
+    def test_wp3_e_dynamodb_no_additions(self):
+        """E) dynamodb --with-deps → keine Ergänzungen."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "e"
+            self._build(target, ["dynamodb"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"], ["dynamodb"])
+            self.assertEqual(m["modules_added"], [])
+
+    def test_multi_used_dependency_appears_once(self):
+        """Mehrfach verwendete Abhängigkeit (dynamodb) erscheint genau einmal."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "multi"
+            self._build(target, ["api", "monitoring", "sqs_worker"])
+            m = self._manifest(target)
+            self.assertEqual(m["modules"].count("dynamodb"), 1)
+            self.assertEqual(m["modules"], sorted(set(m["modules"])))
+
+    def test_unknown_module_rejected_with_deps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["iam", "nope"])
+            self.assertIn("unbekannte Module", str(ctx.exception))
+
+    def test_duplicates_rejected_with_deps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["iam", "iam"])
+            self.assertIn("doppelte Module", str(ctx.exception))
+
+    def test_cycle_detected_fail_closed(self):
+        """Zyklus im Katalog → verständliche Meldung mit Zyklus-Pfad."""
+        from module_builder.catalog import resolve_with_deps
+        cyclic = {
+            "a": {"dir": "a", "deps": ["b"], "optional_deps": []},
+            "b": {"dir": "b", "deps": ["c"], "optional_deps": []},
+            "c": {"dir": "c", "deps": ["a"], "optional_deps": []},
+        }
+        with mock.patch("module_builder.catalog.MODULE_CATALOG", cyclic):
+            with self.assertRaises(SystemExit) as ctx:
+                resolve_with_deps(["a"])
+            msg = str(ctx.exception)
+            self.assertIn("Abhängigkeitszyklus", msg)
+            self.assertIn("a -> b -> c -> a", msg)
+
+    def test_inconsistent_catalog_entry_fail_closed(self):
+        """Katalogeintrag ohne deps-Feld → fail-closed."""
+        from module_builder.catalog import resolve_with_deps
+        broken = {"a": {"dir": "a"}}
+        with mock.patch("module_builder.catalog.MODULE_CATALOG", broken):
+            with self.assertRaises(SystemExit) as ctx:
+                resolve_with_deps(["a"])
+            self.assertIn("inkonsistenter Katalogeintrag", str(ctx.exception))
+
+    def test_b1_without_with_deps_still_fail_closed(self):
+        """Ohne --with-deps bleibt das B1-Verhalten exakt erhalten."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["lambda"], with_deps=False)
+            self.assertIn("fehlende Pflichtabhängigkeiten", str(ctx.exception))
+
+    def test_with_deps_deterministic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = self._build(Path(tmp) / "a", ["sqs_worker"])
+            second = self._build(Path(tmp) / "b", ["sqs_worker"])
+            def tree_files(root: Path) -> dict:
+                return {
+                    str(p.relative_to(root)): p.read_bytes()
+                    for p in root.rglob("*")
+                    if p.is_file() and p.name != "module-builder.manifest.json"
+                }
+            self.assertEqual(tree_files(first.target), tree_files(second.target))
+
+    def test_readme_documents_added_deps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "readme"
+            self._build(target, ["sqs_worker"])
+            readme = (target / "README.md").read_text()
+            self.assertIn("--with-deps", readme)
+            self.assertIn("dynamodb", readme)
+
+    def test_cli_with_deps_transparency_output(self):
+        """WP5: CLI unterscheidet Requested / Added / Final."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "cli-b2"
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main([
+                    "build", "--target", str(target),
+                    "--project-name", "cli-b2",
+                    "--modules", "sqs_worker", "--with-deps",
+                ])
+            out = stdout.getvalue()
+            self.assertEqual(code, 0)
+            self.assertIn("Requested modules:", out)
+            self.assertIn("sqs_worker", out)
+            self.assertIn("Automatically added dependencies:", out)
+            self.assertIn("dynamodb", out)
+            self.assertIn("sqs", out)
+            self.assertIn("Final module selection:", out)
+            self.assertIn("dynamodb, sqs, sqs_worker", out)
+
+    def test_cli_without_with_deps_output_unchanged(self):
+        """B1-CLI-Ausgabe bleibt unverändert (keine Deps-Blöcke)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "cli-b1"
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main([
+                    "build", "--target", str(target),
+                    "--project-name", "cli-b1",
+                    "--modules", "dynamodb,sqs,iam",
+                ])
+            out = stdout.getvalue()
+            self.assertEqual(code, 0)
+            self.assertNotIn("Automatically added dependencies:", out)
+            self.assertIn("Module:      dynamodb, iam, sqs", out)
+
+
 if __name__ == "__main__":
     unittest.main()

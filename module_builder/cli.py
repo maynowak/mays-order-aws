@@ -49,10 +49,16 @@ def _create_parser() -> argparse.ArgumentParser:
     )
     build_parser.add_argument(
         "--modules", default=None,
-        help="B1: kommagetrennte Modulauswahl (stabile Modulnamen), z. B. "
+        help="B1/B2: kommagetrennte Modulauswahl (stabile Modulnamen), z. B. "
              "--modules dynamodb,sqs,iam. Pflichtabhängigkeiten müssen explizit "
-             "angegeben werden (keine automatische Ergänzung); unbekannte/doppelte "
-             "Module werden abgelehnt. Schließt --preset aus.",
+             "angegeben werden — außer --with-deps ist gesetzt. Unbekannte/doppelte "
+             "Module werden immer abgelehnt. Schließt --preset aus.",
+    )
+    build_parser.add_argument(
+        "--with-deps", action="store_true",
+        help="B2: fehlende Pflichtabhängigkeiten automatisch und transitiv "
+             "ergänzen (optionale Abhängigkeiten wie sqs für iam/lambda werden "
+             "NIEMALS ergänzt). Nur wirksam mit --modules.",
     )
     build_parser.add_argument(
         "--source", default=None,
@@ -91,9 +97,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             parser.error("--preset und --modules schließen sich gegenseitig aus.")
         preset_name = parsed.preset or "complete"
         modules = None
+        final_modules: List[str] = []
+        added_modules: List[str] = []
+        requested_modules: List[str] = []
         if parsed.modules:
-            from module_builder.catalog import parse_module_selection
-            modules = parse_module_selection(parsed.modules)
+            from module_builder.catalog import parse_and_resolve
+            requested_modules = [n.strip() for n in parsed.modules.split(",") if n.strip()]
+            final_modules, added_modules = parse_and_resolve(parsed.modules, parsed.with_deps)
+            modules = final_modules
 
         target = Path(parsed.target)
         source = Path(parsed.source) if parsed.source else _default_source_root()
@@ -104,10 +115,26 @@ def main(argv: Optional[List[str]] = None) -> int:
             source_root=source,
             force=parsed.force,
             modules=modules,
+            with_deps=parsed.with_deps,
         )
         print(f"Build OK: {result.target}")
         print(f"  Preset:      {preset_name if modules is None else 'custom (--modules)'}")
-        if modules is not None:
+        if modules is None:
+            pass  # Preset-Build: keine Modul-Blöcke
+        elif parsed.with_deps:
+            # WP5 — Transparenz: angefragt vs. ergänzt vs. final
+            print("Requested modules:")
+            for name in requested_modules:
+                print(f"  {name}")
+            print("Automatically added dependencies:")
+            if added_modules:
+                for name in added_modules:
+                    print(f"  {name}")
+            else:
+                print("  (keine — Auswahl war bereits abhängigkeitsvollständig)")
+            print("Final module selection:")
+            print(f"  {', '.join(final_modules)}")
+        else:
             print(f"  Module:      {', '.join(sorted(modules))}")
         print(f"  Projekt:     {parsed.project_name}")
         print(f"  Dateien:     {len(result.files)}")
