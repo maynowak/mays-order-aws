@@ -82,7 +82,8 @@ Only four top-level dirs contain executable code — the rest (`api/`, `database
 - `module_builder/` — Terraform Module Builder CLI (`python -m module_builder`);
   erzeugt eigenständige Terraform-Bereitstellungen aus den bestehenden Komponenten
   (Preset `complete` oder freie Modulauswahl `--modules`; Pflicht-Abhängigkeits-Checks
-  fail-closed, optional transitive Ergänzung via `--with-deps`; keine AWS-Mutationen)
+  fail-closed, optional transitive Ergänzung via `--with-deps`; Preset `orders-service`
+  generiert das wiederverwendbare Orders-Service-Terraform-Modul; keine AWS-Mutationen)
 - `terraform/` — root module orchestrating 7 child modules in `terraform/modules/`
   (dynamodb, iam, lambda, cognito, api, monitoring, cloudtrail); `bootstrap/` provisions the
   state bucket/lock table; `policy/` is the Policy Gate
