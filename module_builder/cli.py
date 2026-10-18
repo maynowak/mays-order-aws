@@ -44,8 +44,15 @@ def _create_parser() -> argparse.ArgumentParser:
         help="Projektname (Kleinbuchstaben/Ziffern/Bindestrich, mind. 3 Zeichen)",
     )
     build_parser.add_argument(
-        "--preset", default="complete", choices=sorted(PRESETS),
-        help="Preset (MVP: nur 'complete')",
+        "--preset", default=None, choices=sorted(PRESETS),
+        help="Preset (MVP: nur 'complete'); gegenseitig ausschließend zu --modules",
+    )
+    build_parser.add_argument(
+        "--modules", default=None,
+        help="B1: kommagetrennte Modulauswahl (stabile Modulnamen), z. B. "
+             "--modules dynamodb,sqs,iam. Pflichtabhängigkeiten müssen explizit "
+             "angegeben werden (keine automatische Ergänzung); unbekannte/doppelte "
+             "Module werden abgelehnt. Schließt --preset aus.",
     )
     build_parser.add_argument(
         "--source", default=None,
@@ -80,17 +87,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         from module_builder.builder import build
         from module_builder.validation import validate_generated_project
 
+        if parsed.preset and parsed.modules:
+            parser.error("--preset und --modules schließen sich gegenseitig aus.")
+        preset_name = parsed.preset or "complete"
+        modules = None
+        if parsed.modules:
+            from module_builder.catalog import parse_module_selection
+            modules = parse_module_selection(parsed.modules)
+
         target = Path(parsed.target)
         source = Path(parsed.source) if parsed.source else _default_source_root()
         result = build(
             target_dir=target,
             project_name=parsed.project_name,
-            preset_name=parsed.preset,
+            preset_name=preset_name,
             source_root=source,
             force=parsed.force,
+            modules=modules,
         )
         print(f"Build OK: {result.target}")
-        print(f"  Preset:      {parsed.preset}")
+        print(f"  Preset:      {preset_name if modules is None else 'custom (--modules)'}")
+        if modules is not None:
+            print(f"  Module:      {', '.join(sorted(modules))}")
         print(f"  Projekt:     {parsed.project_name}")
         print(f"  Dateien:     {len(result.files)}")
         for artifact, digest in sorted(result.artifacts.items()):

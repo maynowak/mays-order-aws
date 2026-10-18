@@ -23,6 +23,7 @@ from module_builder.builder import (
     _extract_terraform_block,
 )
 from module_builder.cli import main
+from module_builder.catalog import MODULE_CATALOG
 from module_builder.spec import PRESETS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -385,6 +386,202 @@ class TestCli(unittest.TestCase):
             self._run(["build", "--target", "/tmp/x", "--project-name", "abc",
                        "--preset", "nope"])
         self.assertEqual(ctx.exception.code, 2)
+
+
+class TestModuleSelectionB1(unittest.TestCase):
+    """B1: freie Modulauswahl — Fail-closed-Validierung + auswahlgetriebene Generierung."""
+
+    def _build(self, target: Path, modules, project_name="sel-test"):
+        return build(
+            target_dir=target,
+            project_name=project_name,
+            preset_name="complete",
+            source_root=REPO_ROOT,
+            modules=modules,
+        )
+
+    def _names(self, root: Path, pattern: str) -> set:
+        import re as _re
+        text = (root / "terraform" / "main.tf").read_text()
+        return set(_re.findall(pattern, text))
+
+    def test_single_module_dynamodb(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "db-only"
+            self._build(target, ["dynamodb"])
+            tree = {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+            self.assertIn("terraform/modules/dynamodb/main.tf", tree)
+            self.assertEqual(len([f for f in tree if f.startswith("terraform/modules/")]), 3)
+            # Keine Lambda-/Backup-Ressourcen ohne Bedarf:
+            self.assertNotIn("lambda/dist/lambda.zip", tree)
+            self.assertNotIn("lambda/dist/cognito_backup.zip", tree)
+            self.assertNotIn("cognito_backup/backup.py", tree)
+            # Policy-Gate bleibt immer dabei:
+            self.assertIn("terraform/policy/validate-plan.py", tree)
+            # Seed gehört zu dynamodb:
+            self.assertIn("scripts/seed_orders.py", tree)
+            main_modules = self._names(target, r'module\s+"([a-z_]+)"')
+            self.assertEqual(main_modules, {"dynamodb"})
+            vars_kept = set(re.findall(r'^variable\s+"([a-z_]+)"',
+                (target / "terraform" / "variables.tf").read_text(), re.M))
+            self.assertEqual(vars_kept, {"project_name", "aws_region", "tags",
+                                         "seed_example_data", "seed_file_path"})
+            outs = set(re.findall(r'^output\s+"([a-z_]+)"',
+                (target / "terraform" / "outputs.tf").read_text(), re.M))
+            self.assertEqual(outs, {"dynamodb_table_name", "dynamodb_table_arn"})
+
+    def test_valid_combination_lambda_chain(self):
+        """dynamodb,sqs,iam,lambda — gültige Kette mit Lambda-Artefakt, ohne Backup-Zip."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "lambda-chain"
+            self._build(target, ["dynamodb", "sqs", "iam", "lambda"])
+            tree = {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+            self.assertIn("lambda/dist/lambda.zip", tree)
+            self.assertIn("lambda/build_zip.py", tree)
+            self.assertNotIn("lambda/dist/cognito_backup.zip", tree)
+            self.assertNotIn("cognito_backup/backup.py", tree)
+            main_modules = self._names(target, r'module\s+"([a-z_]+)"')
+            self.assertEqual(main_modules, {"dynamodb", "sqs", "iam", "lambda"})
+            vars_kept = set(re.findall(r'^variable\s+"([a-z_]+)"',
+                (target / "terraform" / "variables.tf").read_text(), re.M))
+            self.assertIn("monitoring_enabled", vars_kept)   # lambda braucht sie
+            self.assertIn("log_retention_days", vars_kept)
+            self.assertNotIn("api_5xx_threshold", vars_kept)  # kein monitoring
+            self.assertNotIn("notification_email", vars_kept)
+            outs = set(re.findall(r'^output\s+"([a-z_]+)"',
+                (target / "terraform" / "outputs.tf").read_text(), re.M))
+            self.assertEqual(outs, {
+                "dynamodb_table_name", "dynamodb_table_arn",
+                "iam_handler_role_name", "iam_handler_role_arn",
+                "lambda_function_name", "lambda_function_arn", "lambda_invoke_arn",
+            })
+
+    def test_missing_dependencies_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["lambda"])
+            msg = str(ctx.exception)
+            for needed in ("dynamodb", "iam", "sqs", "B2"):
+                self.assertIn(needed, msg)
+
+    def test_transitive_dependency_reported(self):
+        """iam ohne sqs → fehlend: sqs (vollständige Diagnose je Modul)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["dynamodb", "iam"])
+            self.assertIn("'iam'", str(ctx.exception))
+            self.assertIn("sqs", str(ctx.exception))
+
+    def test_unknown_module_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["dynamodb", "foo"])
+            self.assertIn("unbekannte Module", str(ctx.exception))
+            self.assertIn("Verfügbare Module", str(ctx.exception))
+
+    def test_duplicate_module_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["dynamodb", "dynamodb"])
+            self.assertIn("doppelte Module", str(ctx.exception))
+
+    def test_nothing_added_silently(self):
+        """Auswahl bleibt exakt die Auswahl — keine stillschweigende Ergänzung."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "exact"
+            self._build(target, ["cognito", "cloudtrail"])
+            main_modules = self._names(target, r'module\s+"([a-z_]+)"')
+            self.assertEqual(main_modules, {"cognito", "cloudtrail"})
+            mod_dirs = {f.split("/")[2] for f in
+                        {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+                        if f.startswith("terraform/modules/")}
+            self.assertEqual(mod_dirs, {"cognito", "cloudtrail"})
+
+    def test_full_custom_selection_equivalent_to_complete(self):
+        """Alle 11 Module via --modules ≈ Preset complete (Modul-/Variablen-/Output-Mengen)."""
+        all_modules = sorted(MODULE_CATALOG)
+        with tempfile.TemporaryDirectory() as tmp:
+            custom = self._build(Path(tmp) / "custom", all_modules)
+            complete = build(
+                target_dir=Path(tmp) / "complete",
+                project_name="sel-test",
+                source_root=REPO_ROOT,
+            )
+            def names_in(root: Path, filename: str, pattern: str) -> set:
+                return set(re.findall(pattern, (root / "terraform" / filename).read_text(), re.M))
+            for filename, pattern in [
+                ("main.tf", r'^module\s+"([a-z_]+)"'),
+                ("variables.tf", r'^variable\s+"([a-z_]+)"'),
+                ("outputs.tf", r'^output\s+"([a-z_]+)"'),
+            ]:
+                self.assertEqual(
+                    names_in(custom.target, filename, pattern),
+                    names_in(complete.target, filename, pattern),
+                    f"Mengen weichen ab: {filename}",
+                )
+
+    def test_custom_manifest_contains_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "manifest-check"
+            self._build(target, ["dynamodb", "sqs"])
+            manifest = json.loads((target / "module-builder.manifest.json").read_text())
+            self.assertEqual(manifest["preset"], "custom")
+            self.assertEqual(manifest["modules"], ["dynamodb", "sqs"])
+            self.assertEqual(manifest["project_name"], "sel-test")
+
+    def test_custom_build_deterministic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = self._build(Path(tmp) / "a", ["cognito", "cloudtrail"])
+            second = self._build(Path(tmp) / "b", ["cognito", "cloudtrail"])
+            def tree_files(root: Path) -> dict:
+                return {
+                    str(p.relative_to(root)): p.read_bytes()
+                    for p in root.rglob("*")
+                    if p.is_file() and p.name != "module-builder.manifest.json"
+                }
+            self.assertEqual(tree_files(first.target), tree_files(second.target))
+
+    def test_custom_output_free_of_states_and_plans(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "clean"
+            self._build(target, ["dynamodb"])
+            for f in {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}:
+                self.assertIsNone(
+                    re.search(r"\.tfstate|\.tfplan|(^|/)tfplan|(^|/)credentials|(^|/)\.env", f),
+                    f"Verbotene Datei: {f}",
+                )
+
+
+class TestModuleSelectionCliB1(unittest.TestCase):
+
+    def _run(self, argv):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = main(argv)
+        return code, stdout.getvalue()
+
+    def test_cli_modules_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "cli-sel"
+            code, out = self._run([
+                "build", "--target", str(target),
+                "--project-name", "cli-sel", "--modules", "dynamodb,cognito",
+            ])
+            self.assertEqual(code, 0)
+            self.assertIn("Build OK", out)
+            self.assertTrue((target / "terraform" / "modules" / "dynamodb").is_dir())
+
+    def test_cli_preset_and_modules_mutually_exclusive(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run(["build", "--target", "/tmp/opencode/never", "--project-name", "abc",
+                       "--preset", "complete", "--modules", "dynamodb"])
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_cli_unknown_module_message(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run(["build", "--target", "/tmp/opencode/never2", "--project-name", "abc",
+                       "--modules", "nope"])
+        self.assertIn("unbekannte Module", str(ctx.exception))
 
 
 if __name__ == "__main__":

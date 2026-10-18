@@ -73,6 +73,126 @@ def _extract_terraform_block(main_tf_text: str) -> tuple:
     _fail("terraform-Block in main.tf nicht korrekt geschlossen (Brace-Matching).")
 
 
+# ---------- B1: Block-Splitter für freie Modulauswahl ----------
+
+BLOCK_HEADER_RE = re.compile(
+    r'^(?P<kind>terraform|locals|provider|module|resource|moved|variable|output)\s*'
+    r'(?P<names>(?:"[^"]*"\s*)+)?'
+    r'\{'
+)
+
+
+def _split_blocks(text: str) -> List[Dict]:
+    """Zerlegt eine .tf-Datei in Top-Level-Blöcke (inkl. vorangestellter
+    Kommentar-Zeilen). Fail-closed: nicht geschlossene Blöcke sind ein Fehler.
+
+    Rückgabe: Liste von dicts {kind, name, text} — name ist der erste
+    Bezeichner in Anführungszeichen (module/output/variable) bzw. der
+    Funktionsname bei provider/resource (z. B. "aws", "terraform_data.seed_orders").
+    """
+    blocks: List[Dict] = []
+    pending: List[str] = []  # Kommentar-/Leerzeilen vor dem nächsten Block
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = BLOCK_HEADER_RE.match(line)
+        if match is None:
+            pending.append(line)
+            i += 1
+            continue
+        kind = match.group("kind")
+        quoted = re.findall(r'"([^"]*)"', match.group("names") or "")
+        name = quoted[0] if quoted else ""
+        depth = line.count("{") - line.count("}")
+        block_lines = [line]
+        i += 1
+        while depth > 0:
+            if i >= len(lines):
+                _fail(
+                    f"Block '{kind} {name}' in der Quelle nicht geschlossen "
+                    f"(Brace-Matching) — Abbruch, nichts wird generiert."
+                )
+            depth += lines[i].count("{") - lines[i].count("}")
+            block_lines.append(lines[i])
+            i += 1
+        block_text = "\n".join(block_lines)
+        blocks.append(
+            {
+                "kind": kind,
+                "name": name,
+                "header": "\n".join(l for l in pending),
+                "text": block_text,
+            }
+        )
+        pending = []
+    if pending and pending != [""]:
+        blocks.append({"kind": "comment", "name": "", "header": "", "text": "\n".join(pending).strip("\n")})
+    return blocks
+
+
+def _render_blocks(blocks: List[Dict]) -> str:
+    """Blöcke zu einer fmt-freundlichen Datei zusammenfügen (Ein Leerzeile dazwischen)."""
+    parts = []
+    for block in blocks:
+        chunk = block["text"]
+        header = block.get("header", "").strip("\n")
+        if header.strip():
+            chunk = header + "\n" + chunk
+        parts.append(chunk)
+    return "\n\n".join(parts) + "\n"
+
+
+def _filter_main_blocks(blocks: List[Dict], selection: set) -> List[Dict]:
+    """Root-main.tf für die Auswahl filtern.
+
+    - terraform → versions.tf (Aufrufer entnimmt ihn separat)
+    - locals / provider → immer (Identität, default_tags)
+    - module X → nur wenn X ausgewählt
+    - resource/output/moved → nur wenn ALLE module.<x>-Referenzen ausgewählt sind
+    """
+    from module_builder.catalog import MODULE_REF_RE
+
+    kept: List[Dict] = []
+    for block in blocks:
+        kind = block["kind"]
+        if kind == "terraform":
+            continue
+        if kind in ("locals", "provider"):
+            kept.append(block)
+            continue
+        if kind == "module":
+            if block["name"] in selection:
+                kept.append(block)
+            continue
+        refs = set(MODULE_REF_RE.findall(block["text"]))
+        if refs and refs.issubset(selection):
+            kept.append(block)
+        elif not refs:
+            kept.append(block)
+    return kept
+
+
+def _filter_named_blocks(
+    blocks: List[Dict], keep_names: set, kind: str
+) -> List[Dict]:
+    """variable-/output-Blöcke nach Namen bzw. Modul-Referenzen filtern."""
+    from module_builder.catalog import MODULE_REF_RE
+
+    kept: List[Dict] = []
+    for block in blocks:
+        if block["kind"] != kind:
+            continue
+        if kind == "variable":
+            if block["name"] in keep_names:
+                kept.append(block)
+            continue
+        refs = set(MODULE_REF_RE.findall(block["text"]))
+        if not refs or refs.issubset(keep_names):
+            kept.append(block)
+    return kept
+
+
 def substitute_project_name(variables_tf_text: str, project_name: str) -> str:
     """Replace the default value inside variable "project_name"."""
     pattern = re.compile(
@@ -116,7 +236,20 @@ def _copy_file(src: Path, dst: Path, written: List[str]) -> None:
     written.append(str(dst))
 
 
-def _render_readme(project_name: str) -> str:
+def sorted_module_catalog() -> List[str]:
+    from module_builder.catalog import MODULE_CATALOG
+    return sorted(MODULE_CATALOG)
+
+
+def _render_readme(project_name: str, modules: Optional[List[str]] = None) -> str:
+    module_section = ""
+    if modules is not None:
+        module_section = (
+            f"\n- **Ausgewählte Module (--modules):** {', '.join(sorted(modules))}\n"
+            f"  Alle Pflichtabhängigkeiten sind explizit Teil der Auswahl; der Builder\n"
+            f"  ergänzt nichts automatisch (bewusste B1-Regel — automatische Auflösung\n"
+            f"  folgt in B2)."
+        )
     return f"""# {project_name} — Standalone Terraform Deployment
 
 Generiert vom **Mays-Orders-AWS Module Builder** (Preset: `complete`).
@@ -134,7 +267,7 @@ Eigenständige Terraform-Bereitstellung — **keine Abhängigkeit zum Quell-Repo
 │   └── build_zip.py      # Artefakt-Rebuild: cd lambda && python3 build_zip.py
 ├── database/seed/        # Demo-Seed (opt-in via var.seed_example_data)
 └── scripts/seed_orders.py
-```
+``{module_section}
 
 ## Quickstart (read-only Prüfung)
 
@@ -211,8 +344,13 @@ def build(
     preset_name: str = "complete",
     source_root: Optional[Path] = None,
     force: bool = False,
+    modules: Optional[List[str]] = None,
 ) -> BuildResult:
-    """Plan → verify → execute a build. Fail-closed; never mutates AWS."""
+    """Plan → verify → execute a build. Fail-closed; never mutates AWS.
+
+    modules=None → Preset-Verhalten (complete, byte-identisch zum Foundation-Stand).
+    modules=[...] → B1: freie Modulauswahl (fail-closed validiert, keine Ergänzung).
+    """
     validate_project_name(project_name)
     preset = get_preset(preset_name)
 
@@ -221,6 +359,45 @@ def build(
     source_root = Path(source_root).resolve()
     target_dir = Path(target_dir).resolve()
 
+    # ---------- B1: Auswahl-Plan berechnen ----------
+    selection: Optional[set] = None
+    module_dirs: List[str] = preset["modules"]
+    keep_vars: Optional[set] = None
+    artifacts: List[str] = preset["artifacts"]
+    lambda_source: List[str] = preset["lambda_source"]
+    backup_source: List[str] = preset.get("cognito_backup_source", [])
+    seed_files: List[str] = preset["seed_files"]
+    if modules is not None:
+        from module_builder.catalog import (
+            BACKUP_SOURCE_MODULES,
+            BACKUP_ZIP_MODULES,
+            LAMBDA_SOURCE_MODULES,
+            LAMBDA_ZIP_MODULES,
+            MODULE_CATALOG,
+            SEED_MODULES,
+            required_variables,
+            validate_module_list,
+        )
+        validate_module_list(list(modules))
+        selection = set(modules)
+        module_dirs = [MODULE_CATALOG[name]["dir"] for name in modules]
+        keep_vars = required_variables(list(modules))
+        artifacts = []
+        if selection & LAMBDA_ZIP_MODULES:
+            artifacts.append("lambda/dist/lambda.zip")
+        if selection & BACKUP_ZIP_MODULES:
+            artifacts.append("lambda/dist/cognito_backup.zip")
+        lambda_source = (
+            ["lambda/src", "lambda/build_zip.py"]
+            if selection & LAMBDA_SOURCE_MODULES else []
+        )
+        backup_source = (
+            ["cognito_backup", "lambda/cognito_backup_handler.py",
+             "lambda/build_cognito_backup_zip.py"]
+            if selection & BACKUP_SOURCE_MODULES else []
+        )
+        seed_files = preset["seed_files"] if selection & SEED_MODULES else []
+
     # ---------- Phase A: verify (no writes yet) ----------
     missing: List[str] = []
     if not (source_root / "terraform").is_dir():
@@ -228,14 +405,14 @@ def build(
     for name in preset["root_tf_files"]:
         if not (source_root / "terraform" / name).is_file():
             missing.append(f"terraform/{name}")
-    for module in preset["modules"]:
+    for module in module_dirs:
         mod_dir = source_root / "terraform" / "modules" / module
         if not mod_dir.is_dir() or not any(mod_dir.glob("*.tf")):
             missing.append(f"terraform/modules/{module}/")
-    for artifact in preset["artifacts"]:
+    for artifact in artifacts:
         if not (source_root / artifact).is_file():
             missing.append(artifact)
-    for aux in preset["lambda_source"] + preset["seed_files"] + preset["doc_files"]:
+    for aux in lambda_source + backup_source + seed_files + preset["doc_files"] + preset["policy_files"]:
         if not (source_root / aux).exists():
             missing.append(aux)
     if missing:
@@ -262,17 +439,27 @@ def build(
     # ---------- Phase B: execute ----------
     written: List[str] = []
 
-    # Child modules (allowlist *.tf + README.md)
-    for module in preset["modules"]:
+    # Child modules (allowlist *.tf + README.md) — nur die Auswahl
+    for module in module_dirs:
         _copy_tf_tree(
             source_root / "terraform" / "modules" / module,
             target_dir / "terraform" / "modules" / module,
             written,
         )
 
-    # Root wiring: split terraform block → versions.tf, rest → main.tf
+    # Root wiring: terraform-Block → versions.tf; main.tf verbatim (Preset)
+    # oder auswahlgefiltert (B1: nur gewählte Module, referenzkonforme
+    # resource-/moved-Blöcke; locals/provider immer).
     main_tf_text = (source_root / "terraform" / "main.tf").read_text(encoding="utf-8")
-    versions_block, main_rest = _extract_terraform_block(main_tf_text)
+    if selection is None:
+        versions_block, main_rest = _extract_terraform_block(main_tf_text)
+    else:
+        blocks = _split_blocks(main_tf_text)
+        terraform_blocks = [b for b in blocks if b["kind"] == "terraform"]
+        if len(terraform_blocks) != 1:
+            _fail("Erwartete genau einen terraform-Block in main.tf.")
+        versions_block = terraform_blocks[0]["text"]
+        main_rest = _render_blocks(_filter_main_blocks(blocks, selection))
     tf_dir = target_dir / "terraform"
     tf_dir.mkdir(parents=True, exist_ok=True)
     (tf_dir / "versions.tf").write_text(versions_block + "\n", encoding="utf-8")
@@ -280,18 +467,35 @@ def build(
     written.append(str(tf_dir / "versions.tf"))
     written.append(str(tf_dir / "main.tf"))
 
-    # variables.tf with substituted project_name default
+    # variables.tf: Preset → komplett; B1 → nur erforderliche Variablen.
+    # project_name-Default wird in beiden Wegen substituiert.
     variables_text = (source_root / "terraform" / "variables.tf").read_text(encoding="utf-8")
+    if selection is not None:
+        variables_text = _render_blocks(
+            _filter_named_blocks(_split_blocks(variables_text), keep_vars, "variable")
+        )
     variables_text = substitute_project_name(variables_text, project_name)
     (tf_dir / "variables.tf").write_text(variables_text, encoding="utf-8")
     written.append(str(tf_dir / "variables.tf"))
 
-    # outputs.tf verbatim
-    _copy_file(
-        source_root / "terraform" / "outputs.tf",
-        tf_dir / "outputs.tf",
-        written,
-    )
+    # outputs.tf: Preset → verbatim; B1 → nur Outputs, deren Modul-Referenzen
+    # vollständig in der Auswahl sind.
+    if selection is None:
+        _copy_file(
+            source_root / "terraform" / "outputs.tf",
+            tf_dir / "outputs.tf",
+            written,
+        )
+    else:
+        outputs_text = _render_blocks(
+            _filter_named_blocks(
+                _split_blocks((source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")),
+                selection,
+                "output",
+            )
+        )
+        (tf_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
+        written.append(str(tf_dir / "outputs.tf"))
 
     # Reference documentation
     for doc in preset["doc_files"]:
@@ -325,18 +529,14 @@ def build(
         else:
             _copy_file(source_root / policy_file, dst, written)
 
-    # Lambda artifacts + source + seed tooling
+    # Lambda artifacts + source + seed tooling — nur bei Bedarf (B1)
     artifact_hashes: Dict[str, str] = {}
-    for artifact in preset["artifacts"]:
+    for artifact in artifacts:
         src = source_root / artifact
         dst = target_dir / artifact
         _copy_file(src, dst, written)
         artifact_hashes[artifact] = _sha256(dst)
-    for entry in (
-        preset["lambda_source"]
-        + preset.get("cognito_backup_source", [])
-        + preset["seed_files"]
-    ):
+    for entry in lambda_source + backup_source + seed_files:
         src = source_root / entry
         if src.is_dir():
             for py_file in sorted(src.glob("*.py")):
@@ -346,7 +546,9 @@ def build(
 
     # Generated README
     readme = target_dir / "README.md"
-    readme.write_text(_render_readme(project_name), encoding="utf-8")
+    readme.write_text(
+        _render_readme(project_name, modules), encoding="utf-8"
+    )
     written.append(str(readme))
 
     # Build manifest (provenance, written last)
@@ -359,7 +561,8 @@ def build(
         commit = "unknown"
     manifest = {
         "builder_version": __version__,
-        "preset": preset_name,
+        "preset": preset_name if selection is None else "custom",
+        "modules": sorted(selection) if selection is not None else sorted_module_catalog(),
         "project_name": project_name,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
