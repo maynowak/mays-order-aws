@@ -98,3 +98,20 @@ output "api_gateway_authorizer_id" {
 # ============================================================
 # Intentionally not re-exported: conditional (dashboard_enabled, monitoring_enabled),
 # internal alarms/dashboard, no external consumers.
+# Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): Integrierende
+# Projekte benötigen Queue- und Worker-Referenzen. Alle drei Werte sind aus
+# bestehenden Modul-Outputs ableitbar — keine neuen Ressourcen.
+output "sqs_queue_url" {
+  description = "URL der Orders-SQS-Queue (asynchrone Verarbeitung)."
+  value       = module.sqs.queue_url
+}
+
+output "sqs_queue_arn" {
+  description = "ARN der Orders-SQS-Queue."
+  value       = module.sqs.queue_arn
+}
+
+output "sqs_worker_lambda_arn" {
+  description = "ARN der Orders-Worker-Lambda (SQS-Consumer)."
+  value       = module.sqs_worker.function_arn
+}
