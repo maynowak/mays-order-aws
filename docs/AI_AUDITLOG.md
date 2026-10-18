@@ -46,6 +46,22 @@ kept accurate even if the audit remains completely read-only.
 
 ==================================================
 
+## SUBAGENT-REPORT-PFLICHT (verbindlich)
+
+Jeder beauftragte Subagent (Research/Explore/Review — read-only oder schreibend)
+liefert sein Ergebnis als strukturierten Report nach den 16 Pflichtpunkten des
+Execution-Log-Templates oben. Die Agenten-Beschreibung (Prompt) MUSS diese
+Report-Pflicht ausdrücklich enthalten. Der Orchestrator trägt die Subagent-
+Reports eigenständig nach unter:
+
+    docs/reports/<TASK-ID>-<SUBWORKING>-<AUFGABE>-EXECUTION_LOG.md
+
+und indiziert sie unten im AUDIT LOG INDEX. So sind Research-Ergebnisse
+crash-sicher, revisionsfähig und für Folge-Checkpoints wiederverwendbar —
+der Chatverlauf ist keine Recovery-Quelle.
+
+==================================================
+
 ## AUDIT LOG INDEX
 
 Current Branch: main
@@ -109,7 +125,10 @@ The following tasks have been completed with reports in docs/reports/:
 - MAYS-ORDERS-MODULE-BUILDER-FOUNDATION-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-FOUNDATION-01.md (IMPLEMENTED/VERIFIED: Python-CLI-Builder `python -m module_builder` — Preset complete erzeugt eigenständige Terraform-Bereitstellung in frei wählbarem Zielordner; fail-closed Preflight, kein backend.tf/state/plan, keine Repo-Abhängigkeit, Artefakt-Hashes im Manifest; 23/23 Builder-Tests, Live-Build terraform fmt/init/validate PASS, 129/129 Installer + 76/76 Lambda Regression, deterministische Builds)
 - MAYS-ORDERS-MODULE-BUILDER-HARDENING-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-HARDENING-01.md (F1 VERIFIED: cognito_backup.zip reproduzierbar — Quelle im Repo (Package + Handler auf deployed-Stand MY_AWS_REGION), deterministisches Build-Skript, Artefakt getrackt, Rebuild im Ziel sha256-identisch; F2 VERIFIED: Policy-Gate (validate-plan.py + resource-policy.json mit Projektnamen-Substitution) in generierte Projekte, Positiv-/Negativtests Exit 0/1, keine Policy-Aufweichung; Commits 92be267 + da80271; 30/30 Builder + 129/129 Installer + 76/76 Lambda)
 - MAYS-ORDERS-MODULE-BUILDER-B1-SELECTION-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-B1-SELECTION-01.md (B1 VERIFIED: freie Modulauswahl --modules mit Modulkatalog, Pflicht-Abhängigkeits-Checks fail-closed, keine stille Ergänzung (B2 stoppt); auswahlgetriebene Generierung von main/variables/outputs, Artefakte nur bei Bedarf, Policy-Gate immer; --preset complete byte-identisch erhalten; 44/44 Builder-Tests, Live terraform validate auf Einzel-/Kombi-/Vollauswahl PASS, 129/129 Installer + 76/76 Lambda)
+- MAYS-ORDERS-MODULARIZATION-01-A-WORKER-IAM-RESEARCH → docs/reports/MAYS-ORDERS-MODULARIZATION-01-A-WORKER-IAM-RESEARCH-EXECUTION_LOG.md (Subagent A, read-only: IAM-Policy-Struktur, optionale Modul-Variablen, Handler-graceful-ohne-SQS, Worker-Rolle self-contained, Root-Wiring-Kopplungen, Boundary-Befund; GREEN)
+- MAYS-ORDERS-MODULARIZATION-01-B-RIS-CONTRACTS-RESEARCH → docs/reports/MAYS-ORDERS-MODULARIZATION-01-B-RIS-CONTRACTS-RESEARCH-EXECUTION_LOG.md (Subagent B, read-only: OrdersPort-Vertrag, RIS-Zwei-Stufen-Integration (HTTP eigene API + orders_reader schreibt MO-Tabelle direkt), RIS-IAM ARN-präzise, Vertragspunkte Statusmaschine/ord_*/Schema/Queue-Form/Naming-Contract; RIS hängt NICHT an MO-Handler-Policy-Form; GREEN)
+- MAYS-ORDERS-MODULARIZATION-01-C-IAM-RESEARCH → docs/reports/MAYS-ORDERS-MODULARIZATION-01-C-IAM-RESEARCH-EXECUTION_LOG.md (Subagent C, read-only: IAM-Inventar beider Repos komplett, Permissions Boundaries [nur Worker, extern ohne IaC], pauschale Kopplungen, Least-Privilege-Abgleich; ORANGE — Queue-Policy Principal=* als Security-Finding [Härtung freigabepflichtig, RIS-Live-Pfad], Boundary-Provenance extern, Doku-Drift; Modularisierungs-Hebel bestätigt: SQS-Gating im iam-Modul nötig)
 
-Overall Status: GREEN - Release Candidate v0.5.0-rc.2 vorbereitet; GitHub-Pre-Release rc.2 zur manuellen Veröffentlichung bereit; Module Builder Foundation + Hardening (F1/F2) + B1 (freie Modulauswahl) implementiert und verifiziert; B2 (automatische Abhängigkeitsauflösung) wartet auf Freigabe; Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
+Overall Status: YELLOW - RC v0.5.0-rc.2 vorbereitet (GitHub-Release manuell offen); Module Builder Foundation + Hardening + B1 verifiziert; MAYS-ORDERS-MODULARIZATION-01: Research A/B GREEN, C ORANGE (Queue-Policy Principal=* — Härtung nur mit Freigabe, RIS-Live-Pfad; Boundary extern ohne IaC; Doku-Drift), Phase 2 (SQS-optional) bereit; B2 wartet auf Freigabe; Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
 
 ==================================================
