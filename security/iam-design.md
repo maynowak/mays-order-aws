@@ -61,11 +61,16 @@ sondern über Cognito (siehe `authentication-decision.md`).
 | `dynamodb:PutItem` | AP1 Create |
 | `dynamodb:GetItem` | AP2 Get by ID |
 | `dynamodb:UpdateItem` | AP4 Status-Update (Conditional) |
-| `dynamodb:Query` | AP3 Listing (GSI1) |
+| `dynamodb:DeleteItem` | Erasure-Funktion (seit MAYS-ORDERS-DSGVO-PRIVACY-ERASURE-01; Ausführungspflicht der Lösch-Verträge) |
+| `dynamodb:Query` | AP3 Listing (GSI1) + Privacy-Abfragen (GSI2, seit MAYS-ORDERS-DSGVO-PRIVACY-CORE-01) |
+| `sqs:SendMessage` | **OPTIONAL** (MAYS-ORDERS-MODULARIZATION-01-PHASE2): nur mit angebundener Queue, eigene count-gated Inline-Policy; ohne Queue-ARN KEINE sqs-Berechtigung |
 | `logs:*` (eingeschränkt) | CloudWatch-Logging der Lambda |
 
-**Bewusst NICHT erlaubt:** `dynamodb:Scan`, `dynamodb:DeleteItem`, `dynamodb:BatchWriteItem`,
-`dynamodb:CreateTable`, `s3:*`, `sqs:*`, `iam:*`. Unnötige Rechte werden nicht vergeben.
+**Bewusst NICHT erlaubt:** `dynamodb:Scan`, `dynamodb:BatchWriteItem`,
+`dynamodb:CreateTable`, `s3:*`, `iam:*`. Unnötige Rechte werden nicht vergeben.
+(`dynamodb:DeleteItem` und `sqs:SendMessage` waren ursprünglich ausgeschlossen;
+beide sind seit der Erasure- bzw. SQS-Worker-Erweiterung beabsichtigt und in
+Code + diesem Design synchron gehalten — siehe `terraform/modules/iam/main.tf`.)
 
 > Hinweis: `logs:*` auf `Resource: "*"` ist üblich, weil Log-Gruppen/-Streams erst zur
 > Laufzeit entstehen. Alternativ kann der Log-Group-ARN auf die Funktion beschränkt werden

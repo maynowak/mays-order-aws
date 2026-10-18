@@ -56,8 +56,9 @@ module "dynamodb" {
 }
 
 # T011-03 — IAM: Lambda Execution Role (Least Privilege)
-# Fachquelle: security/iam-design.md §2.1
-# Kein dynamodb:Scan/DeleteItem/BatchWriteItem/CreateTable; keine s3/sqs/iam-Aktionen.
+# Fachquelle: security/iam-design.md §2.1 (mit Code synchronisiert, MODULARIZATION-01-PHASE2)
+# Bewusst NICHT erlaubt: dynamodb:Scan/BatchWriteItem/CreateTable, s3:*, iam:*.
+# DeleteItem: Erasure-Funktion. SQS:SendMessage: OPTIONAL, count-gated nur mit Queue.
 
 module "iam" {
   source             = "./modules/iam"
