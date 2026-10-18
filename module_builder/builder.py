@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from module_builder import __version__
+from module_builder.catalog import MODULE_REF_RE
 from module_builder.spec import get_preset
 
 # Terraform-side project_name validation (mirrors terraform/variables.tf).
@@ -143,16 +144,42 @@ def _render_blocks(blocks: List[Dict]) -> str:
     return "\n\n".join(parts) + "\n"
 
 
+def _strip_unselected_module_inputs(block: Dict, selection: set) -> Dict:
+    """PHASE2: Eingabe-Zeilen, die ein NICHT gewähltes optionales Modul
+    referenzieren, entfernen (z. B. `sqs_queue_arn = module.sqs.queue_arn` im
+    iam-Block bzw. `queue_url = module.sqs.queue_url` im lambda-Block).
+
+    Sicher, weil: jede module.<x>-Referenz in einem Modulblock entweder auf
+    eine Pflicht-Dep geht (per validate_selection_closure garantiert in der
+    Auswahl) oder auf die optionale sqs-Dep — alle betroffenen Variablen
+    haben Defaults (""), und das iam-Modul erzeugt ohne ARN keine
+    sqs-Berechtigung. Nur Zuweisungen (`= module.<x>.`) werden entfernt —
+    Kommentare und source-Zeilen bleiben unberührt.
+    """
+    from module_builder.catalog import MODULE_REF_RE
+
+    lines = block["text"].split("\n")
+    kept_lines = []
+    for line in lines:
+        if re.match(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*module\.", line):
+            refs = set(MODULE_REF_RE.findall(line))
+            if refs and not refs.issubset(selection):
+                continue  # Wiring-Zeile auf nicht gewähltes optionales Modul entfernen
+        kept_lines.append(line)
+    new_block = dict(block)
+    new_block["text"] = "\n".join(kept_lines).rstrip("\n")
+    return new_block
+
+
 def _filter_main_blocks(blocks: List[Dict], selection: set) -> List[Dict]:
     """Root-main.tf für die Auswahl filtern.
 
     - terraform → versions.tf (Aufrufer entnimmt ihn separat)
     - locals / provider → immer (Identität, default_tags)
-    - module X → nur wenn X ausgewählt
+    - module X → nur wenn X ausgewählt; PHASE2: Wiring-Zeilen auf nicht
+      gewählte optionale Deps werden entfernt (siehe _strip_unselected_module_inputs)
     - resource/output/moved → nur wenn ALLE module.<x>-Referenzen ausgewählt sind
     """
-    from module_builder.catalog import MODULE_REF_RE
-
     kept: List[Dict] = []
     for block in blocks:
         kind = block["kind"]
@@ -163,7 +190,7 @@ def _filter_main_blocks(blocks: List[Dict], selection: set) -> List[Dict]:
             continue
         if kind == "module":
             if block["name"] in selection:
-                kept.append(block)
+                kept.append(_strip_unselected_module_inputs(block, selection))
             continue
         refs = set(MODULE_REF_RE.findall(block["text"]))
         if refs and refs.issubset(selection):
@@ -250,6 +277,13 @@ def _render_readme(project_name: str, modules: Optional[List[str]] = None) -> st
             f"  ergänzt nichts automatisch (bewusste B1-Regel — automatische Auflösung\n"
             f"  folgt in B2)."
         )
+        if "sqs" not in modules and ({"iam", "lambda"} & set(modules)):
+            module_section += (
+                "\n- **SQS nicht ausgewählt (PHASE2):** Der Handler erhält KEINE\n"
+                "  sqs-Berechtigung (count-gated) und arbeitet ohne Enqueue synchron\n"
+                "  (POST /orders → 201, kein Worker-Kick). Bei Bedarf `sqs` (und für\n"
+                "  asynchrone Verarbeitung `sqs_worker`) ergänzen."
+            )
     return f"""# {project_name} — Standalone Terraform Deployment
 
 Generiert vom **Mays-Orders-AWS Module Builder** (Preset: `complete`).

@@ -19,21 +19,27 @@ from __future__ import annotations
 import re
 from typing import Dict, List
 
-# Stabiler Modulname -> Verzeichnis (unter terraform/modules/) + direkte Deps.
+# Stabiler Modulname -> Verzeichnis (unter terraform/modules/) + direkte Pflicht-Deps
+# + optionale Deps (PHASE2): optionale Deps werden NICHT erzwungen; fehlen sie,
+# entfernt der Builder die entsprechenden Wiring-Zeilen (z. B. iam.sqs_queue_arn,
+# lambda.queue_url) — die Module haben dafür geeignete Defaults (""), und das
+# iam-Modul erzeugt ohne Queue-ARN KEINE sqs-Berechtigung (count-gated).
+# Basis: Research A/C (MAYS-ORDERS-MODULARIZATION-01-A/-C-EXECUTION_LOG).
 MODULE_CATALOG: Dict[str, Dict] = {
-    "dynamodb": {"dir": "dynamodb", "deps": []},
-    "sqs": {"dir": "sqs", "deps": []},
-    "cognito": {"dir": "cognito", "deps": []},
-    "cloudtrail": {"dir": "cloudtrail", "deps": []},
-    "cognito_backup": {"dir": "cognito_backup", "deps": []},
-    "iam": {"dir": "iam", "deps": ["dynamodb", "sqs"]},
-    "lambda": {"dir": "lambda", "deps": ["dynamodb", "iam", "sqs"]},
-    "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"]},
-    "api": {"dir": "api", "deps": ["cognito", "lambda"]},
-    "monitoring": {"dir": "monitoring", "deps": ["api", "dynamodb", "lambda"]},
+    "dynamodb": {"dir": "dynamodb", "deps": [], "optional_deps": []},
+    "sqs": {"dir": "sqs", "deps": [], "optional_deps": []},
+    "cognito": {"dir": "cognito", "deps": [], "optional_deps": []},
+    "cloudtrail": {"dir": "cloudtrail", "deps": [], "optional_deps": []},
+    "cognito_backup": {"dir": "cognito_backup", "deps": [], "optional_deps": []},
+    "iam": {"dir": "iam", "deps": ["dynamodb"], "optional_deps": ["sqs"]},
+    "lambda": {"dir": "lambda", "deps": ["dynamodb", "iam"], "optional_deps": ["sqs"]},
+    "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"], "optional_deps": []},
+    "api": {"dir": "api", "deps": ["cognito", "lambda"], "optional_deps": []},
+    "monitoring": {"dir": "monitoring", "deps": ["api", "dynamodb", "lambda"], "optional_deps": []},
     "cognito_backup_automation": {
         "dir": "cognito_backup_automation",
         "deps": ["cognito", "cognito_backup"],
+        "optional_deps": [],
     },
 }
 

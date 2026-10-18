@@ -461,16 +461,73 @@ class TestModuleSelectionB1(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 self._build(Path(tmp) / "x", ["lambda"])
             msg = str(ctx.exception)
-            for needed in ("dynamodb", "iam", "sqs", "B2"):
+            for needed in ("dynamodb", "iam", "B2"):
                 self.assertIn(needed, msg)
+            # PHASE2: sqs ist KEINE Pflicht-Dep von lambda mehr — darf nicht als
+            # fehlend gemeldet werden:
+            self.assertNotIn("'lambda' benötigt: dynamodb, iam, sqs", msg)
 
     def test_transitive_dependency_reported(self):
-        """iam ohne sqs → fehlend: sqs (vollständige Diagnose je Modul)."""
+        """iam ohne dynamodb → fehlend: dynamodb (vollständige Diagnose je Modul)."""
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit) as ctx:
-                self._build(Path(tmp) / "x", ["dynamodb", "iam"])
+                self._build(Path(tmp) / "x", ["sqs", "iam"])
             self.assertIn("'iam'", str(ctx.exception))
+            self.assertIn("dynamodb", str(ctx.exception))
+
+    def test_sqs_worker_still_requires_sqs(self):
+        """Worker-Abhängigkeiten bleiben hart: sqs_worker ohne sqs → fail-closed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit) as ctx:
+                self._build(Path(tmp) / "x", ["dynamodb", "sqs_worker"])
+            self.assertIn("sqs_worker", str(ctx.exception))
             self.assertIn("sqs", str(ctx.exception))
+
+    # ---------- PHASE2: SQS optional für iam/lambda ----------
+
+    def test_iam_without_sqs_valid(self):
+        """IAM ohne Queue-ARN: gültige Auswahl, kein SQS-Wiring, count-Gated Modul."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "iam-only"
+            self._build(target, ["dynamodb", "iam"])
+            main_tf = (target / "terraform" / "main.tf").read_text()
+            self.assertNotIn("sqs_queue_arn", main_tf)
+            self.assertNotIn("module.sqs", main_tf)
+            iam_module = (
+                target / "terraform" / "modules" / "iam" / "main.tf"
+            ).read_text()
+            # Count-Gating: ohne Queue-ARN entsteht KEINE sqs-Berechtigung
+            self.assertIn('count = var.sqs_queue_arn != "" ? 1 : 0', iam_module)
+            # Basis-Policy (DDB+Logs) bleibt im handler-Dokument:
+            self.assertIn("DynamoDBTable", iam_module)
+            self.assertIn("Logs", iam_module)
+
+    def test_lambda_without_sqs_sync_only(self):
+        """Lambda ohne Queue: gültig (synchroner Handler), kein queue_url-Wiring."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "sync-only"
+            self._build(target, ["dynamodb", "iam", "lambda"])
+            main_tf = (target / "terraform" / "main.tf").read_text()
+            self.assertNotIn("queue_url", main_tf)
+            self.assertIn('module "lambda"', main_tf)
+            # Handler-Artefakt wird nach wie vor geliefert (Lambda ist ausgewählt):
+            self.assertTrue((target / "lambda" / "dist" / "lambda.zip").is_file())
+
+    def test_iam_with_sqs_keeps_wiring(self):
+        """Mit sqs in der Auswahl bleibt das SQS-Wiring unverändert erhalten."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "with-sqs"
+            self._build(target, ["dynamodb", "sqs", "iam"])
+            main_tf = (target / "terraform" / "main.tf").read_text()
+            self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", main_tf)
+
+    def test_lambda_without_sqs_readme_note(self):
+        """Generiertes README dokumentiert den synchronen Betrieb ohne SQS."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "readme-check"
+            self._build(target, ["dynamodb", "iam", "lambda"])
+            readme = (target / "README.md").read_text()
+            self.assertIn("SQS nicht ausgewählt", readme)
 
     def test_unknown_module_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
