@@ -883,7 +883,8 @@ class TestOrdersServiceModule(unittest.TestCase):
         variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
                           (self.target / "variables.tf").read_text(), re.M))
         self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days"})
+                                     "monitoring_enabled", "log_retention_days",
+                                     "external_cognito"})
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
 
@@ -997,6 +998,121 @@ class TestOrdersServiceModule(unittest.TestCase):
             main(["build", "--preset", "orders-service", "--target", "/tmp/opencode/x",
                   "--project-name", "abc", "--modules", "dynamodb"])
         self.assertEqual(ctx.exception.code, 2)  # Mutual-Exclusion (argparse)
+
+
+class TestExternalCognitoIntegration(unittest.TestCase):
+    """MAYS-ORDERS-EXTERNAL-COGNITO-INTEGRATION-01: MANAGED/EXTERNAL im
+    generierten Orders-Modul (nur Builder-Scope; Stamm-Repo unangetastet)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from module_builder.builder import build_module
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.target = Path(cls._tmp.name) / "Mays-Order-AWS"
+        build_module(target_dir=cls.target, project_name="cognito-modes",
+                    source_root=REPO_ROOT)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _main(self) -> str:
+        return (self.target / "main.tf").read_text()
+
+    def _variables(self) -> str:
+        return (self.target / "variables.tf").read_text()
+
+    def _outputs(self) -> str:
+        return (self.target / "outputs.tf").read_text()
+
+    def test_managed_is_default(self):
+        """1) MANAGED bleibt Standard: external_cognito = null."""
+        self.assertRegex(self._variables(),
+                         r'variable\s+"external_cognito"[\s\S]*?default\s*=\s*null')
+
+    def test_managed_cognito_module_with_count_gate(self):
+        """2) MANAGED erzeugt Cognito wie bisher (count=1 bei null)."""
+        main = self._main()
+        self.assertIn('module "cognito" {', main)
+        self.assertRegex(
+            main, r"count\s*=\s*var\.external_cognito == null \? 1 : 0")
+        self.assertTrue((self.target / "modules" / "cognito" / "main.tf").is_file())
+
+    def test_external_uses_existing_references(self):
+        """3) EXTERNAL verwendet die Referenzen über locals."""
+        main = self._main()
+        self.assertRegex(
+            main,
+            r"cognito_endpoint\s*=\s*var\.external_cognito == null \? "
+            r"one\(module\.cognito\[\*\]\.user_pool_endpoint\) : "
+            r"var\.external_cognito\.user_pool_endpoint")
+        self.assertRegex(
+            main,
+            r"cognito_client_id\s*=\s*var\.external_cognito == null \? "
+            r"one\(module\.cognito\[\*\]\.user_pool_client_id\) : "
+            r"var\.external_cognito\.user_pool_client_id")
+
+    def test_external_creates_no_cognito_resources(self):
+        """4/5) EXTERNAL erzeugt keinen Pool und keinen App-Client:
+        module.cognito ist ausschließlich count-gated instanziiert."""
+        main = self._main()
+        self.assertEqual(main.count('module "cognito" {'), 1)
+        # api-Block referenziert NUR die locals, nie direkt module.cognito:
+        api_block = main[main.index('module "api" {'):]
+        api_block = api_block[:api_block.index("}")]
+        self.assertNotIn("module.cognito", api_block)
+
+    def test_jwt_authorizer_stays_active(self):
+        """6) JWT-Authorizer bleibt in beiden Varianten aktiv
+        (api-Eingaben bleiben gesetzt, Werte nie leer — kein Default ""!)."""
+        api_block = self._main().split('module "api" {')[1].split("}")[0]
+        self.assertRegex(api_block, r"cognito_user_pool_endpoint\s*=\s*local\.cognito_endpoint")
+        self.assertRegex(api_block, r"cognito_user_pool_client_id\s*=\s*local\.cognito_client_id")
+
+    def test_incomplete_external_refs_fail_closed(self):
+        """7) Unvollständige externe Referenzen werden verständlich abgelehnt."""
+        variables = self._variables()
+        self.assertIn("validation {", variables)
+        self.assertIn("fail-closed", variables)
+        # HCL-escapte Regex (Datei enthält \\., String-Wert enthält \.)
+        self.assertIn("cognito-idp\\\\.[a-z0-9-]+", variables)
+
+    def test_worker_sqs_dynamodb_stay_mandatory(self):
+        """8-10) Worker, SQS, eigene Tabelle bleiben enthalten."""
+        modules = set(re.findall(r'^module\s+"([a-z_]+)"', self._main(), re.M))
+        self.assertIn("sqs_worker", modules)
+        self.assertIn("sqs", modules)
+        self.assertIn("dynamodb", modules)
+
+    def test_tags_preserved(self):
+        """11) Bestehende Tags bleiben erhalten (local.default_tags)."""
+        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 7)
+
+    def test_output_names_and_external_safe_values(self):
+        """12) 19 Output-Namen erhalten + EXTERNAL-sichere Werte."""
+        outputs = self._outputs()
+        names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
+        self.assertEqual(len(names), 19)
+        # Modus-sichere Wertformen:
+        self.assertIn("value       = local.cognito_endpoint", outputs)
+        self.assertIn("value       = local.cognito_client_id", outputs)
+        self.assertIn("value       = one(module.cognito[*].user_pool_id)", outputs)
+        self.assertIn("value       = one(module.cognito[*].user_pool_arn)", outputs)
+        self.assertIn("value       = one(module.cognito[*].user_pool_group_staff_name)", outputs)
+        # Keine ungesicherten Direktreferenzen mehr:
+        self.assertNotIn("= module.cognito.", outputs)
+
+    def test_readme_documents_both_modes(self):
+        readme = (self.target / "README.md").read_text()
+        self.assertIn("MANAGED", readme)
+        self.assertIn("EXTERNAL", readme)
+        self.assertIn("external_cognito", readme)
+        self.assertIn("NICHT automatisiert", readme)  # Migration-Warnung
+
+    def test_manifest_notes_external_cognito(self):
+        manifest = json.loads(
+            (self.target / "module-builder.manifest.json").read_text())
+        self.assertIn("external_cognito", manifest["notes"])
 
 
 if __name__ == "__main__":

@@ -642,6 +642,52 @@ def build(
 # Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): Modul-Generator
 # ---------------------------------------------------------------------------
 
+# EXTERNAL-Cognito (MAYS-ORDERS-EXTERNAL-COGNITO-INTEGRATION-01): Im generierten
+# Orders-Modul wählbare Cognito-Bereitstellungsart. Format abgeleitet aus dem
+# bestehenden api-Modul (issuer = "https://${cognito_user_pool_endpoint}" —
+# der Endpoint ist das Pool-endpoint-Attribut OHNE Scheme).
+EXTERNAL_COGNITO_VARIABLE = '''
+# Cognito-Bereitstellungsart (MAYS-ORDERS-EXTERNAL-COGNITO-INTEGRATION-01):
+# null (Default) = MANAGED: das Modul erstellt und verwaltet den eigenen
+# Cognito User Pool + App Client + Gruppe "staff" (bisheriges Verhalten).
+# Objekt gesetzt  = EXTERNAL: ein vorhandener Pool/Client des integrierenden
+# Projekts wird verwendet; das Modul erzeugt KEINE Cognito-Ressourcen und
+# verändert KEINE fremden Ressourcen. Der JWT-Authorizer bleibt in beiden
+# Varianten aktiv (fail-closed: unvollständige Referenzen werden abgelehnt).
+variable "external_cognito" {
+  description = "Externe Cognito-Referenzen (EXTERNAL) oder null fuer eigenen Pool (MANAGED, Standard)."
+  type = object({
+    user_pool_endpoint = string # Pool-Endpoint OHNE Scheme (api-Modul ergaenzt https://)
+    user_pool_client_id = string # App-Client-ID (Audience des JWT-Authorizers)
+  })
+  default = null
+
+  validation {
+    condition = var.external_cognito == null || (
+      can(regex("^cognito-idp\\\\.[a-z0-9-]+\\\\.amazonaws\\\\.com/[a-zA-Z0-9_-]+$", var.external_cognito.user_pool_endpoint))
+      && var.external_cognito.user_pool_client_id != ""
+    )
+    error_message = "external_cognito erfordert einen vollstaendigen user_pool_endpoint im Format 'cognito-idp.<region>.amazonaws.com/<pool-id>' (ohne https://) und eine nicht leere user_pool_client_id - unvollstaendige Referenzen werden fail-closed abgelehnt."
+  }
+}
+'''
+
+# Modus-sichere Output-Werte (EXTERNAL: managed-fremde Werte → null statt
+# Verweis auf nicht existierende Instanzen; endpoint/client_id geben die
+# tatsächlich verwendeten Referenzen zurück — semantisch übertragbar).
+EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS = [
+    ("value       = module.cognito.user_pool_endpoint",
+     "value       = local.cognito_endpoint"),
+    ("value       = module.cognito.user_pool_client_id",
+     "value       = local.cognito_client_id"),
+    ("value       = module.cognito.user_pool_id",
+     "value       = one(module.cognito[*].user_pool_id)"),
+    ("value       = module.cognito.user_pool_arn",
+     "value       = one(module.cognito[*].user_pool_arn)"),
+    ("value       = module.cognito.user_pool_group_staff_name",
+     "value       = one(module.cognito[*].user_pool_group_staff_name)"),
+]
+
 ORDERS_SERVICE_README_TEMPLATE = """# Mays-Order-AWS — Orders-Service Terraform-Modul
 
 **Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01):** Dieses Verzeichnis ist ein
@@ -689,6 +735,44 @@ output "orders_api" {{
 | `tags` | map(string) | `{{}}` | Zusatz-Tags; `Maker`/`Environment` werden intern ergänzt (Tag-Parität zum Stamm-Deploy) |
 | `monitoring_enabled` | bool | `true` | Log-Group/Retention-Steuerung in Lambda-/Worker-Modulen |
 | `log_retention_days` | number | `7` | CloudWatch-Log-Retention |
+| `external_cognito` | object | `null` | **MANAGED (Default/null):** eigener Pool + App Client + Gruppe `staff`. **EXTERNAL (Objekt):** vorhandener Pool des integrierenden Projekts — `user_pool_endpoint` (Format `cognito-idp.<region>.amazonaws.com/<pool-id>`, **ohne** `https://`) + `user_pool_client_id`. Fail-closed bei unvollständigen Referenzen. |
+
+## Cognito-Varianten (MANAGED / EXTERNAL)
+
+**MANAGED (Standard):** Ohne `external_cognito` erstellt das Modul seinen
+eigenen Cognito User Pool + App Client + Gruppe `staff` — identisch zum
+bisherigen Verhalten; JWT-Authorizer nutzt `https://<pool-endpoint>`.
+
+**EXTERNAL:** Mit gültigem `external_cognito` verwendet das Modul den
+vorhandenen Pool/Client; es werden **keine** Cognito-Ressourcen erzeugt und
+**keine** fremden Ressourcen verändert. Der JWT-Authorizer bleibt aktiv
+(issuer/audience aus den externen Referenzen).
+
+```hcl
+module "orders" {{
+  source = "../module/Mays-Order-AWS"
+
+  project_name = "{project_name}"
+  external_cognito = {{
+    user_pool_endpoint = "cognito-idp.eu-central-1.amazonaws.com/eu-central-1_XXXXXXX"
+    user_pool_client_id = "1a2b3c4d5e6f7g8h9i0j1k2l3"
+  }}
+}}
+```
+
+**Outputs im EXTERNAL-Modus:** `cognito_user_pool_endpoint` und
+`cognito_user_pool_client_id` geben die tatsächlich verwendeten externen
+Referenzen zurück. `cognito_user_pool_id`, `cognito_user_pool_arn` und
+`cognito_user_pool_group_name` sind `null` (vom Modul nicht verwaltet —
+dokumentierte Inkompatibilität statt stiller Umdeutung; Lösungsvorschlag:
+optionale Zusatzfelder im `external_cognito`-Objekt, freizugeben).
+
+**Migration MANAGED → EXTERNAL (NICHT automatisiert):** Ein Wechsel eines
+bestehenden Deployments führt zur geplanten Entfernung des verwalteten Pools
+(inkl. Nutzer/Gruppen). Kontrollierter Wechsel erfordert: menschliche Freigabe,
+Nutzer-/Gruppen-Migration in den Zitpool, bewusstes `terraform state rm` der
+Cognito-Adressen oder Destruktion des Modul-Pools, anschließende EXTERNAL-
+Konfiguration. Keine automatische Umschaltung/State-Migration durch das Modul.
 
 ## Outputs (vollständiger Output-Vertrag)
 
@@ -793,7 +877,15 @@ def build_module(
         locals_text[:-1].rstrip("\n")
         + "\n\n  # Tag-Parität zum Stamm-Deploy (WP3): Maker/Environment bleiben"
         + "\n  # auch ohne Provider-default_tags an jeder Orders-Ressource."
-        + "\n  default_tags = merge({ \"Maker\" = local.maker, \"Environment\" = local.environment }, var.tags)\n}"
+        + "\n  default_tags = merge({ \"Maker\" = local.maker, \"Environment\" = local.environment }, var.tags)"
+        + "\n\n  # Cognito-Bereitstellungsart (EXTERNAL-COGNITO-INTEGRATION-01):"
+        + "\n  # MANAGED (external_cognito = null): eigener Pool (module.cognito count=1)."
+        + "\n  # EXTERNAL (external_cognito gesetzt): vorhandener Pool; das Modul"
+        + "\n  # erzeugt KEINE Cognito-Ressourcen (count=0, splat bleibt leer)."
+        + "\n  # one() macht beide Zweige auswertungssicher (kein Index-Fehler)."
+        + "\n  cognito_endpoint = var.external_cognito == null ? one(module.cognito[*].user_pool_endpoint) : var.external_cognito.user_pool_endpoint"
+        + "\n  cognito_client_id = var.external_cognito == null ? one(module.cognito[*].user_pool_client_id) : var.external_cognito.user_pool_client_id"
+        + "\n}"
     )
     kept_blocks = [{"kind": "locals", "name": "", "header": "", "text": locals_text}]
     for block in blocks:
@@ -805,6 +897,25 @@ def build_module(
             "${path.module}/lambda/dist/lambda.zip",
         )
         text = re.sub(r"tags(\s*)=\s*var\.tags", r"tags\1= local.default_tags", text)
+        if block["name"] == "cognito":
+            # EXTERNAL-Variante: Pool nur im MANAGED-Modus instanziieren
+            # (null = Default). Impliziter Terraform-Move module.cognito →
+            # module.cognito[0] bei Bestandsupgrades (TF ≥1.3, dokumentiert).
+            text = text.replace(
+                'module "cognito" {',
+                'module "cognito" {\n'
+                '  count = var.external_cognito == null ? 1 : 0',
+                1,
+            )
+        if block["name"] == "api":
+            # JWT-Autorisierung bleibt in beiden Varianten aktiv; die Werte
+            # stammen aus den locals (MANAGED: eigener Pool; EXTERNAL: Referenz).
+            text = text.replace(
+                "module.cognito.user_pool_endpoint", "local.cognito_endpoint"
+            )
+            text = text.replace(
+                "module.cognito.user_pool_client_id", "local.cognito_client_id"
+            )
         kept_blocks.append(dict(block, text=text))
     (target_dir / "versions.tf").write_text(
         terraform_blocks[0]["text"] + "\n", encoding="utf-8"
@@ -824,12 +935,17 @@ def build_module(
         )
     )
     variables_text = substitute_project_name(variables_text, project_name)
+    # EXTERNAL-Cognito-Vertragsvariable (generiert, nicht Stamm-Bestand):
+    # null = MANAGED (Standard), Objekt = EXTERNAL; fail-closed-Validierung.
+    variables_text = variables_text.rstrip("\n") + "\n" + EXTERNAL_COGNITO_VARIABLE
     (target_dir / "variables.tf").write_text(variables_text, encoding="utf-8")
     written.append(target_dir / "variables.tf")
 
     # outputs.tf: referenzgefilterte Quell-Outputs (die 3 neuen Vertrag-Outputs
     # sind in der Quelle enthalten und werden über den Filter automatisch
     # übernommen — refs: module.sqs / module.sqs_worker ∈ Kern).
+    # EXTERNAL-Modus-Sicherheit: alle module.cognito-Werte werden auf
+    # auswertungssichere Formen umgestellt (one(splat) / locals).
     outputs_text = _render_blocks(
         _filter_named_blocks(
             _split_blocks(
@@ -839,6 +955,10 @@ def build_module(
             "output",
         )
     )
+    for old, new in EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS:
+        if old not in outputs_text:
+            _fail(f"Erwarteter Output-Ausdruck fehlt in der Quelle: {old!r}")
+        outputs_text = outputs_text.replace(old, new)
     (target_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
     written.append(target_dir / "outputs.tf")
 
@@ -884,6 +1004,7 @@ def build_module(
         "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
         "notes": {
             "contract": "MAYS-ORDERS-MODULE-CONTRACT-01: fixed 7-module Orders-Service composition",
+            "external_cognito": "runtime variable: null = MANAGED (own pool, default), object = EXTERNAL (existing pool, fail-closed validated)",
             "module_mode": "local Terraform module (no provider block, path.module artifacts)",
             "policy_gate": "root-level responsibility of the integrating project",
             "privacy_production_activation": "BLOCKED (secret management missing)",
