@@ -47,6 +47,7 @@ Terraform + Installer + Policy Gate | IAM | CloudWatch | CloudTrail
 - [Release-Candidate-Report](docs/reports/MAYS-ORDERS-RELEASE-CANDIDATE-HARDENING-01.md)
 - [Destroy-Nachweis](docs/reports/MAYS-ORDERS-PRIVACY-DESTROY-AND-RELEASE-01.md)
 - [Orders-Service-Modul-Vertrag](docs/reports/MAYS-ORDERS-MODULE-CONTRACT-01.md)
+- [Modul-Integrations- & Testleitfaden](docs/MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md)
 
 ## Einstieg ohne Deployment
 

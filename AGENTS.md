@@ -74,7 +74,8 @@ Run artifacts land in `.mays-installer/runs/` (gitignored).
 ## Where the code is
 
 Only four top-level dirs contain executable code — the rest (`api/`, `database/`,
-`security/`, `Week-1..4/`, `docs/`, …) is documentation, however code-like the names look:
+`security/`, `docs/` (inkl. historischer Wochen-Dokus unter `docs/initialweekcontest/`),
+…) is documentation, however code-like the names look:
 
 - `lambda/` — active order handler, entrypoint `src/index.py` (`index.handler`)
 - `installer/` + `Mays-Order-AWS-installer` — deployment lifecycle CLI

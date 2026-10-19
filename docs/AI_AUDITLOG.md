@@ -65,7 +65,7 @@ der Chatverlauf ist keine Recovery-Quelle.
 ## AUDIT LOG INDEX
 
 Current Branch: main
-Latest HEAD: 736886a (CLI-CLEANUP; aktueller Stand via `git log -1`)
+Latest HEAD: 5bdde18 (CONSISTENCY-SCAN; aktueller Stand via `git log -1`)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -259,3 +259,4 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - four-week-plan → docs/reports/four-week-plan.md (retroaktiv indexiert)
 - recovery-checkpoint-strategy → docs/reports/recovery-checkpoint-strategy.md (retroaktiv indexiert)
 - test-strategy → docs/reports/test-strategy.md (retroaktiv indexiert)
+- MAYS-ORDERS-MODULE-DOC-INTEGRATION-01 → docs/reports/MAYS-ORDERS-MODULE-DOC-INTEGRATION-01.md (VERIFIED: Nutzer-Doku für den Modulbau integriert — Week-1..4 byte-identisch nach docs/initialweekcontest/ verschoben, Modul-Testleitfaden gegengeprüft [34 Dateien, MANAGED/EXTERNAL, Negativtest] und 12 Evidenz-Stellen auf Repo-Reports umgestellt, AGENTS.md/README-Referenzen konsistent; keine Funktionsänderung)
