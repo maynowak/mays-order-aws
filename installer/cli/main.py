@@ -162,11 +162,11 @@ class InstallerCLI:
             action="store_true",
             help="Generate destroy plan instead of deploy plan"
         )
-        plan_parser.add_argument(
-            "--no-policy-check",
-            action="store_true",
-            help="Skip policy gate check"
-        )
+        # Policy-Gate-Hinweis: Es gibt absichtlich KEIN Flag zum Überspringen
+        # des Gates (das historische --no-policy-check war nie konsumiert und
+        # wurde entfernt — MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01). Der
+        # Deploy-Gate in _cmd_deploy läuft bedingungslos; FAIL blockiert vor
+        # dem menschlichen Approval.
 
         # destroy-plan command (alias for plan --destroy)
         destroy_parser = subparsers.add_parser(
