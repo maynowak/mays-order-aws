@@ -61,6 +61,23 @@ git checkout v0.5.0-rc.2
 
 **Kein AWS-Deployment ohne Freigabe.** Konto, Region, Profil, Workspace, Plan und Policy Gate vor jeder Mutation prüfen. Details im [Installer-Handbuch](docs/INSTALLER_GUIDE.md).
 
+## Module Builder — Terraform-Bereitstellung generieren
+
+```bash
+# 1) Vollständiger Stack als eigenständiges Projekt:
+python -m module_builder build --target ./generated/my-orders   --project-name my-orders --preset complete --validate
+
+# 2) Wiederverwendbares Orders-Service-Terraform-Modul (MANAGED/EXTERNAL Cognito):
+python -m module_builder build --preset orders-service   --target ./module/Mays-Order-AWS --project-name my-orders --validate
+
+# 3) Freie Modulauswahl (Pflicht-Deps explizit; --with-deps ergänzt transitiv):
+python -m module_builder build --target ./generated/custom   --project-name custom --modules dynamodb,sqs,iam,lambda --with-deps
+
+python -m module_builder presets    # verfügbare Presets listen
+```
+
+Details: [Modul-Integrations- & Testleitfaden](docs/MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md) · [Orders-Service-Modul-Vertrag](docs/reports/MAYS-ORDERS-MODULE-CONTRACT-01.md) · `python -m module_builder --help`
+
 ## Projektabgrenzung
 
 Mays-Orders-AWS ist eine eigenständige Order-/Work-Processing-Komponente. Mays-RIS ist ein separates System und wird durch einen Tag dieses Repositories nicht automatisch aktualisiert.

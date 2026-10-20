@@ -66,3 +66,12 @@ Leitfaden §9 (Git-Sourcing) als nächsten Test gemäß eigener Abnahmechecklist
 ## Current Resume Point
 
 Task abgeschlossen, committet, gepusht; Git CLEAN; Auditlog aktualisiert (dieser Eintrag).
+
+## Nachtrag (2026-10-20): Auffindbarkeit des Builder-Aufrufs
+
+Prüfrage aus dem Betrieb: „Wie ist der Aufruf von module_builder — würdest du das anhand der Doku gleich finden?" Ehrlicher Befund: **Nein** — README.md, INSTALLER_GUIDE.md und PRODUCT_OVERVIEW.md hatten **0 Erwähnungen**; der Aufruf stand nur in AGENTS.md (1×) und im Testleitfaden (3×). Behoben:
+
+- `README.md`: eigene Sektion **„Module Builder — Terraform-Bereitstellung generieren"** mit allen drei Aufrufvarianten (complete / orders-service / --modules --with-deps), Presets-Listing und Links zu Leitfaden + Vertrag.
+- `docs/PRODUCT_OVERVIEW.md`: Funktionsübersicht um die Module-Builder-Zeile ergänzt (mit Test-Nachweis).
+
+Re-Verifikation nach Fix: README Erwähnungen 0 → 6 (Aufruf 0 → 4). Keine Funktionsänderung; Commit folgt unmittelbar.

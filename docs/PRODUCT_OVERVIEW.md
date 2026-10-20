@@ -21,6 +21,7 @@ Das System kann als technische Komponente anderer Anwendungen eingesetzt werden.
 | Infrastruktur | Terraform-Module, isolierte Workspaces, Policy Gate | Installation und Destroy im Test verifiziert |
 | Beobachtbarkeit | CloudWatch-Logs, Alarme/Dashboard, CloudTrail | Im isolierten Test nachgewiesen |
 | Installer | Validierung, Plan, Deploy, Destroy, Kontext- und Artefaktprüfung | 81 Installer-Tests, 5 Integritätstests |
+| Module Builder | Eigenständige Terraform-Bereitstellungen aus den Bestandteilen generieren (Preset `complete`, Orders-Service-Modul, freie Modulauswahl `--modules`/`--with-deps`) | 87 Builder-Tests, Wrapper-Integration live validiert |
 
 ## 3. Systemarchitektur
 
