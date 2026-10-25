@@ -29,3 +29,16 @@ variable "sqs_queue_arn" {
   type        = string
   default     = ""
 }
+
+variable "sqs_enabled" {
+  description = <<-EOT
+    Plan-bekanntes Gate fuer die SQS-IAM-Berechtigung (GAP-06).
+    true  = Handler-Policy mit sqs:SendMessage auf sqs_queue_arn wird erzeugt;
+            ein leerer sqs_queue_arn ist dann ein harter Fehler (Precondition).
+    false = keine SQS-bezogenen IAM-Ressourcen (Standard, z. B. synchroner Betrieb).
+    Der Wert muss vor der Queue-Erstellung bekannt sein; er darf NICHT vom
+    berechneten Queue-ARN abgeleitet werden.
+  EOT
+  type        = bool
+  default     = false
+}

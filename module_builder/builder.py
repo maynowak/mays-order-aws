@@ -76,6 +76,12 @@ def _extract_terraform_block(main_tf_text: str) -> tuple:
 
 # ---------- B1: Block-Splitter für freie Modulauswahl ----------
 
+# Verdrahtungs-Flags ohne module.-Referenz, die dennoch nur mit einem
+# bestimmten optionalen Modul sinnvoll sind (GAP-06): `sqs_enabled = true`
+# steuert die SQS-IAM-Policy; ohne sqs-Modul muss das Gate AUS bleiben
+# (Default false) und die Zeile wird entfernt.
+OPTIONAL_MODULE_FLAGS = {"sqs_enabled": "sqs"}
+
 BLOCK_HEADER_RE = re.compile(
     r'^(?P<kind>terraform|locals|provider|module|resource|moved|variable|output)\s*'
     r'(?P<names>(?:"[^"]*"\s*)+)?'
@@ -155,12 +161,22 @@ def _strip_unselected_module_inputs(block: Dict, selection: set) -> Dict:
     haben Defaults (""), und das iam-Modul erzeugt ohne ARN keine
     sqs-Berechtigung. Nur Zuweisungen (`= module.<x>.`) werden entfernt —
     Kommentare und source-Zeilen bleiben unberührt.
+
+    GAP-06: `sqs_enabled` ist eine Verdrahtungs-Flag OHNE module.-Referenz,
+    die dennoch nur mit dem optionalen sqs-Modul sinnvoll ist. Ohne sqs in der
+    Auswahl wird sie mit entfernt → IAM-Default `false`, keine SQS-Policy
+    (sonst würde die ARN-Precondition beim Plan fehlschlagen).
     """
     from module_builder.catalog import MODULE_REF_RE
 
     lines = block["text"].split("\n")
     kept_lines = []
     for line in lines:
+        assignment = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
+        if assignment is not None:
+            flag_owner = OPTIONAL_MODULE_FLAGS.get(assignment.group(1))
+            if flag_owner is not None and flag_owner not in selection:
+                continue
         if re.match(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*module\.", line):
             refs = set(MODULE_REF_RE.findall(line))
             if refs and not refs.issubset(selection):
@@ -699,7 +715,7 @@ bereitstellt. Feste Zusammensetzung (nicht abwählbar):
 - Orders-SQS-Queue (asynchrone Verarbeitung)
 - Eigene Orders-DynamoDB-Tabelle (GSI1/GSI2)
 - Erforderliche Orders-IAM-Rollen/Policies (Least Privilege; SQS-Berechtigung
-  nur mit angebundener Queue — count-gated)
+  nur bei plan-bekanntem `sqs_enabled`-Gate — der Queue-ARN bleibt Policy-Resource)
 - Cognito User Pool/Client/Gruppe `staff` (JWT-Grundlage der Orders-API)
 
 Nicht Bestandteil des Vertrags (Verantwortung des integrierenden Projekts):
@@ -782,7 +798,7 @@ Konfiguration. Keine automatische Umschaltung/State-Migration durch das Modul.
 `cognito_user_pool_endpoint`, `cognito_user_pool_client_id`,
 `cognito_user_pool_group_name`, `api_gateway_endpoint`, `api_gateway_id`,
 `api_gateway_stage_name`, `api_gateway_authorizer_id`, `sqs_queue_url`,
-`sqs_queue_arn`, `sqs_worker_lambda_arn`
+`sqs_queue_arn`, `sqs_queue_name`, `sqs_worker_lambda_arn`
 
 ## Betriebs- und Vertragsnotizen
 

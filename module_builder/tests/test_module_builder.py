@@ -456,7 +456,7 @@ class TestModuleSelectionB1(unittest.TestCase):
                 "lambda_function_name", "lambda_function_arn", "lambda_invoke_arn",
                 # Neu seit MODULE-CONTRACT-01: Queue-Outputs referenzieren module.sqs
                 # (in dieser Auswahl enthalten) und werden mitgefiltert:
-                "sqs_queue_url", "sqs_queue_arn",
+                "sqs_queue_url", "sqs_queue_arn", "sqs_queue_name",
             })
 
     def test_missing_dependencies_fail_closed(self):
@@ -489,18 +489,23 @@ class TestModuleSelectionB1(unittest.TestCase):
     # ---------- PHASE2: SQS optional für iam/lambda ----------
 
     def test_iam_without_sqs_valid(self):
-        """IAM ohne Queue-ARN: gültige Auswahl, kein SQS-Wiring, count-Gated Modul."""
+        """IAM ohne Queue-ARN: gültige Auswahl, kein SQS-Wiring, Gate AUS."""
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "iam-only"
             self._build(target, ["dynamodb", "iam"])
             main_tf = (target / "terraform" / "main.tf").read_text()
             self.assertNotIn("sqs_queue_arn", main_tf)
             self.assertNotIn("module.sqs", main_tf)
+            # GAP-06: ohne sqs-Modul wird auch das Gate-Flag entfernt
+            # (IAM-Default false) — sonst würde die ARN-Precondition scheitern.
+            self.assertNotIn("sqs_enabled", main_tf)
             iam_module = (
                 target / "terraform" / "modules" / "iam" / "main.tf"
             ).read_text()
-            # Count-Gating: ohne Queue-ARN entsteht KEINE sqs-Berechtigung
-            self.assertIn('count = var.sqs_queue_arn != "" ? 1 : 0', iam_module)
+            # Count-Gating: ausschließlich das boolesche Gate steuert die Anzahl
+            self.assertEqual(iam_module.count("count = var.sqs_enabled ? 1 : 0"), 1)
+            self.assertEqual(iam_module.count("count  = var.sqs_enabled ? 1 : 0"), 1)
+            self.assertNotIn("var.sqs_queue_arn != ", iam_module)
             # Basis-Policy (DDB+Logs) bleibt im handler-Dokument:
             self.assertIn("DynamoDBTable", iam_module)
             self.assertIn("Logs", iam_module)
@@ -517,12 +522,26 @@ class TestModuleSelectionB1(unittest.TestCase):
             self.assertTrue((target / "lambda" / "dist" / "lambda.zip").is_file())
 
     def test_iam_with_sqs_keeps_wiring(self):
-        """Mit sqs in der Auswahl bleibt das SQS-Wiring unverändert erhalten."""
+        """Mit sqs in der Auswahl bleiben ARN- und Gate-Wiring erhalten."""
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "with-sqs"
             self._build(target, ["dynamodb", "sqs", "iam"])
             main_tf = (target / "terraform" / "main.tf").read_text()
             self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", main_tf)
+            self.assertRegex(main_tf, r"sqs_enabled\s*=\s*true")
+
+    def test_sqs_outputs_dropped_without_sqs_module(self):
+        """GAP-02: sqs_queue_name referenziert module.sqs — ohne sqs-Modul darf
+        kein SQS-Output (auch nicht der neue Name) im Output-Vertrag landen."""
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "no-sqs-outputs"
+            self._build(target, ["dynamodb", "iam"])
+            outputs_text = (target / "terraform" / "outputs.tf").read_text()
+            self.assertNotIn("sqs_queue_name", outputs_text)
+            self.assertNotIn("module.sqs", outputs_text)
+            names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
+            self.assertEqual(names, {"dynamodb_table_name", "dynamodb_table_arn",
+                                     "iam_handler_role_name", "iam_handler_role_arn"})
 
     def test_lambda_without_sqs_readme_note(self):
         """Generiertes README dokumentiert den synchronen Betrieb ohne SQS."""
@@ -889,14 +908,14 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
 
     def test_outputs_contract(self):
-        """WP5: alle Integrations-Outputs vorhanden (16 Bestand + 3 Vertrag)."""
+        """WP5 + GAP-02: 19 Bestands-Outputs + sqs_queue_name = 20."""
         outputs_text = (self.target / "outputs.tf").read_text()
         outputs = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
         for required in [
             "api_gateway_endpoint", "api_gateway_id", "api_gateway_stage_name",
             "api_gateway_authorizer_id",
             "dynamodb_table_name", "dynamodb_table_arn",
-            "sqs_queue_url", "sqs_queue_arn",
+            "sqs_queue_url", "sqs_queue_arn", "sqs_queue_name",
             "sqs_worker_lambda_arn",
             "lambda_function_name", "lambda_function_arn", "lambda_invoke_arn",
             "iam_handler_role_name", "iam_handler_role_arn",
@@ -905,10 +924,62 @@ class TestOrdersServiceModule(unittest.TestCase):
             "cognito_user_pool_group_name",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
+        self.assertEqual(len(outputs), 20)
+        # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
+        # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
+        block = re.search(
+            r'output "sqs_queue_name" \{(.*?)\n\}', outputs_text, re.S
+        )
+        self.assertIsNotNone(block)
+        self.assertRegex(block.group(1), r"value\s*=\s*module\.sqs\.queue_name")
+        self.assertNotIn("${", block.group(1))
+        self.assertNotIn("project_name", block.group(1))
         # Alle Referenzen bleiben im Vertragsbestand
         refs = set(re.findall(r"module\.([a-z_]+)", outputs_text))
         self.assertTrue(refs.issubset({"api", "cognito", "dynamodb", "iam",
                                        "lambda", "sqs", "sqs_worker"}))
+
+    def test_iam_sqs_gate_contract(self):
+        """GAP-06: beide counts hängen NUR am booleschen Gate; der ARN bleibt
+        Policy-Resource (keine Wildcard) und wird per Precondition geprüft."""
+        iam_main = (self.target / "modules" / "iam" / "main.tf").read_text()
+        iam_vars = (self.target / "modules" / "iam" / "variables.tf").read_text()
+
+        # Beide ehemals ARN-abhängigen counts sind jetzt gate-abhängig.
+        self.assertEqual(iam_main.count("var.sqs_enabled ? 1 : 0"), 2)
+        self.assertNotRegex(iam_main, r"count[^\n]*var\.sqs_queue_arn")
+        self.assertNotIn('var.sqs_queue_arn != ""', iam_main)
+
+        sqs_doc = iam_main.split('data "aws_iam_policy_document" "sqs" {')[1]
+        sqs_doc = sqs_doc.split('resource "aws_iam_role_policy" "sqs" {')[0]
+        self.assertIn("resources = [var.sqs_queue_arn]", sqs_doc)
+        self.assertNotIn('"*"', sqs_doc)
+        self.assertIn("precondition {", sqs_doc)
+        self.assertIn('trimspace(var.sqs_queue_arn) != ""', sqs_doc)
+
+        # Interner Vertrag: bool, Default false → kein 6. öffentlicher Input.
+        self.assertRegex(
+            iam_vars,
+            r'variable "sqs_enabled" \{[\s\S]*?type\s*=\s*bool[\s\S]*?default\s*=\s*false',
+        )
+        # Kein check-Block (liefert nur Warnungen; GAP-06 verlangt hart).
+        self.assertNotIn('check "', iam_main)
+
+    def test_iam_sqs_gate_wired_plan_known(self):
+        """GAP-06: der Root-Aufrufer setzt das Gate als Literal (plan-bekannt),
+        abgeleitet aus der festen Modulkonfiguration — nicht aus ARN/Namen."""
+        main_tf = (self.target / "main.tf").read_text()
+        iam_block = main_tf.split('module "iam" {')[1].split("\n}")[0]
+        self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
+        self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", iam_block)
+        self.assertNotIn("sqs_enabled = module.", iam_block)
+        # Genau 5 öffentliche Inputs (kein zusätzlicher Gate-Input):
+        variables = set(re.findall(
+            r'^variable\s+"([a-z_]+)"',
+            (self.target / "variables.tf").read_text(), re.M))
+        self.assertEqual(variables, {"project_name", "tags",
+                                     "monitoring_enabled", "log_retention_days",
+                                     "external_cognito"})
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()
@@ -934,6 +1005,7 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertIn("source =", readme)
         self.assertIn("project_name", readme)
         self.assertIn("sqs_queue_url", readme)          # Outputs dokumentiert
+        self.assertIn("sqs_queue_name", readme)
         self.assertIn("sqs_worker_lambda_arn", readme)
         self.assertIn("BLOCKED", readme)                # Privacy-Hinweis
         self.assertIn("Orders-Service", readme)         # Vertrag benannt
@@ -1089,10 +1161,11 @@ class TestExternalCognitoIntegration(unittest.TestCase):
         self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 7)
 
     def test_output_names_and_external_safe_values(self):
-        """12) 19 Output-Namen erhalten + EXTERNAL-sichere Werte."""
+        """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 20)
+        self.assertIn("sqs_queue_name", names)
         # Modus-sichere Wertformen:
         self.assertIn("value       = local.cognito_endpoint", outputs)
         self.assertIn("value       = local.cognito_client_id", outputs)

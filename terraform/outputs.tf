@@ -111,6 +111,11 @@ output "sqs_queue_arn" {
   value       = module.sqs.queue_arn
 }
 
+output "sqs_queue_name" {
+  description = "Name der Orders-SQS-Queue."
+  value       = module.sqs.queue_name
+}
+
 output "sqs_worker_lambda_arn" {
   description = "ARN der Orders-Worker-Lambda (SQS-Consumer)."
   value       = module.sqs_worker.function_arn

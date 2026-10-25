@@ -68,6 +68,9 @@ module "iam" {
   dynamodb_gsi1_arn  = module.dynamodb.gsi1_arn
   dynamodb_gsi2_arn  = module.dynamodb.gsi2_arn
   sqs_queue_arn      = module.sqs.queue_arn
+  # GAP-06: plan-bekanntes Gate (Root erzeugt die Queue immer). Der ARN oben
+  # ist beim Fresh-Plan noch unbekannt und bleibt Policy-Resource.
+  sqs_enabled = true
 }
 
 # T011-04 — Lambda: Order Handler (Zip-Build, Python 3.14)
