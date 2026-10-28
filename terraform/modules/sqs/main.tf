@@ -23,22 +23,10 @@ resource "aws_sqs_queue" "orders" {
   tags = merge({ "Project" = var.project_name }, var.tags)
 }
 
-resource "aws_sqs_queue_policy" "orders" {
-  queue_url = aws_sqs_queue.orders.id
+# Resource Policy bewusst nicht gesetzt
+# Zugriff wird ausschließlich über IAM-Identitäts-Policies gesteuert.
+# Dadurch wird ein Wildcard-Principal vermieden und Least Privilege eingehalten.
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowAccessFromAccount"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-        Resource  = aws_sqs_queue.orders.arn
-      }
-    ]
-  })
-}
 
 output "queue_url" {
   description = "URL of the SQS queue"
