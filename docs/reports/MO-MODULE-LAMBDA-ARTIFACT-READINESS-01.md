@@ -16,7 +16,8 @@ Build-Skript `lambda/build_zip.py` erstellt `lambda/dist/lambda.zip`.
 
 ## Prüfung
 
-- `lambda/dist/lambda.zip` vorhanden, 38.5 kB
+- `lambda/dist/lambda.zip` vorhanden, 11.8 kB (11 815 Byte, SHA256 versioniert)
+- Unkomprimierte Payload: ~38.6 kB
 - Enthält: index.py, order_service.py, state_machine.py, validation.py, errors.py, order_types.py, sqs_handler.py
 - Keine Secrets
 - Module Builder kopiert `lambda/dist/lambda.zip`, `lambda/src/`, `lambda/build_zip.py` ins generierte Modul
