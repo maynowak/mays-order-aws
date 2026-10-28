@@ -100,6 +100,7 @@ ORDERS_SERVICE_VARIABLES: List[str] = [
     "tags",
     "monitoring_enabled",
     "log_retention_days",
+    "lambda_execution_boundary",
 ]
 
 # Seed tooling (opt-in via var.seed_example_data, default false).

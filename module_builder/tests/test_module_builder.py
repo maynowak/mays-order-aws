@@ -903,6 +903,7 @@ class TestOrdersServiceModule(unittest.TestCase):
                           (self.target / "variables.tf").read_text(), re.M))
         self.assertEqual(variables, {"project_name", "tags",
                                      "monitoring_enabled", "log_retention_days",
+                                     "lambda_execution_boundary",
                                      "external_cognito"})
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
@@ -973,12 +974,13 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
         self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", iam_block)
         self.assertNotIn("sqs_enabled = module.", iam_block)
-        # Genau 5 öffentliche Inputs (kein zusätzlicher Gate-Input):
+        # Genau 6 öffentliche Inputs (kein zusätzlicher Gate-Input):
         variables = set(re.findall(
             r'^variable\s+"([a-z_]+)"',
             (self.target / "variables.tf").read_text(), re.M))
         self.assertEqual(variables, {"project_name", "tags",
                                      "monitoring_enabled", "log_retention_days",
+                                     "lambda_execution_boundary",
                                      "external_cognito"})
 
     def test_versions_tf_contains_terraform_block(self):

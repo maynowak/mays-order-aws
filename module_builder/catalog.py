@@ -51,6 +51,7 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "seed_file_path": ["dynamodb"],
     "monitoring_enabled": ["lambda", "sqs_worker", "monitoring"],
     "log_retention_days": ["lambda", "sqs_worker", "monitoring"],
+    "lambda_execution_boundary": ["sqs_worker"],
     "dashboard_enabled": ["monitoring"],
     "alarm_period_seconds": ["monitoring"],
     "alarm_evaluation_periods": ["monitoring"],

@@ -951,6 +951,18 @@ def build_module(
         )
     )
     variables_text = substitute_project_name(variables_text, project_name)
+    # IAM Portabilität (MAYS-ORDERS-MODULE-IAM-PORTABILITY-FIX-01):
+    # Im generierten Orders-Service-Modul darf keine konto-spezifische
+    # Permissions Boundary als Default übernommen werden. Der Default wird
+    # auf null gesetzt; die Root-Installation behält den konto-spezifischen
+    # Default über terraform/variables.tf.
+    import re as _re
+    variables_text = _re.sub(
+        r'(variable "lambda_execution_boundary" \{[\s\S]*?default\s*=\s*)".*?"',
+        r'\1null',
+        variables_text,
+        count=1,
+    )
     # EXTERNAL-Cognito-Vertragsvariable (generiert, nicht Stamm-Bestand):
     # null = MANAGED (Standard), Objekt = EXTERNAL; fail-closed-Validierung.
     variables_text = variables_text.rstrip("\n") + "\n" + EXTERNAL_COGNITO_VARIABLE

@@ -30,9 +30,14 @@ variable "dynamodb_table_arn" {
 }
 
 variable "lambda_execution_boundary" {
-  description = "IAM permissions boundary"
+  description = "Optional IAM permissions boundary ARN for the SQS worker Lambda role"
   type        = string
-  default     = "arn:aws:iam::240571105849:policy/Mays-Orders-Lambda-Execution-Boundary"
+  default     = null
+
+  validation {
+    condition     = var.lambda_execution_boundary == null || can(regex("^arn:aws:iam::[0-9]{12}:policy/", var.lambda_execution_boundary))
+    error_message = "lambda_execution_boundary must be null or a valid IAM policy ARN (arn:aws:iam::<12-digit-account-id>:policy/<name>)."
+  }
 }
 
 variable "filename" {

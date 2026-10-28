@@ -134,3 +134,14 @@ variable "enable_cognito_backup_automation" {
   type        = bool
   default     = true
 }
+
+variable "lambda_execution_boundary" {
+  description = "Optional IAM permissions boundary ARN for the SQS worker Lambda role. If null, no permissions boundary is set."
+  type        = string
+  default     = "arn:aws:iam::240571105849:policy/Mays-Orders-Lambda-Execution-Boundary"
+
+  validation {
+    condition     = var.lambda_execution_boundary == null || can(regex("^arn:aws:iam::[0-9]{12}:policy/", var.lambda_execution_boundary))
+    error_message = "lambda_execution_boundary must be null or a valid IAM policy ARN (arn:aws:iam::<12-digit-account-id>:policy/<name>)."
+  }
+}

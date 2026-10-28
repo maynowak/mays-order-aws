@@ -203,6 +203,7 @@ module "sqs_worker" {
   filename            = "${path.root}/../lambda/dist/lambda.zip"
   monitoring_enabled  = var.monitoring_enabled
   log_retention_days  = var.log_retention_days
+  lambda_execution_boundary = var.lambda_execution_boundary
 }
 
 # Cognito User Data Backup Storage (optional via var.enable_cognito_backup,
