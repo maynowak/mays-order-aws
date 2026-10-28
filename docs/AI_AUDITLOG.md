@@ -260,3 +260,5 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - recovery-checkpoint-strategy → docs/reports/recovery-checkpoint-strategy.md (retroaktiv indexiert)
 - test-strategy → docs/reports/test-strategy.md (retroaktiv indexiert)
 - MAYS-ORDERS-MODULE-DOC-INTEGRATION-01 → docs/reports/MAYS-ORDERS-MODULE-DOC-INTEGRATION-01.md (VERIFIED: Nutzer-Doku für den Modulbau integriert — Week-1..4 byte-identisch nach docs/initialweekcontest/ verschoben, Modul-Testleitfaden gegengeprüft [34 Dateien, MANAGED/EXTERNAL, Negativtest] und 12 Evidenz-Stellen auf Repo-Reports umgestellt, AGENTS.md/README-Referenzen konsistent; keine Funktionsänderung)
+- MAYS-ORDERS-MODULE-IAM-PORTABILITY-AUDIT-01 → docs/reports/MAYS-ORDERS-MODULE-IAM-PORTABILITY-AUDIT-01.md
+- MAYS-ORDERS-MODULE-IAM-PORTABILITY-FIX-01 → docs/reports/MAYS-ORDERS-MODULE-IAM-PORTABILITY-FIX-01.md
