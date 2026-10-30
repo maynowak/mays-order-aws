@@ -190,6 +190,6 @@ Ausgeführte Prüfungen (lokal, nicht destruktiv):
 
 ---
 
-**Audit abgeschlossen am:** 2026-10-22  
-**Auditor:** OpenCode  
+**Audit abgeschlossen am:** 2026-10-22
+**Auditor:** OpenCode
 **Status:** Befund bestätigt, Implementierung ausstehend auf Freigabe
