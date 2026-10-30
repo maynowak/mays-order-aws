@@ -4,25 +4,28 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-10-11)
+## Aktueller Stand (zuletzt aktualisiert: 2026-10-30)
 
 ```text
 May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Release Candidate — v0.5.0-rc.2 (Incident-Aufarbeitung: Collision-Preflight, State-Cleanup, Guide-Update)
+Release Candidate — v0.5.0-rc.3 (MO-Modul-Integration + RIS)
 
 Current Feature:
-Privacy Capability intern, Installer Härtung, Release Candidate Dokumentation
+MO-RC3-P00-BASELINE & MO-RC3-P01-MERGE-READINESS
 
 Current Task:
-MAYS-ORDERS-RC-DOCUMENTATION-FINAL-REVIEW-01 — Produkt- und Installer-Dokumentation technisch prüfen und konsistent veröffentlichen
+MO-RC3-P01-MERGE-READINESS — Merge-Readiness-Analyse zwischen main und feature/mo-module-contract-ris-dev2-2026
 
 Hinweis Release Candidate:
-v0.5.0-rc.2, Tag auf Release-Commit (inkl. Doku), Baseline adddca8. Kollisions-Incident aufgearbeitet: unser mays-orders-Backup-Stack-Rest (20 Ressourcen) kontrolliert abgebaut, RIS-Installation unangetastet, Collision-Preflight + --guide im Installer. Vorgänger v0.5.0-rc.1 → f6e737b unverändert. Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
-T011-10 — DynamoDB Demo-Seed Finalisierung COMPLETE (50 Demo-Orders, version/isTestData, seed_example_data opt-in; Report docs/reports/DYNAMODB-SEED-DEMO-50.md)
-T011-07 — terraform validate + plan (Review) COMPLETE (Plan: 16 to add, 0 to change, 0 to destroy — Klassifikation A: EXPECTED/CLEAN)
+v0.5.0-rc.3 wird vorbereitet. Integrationsbranch feature/mo-module-contract-ris-dev2-2026 enthält MO-RIS-Integration. Vorgänger v0.5.0-rc.2 → 5bdde18 unverändert. Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
+
+RC.3 Integration Branch Status:
+✅ P00 Git-Baseline abgeschlossen (docs/reports/MO-RC3-P00-BASELINE.md)
+✅ P01 Merge-Readiness abgeschlossen (docs/reports/MO-RC3-P01-MERGE-READINESS.md)
+🟡 Warte auf menschliche Freigabe für Merge nach main.
 
 Current Checkpoint:
 feature/t011-11-cloudwatch-monitoring (T011-11 — CloudWatch Monitoring as Code; kein apply)
