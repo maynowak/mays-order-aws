@@ -64,8 +64,8 @@ der Chatverlauf ist keine Recovery-Quelle.
 
 ## AUDIT LOG INDEX
 
-Current Branch: feature/mo-module-contract-ris-dev2-2026
-Latest HEAD: 640f4f0 (chore: format terraform/main.tf - align whitespace in sqs_worker module config)
+Current Branch: main
+Latest HEAD: c5c5b87 (fix: remove trailing whitespace from MO-RC3 documentation files)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -276,3 +276,5 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC-READINESS-CONSOLIDATED-2026-10 → docs/reports/MO-RC-READINESS-CONSOLIDATED-2026-10.md
 - MO-RC3-P00-BASELINE → docs/reports/MO-RC3-P00-BASELINE.md (P00 Git-Baseline für RC.3 Release Preparation)
 - MO-RC3-P01-MERGE-READINESS → docs/reports/MO-RC3-P01-MERGE-READINESS.md (P01 Merge-Readiness-Analyse)
+- MO-RC3-P02-MERGE-DONE → docs/reports/MO-RC3-P02-MERGE-RESULT.md (P02 Merge completed to main)
+- MO-RC3-P00-P01-AUDIT-EXECUTION-LOG → docs/reports/MO-RC3-P00-P01-AUDIT-EXECUTION-LOG.md
