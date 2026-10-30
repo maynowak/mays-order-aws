@@ -193,16 +193,16 @@ module "sqs" {
 # SQS Worker Lambda - processes messages from SQS queue
 # This module will be imported to manage existing AWS resources
 module "sqs_worker" {
-  source              = "./modules/sqs-worker"
-  project_name        = var.project_name
-  tags                = var.tags
-  sqs_queue_arn       = module.sqs.queue_arn
-  sqs_queue_name      = module.sqs.queue_name
-  dynamodb_table_name = module.dynamodb.table_name
-  dynamodb_table_arn  = module.dynamodb.table_arn
-  filename            = "${path.root}/../lambda/dist/lambda.zip"
-  monitoring_enabled  = var.monitoring_enabled
-  log_retention_days  = var.log_retention_days
+  source                    = "./modules/sqs-worker"
+  project_name              = var.project_name
+  tags                      = var.tags
+  sqs_queue_arn             = module.sqs.queue_arn
+  sqs_queue_name            = module.sqs.queue_name
+  dynamodb_table_name       = module.dynamodb.table_name
+  dynamodb_table_arn        = module.dynamodb.table_arn
+  filename                  = "${path.root}/../lambda/dist/lambda.zip"
+  monitoring_enabled        = var.monitoring_enabled
+  log_retention_days        = var.log_retention_days
   lambda_execution_boundary = var.lambda_execution_boundary
 }
 
