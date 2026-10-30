@@ -64,8 +64,8 @@ der Chatverlauf ist keine Recovery-Quelle.
 
 ## AUDIT LOG INDEX
 
-Current Branch: main
-Latest HEAD: 5bdde18 (CONSISTENCY-SCAN; aktueller Stand via `git log -1`)
+Current Branch: feature/mo-module-contract-ris-dev2-2026
+Latest HEAD: 640f4f0 (chore: format terraform/main.tf - align whitespace in sqs_worker module config)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -135,7 +135,12 @@ The following tasks have been completed with reports in docs/reports/:
 
 - MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01.md (VERIFIED: totes --no-policy-check [nur Installer plan-Subparser, nie konsumiert, keine Aufrufer — RIS-Treffer = gepinnter Clone] entfernt, Policy-Gate unverändert bedingungslos; B3 minimal = FUNCTIONALLY COVERED / NO SEPARATE PRESET [--modules+--with-deps + orders-service-Modul]; 87/87 Builder + 129/129 Installer + 76/76 Lambda, Modul+Wrapper live validate PASS)
 
-Overall Status: YELLOW - RC v0.5.0-rc.2 vorbereitet (GitHub-Release manuell offen); Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); OPEN: Queue-Policy-Härtung (Principal=*, RIS-Live-Pfad, freigabepflichtig), Boundary-IaC, optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); RIS-Composite-Test-Reste in OUR Backend (Aufräumung offen); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
+Overall Status: YELLOW - RC v0.5.0-rc.2 vorbereitet (GitHub-Release manuell offen); RC.3 Preparation in progress (P00 BASELINE, P01 MERGE-READINESS); Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); OPEN: Queue-Policy-Härtung (Principal=*, RIS-Live-Pfad, freigabepflichtig), Boundary-IaC, optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); RIS-Composite-Test-Reste in OUR Backend (Aufräumung offen); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
+
+## MO-RC3 Progress
+
+- MO-RC3-P00-BASELINE: COMPLETE - Git-Baseline geprüft und dokumentiert
+- MO-RC3-P01-MERGE-READINESS: COMPLETE - Merge-Readiness analysiert, keine Konflikte, alle Tests bestanden
 
 ==================================================
 
@@ -269,3 +274,5 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-CONSUMER-HANDOFF-01 → docs/reports/MO-CONSUMER-HANDOFF-01.md
 - MO-RC-READINESS-DECISION-01 → docs/reports/MO-RC-READINESS-DECISION-01.md
 - MO-RC-READINESS-CONSOLIDATED-2026-10 → docs/reports/MO-RC-READINESS-CONSOLIDATED-2026-10.md
+- MO-RC3-P00-BASELINE → docs/reports/MO-RC3-P00-BASELINE.md (P00 Git-Baseline für RC.3 Release Preparation)
+- MO-RC3-P01-MERGE-READINESS → docs/reports/MO-RC3-P01-MERGE-READINESS.md (P01 Merge-Readiness-Analyse)
