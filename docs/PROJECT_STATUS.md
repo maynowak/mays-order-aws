@@ -4,28 +4,36 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-10-30)
+## Aktueller Stand (zuletzt aktualisiert: 2026-10-31)
 
 ```text
 May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Release Candidate — v0.5.0-rc.3 (MO-Modul-Integration + RIS)
+Release Candidate — v0.5.0-rc.3 (MO-Modul-Integration + RIS) — GO fuer RC
 
 Current Feature:
-MO-RC3-P00-BASELINE & MO-RC3-P01-MERGE-READINESS
+MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC3-P01-MERGE-READINESS — Merge-Readiness-Analyse zwischen main und feature/mo-module-contract-ris-dev2-2026
+MO-RC3-P06 — RIS-E2E-Evidence verifiziert (Builder-Pin 1dbb0cb code-identisch zu 8b61922)
 
 Hinweis Release Candidate:
-v0.5.0-rc.3 wird vorbereitet. Integrationsbranch feature/mo-module-contract-ris-dev2-2026 enthält MO-RIS-Integration. Vorgänger v0.5.0-rc.2 → 5bdde18 unverändert. Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
+v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
+1dbb0cb den vollen Lifecycle bestanden (Plan 169 add, Apply, No-Op, 7 Live-Tests inkl.
+SQS->Worker->DDB PENDING->CONFIRMED, Destroy, CLEAN; Account 262370457690).
+Delta zu 8b61922: nur Whitespace in terraform/main.tf plus Docs (git diff -w leer).
+Vorgaenger v0.5.0-rc.2 -> 5bdde18 unveraendert. Tag/GitHub-Release nur noch menschlich.
+Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
 
-RC.3 Integration Branch Status:
-✅ P00 Git-Baseline abgeschlossen (docs/reports/MO-RC3-P00-BASELINE.md)
-✅ P01 Merge-Readiness abgeschlossen (docs/reports/MO-RC3-P01-MERGE-READINESS.md)
-🟡 Warte auf menschliche Freigabe für Merge nach main.
+RC.3 Status:
+[x] P00 Git-Baseline, P01 Merge-Readiness, P02 Merge nach main
+[x] P03 Release-Baseline / Builder-Inventar / Gate-Matrix
+[x] P04 Builder-Verifikation (90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS)
+[x] P05/P06 RIS-Evidence: F-03 RESOLVED, IAM-Portabilitaet im Fremdkonto belegt
+[ ] Tag v0.5.0-rc.3 + GitHub-Release: wartet auf menschliche Freigabe
+[!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
 feature/t011-11-cloudwatch-monitoring (T011-11 — CloudWatch Monitoring as Code; kein apply)

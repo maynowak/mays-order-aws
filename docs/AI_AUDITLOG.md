@@ -65,7 +65,7 @@ der Chatverlauf ist keine Recovery-Quelle.
 ## AUDIT LOG INDEX
 
 Current Branch: main
-Latest HEAD: c5c5b87 (fix: remove trailing whitespace from MO-RC3 documentation files)
+Latest HEAD: siehe `git log -1` (RC.3-Basis vor diesem Doku-Commit: `8b61922`)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -135,12 +135,17 @@ The following tasks have been completed with reports in docs/reports/:
 
 - MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01.md (VERIFIED: totes --no-policy-check [nur Installer plan-Subparser, nie konsumiert, keine Aufrufer — RIS-Treffer = gepinnter Clone] entfernt, Policy-Gate unverändert bedingungslos; B3 minimal = FUNCTIONALLY COVERED / NO SEPARATE PRESET [--modules+--with-deps + orders-service-Modul]; 87/87 Builder + 129/129 Installer + 76/76 Lambda, Modul+Wrapper live validate PASS)
 
-Overall Status: YELLOW - RC v0.5.0-rc.2 vorbereitet (GitHub-Release manuell offen); RC.3 Preparation in progress (P00 BASELINE, P01 MERGE-READINESS); Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); OPEN: Queue-Policy-Härtung (Principal=*, RIS-Live-Pfad, freigabepflichtig), Boundary-IaC, optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); RIS-Composite-Test-Reste in OUR Backend (Aufräumung offen); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
+Overall Status: YELLOW→GREEN (RC) - RC v0.5.0-rc.3 **GO** (RIS-AWS-E2E verifiziert, Tag/GitHub-Release nur noch menschlich); v0.5.0-rc.2 veröffentlicht; Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); RESOLVED: Queue-Policy-Härtung (F-03 Wildcard entfernt, im RIS-E2E bestätigt), IAM-Portabilität (FIX-01/02, Installation in Fremdkonto gelungen); OFFEN: Boundary-Explizitsetzung (F-01, Consumer-Verantwortung), optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
 
 ## MO-RC3 Progress
 
 - MO-RC3-P00-BASELINE: COMPLETE - Git-Baseline geprüft und dokumentiert
 - MO-RC3-P01-MERGE-READINESS: COMPLETE - Merge-Readiness analysiert, keine Konflikte, alle Tests bestanden
+- MO-RC3-P02-MERGE: COMPLETE - Integrationsbranch nach `main` gemerged, Branch erhalten
+- MO-RC3-P03-RELEASE-BASELINE: COMPLETE - Baseline, Builder-Inventar, Gate-Matrix dokumentiert
+- MO-RC3-P04-MODULE-BUILDER-VERIFICATION: COMPLETE - 90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS
+- MO-RC3-P05-RIS-EVIDENCE: COMPLETE (Nachtrag 2026-10-31: RIS-Repo read-only ausgewertet)
+- MO-RC3-P06-RIS-E2E: **VERIFIED** — RIS-MO-RC-01 (2026-10-30) Full-Lifecycle in Account 262370457690 auf Builder-Pin `1dbb0cb`; Delta zu `8b61922` nur Whitespace (`git diff -w` leer) → RC.3 = **GO**, Produktion **BLOCKED** (Privacy)
 
 ==================================================
 
@@ -278,3 +283,10 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC3-P01-MERGE-READINESS → docs/reports/MO-RC3-P01-MERGE-READINESS.md (P01 Merge-Readiness-Analyse)
 - MO-RC3-P02-MERGE-DONE → docs/reports/MO-RC3-P02-MERGE-RESULT.md (P02 Merge completed to main)
 - MO-RC3-P00-P01-AUDIT-EXECUTION-LOG → docs/reports/MO-RC3-P00-P01-AUDIT-EXECUTION-LOG.md
+- MO-RC3-P03-RELEASE-BASELINE → docs/reports/MO-RC3-P03-RELEASE-BASELINE.md
+- MO-RC3-P03-MODULE-BUILDER-INVENTORY → docs/reports/MO-RC3-P03-MODULE-BUILDER-INVENTORY.md
+- MO-RC3-P03-RELEASE-GATES → docs/reports/MO-RC3-P03-RELEASE-GATES.md
+- MO-RC3-P04-MODULE-BUILDER-VERIFICATION → docs/reports/MO-RC3-P04-MODULE-BUILDER-VERIFICATION.md
+- MO-RC3-P05-RIS-INTEGRATION-EVIDENCE → docs/reports/MO-RC3-P05-RIS-INTEGRATION-EVIDENCE.md
+- MO-RC3-P06-RIS-E2E-EVIDENCE-VERIFICATION → docs/reports/MO-RC3-P06-RIS-E2E-EVIDENCE-VERIFICATION.md (Rev. 2: RIS-Repo read-only geprüft; Builder-Pin `1dbb0cb` code-identisch zu RC.3; RIS-MO-RC-01 Full-Lifecycle E2E PASS → RC GO)
+- RIS-RC3-E2E-TEST-PREPARATION → docs/reports/RIS-RC3-E2E-TEST-PREPARATION.md (Rev. 2: kein neuer E2E vor RC.3 erforderlich)

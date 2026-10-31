@@ -2,187 +2,147 @@
 
 **RIS E2E Evidence Verification für MO-RC3**
 
-**Datum:** 2026-10-31
-**MO Commit:** `0b4f7ca79e21eaa6f5bed90927d768ea543c21df`
-**MO HEAD:** `main` (nach Merge)
+**Datum:** 2026-10-31 (Revision 2 — RIS-Repository geprüft)
+**MO Commit (RC.3-Kandidat):** `8b61922a2d79180ad5b14e51e51e4568b8ad2098` (`main`)
+**RIS Branch:** `feature/mo-module-installer-ris-dev2-2026` @ `73965e3`
 **Ziel:** v0.5.0-rc.3 Release
 
-## 1. RIS Git-Baseline
+## 0. Korrekturhinweis zu Revision 1
 
-### RIS Repository
+Revision 1 (2026-10-31, vormittags) meldete **BLOCKED**, weil das RIS-Repository lokal
+nicht als Git-Repository vorlag. Diese Einschränkung ist **aufgehoben**: Das RIS-Repo
+wurde per `git ls-remote`/`git clone` read-only aus GitHub gelesen
+(Klon nach `/tmp/opencode/ris-readonly`, keine Schreibzugriffe, kein Push, keine
+Änderung am RIS-Repo und keinerlei AWS-Aufruf).
 
-| Feld | Wert |
-|------|------|
-| Repository | `maynowak/Mays-Recruiting-Intelligence-System` |
-| Status | **NICHT LOKAL ZUGÄSSLICH** |
-| Relevante Branch | `feature/mo-module-installer-ris-dev2-2026` (laut MO-Bericht) |
-| Consumer Pin | Nicht lokal verfügbar |
-| Builder-Version | Nicht lokal verfügbar |
+Damit liegen erstmals die **tatsächlichen** RIS-Pins und die **tatsächliche**
+AWS-E2E-Evidence vor. Revision 1 bleibt als Zeitdokument in der Git-Historie erhalten.
 
-### Limitation
-
-⚠️ **WICHTIG:** Das RIS-Repository ist in der lokalen Umgebung nicht verfügbar.
-Alle Angaben basieren auf MO-Dokumentation und historischen Reports.
-
-## 2. MO Consumer Pin
+## 1. RIS Git-Baseline (VERIFIED)
 
 | Feld | Wert |
 |------|------|
-| Report | `docs/reports/MO-CONSUMER-HANDOFF-01.md` |
-| Erstellt | 2026-10-28 |
-| Commit-Bezug | Integration branch `feature/mo-module-contract-ris-dev2-2026` |
-| Builder-Format | Preset `orders-service` |
-| Module | api, cognito, dynamodb, iam, lambda, sqs, sqs_worker (7 Module) |
+| Repository | `maynowak/Mays-Recruiting-Intelligence-System` (public, read-only gelesen) |
+| Relevanter Branch | `feature/mo-module-installer-ris-dev2-2026` |
+| Remote-HEAD dieses Branches | `73965e3964ec86fe265a0cce5670e58bf77ceacf` — "docs: consolidate RIS-MO findings for main merge" |
+| `main` | `c49eb2b37ab3d629eeee224084045a9659c59705` |
+| weiterer Branch | `feature/integration` @ `a3bae15b822e3d6e196c0f7acd667954d883d213` |
+| Zugriffsart | read-only (`git ls-remote`, `git clone --depth 1 -b <branch>` nach `/tmp`) |
 
-## 3. Historische AWS-E2E Testmatrix
+## 2. Consumer-Pins (VERIFIED)
 
-Basierend auf RIS-Handoff-Report (2026-10-16) und MO-Dokumentation:
+Es existieren **zwei** Pins im RIS-Repo:
 
-| Test | Datum | Ergebnis | MO-Commit (laut Report) | Status |
-|------|-------|----------|-------------------------|--------|
-| Terraform Plan | 2026-10-01 | ✅ PASS | `9c61237` (RIS Pin) | REPORTED |
-| Terraform Apply | 2026-10-01 | ✅ PASS | `9c61237` | REPORTED |
-| SQS → Worker | 2026-10-01 | ✅ PASS | `9c61237` | REPORTED |
-| DynamoDB Update | 2026-10-01 | ✅ PASS | `9c61237` | REPORTED |
-| Status PENDING → CONFIRMED | 2026-10-01 | ✅ PASS | `9c61237` | REPORTED |
-| Terraform No-Op | Nach Apply | ✅ PASS | `9c61237` | REPORTED |
-| Terraform Destroy | Nach No-Op | ✅ PASS | `9c61237` | REPORTED |
-| Ressourcenbereinigung | 2026-10-13 | ✅ PASS | `v0.5.0-rc.2` | REPORTED |
+| Pin-Datei | Commit | Bedeutung |
+|---|---|---|
+| `installer/mays-orders-builder.pinned.json` | **`1dbb0cb4e6cc019bc5b03f92e5ffb368a7bdb88d`** | Builder-Quelle für den Module-Builder-Weg (maßgeblich für die MO-Integration) |
+| `installer/mays-orders-clone.pinned.json` | `5cf50a0a8e4221348c264c59432ff4c8dc580c8b` | Legacy-Composite-Clone (v0.5.0-rc.2 prep), von `0x` abgelöst |
 
-### RIS Installation Details (laut Handoff-Report)
+`1dbb0cb` ist der MO-Commit *"docs(lambda): correct zip size in artefact readiness report"*
+und liegt **in** der RC.3-Historie (siehe §4).
 
-- **MO-Installation:** Vollständiger MO-Stack (45 Terraform-Blöcke)
-- **State:** Lokaler State, Serial 129, Lineage `945c0b35…`
-- **Produktiv:** Aktiv über GATE-6 (SQS → Worker → Orders-Function)
-- **API:** `mays-orders-api`/`vmmqrwcb26`
-- **Cognito Pool:** `eu-central-1_ENMwxNFS9` (`mays-orders-users`)
-- **DynamoDB:** `mays-orders`
-- **Lambda:** `mays-orders-handler`/`-sqs-worker`
-- **SQS:** `mays-orders-orders-queue`
+## 3. AWS-E2E-Evidence (VERIFIED AWS E2E)
 
-## 4. MO-Commit Delta-Vergleich
+Quelle: `docs/reports/RIS-MO-RC-01-CONSUMER-ACCEPTANCE.md` (2026-10-30) +
+`docs/reports/evidence/RIS-MO-RC-01-2026/*`.
 
-### Historischer RIS-Commit
-- **Commit:** `9c61237` (laut Handoff-Report)
-- **Branch:** RIS PIN Branch
+| Test | Ergebnis | Evidence |
+|---|---|---|
+| Preflight (STS, Region, Backend, leerer State) | PASS — Account `262370457690`, Region `eu-central-1`, Workspace `ris-dev2` | `02-aws-identity.json` |
+| `terraform init` (Backend S3 + DDB-Lock) | Exit 0 — 21 Module, aws 6.67.0 | `04-terraform-pipeline.txt [1]` |
+| `terraform plan` | Exit 0 — **169 add, 0 change, 0 destroy**, kein `must be replaced` | `plan-ris-dev2.txt` |
+| `terraform apply` | Exit 0 (183 Ressourcen im State) | `04-terraform-pipeline.txt [4]` |
+| Post-Deploy No-Op | Exit 0 — "No changes. Your infrastructure matches the configuration." | `04-terraform-pipeline.txt [6]` |
+| Live-Tests T-01…T-07 | 7 PASS (Cognito-Pool, 401-Enforcement, Handler, Reader, 12 DDB-Tabellen, 6 SQS-Queues, Worker-Roundtrip) | `06-live-tests.txt` |
+| **SQS → Worker → DynamoDB** | **PASS** — `PENDING → CONFIRMED`, Queue danach leer | `08-live-roundtrip.txt` |
+| `terraform destroy` | Exit 0 (nach Bereinigung eigener Restbestände) | `04-terraform-pipeline.txt [8]` |
+| Ressourcenbereinigung | CLEAN — 0 Laufzeitressourcen; nur Backend (S3 `ris-dev2-tf-state-dev`, DDB `ris-dev2-tf-lock`) erhalten | `05-aws-cleanup-verification.txt`, `09-cleanup-roundtrip.txt` |
 
-### Aktueller MO-Commit
-- **Commit:** `0b4f7ca` (main, RC.3-Kandidat)
-- **Branch:** `main` (nach 8ae0319 Merge)
+**Aussagegrenzen (aus dem RIS-Report übernommen):**
+- `04-…txt` und `06-…txt` sind Konsolen-Rekonstruktionen der Sitzung mit Exit-Codes;
+  als frische Artefakte gelten `03-…`, `05-…`, `08-…`, `09-…` sowie `plan-ris-dev2.txt`.
+- Testaccount ist `262370457690` (**nicht** der geteilte Account `240571105849`).
+- Kein AWS-Aufruf wurde von MO-Seite durchgeführt.
 
-### Unterschiede
+## 4. MO-Delta-Vergleich: getesteter Pin ↔ RC.3-Kandidat (VERIFIED LOCAL)
 
-| Komponente | `9c61237` | `0b4f7ca` | Impact |
-|------------|-----------|-----------|--------|
-| Module Builder | v0.5.0-rc.1 Basis | v0.5.0-rc.3 | ✅ NEU: IAM-FIX-01/02 |
-| SQS Policy | Wildcard-Principal | Keine Policy | ✅ SECURITY FIX |
-| IAM-Poolabilität | Hartcodierte Account-IDs | null Defaults | ✅ PORTABILITY FIX |
-| Lambda Artefakte | vorhanden | reproduzierbar | ✅ MANIFEST |
-| Builder Tests | 76/76 | 90/90 | ✅ erweitert |
-| Collision-Preflight | vorhanden | erweitert | ✅ verbessert |
+| Feld | Wert |
+|---|---|
+| RIS-getesteter Builder-Pin | `1dbb0cb` |
+| RC.3-Kandidat | `8b61922` (`main`) |
+| Vorfahrenschaft | `git merge-base --is-ancestor 1dbb0cb main` → **OK** |
+| Code-Delta `1dbb0cb..main` (terraform/, lambda/, module_builder/, installer/, scripts/) | **nur `terraform/main.tf`, 10+/10−** |
+| Delta mit `git diff -w` (Whitespace ignoriert) | **leer** → rein kosmetische Ausrichtung im `sqs_worker`-Block |
+| Übrige Delta-Dateien | ausschließlich `docs/` (RC.3-Berichte) |
 
-## 5. Security-Fix-Abdeckung
+**Bewertung:** Der RIS-AWS-E2E-Lauf hat **funktional denselben Code** geprüft, der
+RC.3 ausliefert. Unterschied ist eine Whitespace-Formatierung in `main.tf` plus
+Dokumentation — keine Verhaltensänderung an Modulen, IAM, SQS, Lambda oder Builder-Logik.
 
-| Security Fix | Implementiert | Im RIS-Test enthalten? | Status |
-|--------------|---------------|------------------------|--------|
-| SQS Wildcard Policy (F-03) | ✅ `a2fb385` | ⚠️ NICHT BELEGT | **NEU** |
-| IAM Hardcoded Account | ✅ `f3e78d0` | ⚠️ NICHT BELEGT | **NEU** |
-| IAM Portabilität | ✅ `a46b189` | ⚠️ NICHT BELEGT | **NEU** |
-| Lambda SHA256 Manifest | ✅ `c1dcca2` | ⚠️ NICHT BELEGT | **NEU** |
+## 5. Security-Fix-Abdeckung (VERIFIED)
 
-⚠️ **KRITISCH:** Die Sicherheitsfixes (F-03, IAM-PORTABILITÄT) wurden **nach** dem letzten bekannten RIS-E2E-Test implementiert.
+| Fix | Commit | Im getesteten Pin `1dbb0cb` enthalten? | Nachweis |
+|---|---|---|---|
+| SQS Wildcard-Policy entfernt (F-03) | `a2fb385` | **JA** | `git show 1dbb0cb:terraform/modules/sqs/main.tf` → **keine** `aws_sqs_queue_policy`, kein `Principal`-Statement; RIS-Report: F-03 **RESOLVED (MO-Vertrag)** |
+| Plan-stabiles SQS-Gate (GAP-06) | `9627eb2` | **JA** | `count = var.sqs_enabled ? 1 : 0`, `resources = [var.sqs_queue_arn]` |
+| IAM-Portabilität (FIX-01/02) | `a46b189`, `f3e78d0` | **JA** | `lambda_execution_boundary` → `default = null`; Installation in fremdem Account `262370457690` erfolgreich |
 
-## 6. Fehlende Evidence
+**Praxisbeleg für Portabilität:** Die Installation lief in einem Account, der **nicht**
+der Quelle der Defaults entspricht — die früher kritisierte kontospezifische Boundary
+ist im gepinnten Stand nicht mehr als Default aktiv (F-01 dadurch entschärft; ein
+explizit gesetzter Fremd-ARN bleibt Verantwortung des Consumers).
 
-| Evidence-Typ | Status | Grund |
-|--------------|--------|-------|
-| RIS Branch HEAD | ⚠️ NICHT ZUGÄSSLICH | RIS-Repo nicht lokal |
-| RIS Consumer Pin | ⚠️ NICHT ZUGÄSSLICH | RIS-Repo nicht lokal |
-| Aktueller MO Build | ✅ VERIFIZIERT | 90/90 Builder Tests |
-| AWS-E2E mit aktuellem MO | ⚠️ NICHT AUSGEFÜHRT | Keine AWS-Credentials |
-| SQS F-03 Regression | ⚠️ NICHT GETESTET | Policy entfernt nach letztem E2E |
-| IAM-FIX Regression | ⚠️ NICHT GETESTET | Fix nach letztem E2E |
+## 6. Lokaler Gegencheck des RC.3-Generators (VERIFIED LOCAL)
 
-## 7. E2E-Entscheidung
+Aus dem RC.3-Stand `8b61922` generiert (`--preset orders-service`,
+`project_name=ris-dev2-mays-orders`), Ziel `/tmp/opencode/rc3-module`, kein AWS:
 
-### Option B — Gezielter zusätzlicher AWS-E2E-Test erforderlich
+| Prüfung | Ergebnis |
+|---|---|
+| Build | OK (35 Dateien inkl. Manifest) |
+| `terraform init -backend=false` | Exit 0 |
+| `terraform validate` | `Success! The configuration is valid.` |
+| `terraform fmt -check -recursive` | Exit 0 (formatiert) |
+| Wildcard-Policy im generierten Modul | keine (`Principal` nur im Kommentar) |
+| `lambda_execution_boundary` | `default = null` |
+| SQS-Gate im Root | `sqs_enabled = true` verdrahtet |
 
-**Begründung:**
+## 7. Offene Findings
 
-1. **Sicherheitsfixes nicht in E2E getestet:**
-   - SQS Wildcard-Policy wurde entfernt (`a2fb385`)
-   - IAM Portabilität verbessert (`f3e78d0`, `a46b189`)
+| ID | Finding | Status | RC-Auswirkung |
+|---|---|---|---|
+| F-01 | IAM-Boundary: explizit gesetzter Konto-ARN ist nicht cross-account-portabel (Default jetzt `null`) | **OPEN** (dokumentiert, Consumer-Verantwortung) | keiner für RC |
+| F-03 | SQS-Wildcard-Policy | **RESOLVED** im MO-Vertrag | keiner |
+| N-RC-01 | Platzhalter-Lambda-ZIPs im RIS-Build (`ImportModuleError`) — RIS-seitiges Bundle-Handling, nicht MO | **RESOLVED** (RIS) | keiner |
+| N-RC-02…04 | CLI-Timeouts → verwaiste State-Locks; doppelte CloudFront-Distributionen; `BucketNotEmpty` beim Destroy | **RESOLVED / DOKUMENTIERT** (RIS-Prozess) | keiner |
+| — | E2E lief in Testaccount `262370457690`, nicht im geteilten Konto | **DOKUMENTIERT** | kein RC-Blocker (Account-Portabilität ist gerade der Punkt) |
+| — | Privacy-Produktivbetrieb | **BLOCKED** (Secret-Management) | blockiert nur Produktion, nicht RC |
 
-2. **Builder-Updates:**
-   - 90/90 Builder-Tests bestanden
-   - Neue Variablen (`external_cognito`, `sqs_enabled`)
+## 8. E2E-Entscheidung
 
-3. **Producer-Schutz:**
-   - RIS Producer darf MO-Tabelle nicht schreiben
-   - Nur über SQS → Worker → DynamoDB Lesepfad erlaubt
+| Option | Bewertung |
+|---|---|
+| A — vorhandene Nachweise reichen für den RC aus | **JA** (Code-Identität nach §4, Security-Fixes nach §5, Full-Lifecycle nach §3) |
+| B — gezielter zusätzlicher AWS-E2E erforderlich | **NEIN** für RC.3; sinnvoll erst vor Produktionsfreigabe / bei Änderung der Pin-Differenz |
+| C — konkrete Inkompatibilität | **keine bekannt** |
 
-### Testumfang (vorschlag)
+## 9. RC-Readiness
 
-| Test | Ressource | Schätzung |
-|------|-----------|-----------|
-| Lambda Deploy | 1 Lambda | 2-3 Min |
-| API Gateway Deploy | 1 HTTP API | 3-5 Min |
-| SQS Queue | 1 Queue | <1 Min |
-| Worker Lambda | 1 Lambda | 2-3 Min |
-| DynamoDB Tables | 3-4 Tabellen | <1 Min |
-| IAM Roles | 2 Rollen | <1 Min |
-| Collision Check | Preflight | <1 Min |
+| Dimension | Entscheidung |
+|---|---|
+| **RC.3-Veröffentlichung** (nicht produktionsfreigegeben) | **GO** |
+| **RIS-Integration des aktuellen Builders** | **GO** — Pin `1dbb0cb` code-identisch zu `8b61922` |
+| **Produktionsfreigabe** | **BLOCKED** — Privacy/Secret-Management offen; F-01 als Betriebsfrage; RC-E2E lief im Testaccount |
 
-**Gesamtkosten:** Minimal (On-Demand, leicht belegt)
-
-**Sichere Bereinigung:**
-- `terraform destroy` mit Plan-Isolation
-- State-Backup vorher
-- Keine fremden Ressourcen betreffen
-
-## 8. Empfehlung für RC.3
-
-**Status: CONDITIONAL**
-
-### Für RC - VOR DEM TAG:
-
-1. ⚠️ **RIS-Team muss:**
-   - `feature/mo-module-installer-ris-dev2-2026` lokal prüfen
-   - **Neuen AWS-E2E mit aktuellem MO-Commit (`0b4f7ca`) durchführen**
-   - SQS-Worker-Verarbeitung bestätigen
-   - Status-Übergänge testen
-
-2. ⚠️ **Spezifische Tests erforderlich:**
-   - SQS Policy Fix (keine Wildcard)
-   - IAM-Portabilität
-   - Lambda Artefakt-Integrität
-
-### FÜR PRODUKTIONSFREIGABE:
-
-- ❌ Privacy Production bleibt BLOCKED
-- ❌ Secret-Management fehlt
-
-## 9. Fazit
-
-| Aspekt | Bewertung |
-|--------|-----------|
-| Lokale Validierung | ✅ COMPLETE |
-| Historische E2E | ⚠️ VERALTN (v0.5.0-rc.2 Stand) |
-| Aktuelle E2E | ❌ NICHT DURCHGEFÜHRT |
-| Sicherheitsfixes | ⚠️ NICHT IN E2E |
-| RC.3 bereit? | **CONDITIONAL** |
-
-**Empfehlung:** STOP vor Tag-Erstellung. RIS-Team muss neuen E2E bestätigen.
+**Empfehlung für P07:** Tag `v0.5.0-rc.3` auf `8b61922` (menschliche Freigabe),
+Release-Notes mit Verweis auf RIS-MO-RC-01; optional RIS-Pin von `1dbb0cb` auf
+`8b61922` nachziehen (kosmetisch, kein Retest erforderlich).
 
 ---
 
-**STOP nach P06.**  
-Keine AWS-Operationen durchführen. Warte auf RIS-Bestätigung.
-
-**Nächste Schritte:**
-1. RIS-Team: `git checkout feature/mo-module-installer-ris-dev2-2026`
-2. RIS-Team: `terraform init && terraform plan`
-3. RIS-Team: Provider- und Projekt-Namen prüfen
-4. RIS-Team: `terraform apply` (falls Plan OK)
-5. RIS-Team: SQS → Worker → DynamoDB E2E testen
-6. RIS-Team: Bestätigung an MO-Team
+**Evidence-Quellen (alle read-only):**
+- RIS: `docs/reports/RIS-MO-RC-01-CONSUMER-ACCEPTANCE.md`,
+  `docs/reports/evidence/RIS-MO-RC-01-2026/*`, `installer/mays-orders{,-builder}-clone.pinned.json`,
+  `docs/reports/MO-RIS-DEV2-{S03,S05,P09}-*.md`
+- MO: `git diff -w 1dbb0cb..main`, `git show 1dbb0cb:terraform/...`,
+  lokaler Generator-Lauf `/tmp/opencode/rc3-module`

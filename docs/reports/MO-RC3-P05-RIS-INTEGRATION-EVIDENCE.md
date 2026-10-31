@@ -203,3 +203,19 @@ python -m module_builder build --target <path> --project-name <name> --preset or
 
 **Empfehlung:**  
 MO ist bereit für RC.3. Die RIS-Integration muss vom RIS-Team verifiziert werden. Keine weiteren MO-Änderungen erforderlich.
+
+---
+
+## 10. Nachtrag (2026-10-31) — RIS-Repo zugänglich, Lücken geschlossen
+
+Dieser Bericht basierte auf „RIS-Repo nicht lokal verfügbar". Das RIS-Repo wurde
+read-only aus GitHub gelesen; die offenen Punkte sind damit beantwortet:
+
+| Zuvor „NOT ACCESSIBLE" | Jetzt belegt |
+|---|---|
+| RIS Branch/HEAD | `feature/mo-module-installer-ris-dev2-2026` @ `73965e3` |
+| RIS Consumer Pin | Builder-Pin `1dbb0cb` (= RC.3-Code, nur Whitespace-Delta), Legacy-Composite `5cf50a0` |
+| RIS AWS-E2E | `RIS-MO-RC-01-CONSUMER-ACCEPTANCE.md` (2026-10-30): Plan 169 add → Apply → No-Op → 7/7 Live-Tests inkl. SQS→Worker→DDB → Destroy → CLEAN |
+
+Details und Bewertung: `docs/reports/MO-RC3-P06-RIS-E2E-EVIDENCE-VERIFICATION.md`
+(Revision 2). Ergebnis: RC.3 = **GO**; Produktionsfreigabe bleibt **BLOCKED**.
