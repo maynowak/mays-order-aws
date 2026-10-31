@@ -2,6 +2,42 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-10-31 — Release Candidate v0.5.0-rc.3 (MO-RC3-P07-P08 — Module Builder & RIS Integration)
+
+### Release
+- Packaging abgeschlossen: Dossier `docs/release/RELEASE-v0.5.0-rc.3.md` + PDF,
+  Gate-Report `docs/release/RELEASE-GATES-v0.5.0-rc.3.md`, Release Notes, Changelog
+- **Kein** Tag und **kein** GitHub-Release in P07/P08 (menschliche Freigabe P09)
+- Vorgaenger `v0.5.0-rc.2` → `5cf50a0` unveraendert; `v0.5.0-rc.1` → `f6e737b` unveraendert
+
+### Aenderungen seit rc.2 (49 Commits)
+- `995f912` — **Feature:** Terraform Module Builder Foundation (`complete`, fail-closed,
+  Manifest mit SHA-256, keine Repo-/Backend-Abhaengigkeit)
+- `92be267`, `da80271` — reproduzierbares `cognito_backup.zip`; Policy-Gate in generierten Projekten
+- `c0ac0f1`, `0e0ae71`, `736886a` — `--modules` (B1), `--with-deps` (B2), CLI-Cleanup
+- `5c70374`, `94097e2`, `9ec7f84` — count-gated SQS-Recht, SQS-Wiring-Stripping, Queue-/Worker-Outputs
+- `4f0ab17`, `54de18d` — Orders-Service-Modulvertrag (7 Module); EXTERNAL-Cognito
+- `9627eb2` — GAP-02/06: `sqs_queue_name`-Output + plan-stabiles IAM-SQS-Gate
+- `ccf22a3`, `a46b189`, `f3e78d0` — IAM-Portabilitaet FIX-01/02 (Boundary optional, kein Konto-Default)
+- `a2fb385` — **Security F-03:** SQS-Wildcard-Policy (`Principal = "*"`) entfernt
+- `6fd76e4`, `640f4f0` — Plan-/State-Reste entfernt, `.gitignore` gehaertet, Formatierung
+- RC.3-Serie `686eb39`…`ca1fa16` — Merge nach `main`, Release-Baseline, Builder-Inventar,
+  Gates, RIS-Evidence (P00–P06)
+
+### Verification (2026-10-31)
+- Lambda 76/76 PASS · Module Builder 90/90 PASS · Installer 81/81 PASS
+- `terraform init` 0 · `validate` PASS · `fmt -check` 0
+- Generiertes `orders-service`-Modul: init/validate/fmt PASS
+- RIS-MO-RC-01 (2026-10-30): Plan 169 add → Apply → No-Op → 7/7 Live-Tests
+  (inkl. SQS→Worker→DynamoDB `PENDING→CONFIRMED`) → Destroy → CLEAN
+- Code-Identitaet: `git diff -w 1dbb0cb..main -- <code>` leer
+
+### Known Limitations
+- **Privacy-Produktivbetrieb BLOCKED** (Secret-Management/Rotation offen)
+- IAM-Portabilitaet in einem Testkonto belegt ≠ allgemeine Multi-Account-Produktionsreife
+- F-01 (expliziter Boundary-ARN cross-account), EXTERNAL-Cognito-Nullfelder,
+  RIS-Pin `1dbb0cb` (kosmetisch), Tag/Release menschlich
+
 ## 2026-10-14 — Release Candidate v0.5.0-rc.2 (MAYS-ORDERS-V050-RC2-RELEASE-PREPARATION-01)
 
 ### Release

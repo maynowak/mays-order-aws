@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC3-P06 — RIS-E2E-Evidence verifiziert (Builder-Pin 1dbb0cb code-identisch zu 8b61922)
+MO-RC3-P07-P08 — Release-Packaging v0.5.0-rc.3 abgeschlossen; P09 (Tag/Release) wartet auf Freigabe
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -32,7 +32,8 @@ RC.3 Status:
 [x] P03 Release-Baseline / Builder-Inventar / Gate-Matrix
 [x] P04 Builder-Verifikation (90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS)
 [x] P05/P06 RIS-Evidence: F-03 RESOLVED, IAM-Portabilitaet im Fremdkonto belegt
-[ ] Tag v0.5.0-rc.3 + GitHub-Release: wartet auf menschliche Freigabe
+[x] P07/P08 Packaging: Dossier (MD+PDF, 5 S. A4), Release Notes, Changelog, Gate-Report
+[ ] Tag v0.5.0-rc.3 + GitHub-Release: wartet auf menschliche Freigabe (P09)
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:

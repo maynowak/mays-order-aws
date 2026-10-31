@@ -135,7 +135,7 @@ The following tasks have been completed with reports in docs/reports/:
 
 - MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01 → docs/reports/MAYS-ORDERS-MODULE-BUILDER-CLI-CLEANUP-01.md (VERIFIED: totes --no-policy-check [nur Installer plan-Subparser, nie konsumiert, keine Aufrufer — RIS-Treffer = gepinnter Clone] entfernt, Policy-Gate unverändert bedingungslos; B3 minimal = FUNCTIONALLY COVERED / NO SEPARATE PRESET [--modules+--with-deps + orders-service-Modul]; 87/87 Builder + 129/129 Installer + 76/76 Lambda, Modul+Wrapper live validate PASS)
 
-Overall Status: YELLOW→GREEN (RC) - RC v0.5.0-rc.3 **GO** (RIS-AWS-E2E verifiziert, Tag/GitHub-Release nur noch menschlich); v0.5.0-rc.2 veröffentlicht; Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); RESOLVED: Queue-Policy-Härtung (F-03 Wildcard entfernt, im RIS-E2E bestätigt), IAM-Portabilität (FIX-01/02, Installation in Fremdkonto gelungen); OFFEN: Boundary-Explizitsetzung (F-01, Consumer-Verantwortung), optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
+Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Release offen, P09 menschlich) (RIS-AWS-E2E verifiziert, Tag/GitHub-Release nur noch menschlich); v0.5.0-rc.2 veröffentlicht; Module Builder Foundation + Hardening + B1 + PHASE2 + B2 + MODULE-CONTRACT + EXTERNAL-COGNITO + CLI-Cleanup verifiziert; B3 minimal bewusst nicht gebaut (funktional abgedeckt); RESOLVED: Queue-Policy-Härtung (F-03 Wildcard entfernt, im RIS-E2E bestätigt), IAM-Portabilität (FIX-01/02, Installation in Fremdkonto gelungen); OFFEN: Boundary-Explizitsetzung (F-01, Consumer-Verantwortung), optional-Felder für EXTERNAL-Cognito-Outputs, MANAGED→EXTERNAL-Migration (separat freizugeben); Privacy-Produktivbetrieb bleibt BLOCKED (Secret-Management offen, 5–8 PT)
 
 ## MO-RC3 Progress
 
@@ -146,6 +146,7 @@ Overall Status: YELLOW→GREEN (RC) - RC v0.5.0-rc.3 **GO** (RIS-AWS-E2E verifiz
 - MO-RC3-P04-MODULE-BUILDER-VERIFICATION: COMPLETE - 90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS
 - MO-RC3-P05-RIS-EVIDENCE: COMPLETE (Nachtrag 2026-10-31: RIS-Repo read-only ausgewertet)
 - MO-RC3-P06-RIS-E2E: **VERIFIED** — RIS-MO-RC-01 (2026-10-30) Full-Lifecycle in Account 262370457690 auf Builder-Pin `1dbb0cb`; Delta zu `8b61922` nur Whitespace (`git diff -w` leer) → RC.3 = **GO**, Produktion **BLOCKED** (Privacy)
+- MO-RC3-P07-P08-PACKAGING: **COMPLETE** — Dossier (MD+PDF), Release Notes, Changelog, Gate-Report; **kein Tag/Release** (P09 menschlich)
 
 ==================================================
 
@@ -290,3 +291,6 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC3-P05-RIS-INTEGRATION-EVIDENCE → docs/reports/MO-RC3-P05-RIS-INTEGRATION-EVIDENCE.md
 - MO-RC3-P06-RIS-E2E-EVIDENCE-VERIFICATION → docs/reports/MO-RC3-P06-RIS-E2E-EVIDENCE-VERIFICATION.md (Rev. 2: RIS-Repo read-only geprüft; Builder-Pin `1dbb0cb` code-identisch zu RC.3; RIS-MO-RC-01 Full-Lifecycle E2E PASS → RC GO)
 - RIS-RC3-E2E-TEST-PREPARATION → docs/reports/RIS-RC3-E2E-TEST-PREPARATION.md (Rev. 2: kein neuer E2E vor RC.3 erforderlich)
+- MO-RC3-P07-P08-RELEASE-PACKAGING → docs/reports/MO-RC3-P07-P08-RELEASE-PACKAGING.md (Packaging v0.5.0-rc.3: Gates aus Evidence verifiziert, kein Tag/Release)
+- RELEASE-v0.5.0-rc.3 (Dossier + PDF) → docs/release/RELEASE-v0.5.0-rc.3.md / .pdf (5 Seiten A4, LibreOffice)
+- RELEASE-GATES-v0.5.0-rc.3 → docs/release/RELEASE-GATES-v0.5.0-rc.3.md (18 Gates, GO für RC, BLOCKED für Produktion)
