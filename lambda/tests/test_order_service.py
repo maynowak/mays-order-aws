@@ -991,3 +991,50 @@ class TestPrivacyConsumerScopeP02B(unittest.TestCase):
         for field in ("subjectId", "consumerId", "ownerId", "actorId",
                       "identityVersion", "identityVerification"):
             self.assertNotIn(field, expression)
+
+
+class TestOrderTypeP02E(unittest.TestCase):
+    """MO-RC4-P02E: orderType ist optional, Default generic, additiv."""
+
+    BODY = TestOrderOwnershipPersistence.BODY
+
+    def _stored(self, body):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        order = service.create_order(body, subject_id="user-123")
+        return stored, order
+
+    def test_default_type_is_generic(self):
+        stored, order = self._stored(self.BODY)
+        self.assertEqual(stored["orderType"], "generic")
+        self.assertEqual(order["orderType"], "generic")
+
+    def test_explicit_generic_and_namespaced_type(self):
+        stored, order = self._stored(dict(self.BODY, orderType="generic"))
+        self.assertEqual(stored["orderType"], "generic")
+
+        stored, order = self._stored(dict(self.BODY, orderType="ris.document.analyze"))
+        self.assertEqual(stored["orderType"], "ris.document.analyze")
+        self.assertEqual(order["orderType"], "ris.document.analyze")
+
+    def test_invalid_type_is_rejected_before_write(self):
+        called = []
+        service = create_order_service(
+            "mays-orders", make_client({"put_item": lambda **kw: called.append(kw) or {}})
+        )
+        for bad in ("", "   ", "Bad/Type", 42, "x" * 200):
+            with self.subTest(value=repr(bad)):
+                with self.assertRaises(OrderError) as ctx:
+                    service.create_order(dict(self.BODY, orderType=bad), subject_id="user-123")
+                self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(called, [])
+
+    def test_ownership_attributes_unaffected_by_type(self):
+        stored, _ = self._stored(dict(self.BODY, orderType="jobsearch.match"))
+        self.assertEqual(stored["subjectId"], "user-123")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")

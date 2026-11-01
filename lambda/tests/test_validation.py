@@ -122,3 +122,45 @@ class TestValidateListParams(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOrderTypeValidationP02E(unittest.TestCase):
+    """MO-RC4-P02E: optionaler, namespace-faehiger orderType."""
+
+    def _body(self, **extra):
+        body = {
+            "customer": {"name": "Max", "email": "max@example.com"},
+            "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+            "currency": "EUR",
+        }
+        body.update(extra)
+        return body
+
+    def test_defaults_to_generic(self):
+        self.assertEqual(validate_create_order(self._body())["orderType"], "generic")
+
+    def test_accepts_generic_and_namespaced(self):
+        for value in ("generic", "ris.document.analyze", "jobsearch.match",
+                      "internal.report.generate", "a", "a-b.c-d"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    validate_create_order(self._body(orderType=value))["orderType"], value
+                )
+
+    def test_rejects_invalid_values(self):
+        for bad in ("", "   ", "UPPER", "with_underscore", "path/to/module",
+                    "1leading", ".leading", "trailing.", "double..dot",
+                    "with space", "x" * 200, 42, None, ["generic"]):
+            with self.subTest(value=repr(bad)):
+                with self.assertRaises(OrderError) as ctx:
+                    validate_create_order(self._body(orderType=bad))
+                self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+
+    def test_existing_payload_stays_compatible(self):
+        parsed = validate_create_order(self._body())
+        self.assertEqual(set(parsed), {"customer", "items", "currency", "orderType"})
+        self.assertEqual(parsed["currency"], "EUR")
+
+    def test_identity_fields_are_still_rejected_in_body(self):
+        with self.assertRaises(OrderError):
+            validate_create_order(self._body(subjectId="attacker"))

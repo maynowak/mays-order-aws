@@ -26,9 +26,17 @@
   "items": [
     { "sku": "SKU-1001", "quantity": 2, "unitPrice": 19.99 }
   ],
-  "currency": "EUR"
+  "currency": "EUR",
+  "orderType": "generic"
 }
 ```
+
+`orderType` ist **optional** (Default `generic`). Er beschreibt die gewünschte fachliche
+Verarbeitung (Routing), **nicht** den Eigentümer oder die aufrufende Anwendung:
+namespace-fähig (`ris.document.analyze`, `jobsearch.match`), ausschließlich Kleinbuchstaben,
+Ziffern, Bindestrich und Punkt als Segmenttrenner, jedes Segment beginnt mit einem Buchstaben,
+max. 128 Zeichen. Unbekannte Typen werden vom Worker abgelehnt (DLQ), nicht als `generic`
+verarbeitet. (MO-RC4-P02E)
 
 **Validierung (400 VALIDATION_ERROR):**
 
@@ -39,6 +47,7 @@
 - `items[].quantity`: Ganzzahl ≥ 1
 - `items[].unitPrice`: Zahl > 0
 - `currency`: Pflicht, 3 Zeichen (ISO-4217)
+- `orderType`: optional, Default `generic`; Namensschema s. o.
 - Unbekannte Felder → 400 (strikte Validierung)
 
 **Antwort 201:**
@@ -47,6 +56,7 @@
 {
   "orderId": "ord_2f4b1c9e...",
   "status": "PENDING",
+  "orderType": "generic",
   "customer": { "name": "Max Mustermann", "email": "max@example.com" },
   "items": [ { "sku": "SKU-1001", "quantity": 2, "unitPrice": 19.99, "lineTotal": 39.98 } ],
   "currency": "EUR",

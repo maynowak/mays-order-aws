@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02C — Worker-Kollisionsschutz + SQS-DLQ/Retention; Ownership beim Lesen offen (V-10)
+MO-RC4-P02E — internes Order-Routing (orderType + Handler-Registry); Abschluss-/Ergebnissemantik offen (P02G)
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin

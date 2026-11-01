@@ -23,8 +23,9 @@ from typing import Any, Dict, Optional
 
 import boto3
 
-from order_service import generate_order_id, is_conditional_check_failed, now_iso
-from order_types import ORDER_ID_PREFIX, ORDER_SK
+from order_handlers import get_handler
+from order_service import is_conditional_check_failed, now_iso
+from order_types import DEFAULT_ORDER_TYPE, ORDER_ID_PREFIX, ORDER_SK
 from state_machine import can_transition
 
 _dynamodb_client = None
@@ -45,6 +46,8 @@ OUTCOME_NOOP = "noop"             # Zielzustand war bereits erreicht -> idempote
 OUTCOME_STALE = "stale"           # Nachricht ueberholt (Bestellung weiter fortgeschritten)
 OUTCOME_REJECTED = "rejected"     # Uebergang unzulaessig (z. B. CANCELLED -> CONFIRMED)
 OUTCOME_MISSING = "missing"       # Bestellung existiert nicht (mehr)
+OUTCOME_UNKNOWN_TYPE = "unknown_type"      # kein Handler fuer den Order-Typ
+OUTCOME_HANDLER_FAILED = "handler_failed"  # Handler hat einen Fehler geworfen
 
 _SUCCESS_OUTCOMES = (OUTCOME_PROCESSED, OUTCOME_NOOP, OUTCOME_STALE)
 
@@ -80,6 +83,22 @@ def _is_stale(current_status: str, target_status: str) -> bool:
     if current_status not in _STATUS_RANK or target_status not in _STATUS_RANK:
         return False
     return _STATUS_RANK[target_status] < _STATUS_RANK[current_status]
+
+
+def _resolve_order_type(item: Dict[str, Any]) -> str:
+    """Order-Typ aus dem gespeicherten Item (NICHT aus der SQS-Nachricht).
+
+    Fehlt das Feld, gilt die Bestellung als Legacy und laeuft als `generic`.
+    Ein vorhandener, aber leerer/ungueltiger Wert wird NICHT auf `generic`
+    zurueckgestuft — er landet als unbekannter Typ in der Fehlerbehandlung.
+    """
+    raw = item.get("orderType")
+    if raw is None:
+        return DEFAULT_ORDER_TYPE
+    value = raw.get("S") if isinstance(raw, dict) else raw
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
 
 
 def _read_item(dynamodb, table_name: str, order_id: str) -> Optional[Dict[str, Any]]:
@@ -185,6 +204,21 @@ def _process_order(order_id: str, status: str, payload: Dict[str, Any]) -> str:
             return OUTCOME_STALE
         print(f"Invalid transition: {current_status} -> {status}")
         return OUTCOME_REJECTED
+
+    # MO-RC4-P02E: interne Routing-Registry. Der Handler macht nur fachliche
+    # Arbeit; den Status schreibt weiterhin ausschliesslich der Worker.
+    order_type = _resolve_order_type(item)
+    handler = get_handler(order_type)
+    if handler is None:
+        print(f"Unknown orderType '{order_type}' for {order_id} (no handler registered)")
+        return OUTCOME_UNKNOWN_TYPE
+
+    try:
+        handler(item, payload)
+    except Exception as exc:
+        # Handler-Fehler darf NICHT als erfolgreicher Abschluss gelten.
+        print(f"Handler for orderType '{order_type}' failed for {order_id}: {exc}")
+        return OUTCOME_HANDLER_FAILED
 
     now = now_iso()
     try:

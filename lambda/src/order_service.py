@@ -185,6 +185,8 @@ class OrderService:
             "sk": ORDER_SK,
             "orderId": order_id,
             "status": "PENDING",
+            # MO-RC4-P02E: fachlicher Verarbeitungstyp (Default "generic").
+            "orderType": input_data["orderType"],
             "customer": input_data["customer"],
             "items": items,
             "currency": input_data["currency"],

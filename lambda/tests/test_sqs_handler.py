@@ -203,3 +203,104 @@ class TestHandlerBatchFailures(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWorkerOrderRoutingP02E(unittest.TestCase):
+    """MO-RC4-P02E: Routing ueber orderType aus dem Item (nicht aus SQS)."""
+
+    def _run(self, client, status="CONFIRMED", payload=None):
+        with mock.patch.object(sqs_handler, "_get_dynamodb_client", return_value=client), \
+             mock.patch.dict("sqs_handler.os.environ", {"ORDERS_TABLE": "mays-orders"}):
+            return sqs_handler._process_order(ORDER_ID, status, payload or {})
+
+    def test_legacy_order_without_type_uses_generic(self):
+        client = FakeDynamo(make_item("PENDING", version=1))  # kein orderType
+        self.assertEqual(self._run(client), sqs_handler.OUTCOME_PROCESSED)
+        self.assertEqual(len(client.updates), 1)
+
+    def test_explicit_generic_type(self):
+        client = FakeDynamo(make_item("PENDING", version=1, orderType={"S": "generic"}))
+        self.assertEqual(self._run(client), sqs_handler.OUTCOME_PROCESSED)
+
+    def test_registered_handler_is_invoked_before_status_write(self):
+        from order_handlers import register
+
+        seen = {}
+
+        @register("test.worker.routed")
+        def routed(order, payload):
+            seen["orderType"] = order["orderType"]["S"]
+            seen["payload"] = payload
+
+        client = FakeDynamo(make_item("PENDING", version=1,
+                                      orderType={"S": "test.worker.routed"}))
+        outcome = self._run(client, payload={"note": "x"})
+
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSED)
+        self.assertEqual(seen["orderType"], "test.worker.routed")
+        self.assertEqual(seen["payload"], {"note": "x"})
+        self.assertEqual(len(client.updates), 1)
+
+    def test_unknown_type_is_rejected_without_write(self):
+        client = FakeDynamo(make_item("PENDING", version=1,
+                                      orderType={"S": "never.registered.type"}))
+        outcome = self._run(client)
+        self.assertEqual(outcome, sqs_handler.OUTCOME_UNKNOWN_TYPE)
+        self.assertEqual(client.updates, [])
+        self.assertEqual(client.item["status"]["S"], "PENDING")
+
+    def test_invalid_stored_type_is_not_downgraded_to_generic(self):
+        client = FakeDynamo(make_item("PENDING", version=1,
+                                      orderType={"S": "Bad/Type"}))
+        self.assertEqual(self._run(client), sqs_handler.OUTCOME_UNKNOWN_TYPE)
+        self.assertEqual(client.updates, [])
+
+    def test_handler_exception_is_not_a_success(self):
+        from order_handlers import register
+
+        @register("test.worker.failing")
+        def failing(order, payload):
+            raise RuntimeError("business failure")
+
+        client = FakeDynamo(make_item("PENDING", version=1,
+                                      orderType={"S": "test.worker.failing"}))
+        outcome = self._run(client)
+
+        self.assertEqual(outcome, sqs_handler.OUTCOME_HANDLER_FAILED)
+        self.assertEqual(client.updates, [])
+        self.assertEqual(client.item["status"]["S"], "PENDING")
+
+    def test_type_from_message_payload_is_ignored(self):
+        """Ein vom Aufrufer mitgegebener Typ darf das Item nicht ueberstimmen."""
+        client = FakeDynamo(make_item("PENDING", version=1, orderType={"S": "generic"}))
+        outcome = self._run(client, payload={"orderType": "test.worker.routed"})
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSED)
+        self.assertEqual(client.item["status"]["S"], "CONFIRMED")
+
+    def test_duplicate_message_does_not_run_handler(self):
+        from order_handlers import register
+
+        calls = []
+
+        @register("test.worker.duplicate")
+        def duplicate(order, payload):
+            calls.append(1)
+
+        client = FakeDynamo(make_item("CONFIRMED", version=2,
+                                      orderType={"S": "test.worker.duplicate"}))
+        outcome = self._run(client)
+
+        self.assertEqual(outcome, sqs_handler.OUTCOME_NOOP)
+        self.assertEqual(calls, [])
+        self.assertEqual(client.updates, [])
+
+    def test_batch_reports_unknown_type(self):
+        records = [
+            {"messageId": "good", "body": json.dumps({"orderId": "ord_1", "status": "CONFIRMED"})},
+            {"messageId": "bad", "body": json.dumps({"orderId": "ord_2", "status": "CONFIRMED"})},
+        ]
+        with mock.patch.object(sqs_handler, "_process_order",
+                               side_effect=[sqs_handler.OUTCOME_PROCESSED,
+                                            sqs_handler.OUTCOME_UNKNOWN_TYPE]):
+            response = sqs_handler.handler({"Records": records}, None)
+        self.assertEqual(response["batchItemFailures"], [{"itemIdentifier": "bad"}])

@@ -15,6 +15,10 @@ OrderStatus = str
 
 ORDER_ID_PREFIX = "ord_"
 
+# MO-RC4-P02E: fachlicher Verarbeitungstyp (Routing). Beschreibt WAS verarbeitet
+# werden soll — nicht den Eigentuemer (subjectId) und nicht den Consumer.
+DEFAULT_ORDER_TYPE = "generic"
+
 ORDER_SK = "#ORDER"
 
 GSI1_PK = "LIST"
@@ -40,6 +44,7 @@ class OrderItem(TypedDict):
 class Order(TypedDict):
     orderId: str
     status: OrderStatus
+    orderType: str
     customer: Customer
     items: List[OrderItem]
     currency: str

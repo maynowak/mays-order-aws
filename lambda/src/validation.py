@@ -4,12 +4,18 @@ import re
 from typing import Any, Dict, List, Optional
 
 from errors import validation_error
-from order_types import ORDER_STATUSES
+from order_types import DEFAULT_ORDER_TYPE, ORDER_STATUSES
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ORDER_ID_RE = re.compile(r"^ord_[A-Za-z0-9]+$")
 CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 STATUS_SET = set(ORDER_STATUSES)
+
+# Namespace-faehige Typen: "generic", "ris.document.analyze".
+# Bewusst KEINE freien Modulnamen/Pfade: nur Kleinbuchstaben, Ziffern, Bindestrich,
+# Punkt als Trenner; jedes Segment beginnt mit einem Buchstaben.
+ORDER_TYPE_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31})*$")
+MAX_ORDER_TYPE_LENGTH = 128
 
 
 def is_plain_object(value: Any) -> bool:
@@ -37,11 +43,32 @@ def assert_integer(value: Any, path: str, minimum: int) -> int:
     return value
 
 
+def validate_order_type(value: Any) -> str:
+    """Validiert einen Order-Typ (kein dynamischer Import, nur Namensschema)."""
+    if not isinstance(value, str):
+        raise validation_error("Field 'orderType' must be a string", {"path": "orderType"})
+    candidate = value.strip()
+    if not candidate:
+        raise validation_error("Field 'orderType' must not be empty", {"path": "orderType"})
+    if len(candidate) > MAX_ORDER_TYPE_LENGTH:
+        raise validation_error(
+            f"Field 'orderType' must be at most {MAX_ORDER_TYPE_LENGTH} characters",
+            {"path": "orderType"},
+        )
+    if not ORDER_TYPE_RE.match(candidate):
+        raise validation_error(
+            "Field 'orderType' must match '<segment>[.<segment>...]' with lowercase "
+            "letters, digits and hyphens (each segment starting with a letter)",
+            {"path": "orderType"},
+        )
+    return candidate
+
+
 def validate_create_order(body: Any) -> Dict[str, Any]:
     if not is_plain_object(body):
         raise validation_error("Request body must be a JSON object")
 
-    reject_unknown_keys(body, ["customer", "items", "currency"], "body")
+    reject_unknown_keys(body, ["customer", "items", "currency", "orderType"], "body")
 
     customer = body.get("customer")
     if not is_plain_object(customer):
@@ -78,7 +105,16 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
             {"path": "currency"},
         )
 
-    return {"customer": {"name": name, "email": email}, "items": validated_items, "currency": currency}
+    order_type = DEFAULT_ORDER_TYPE
+    if "orderType" in body:
+        order_type = validate_order_type(body.get("orderType"))
+
+    return {
+        "customer": {"name": name, "email": email},
+        "items": validated_items,
+        "currency": currency,
+        "orderType": order_type,
+    }
 
 
 def validate_order_id(order_id: Any) -> str:
