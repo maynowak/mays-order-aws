@@ -63,6 +63,10 @@ OUTCOME_HANDLER_FAILED = "handler_failed"
 
 OUTCOME_PROCESSING_SUCCEEDED = "processing_succeeded"
 OUTCOME_PROCESSING_FAILED = "processing_failed"
+# MO-RC4-P02I-A: getrennte Klassifikation statt eines Sammel-Outcomes.
+OUTCOME_PROCESSING_ALREADY_RUNNING = "processing_already_running"
+OUTCOME_PROCESSING_TERMINAL_FAILED = "processing_terminal_failed"
+OUTCOME_PROCESSING_ATTEMPT_EXHAUSTED = "processing_attempt_exhausted"
 OUTCOME_PROCESSING_SKIPPED = "processing_skipped"
 OUTCOME_PROCESSING_REJECTED = "processing_rejected"
 
@@ -73,6 +77,9 @@ _SUCCESS_OUTCOMES = (
     OUTCOME_STALE,
     OUTCOME_PROCESSING_SUCCEEDED,
     OUTCOME_PROCESSING_FAILED,
+    OUTCOME_PROCESSING_ALREADY_RUNNING,
+    OUTCOME_PROCESSING_TERMINAL_FAILED,
+    OUTCOME_PROCESSING_ATTEMPT_EXHAUSTED,
     OUTCOME_PROCESSING_SKIPPED,
     OUTCOME_PROCESSING_REJECTED,
 )
@@ -103,6 +110,21 @@ def _get_sqs_client():
 
 def _get_table_name():
     return os.environ.get("ORDERS_TABLE")
+
+
+def _log_event(event: str, **fields: Any) -> None:
+    """Strukturiertes, payload-freies Processing-Ereignis (MO-RC4-P02I-A).
+
+    Nur explizit uebergebene Felder (orderId, attemptId, Zustand, Outcome) —
+    niemals Payloads, Ergebnisse, Kundendaten, Tokens oder Secrets.
+    """
+    parts = [f"event={event}"]
+    for key, value in fields.items():
+        if value is None:
+            continue
+        text = str(value).replace(" ", "_")
+        parts.append(f"{key}={text}")
+    print("processing " + " ".join(parts))
 
 
 def _current_status(item: Dict[str, Any]) -> str:
@@ -159,6 +181,16 @@ def _lease_expiry_text(now: datetime) -> str:
 def _processing_state(item: Dict[str, Any]) -> Optional[str]:
     value = item.get("processingState")
     return value.get("S") if isinstance(value, dict) else value
+
+
+def _processing_attempts(item: Dict[str, Any]) -> Optional[int]:
+    raw = item.get("processingAttempts")
+    if isinstance(raw, dict):
+        raw = raw.get("N")
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _order_version(item: Dict[str, Any]) -> Optional[int]:
@@ -275,6 +307,7 @@ def _apply_status_transition(
 
 def _claim_processing(dynamodb, table_name: str, order_id: str, item: Dict[str, Any]) -> Optional[str]:
     """Setzt den Processing-Claim atomar. Rueckgabe: attemptId oder None."""
+    previous_state = _processing_state(item)
     attempt_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
     now_text = _iso(now)
@@ -321,10 +354,21 @@ def _claim_processing(dynamodb, table_name: str, order_id: str, item: Dict[str, 
         if is_conditional_check_failed(err):
             return None
         raise
+
+    if previous_state == _PROCESSING_RUNNING:
+        # Abgelaufene Lease wurde atomar uebernommen (nur mit neuer Zustellung).
+        _log_event("PROCESSING_LEASE_EXPIRED", orderId=order_id)
+    _log_event(
+        "PROCESSING_CLAIMED",
+        orderId=order_id,
+        attemptId=attempt_id,
+        attempts=_processing_attempts(item),
+    )
     return attempt_id
 
 
 def _classify_claim_failure(dynamodb, table_name: str, order_id: str) -> str:
+    """Klassifiziert einen abgelehnten Claim ohne Zustand zu veraendern."""
     item = _read_item(dynamodb, table_name, order_id)
     if item is None:
         return OUTCOME_MISSING
@@ -333,11 +377,21 @@ def _classify_claim_failure(dynamodb, table_name: str, order_id: str) -> str:
     if item.get("subjectId") is None:
         # Anonymisiert: kein neuer Processing-Versuch
         return OUTCOME_PROCESSING_REJECTED
+
     state = _processing_state(item)
-    if state in (_PROCESSING_SUCCEEDED, _PROCESSING_FAILED, _PROCESSING_RUNNING):
-        # bereits abgeschlossen / anderer Versuch aktiv / terminal fehlgeschlagen
-        return OUTCOME_PROCESSING_SKIPPED
-    # Versuchsbudget erschoepft oder Zustaendigkeit unklar
+    if state == _PROCESSING_SUCCEEDED:
+        return OUTCOME_NOOP
+    if state == _PROCESSING_FAILED:
+        return OUTCOME_PROCESSING_TERMINAL_FAILED
+
+    attempts = _processing_attempts(item)
+    if attempts is not None and attempts >= MAX_PROCESSING_ATTEMPTS:
+        return OUTCOME_PROCESSING_ATTEMPT_EXHAUSTED
+    if state == _PROCESSING_RUNNING:
+        # Aktiver fremder Versuch (Lease gueltig) -> nicht ueberschreiben.
+        return OUTCOME_PROCESSING_ALREADY_RUNNING
+
+    # Zustand unklar (z. B. parallele Aenderung) -> nicht verarbeiten.
     return OUTCOME_PROCESSING_SKIPPED
 
 
@@ -409,7 +463,11 @@ def _complete_processing(
             return _classify_completion_failure(dynamodb, table_name, order_id)
         raise
 
-    print(f"Order {order_id} processing {'succeeded' if success else 'failed'} (attempt {attempt_id})")
+    _log_event(
+        "PROCESSING_SUCCEEDED" if success else "PROCESSING_FAILED",
+        orderId=order_id,
+        attemptId=attempt_id,
+    )
     return OUTCOME_PROCESSING_SUCCEEDED if success else OUTCOME_PROCESSING_FAILED
 
 
@@ -418,19 +476,25 @@ def _classify_completion_failure(dynamodb, table_name: str, order_id: str) -> st
     if item is None:
         return OUTCOME_MISSING
     if item.get("subjectId") is None:
-        print(f"Processing completion rejected for {order_id}: order anonymized")
+        _log_event("PROCESSING_REJECTED", orderId=order_id, reason="anonymized")
         return OUTCOME_PROCESSING_REJECTED
     if _current_status(item) == "CANCELLED":
-        print(f"Processing completion rejected for {order_id}: order cancelled")
+        _log_event("PROCESSING_REJECTED", orderId=order_id, reason="cancelled")
         return OUTCOME_PROCESSING_REJECTED
     if _processing_state(item) == _PROCESSING_SUCCEEDED:
         return OUTCOME_NOOP
-    print(f"Processing completion rejected for {order_id}: attempt/state conflict")
+    # Zustand bleibt ggf. auf `running` -> sichtbarer Recovery-Bedarf.
+    _log_event(
+        "PROCESSING_RECOVERY_REQUIRED",
+        orderId=order_id,
+        state=_processing_state(item),
+    )
     return OUTCOME_PROCESSING_SKIPPED
 
 
 def _release_claim(dynamodb, table_name: str, order_id: str, attempt_id: str) -> None:
     """Gibt den Claim nach einem technischen Fehler frei (begrenzter Retry)."""
+    _log_event("PROCESSING_RETRY_RELEASED", orderId=order_id, attemptId=attempt_id)
     try:
         dynamodb.update_item(
             TableName=table_name,
@@ -526,7 +590,19 @@ def _process_order(order_id: str, status: str, payload: Dict[str, Any]) -> str:
 
     attempt_id = _claim_processing(dynamodb, table_name, order_id, item)
     if attempt_id is None:
-        return _classify_claim_failure(dynamodb, table_name, order_id)
+        outcome = _classify_claim_failure(dynamodb, table_name, order_id)
+        _log_event(
+            {
+                OUTCOME_PROCESSING_ALREADY_RUNNING: "PROCESSING_ALREADY_RUNNING",
+                OUTCOME_PROCESSING_TERMINAL_FAILED: "PROCESSING_TERMINAL_FAILED",
+                OUTCOME_PROCESSING_ATTEMPT_EXHAUSTED: "PROCESSING_ATTEMPT_EXHAUSTED",
+                OUTCOME_PROCESSING_REJECTED: "PROCESSING_REJECTED",
+                OUTCOME_NOOP: "PROCESSING_ALREADY_SUCCEEDED",
+            }.get(outcome, "PROCESSING_SKIPPED"),
+            orderId=order_id,
+            outcome=outcome,
+        )
+        return outcome
 
     context = {"attemptId": attempt_id, "orderType": order_type}
     try:
@@ -539,9 +615,10 @@ def _process_order(order_id: str, status: str, payload: Dict[str, Any]) -> str:
         return _complete_processing(
             dynamodb, table_name, order_id, attempt_id, success=False, error=error
         )
-    except Exception as exc:
+    except Exception:
         # Technischer Fehler: Claim freigeben, Nachricht erneut zustellen.
-        print(f"Processing handler for '{order_type}' failed technically for {order_id}: {exc}")
+        # Bewusst ohne Exception-Text im Log (kann Nutzdaten enthalten).
+        _log_event("PROCESSING_TECHNICAL_ERROR", orderId=order_id, attemptId=attempt_id)
         _release_claim(dynamodb, table_name, order_id, attempt_id)
         raise
 

@@ -198,7 +198,7 @@ class TestProcessingClaim(unittest.TestCase):
                                  processingClaimedAt={"S": "9999-12-31T23:59:59.000Z"}))
         outcome = run(client)
 
-        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_SKIPPED)
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_ALREADY_RUNNING)
         self.assertEqual(calls, [])
 
     def test_expired_claim_can_be_retried(self):
@@ -236,7 +236,7 @@ class TestProcessingClaim(unittest.TestCase):
                                  processingState={"S": "failed"},
                                  processingAttempts={"N": "1"}))
         outcome = run(client)
-        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_SKIPPED)
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_TERMINAL_FAILED)
         self.assertEqual(calls, [])
 
     def test_attempt_budget_limits_retries(self):
@@ -247,7 +247,7 @@ class TestProcessingClaim(unittest.TestCase):
                                  processingAttempts={"N": str(sqs_handler.MAX_PROCESSING_ATTEMPTS)},
                                  processingClaimedAt={"S": "2000-01-01T00:00:00.000Z"}))
         outcome = run(client)
-        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_SKIPPED)
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_ATTEMPT_EXHAUSTED)
 
     def test_legacy_item_without_version_can_be_claimed(self):
         handler_type = processing_handler()

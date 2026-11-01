@@ -20,6 +20,16 @@ Regeln (unveraendert):
 - Handler schreiben NIE Status, Ownership oder Ergebnis selbst.
 - Unbekannte Typen werden abgelehnt; nur ein FEHLENDES `orderType` gilt als
   Legacy und laeuft als `generic`.
+
+Idempotenzvertrag fuer Processing-Handler (MO-RC4-P02I-A):
+- `context["attemptId"]` ist die Identitaet EINES Versuchs (Claim-Fencing,
+  Ergebnisuebernahme, Diagnose). Sie ist bei jedem Wiederholungsversuch neu und
+  taugt NICHT als alleiniger externer Idempotency Key.
+- `orderId` (im Order-Item und in der SQS-Nachricht) ist die stabile fachliche
+  Auftragsidentitaet und eignet sich als externer Idempotency Key.
+- MO garantiert idempotente Status-/Ergebnisuebernahme, NICHT idempotente
+  externe Seiteneffekte. Handler muessen eigene Seiteneffekte gegen `orderId`
+  absichern (keine Exactly-once-Zusage).
 """
 
 from __future__ import annotations
