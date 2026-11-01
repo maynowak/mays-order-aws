@@ -208,3 +208,29 @@ variable "recovery_lease_seconds" {
   type        = number
   default     = 300
 }
+
+# MO-RC4-P02I-B2: automatische Processing-Recovery (abgelaufene Claims).
+# Standardmaessig AUS; unabhaengig von recovery_enabled (P02F).
+variable "processing_recovery_enabled" {
+  description = "Aktiviert die automatische Processing-Recovery (abgelaufene Processing-Claims). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "processing_recovery_schedule_expression" {
+  description = "Schedule-Ausdruck der Processing-Recovery (Default: rate(5 minutes))."
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
+variable "processing_recovery_limit" {
+  description = "Maximale Kandidaten pro Processing-Recovery-Lauf."
+  type        = number
+  default     = 20
+}
+
+variable "processing_recovery_safety_margin_seconds" {
+  description = "Sicherheitsabstand zur Processing-Lease (Default 60 s)."
+  type        = number
+  default     = 60
+}

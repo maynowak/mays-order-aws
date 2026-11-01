@@ -44,6 +44,9 @@ _sqs_client = None
 PROCESSING_LEASE_SECONDS = 300
 MAX_PROCESSING_ATTEMPTS = 2
 
+# MO-RC4-P02I-B2: GSI3-Partition fuer aktive Claims (KEYS_ONLY, keine PII).
+PROCESSING_INDEX_PK = "PROCESSING#RUNNING"
+
 _STATUS_RANK = {
     "PENDING": 0,
     "CONFIRMED": 1,
@@ -330,6 +333,7 @@ def _claim_processing(dynamodb, table_name: str, order_id: str, item: Dict[str, 
         ":leaseExpiry": {"S": _lease_expiry_text(now)},
         ":attempt": {"S": attempt_id},
         ":maxAttempts": {"N": str(MAX_PROCESSING_ATTEMPTS)},
+        ":gsi3pk": {"S": PROCESSING_INDEX_PK},
         ":zero": {"N": "0"},
         ":one": {"N": "1"},
     }
@@ -345,7 +349,8 @@ def _claim_processing(dynamodb, table_name: str, order_id: str, item: Dict[str, 
             UpdateExpression=(
                 "SET processingState = :running, processingAttemptId = :attempt, "
                 "processingClaimedAt = :now, "
-                "processingAttempts = if_not_exists(processingAttempts, :zero) + :one"
+                "processingAttempts = if_not_exists(processingAttempts, :zero) + :one, "
+                "gsi3pk = :gsi3pk, gsi3sk = :now"
             ),
             ExpressionAttributeNames={"#status": "status", "#version": "version"},
             ExpressionAttributeValues=values,
@@ -411,7 +416,7 @@ def _complete_processing(
             "SET processingState = :succeeded, #result = :result, "
             "completedAt = :now, updatedAt = :now, "
             "#version = if_not_exists(#version, :zero) + :one "
-            "REMOVE processingError, processingClaimedAt"
+            "REMOVE processingError, processingClaimedAt, gsi3pk, gsi3sk"
         )
         names = {"#result": "result", "#version": "version"}
         values = {
@@ -426,7 +431,7 @@ def _complete_processing(
             "SET processingState = :failed, processingError = :error, "
             "completedAt = :now, updatedAt = :now, "
             "#version = if_not_exists(#version, :zero) + :one "
-            "REMOVE #result, processingClaimedAt"
+            "REMOVE #result, processingClaimedAt, gsi3pk, gsi3sk"
         )
         names = {"#result": "result", "#version": "version"}
         values = {
@@ -502,7 +507,10 @@ def _release_claim(dynamodb, table_name: str, order_id: str, attempt_id: str) ->
             ConditionExpression=(
                 "processingState = :running AND processingAttemptId = :attempt"
             ),
-            UpdateExpression="SET processingState = :pending REMOVE processingClaimedAt",
+            UpdateExpression=(
+                "SET processingState = :pending "
+                "REMOVE processingClaimedAt, gsi3pk, gsi3sk"
+            ),
             ExpressionAttributeValues={
                 ":running": {"S": _PROCESSING_RUNNING},
                 ":pending": {"S": _PROCESSING_PENDING},

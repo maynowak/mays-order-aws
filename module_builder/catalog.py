@@ -65,6 +65,11 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "recovery_min_age_seconds": ["recovery"],
     "recovery_limit": ["recovery"],
     "recovery_lease_seconds": ["recovery"],
+    # MO-RC4-P02I-B2: Processing-Recovery
+    "processing_recovery_enabled": ["recovery"],
+    "processing_recovery_schedule_expression": ["recovery"],
+    "processing_recovery_limit": ["recovery"],
+    "processing_recovery_safety_margin_seconds": ["recovery"],
     "lambda_execution_boundary": ["sqs_worker"],
     "dashboard_enabled": ["monitoring"],
     "alarm_period_seconds": ["monitoring"],

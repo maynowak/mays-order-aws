@@ -67,6 +67,7 @@ module "iam" {
   dynamodb_table_arn = module.dynamodb.table_arn
   dynamodb_gsi1_arn  = module.dynamodb.gsi1_arn
   dynamodb_gsi2_arn  = module.dynamodb.gsi2_arn
+  dynamodb_gsi3_arn  = module.dynamodb.gsi3_arn
   sqs_queue_arn      = module.sqs.queue_arn
   # GAP-06: plan-bekanntes Gate (Root erzeugt die Queue immer). Der ARN oben
   # ist beim Fresh-Plan noch unbekannt und bleibt Policy-Resource.
@@ -175,10 +176,13 @@ module "monitoring" {
   lambda_duration_threshold_ms = var.lambda_duration_threshold_ms
   lambda_throttle_threshold    = var.lambda_throttle_threshold
   dynamodb_throttled_threshold = var.dynamodb_throttled_threshold
-  lambda_function_name         = module.lambda.function_name
-  api_id                       = module.api.api_id
-  api_stage_name               = module.api.api_stage_name
-  dynamodb_table_name          = module.dynamodb.table_name
+
+  # MO-RC4-P02I-B2: DLQ-Alarm
+  dlq_name             = module.sqs.dlq_name
+  lambda_function_name = module.lambda.function_name
+  api_id               = module.api.api_id
+  api_stage_name       = module.api.api_stage_name
+  dynamodb_table_name  = module.dynamodb.table_name
 }
 
 # SQS Queue for async order processing
@@ -226,6 +230,12 @@ module "recovery" {
   min_age_seconds     = var.recovery_min_age_seconds
   limit               = var.recovery_limit
   lease_seconds       = var.recovery_lease_seconds
+
+  # MO-RC4-P02I-B2: Processing-Recovery (separat, default aus).
+  processing_enabled               = var.processing_recovery_enabled
+  processing_schedule_expression   = var.processing_recovery_schedule_expression
+  processing_limit                 = var.processing_recovery_limit
+  processing_safety_margin_seconds = var.processing_recovery_safety_margin_seconds
 }
 
 # Cognito User Data Backup Storage (optional via var.enable_cognito_backup,

@@ -728,7 +728,8 @@ class OrderService:
                         Key={"pk": pk, "sk": sk},
                         UpdateExpression=(
                             "SET #c.#n = :anon, #c.#e = :anon_email "
-                            "REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt"
+                            "REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt, "
+                            "gsi3pk, gsi3sk"
                         ),
                         ConditionExpression=cond_expr,
                         ExpressionAttributeNames={

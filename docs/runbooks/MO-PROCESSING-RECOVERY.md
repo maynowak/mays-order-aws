@@ -145,12 +145,48 @@ Seiteneffekte. Bei Verdacht:
 
 ---
 
-## 8. Bekannte Grenzen (BLOCKED/OPEN)
+## 8. Automatische Processing-Recovery (P02I-B2)
+
+Aktivierung: `processing_recovery_enabled=true` (Default **false**, unabhängig von
+`recovery_enabled`). Schedule: `${project}-orders-processing-recovery`, `rate(5 minutes)`.
+
+Ablauf:
+
+1. Query auf **GSI3** (`gsi3pk=PROCESSING#RUNNING`, `gsi3sk <= now − 300 s − 60 s`).
+2. **GetItem-Recheck** je Kandidat (ConsistentRead): `processingState=running`,
+   `processingClaimedAt <= cutoff`, `processingAttempts < 2`, `subjectId` vorhanden,
+   `status != CANCELLED`.
+3. Erneute Zustellung an die bestehende Queue (`metadata.reason=processing_recovery`).
+
+Was die Recovery **nicht** tut: keine Claims zurücksetzen, keine Attempts/Attempt-IDs
+ändern, keine Ergebnisse schreiben, keine Privacy-Zustände ändern, kein `failed` setzen.
+Der **Worker** entscheidet atomar über den neuen Claim.
+
+Grenzen:
+
+- Budget erschöpft (`attempts >= 2`): **keine** Zustellung, Order bleibt `running`
+  (Operator-Fall).
+- Legacy-`running` ohne GSI3-Attribute: **unsichtbar** (kein Backfill).
+- Mehrfache Zustellungen sind möglich (at-least-once); Duplikate enden als
+  `PROCESSING_ALREADY_RUNNING`/`NOOP`.
+
+Diagnose-Logs: `PROCESSING_RECOVERY_*`-Zähler im Report des Laufs
+(`scanned`, `candidates`, `checked`, `sent`, `failed`, `budgetExhausted`, `skipped`).
+
+## 9. DLQ-Alarm
+
+Alarm `${project}-dlq-messages` (CloudWatch `AWS/SQS ApproximateNumberOfMessagesVisible`,
+Dimension `QueueName=<projekt>-orders-queue-dlq`, Maximum, 300 s, Schwelle ≥ 1).
+Er löst aus, verändert nichts und benachrichtigt **niemanden** (kein SNS-Kanal im Stack →
+OPEN). Ein Alarm ersetzt keine Recovery.
+
+## 10. Bekannte Grenzen (BLOCKED/OPEN)
 
 | Grenze | Status |
 |---|---|
-| Automatische Erkennung hängender `running`-Orders | **OPEN** (kein Index, kein Trigger) |
-| Automatischer Processing-Retry über SQS | **BLOCKED** (`maxReceiveCount=1`, Nachricht in DLQ) |
+| Automatische Erkennung hängender `running`-Orders | **IMPLEMENTIERT** (GSI3 + Schedule), aber **standardmäßig aus** |
+| Automatischer Processing-Retry über SQS | nur für abgelaufene Claims mit Budgetrest; `maxReceiveCount=1` unverändert |
+| Alt-`running` ohne GSI3-Attribute | **OPEN** (kein Backfill) |
 | Operator-Vertrag (Rechte, Freigabe, Audit) | **BLOCKED** (nicht implementiert) |
 | DLQ-Alarm | **OPEN** (kein Alarm vorhanden) |
 | P02F hilft bei Processing-Hängern | **NEIN** (nur nicht zugestellte `PENDING`-Orders) |

@@ -33,6 +33,13 @@ from order_types import GSI1_PK, ORDER_ID_PREFIX, ORDER_SK
 
 RECOVERY_ACTION = "recovery/scan"
 
+# MO-RC4-P02I-B2: Processing-Recovery (abgelaufene Verarbeitungs-Claims).
+PROCESSING_RECOVERY_ACTION = "processing/scan"
+GSI3_NAME = "gsi3"
+DEFAULT_PROCESSING_LIMIT = 20
+MAX_PROCESSING_LIMIT = 100
+DEFAULT_PROCESSING_SAFETY_MARGIN_SECONDS = 60
+
 DEFAULT_WINDOW_MINUTES = 60
 DEFAULT_LIMIT = 50
 DEFAULT_MIN_AGE_SECONDS = 60
@@ -234,6 +241,150 @@ def run_recovery(
             # ungewiss. Die Nachricht ist raus; ein spaeterer Lauf darf nach
             # Lease-Ablauf erneut senden (Worker bleibt idempotent).
             report["uncertain"] += 1
+
+    if report["failed"] and not report["sent"]:
+        report["status"] = "PARTIALLY_COMPLETED"
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Processing-Recovery (MO-RC4-P02I-B2)
+# ---------------------------------------------------------------------------
+
+def run_processing_recovery(
+    table: Any,
+    send_message: Callable[[str], None],
+    *,
+    now: Optional[datetime] = None,
+    limit: int = DEFAULT_PROCESSING_LIMIT,
+    safety_margin_seconds: int = DEFAULT_PROCESSING_SAFETY_MARGIN_SECONDS,
+) -> Dict[str, Any]:
+    """Stellt Orders mit abgelaufenem Processing-Claim erneut zu.
+
+    Die Recovery trifft KEINE Verarbeitungsentscheidung: sie sucht ueber GSI3,
+    prueft per GetItem nach und sendet an die bestehende Queue. Der Worker
+    entscheidet atomar ueber den neuen Claim (Budget, Lease, Privacy, Status).
+
+    `send_message(order_id)` muss bei Fehlern eine Exception werfen.
+    """
+    from sqs_handler import (
+        MAX_PROCESSING_ATTEMPTS,
+        PROCESSING_INDEX_PK,
+        PROCESSING_LEASE_SECONDS,
+    )
+
+    now_dt = now or datetime.now(timezone.utc)
+    if now_dt.tzinfo is None:
+        now_dt = now_dt.replace(tzinfo=timezone.utc)
+
+    limit = _bounded_int(limit, DEFAULT_PROCESSING_LIMIT, 1, MAX_PROCESSING_LIMIT)
+    safety_margin_seconds = _bounded_int(
+        safety_margin_seconds, DEFAULT_PROCESSING_SAFETY_MARGIN_SECONDS, 0, 3600
+    )
+    cutoff = _fmt(now_dt - timedelta(seconds=PROCESSING_LEASE_SECONDS + safety_margin_seconds))
+
+    report: Dict[str, Any] = {
+        "status": "COMPLETED",
+        "runId": str(uuid.uuid4()),
+        "kind": "processing",
+        "leaseSeconds": PROCESSING_LEASE_SECONDS,
+        "safetyMarginSeconds": safety_margin_seconds,
+        "limit": limit,
+        "scanned": 0,
+        "candidates": 0,
+        "checked": 0,
+        "sent": 0,
+        "failed": 0,
+        "budgetExhausted": 0,
+        "skipped": {},
+    }
+    skipped = report["skipped"]
+
+    def skip(reason: str) -> None:
+        skipped[reason] = skipped.get(reason, 0) + 1
+
+    # ---------- 1) Kandidaten ueber GSI3 (nur abgelaufene Claims) ----------
+    order_ids = []
+    start_key = None
+    while len(order_ids) < limit:
+        query_kwargs: Dict[str, Any] = {
+            "IndexName": GSI3_NAME,
+            "KeyConditionExpression": "gsi3pk = :pk AND gsi3sk <= :cutoff",
+            "ExpressionAttributeValues": {
+                ":pk": PROCESSING_INDEX_PK,
+                ":cutoff": cutoff,
+            },
+            "ScanIndexForward": True,  # aelteste Claims zuerst
+            "Limit": limit,
+        }
+        if start_key:
+            query_kwargs["ExclusiveStartKey"] = start_key
+        page = table.query(**query_kwargs)
+        for entry in page.get("Items", []):
+            report["scanned"] += 1
+            order_id = entry.get("orderId")
+            if not order_id:
+                # KEYS_ONLY: der Primaerschluessel ist vorhanden.
+                pk = entry.get("pk")
+                if isinstance(pk, str) and pk.startswith(ORDER_ID_PREFIX):
+                    order_id = pk[len(ORDER_ID_PREFIX):]
+            if not order_id:
+                skip("missing_order_id")
+                continue
+            order_ids.append(order_id)
+            if len(order_ids) >= limit:
+                break
+        start_key = page.get("LastEvaluatedKey")
+        if not start_key:
+            break
+
+    report["candidates"] = len(order_ids)
+
+    # ---------- 2) GetItem-Recheck + erneute Zustellung ----------
+    for order_id in order_ids:
+        try:
+            item = table.get_item(
+                Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+                ConsistentRead=True,
+            ).get("Item")
+        except Exception:
+            skip("read_error")
+            continue
+
+        report["checked"] += 1
+        if item is None:
+            skip("order_missing")
+            continue
+        if item.get("processingState") != "running":
+            skip("not_running")
+            continue
+        claimed_at = item.get("processingClaimedAt")
+        if not isinstance(claimed_at, str) or claimed_at > cutoff:
+            skip("lease_not_expired")
+            continue
+        attempts = item.get("processingAttempts")
+        try:
+            attempts_value = int(attempts) if attempts is not None else 0
+        except (TypeError, ValueError):
+            attempts_value = 0
+        if attempts_value >= MAX_PROCESSING_ATTEMPTS:
+            report["budgetExhausted"] += 1
+            skip("budget_exhausted")
+            continue
+        if not item.get("subjectId"):
+            skip("anonymized")
+            continue
+        if item.get("status") == "CANCELLED":
+            skip("cancelled")
+            continue
+
+        try:
+            send_message(order_id)
+        except Exception:
+            report["failed"] += 1
+            skip("send_failed")
+            continue
+        report["sent"] += 1
 
     if report["failed"] and not report["sent"]:
         report["status"] = "PARTIALLY_COMPLETED"

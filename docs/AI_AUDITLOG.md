@@ -159,6 +159,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P02G-B: **COMPLETE (lokal)** — Processing-Claim + atomarer Abschluss (result/error), Anonymize/Cancel blockieren Abschluss; 255/255 Lambda
 - MO-RC4-P02H-A: **COMPLETE (lokal)** — Owner-/Consumer-Autorisierung (V-10), Legacy fail-closed, Worker unverändert; 281/281 Lambda
 - MO-RC4-P02I-A: **COMPLETE (lokal)** — Recovery-Safety-Klassifikation + Runbook; automatische Processing-Recovery bleibt OPEN
+- MO-RC4-P02I-B2: **COMPLETE (lokal, nicht deployed)** — GSI3-Recovery, separater Schedule (default aus), DLQ-Alarm; 321/321 Lambda, terraform validate PASS
 
 ==================================================
 
@@ -329,3 +330,4 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02G-B-PROCESSING-LIFECYCLE-AND-RESULT-PERSISTENCE → docs/reports/MO-RC4-P02G-B-PROCESSING-LIFECYCLE-AND-RESULT-PERSISTENCE.md (Claim/Lease, atomare Ergebnisübernahme, Privacy-Race-Schutz; 255/255 Lambda)
 - MO-RC4-P02H-A-ORDER-OWNER-CONSUMER-AUTHORIZATION → docs/reports/MO-RC4-P02H-A-ORDER-OWNER-CONSUMER-AUTHORIZATION.md (V-10 geschlossen: LIST via GSI2, GET/PATCH Owner+Consumer, atomare Bedingung; 281/281 Lambda)
 - MO-RC4-P02I-A-PROCESSING-RECOVERY-SAFETY → docs/reports/MO-RC4-P02I-A-PROCESSING-RECOVERY-SAFETY.md (präzise Claim-Klassifikation, payload-freies Ereignis-Logging, Runbook; 298/298 Lambda)
+- MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY → docs/reports/MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY.md (GSI3 + processing/scan + DLQ-Alarm, default aus; 321/321 Lambda)

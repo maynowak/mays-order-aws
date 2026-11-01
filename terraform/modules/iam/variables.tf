@@ -19,6 +19,11 @@ variable "dynamodb_gsi1_arn" {
   type        = string
 }
 
+variable "dynamodb_gsi3_arn" {
+  description = "ARN des DynamoDB GSI3 (Processing-Recovery, MO-RC4-P02I-B2)."
+  type        = string
+}
+
 variable "dynamodb_gsi2_arn" {
   description = "ARN des GSI2-Index fuer DynamoDB-Berechtigungen in der IAM-Policy."
   type        = string

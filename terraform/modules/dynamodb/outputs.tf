@@ -33,3 +33,13 @@ output "gsi2_arn" {
   description = "ARN des Global Secondary Index (GSI2)."
   value       = "${aws_dynamodb_table.orders.arn}/index/gsi2"
 }
+
+output "gsi3_name" {
+  description = "Name des Global Secondary Index (GSI3, aktive Processing-Claims)."
+  value       = "gsi3"
+}
+
+output "gsi3_arn" {
+  description = "ARN des Global Secondary Index (GSI3)."
+  value       = "${aws_dynamodb_table.orders.arn}/index/gsi3"
+}

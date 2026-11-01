@@ -65,8 +65,35 @@ variable "lease_seconds" {
   default     = 300
 }
 
+# MO-RC4-P02I-B2: Processing-Recovery (abgelaufene Verarbeitungs-Claims).
+variable "processing_enabled" {
+  description = "Aktiviert den Processing-Recovery-Schedule (unabhaengig von enabled/false)."
+  type        = bool
+  default     = false
+}
+
+variable "processing_schedule_expression" {
+  description = "Schedule-Ausdruck fuer die Processing-Recovery."
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
+variable "processing_limit" {
+  description = "Maximale Kandidaten pro Processing-Recovery-Lauf."
+  type        = number
+  default     = 20
+}
+
+variable "processing_safety_margin_seconds" {
+  description = "Sicherheitsabstand zusaetzlich zur Processing-Lease."
+  type        = number
+  default     = 60
+}
+
+# Rolle wird erstellt, sobald mindestens einer der beiden Schedules aktiv ist
+# (P02F und Processing-Recovery sind unabhaengig aktivierbar).
 resource "aws_iam_role" "scheduler" {
-  count = var.enabled ? 1 : 0
+  count = var.enabled || var.processing_enabled ? 1 : 0
   name  = "${var.project_name}-orders-recovery-scheduler"
 
   assume_role_policy = jsonencode({
@@ -82,7 +109,7 @@ resource "aws_iam_role" "scheduler" {
 }
 
 resource "aws_iam_role_policy" "invoke_handler" {
-  count = var.enabled ? 1 : 0
+  count = var.enabled || var.processing_enabled ? 1 : 0
   name  = "${var.project_name}-orders-recovery-invoke"
   role  = aws_iam_role.scheduler[0].id
 
@@ -121,12 +148,43 @@ resource "aws_scheduler_schedule" "recovery" {
   }
 }
 
+# MO-RC4-P02I-B2: eigener Schedule fuer abgelaufene Processing-Claims.
+# Nutzt dieselbe Lambda und dieselbe Scheduler-Rolle; unabhaengig aktivierbar.
+resource "aws_scheduler_schedule" "processing_recovery" {
+  # Unabhaengig von `enabled` (P02F): nur das Processing-Flag entscheidet.
+  count = var.processing_enabled ? 1 : 0
+  name  = "${var.project_name}-orders-processing-recovery"
+
+  schedule_expression = var.processing_schedule_expression
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = var.function_arn
+    role_arn = aws_iam_role.scheduler[0].arn
+
+    input = jsonencode({
+      internalAction = "processing/scan"
+      options = {
+        limit               = var.processing_limit
+        safetyMarginSeconds = var.processing_safety_margin_seconds
+      }
+    })
+  }
+}
+
+output "processing_schedule_name" {
+  description = "Name des Processing-Recovery-Schedulers (leer, wenn deaktiviert)"
+  value       = length(aws_scheduler_schedule.processing_recovery) > 0 ? aws_scheduler_schedule.processing_recovery[0].name : ""
+}
+
 output "schedule_name" {
   description = "Name des Recovery-Schedulers (leer, wenn deaktiviert)"
   value       = var.enabled ? aws_scheduler_schedule.recovery[0].name : ""
 }
 
 output "scheduler_role_arn" {
-  description = "ARN der Scheduler-Rolle (leer, wenn deaktiviert)"
-  value       = var.enabled ? aws_iam_role.scheduler[0].arn : ""
+  description = "ARN der Scheduler-Rolle (leer, wenn beide Schedules deaktiviert)"
+  value       = (var.enabled || var.processing_enabled) ? aws_iam_role.scheduler[0].arn : ""
 }

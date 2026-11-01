@@ -133,6 +133,49 @@ _INTERNAL_PRIVACY_ACTIONS = ("privacy/inspect", "privacy/export", "privacy/erase
 # Scheduler-Rolle); ein Secret im Scheduler-Payload waere ein Leak im State.
 INTERNAL_RECOVERY_ACTION = "recovery/scan"
 
+# MO-RC4-P02I-B2: Processing-Recovery (abgelaufene Verarbeitungs-Claims).
+# Ebenfalls nur per direktem Lambda-Invoke (Scheduler/Operator), keine Route.
+INTERNAL_PROCESSING_RECOVERY_ACTION = "processing/scan"
+
+
+def _send_processing_recovery(order_id: str) -> None:
+    """Stellt eine Order erneut zu; wirft bei Fehlern (Recovery zaehlt das als Fehler)."""
+    if not SQS_QUEUE_URL:
+        raise RuntimeError("SQS_QUEUE_URL not configured")
+    message = {
+        "orderId": order_id,
+        "status": "CONFIRMED",
+        "metadata": {"reason": "processing_recovery"},
+    }
+    _get_sqs_client().send_message(
+        QueueUrl=SQS_QUEUE_URL,
+        MessageBody=json.dumps(message),
+        MessageAttributes={"orderId": {"StringValue": order_id, "DataType": "String"}},
+    )
+
+
+def _handle_processing_recovery(event: Dict[str, Any]) -> Dict[str, Any]:
+    from recovery import run_processing_recovery
+
+    options = event.get("options") or {}
+
+    import boto3
+
+    table_name = os.environ.get("ORDERS_TABLE")
+    if not table_name:
+        return fail(internal_error("Lambda is not configured (ORDERS_TABLE missing)"))
+    table = boto3.resource(
+        "dynamodb", region_name=os.environ.get("AWS_REGION", "eu-central-1")
+    ).Table(table_name)
+
+    report = run_processing_recovery(
+        table,
+        _send_processing_recovery,
+        limit=options.get("limit", 20),
+        safety_margin_seconds=options.get("safetyMarginSeconds", 60),
+    )
+    return ok(200, report)
+
 
 def _mark_delivery(service: Any, order_id: str, state: str) -> None:
     """Best-effort-Zustellvermerk; darf die API-Antwort nicht veraendern."""
@@ -176,6 +219,11 @@ def _handle_internal(service: Any, event: Dict[str, Any]) -> Dict[str, Any]:
     if action == INTERNAL_RECOVERY_ACTION:
         try:
             return _handle_recovery(event)
+        except Exception as err:
+            return fail(err)
+    if action == INTERNAL_PROCESSING_RECOVERY_ACTION:
+        try:
+            return _handle_processing_recovery(event)
         except Exception as err:
             return fail(err)
     if action not in _INTERNAL_PRIVACY_ACTIONS:

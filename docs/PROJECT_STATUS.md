@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02I-A — Recovery-Safety (Klassifikation, Ereignis-Logs, Runbook); Auto-Recovery OPEN
+MO-RC4-P02I-B2 — Automatische Processing-Recovery (GSI3, separater Schedule default aus, DLQ-Alarm)
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
