@@ -98,6 +98,48 @@ class TestPreflightFailClosed(unittest.TestCase):
             self.assertTrue((target / "terraform" / "main.tf").is_file())
 
 
+class TestArtifactIntegrityGate(unittest.TestCase):
+    """MO-RC4-P02I-C1: der Builder uebernimmt keine ungueltigen Lambda-Artefakte."""
+
+    def _lambda_dir(self, root: Path, modules: dict, archived: dict) -> None:
+        (root / "lambda" / "src").mkdir(parents=True)
+        (root / "lambda" / "dist").mkdir(parents=True)
+        for name, content in modules.items():
+            (root / "lambda" / "src" / name).write_text(content)
+        import zipfile
+        with zipfile.ZipFile(root / "lambda" / "dist" / "lambda.zip", "w") as archive:
+            for name, content in archived.items():
+                archive.writestr(name, content)
+
+    def test_real_repository_artifact_is_accepted(self):
+        from module_builder.builder import _verify_lambda_artifact
+        _verify_lambda_artifact(REPO_ROOT)  # kein SystemExit
+
+    def test_stale_archive_fails_closed(self):
+        from module_builder.builder import _verify_lambda_artifact
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._lambda_dir(
+                root,
+                modules={"index.py": "a = 1\n", "sqs_handler.py": "b = 2\n"},
+                archived={"index.py": "a = 1\n"},
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                _verify_lambda_artifact(root)
+            message = str(ctx.exception)
+            self.assertIn("fail-closed", message)
+            self.assertIn("sqs_handler.py", message)
+
+    def test_missing_archive_fails_closed(self):
+        from module_builder.builder import _verify_lambda_artifact
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "lambda" / "src").mkdir(parents=True)
+            (root / "lambda" / "src" / "index.py").write_text("a = 1\n")
+            with self.assertRaises(SystemExit):
+                _verify_lambda_artifact(root)
+
+
 class TestGeneratedProject(unittest.TestCase):
     """Vollständiger Build gegen das echte Repo-Quellverzeichnis."""
 
