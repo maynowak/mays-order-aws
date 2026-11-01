@@ -144,6 +144,14 @@ Agenten-/Dienst-Delegation bleibt **BLOCKED**, bis ein verifizierter Delegations
 entschieden ist; der kanonische Schlüssel ist kollisionsfrei (Längenpräfixe) und wird
 **nicht** als neuer DynamoDB-Schlüssel eingeführt (GSI2/Privacy bleiben unverändert).
 
+*Nachtrag P02B (2026-11-01, implementiert, additiv):* Jede Bindung trägt einen
+`identityVerification`-Kontext (`verified_jwt`; `verified_internal_signed` ist definiert,
+aber **nicht** implementiert). `resolve_internal_order_identity` verweigert Bindungen ohne
+verifizierten Kontext und lehnt Owner≠Actor ab. RIS-Direktschreibungen bleiben
+**BLOCKED** (MO kann sie technisch nicht validieren; benötigt V-1/V-3 und RIS-Umsetzung).
+Privacy-Funktionen akzeptieren einen **optionalen** `consumerId`-Scope, der nur
+einschränkt; echte Mehr-Consumer-Isolation auf Indexebene ist **BLOCKED** (GSI2 unverändert).
+
 **D-2 — Orphan Detection**
 Verwaist = Nutzer nachweislich weg **und** Frist abgelaufen **und** nicht `RETAIN`.
 Bestellungen **ohne** Nutzerbezug gelten **nicht** als verwaist. Nicht prüfbare Zuordnung

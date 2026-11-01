@@ -45,6 +45,7 @@ ITEM_OWNER_ID = "ownerId"
 ITEM_ACTOR_TYPE = "actorType"
 ITEM_ACTOR_ID = "actorId"
 ITEM_IDENTITY_VERSION = "identityVersion"
+ITEM_IDENTITY_VERIFICATION = "identityVerification"
 
 IDENTITY_ITEM_FIELDS = (
     ITEM_CONSUMER_ID,
@@ -53,12 +54,21 @@ IDENTITY_ITEM_FIELDS = (
     ITEM_ACTOR_TYPE,
     ITEM_ACTOR_ID,
     ITEM_IDENTITY_VERSION,
+    ITEM_IDENTITY_VERIFICATION,
 )
+
+# Verifikationskontext (MO-RC4-P02B): WARUM darf der Actor fuer den Owner handeln?
+# Nur ausdruecklich verifizierte Kontexte duerfen eine Bindung erzeugen.
+VERIFICATION_JWT = "verified_jwt"                 # API Gateway JWT (implementiert)
+VERIFICATION_INTERNAL = "verified_internal_signed"  # interner Vertrag (NICHT implementiert)
+VERIFICATION_NONE = "none"                        # unverifiziert (keine Bindung)
+VERIFIED_CONTEXTS = (VERIFICATION_JWT,)
 
 # Herkunft der Eigentuemerzuordnung (nur Klassifikation, keine Mutation).
 SOURCE_API_V1 = "api_v1"
 SOURCE_LEGACY_SUBJECT = "legacy_subject"
 SOURCE_LEGACY_UNOWNED = "legacy_unowned"
+SOURCE_INCONSISTENT = "inconsistent_binding"
 
 
 def _clean_component(value: Any, name: str) -> Optional[str]:
@@ -158,12 +168,18 @@ class OrderIdentity:
     actor_type: str
     actor_id: str
     identity_version: int = IDENTITY_VERSION
+    verification_context: str = VERIFICATION_JWT
 
     def __post_init__(self) -> None:
         if self.owner_type not in IDENTITY_TYPES:
             raise validation_error(f"Unsupported ownerType '{self.owner_type}'")
         if self.actor_type not in IDENTITY_TYPES:
             raise validation_error(f"Unsupported actorType '{self.actor_type}'")
+        if self.verification_context not in VERIFIED_CONTEXTS:
+            # Eine unverifizierte Identitaet darf niemals als Bindung gelten.
+            raise validation_error(
+                f"Unsupported verification context '{self.verification_context}'"
+            )
 
     def canonical_key(self) -> str:
         """Kollisionsfreier Schluessel: consumerId + ownerType + ownerId.
@@ -187,6 +203,7 @@ class OrderIdentity:
             ITEM_ACTOR_TYPE: self.actor_type,
             ITEM_ACTOR_ID: self.actor_id,
             ITEM_IDENTITY_VERSION: self.identity_version,
+            ITEM_IDENTITY_VERIFICATION: self.verification_context,
         }
 
 
@@ -222,6 +239,69 @@ def resolve_order_identity(
     )
 
 
+@dataclass(frozen=True)
+class InternalOrderIdentity(OrderIdentity):
+    """Identitaet aus einem internen Kontext (nicht HTTP).
+
+    Traegt zusaetzlich den Verifikationskontext, WARUM der Actor fuer den
+    Owner handeln darf. Nur verifizierte Kontexte sind zulaessig
+    (siehe VERIFIED_CONTEXTS); `order`-Daten sind NIE eine Identitaetsquelle.
+    """
+
+
+def resolve_internal_order_identity(
+    context: Mapping[str, Any],
+    order: Optional[Mapping[str, Any]] = None,
+) -> InternalOrderIdentity:
+    """Loest eine Identitaet fuer interne Consumer (z. B. RIS) auf.
+
+    `order` wird bewusst NICHT ausgewertet: Bestelldaten (inkl. vom Client
+    uebermittelter IDs) sind keine vertrauenswuerdige Identitaetsquelle.
+    Ohne verifizierten Kontext gibt es KEINE Bindung (fail-closed).
+    """
+    if not isinstance(context, Mapping):
+        raise validation_error("Missing internal identity context")
+
+    verification = context.get("verificationContext")
+    if verification not in VERIFIED_CONTEXTS:
+        raise validation_error(
+            "No verified internal identity context: owner binding for internal "
+            "consumers is BLOCKED until a verified trust contract exists"
+        )
+
+    consumer_id = _value_component(context.get("consumerId"), "consumerId")
+    owner_type = context.get("ownerType")
+    if owner_type not in IDENTITY_TYPES:
+        raise validation_error(f"Unsupported ownerType '{owner_type}'")
+    if owner_type != OWNER_TYPE_USER:
+        raise validation_error(
+            f"Owner type '{owner_type}' is not enabled: no verified owner contract"
+        )
+    owner_id = _value_component(context.get("ownerId"), "ownerId")
+
+    actor_type = context.get("actorType") or owner_type
+    actor_id = context.get("actorId") or owner_id
+    if actor_type not in IDENTITY_TYPES:
+        raise validation_error(f"Unsupported actorType '{actor_type}'")
+    actor_id = _value_component(actor_id, "actorId")
+
+    if (owner_type, owner_id) != (actor_type, actor_id):
+        raise validation_error(
+            "Owner/actor separation requires a signed verification context "
+            "(not implemented): refusing to bind an unverified delegation"
+        )
+
+    return InternalOrderIdentity(
+        consumer_id=consumer_id,
+        owner_type=owner_type,
+        owner_id=owner_id,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        identity_version=IDENTITY_VERSION,
+        verification_context=verification,
+    )
+
+
 def resolve_order_identity_from_event(event: Mapping[str, Any]) -> OrderIdentity:
     """Einstieg fuer den Order-Handler (HTTP-API-v2-Event)."""
     return resolve_order_identity(_claims_from_event(event))
@@ -242,13 +322,26 @@ def classify_ownership(item: Mapping[str, Any]) -> Dict[str, Any]:
     """
     subject = item.get("subjectId")
     version = item.get(ITEM_IDENTITY_VERSION)
-    if isinstance(subject, str) and subject and isinstance(version, int) and version >= IDENTITY_VERSION:
+    verification = item.get(ITEM_IDENTITY_VERIFICATION)
+    if (
+        isinstance(subject, str)
+        and subject
+        and isinstance(version, int)
+        and version >= IDENTITY_VERSION
+    ):
+        # Eine Bindung gilt nur mit ausdruecklich verifiziertem Kontext und
+        # konsistenten Feldern; sonst wird sie NICHT als verifiziert gemeldet.
+        consistent = (
+            item.get(ITEM_OWNER_ID) in (None, subject)
+            and verification in VERIFIED_CONTEXTS
+        )
         return {
-            "ownerSource": SOURCE_API_V1,
+            "ownerSource": SOURCE_API_V1 if consistent else SOURCE_INCONSISTENT,
             "ownerType": item.get(ITEM_OWNER_TYPE, OWNER_TYPE_USER),
             "ownerId": item.get(ITEM_OWNER_ID, subject),
             "consumerId": item.get(ITEM_CONSUMER_ID),
             "identityVersion": version,
+            "verificationContext": verification,
         }
     if isinstance(subject, str) and subject:
         return {
@@ -257,6 +350,7 @@ def classify_ownership(item: Mapping[str, Any]) -> Dict[str, Any]:
             "ownerId": subject,
             "consumerId": None,
             "identityVersion": IDENTITY_VERSION_LEGACY,
+            "verificationContext": None,
         }
     return {
         "ownerSource": SOURCE_LEGACY_UNOWNED,
@@ -264,4 +358,35 @@ def classify_ownership(item: Mapping[str, Any]) -> Dict[str, Any]:
         "ownerId": None,
         "consumerId": None,
         "identityVersion": None,
+        "verificationContext": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Privacy-Scope (MO-RC4-P02B): Consumer-Isolation
+# ---------------------------------------------------------------------------
+
+def privacy_scope_consumer(context: Optional[Mapping[str, Any]]) -> Optional[str]:
+    """Liest den optionalen Consumer-Scope aus einem internen Auth-Kontext.
+
+    Nicht gesetzt => unveraendertes Verhalten (Deployment-weiter Scope).
+    Gesetzt      => Abfragen duerfen nur Items dieses Consumers sehen.
+    """
+    if not isinstance(context, Mapping):
+        return None
+    raw = context.get("consumerId") or context.get("consumer")
+    if raw is None:
+        return None
+    return _value_component(raw, "consumerId")
+
+
+def item_in_privacy_scope(item: Mapping[str, Any], consumer_id: Optional[str]) -> bool:
+    """True, wenn das Item im angegebenen Consumer-Scope liegt.
+
+    Ohne Scope immer True (rueckwaertskompatibel). Mit Scope gilt strikt:
+    nur Items mit identischer `consumerId`. Legacy-Items (ohne `consumerId`)
+    werden NICHT stillschweigend einem Consumer zugeschlagen.
+    """
+    if consumer_id is None:
+        return True
+    return item.get(ITEM_CONSUMER_ID) == consumer_id

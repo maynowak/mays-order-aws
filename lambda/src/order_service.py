@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
-from identity import IDENTITY_ITEM_FIELDS, OrderIdentity, OWNER_TYPE_USER
+from identity import (
+    IDENTITY_ITEM_FIELDS,
+    OrderIdentity,
+    OWNER_TYPE_USER,
+    item_in_privacy_scope,
+    privacy_scope_consumer,
+)
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
@@ -277,6 +283,7 @@ class OrderService:
         # Query GSI2 for orders linked to subject (vollstaendig paginiert:
         # MO-RC4-P02 — ein Benutzer kann mehr Bestellungen haben als eine
         # DynamoDB-Seite (1 MB) zurueckgibt).
+        scope = privacy_scope_consumer(context)
         items = []
         last_evaluated_key = None
         try:
@@ -285,13 +292,16 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer",
+                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,consumerId",
                     "ExpressionAttributeNames": {"#status": "status"},
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
-                items.extend(result.get("Items", []))
+                page_items = result.get("Items", [])
+                items.extend(
+                    item for item in page_items if item_in_privacy_scope(item, scope)
+                )
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
                     break
@@ -337,6 +347,7 @@ class OrderService:
             raise validation_error("Invalid subjectId")
 
         operation_id = str(uuid.uuid4())
+        scope = privacy_scope_consumer(context)
         orders = []
         last_evaluated_key = None
         limitations = []
@@ -347,7 +358,7 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency",
+                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency,consumerId",
                     "ExpressionAttributeNames": {"#status": "status"},
                 }
                 if last_evaluated_key:
@@ -355,6 +366,8 @@ class OrderService:
                 result = self._table.query(**query_kwargs)
                 items = result.get("Items", [])
                 for item in items:
+                    if not item_in_privacy_scope(item, scope):
+                        continue
                     # Build minimal export view, exclude internal fields
                     export_item = {
                         "orderId": item.get("orderId"),
@@ -441,6 +454,8 @@ class OrderService:
                         "orderId": item.get("orderId"),
                         "subjectId": item.get("subjectId"),
                         "version": item.get("version"),
+                        # P02B: fuer den optionalen Consumer-Scope-Filter
+                        "consumerId": item.get("consumerId"),
                     })
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -459,6 +474,19 @@ class OrderService:
                 "completedAt": now_iso(),
             }
 
+        scope = privacy_scope_consumer(context)
+        if scope is not None:
+            in_scope = [entry for entry in affected if item_in_privacy_scope(entry, scope)]
+            excluded = len(affected) - len(in_scope)
+            affected = in_scope
+        else:
+            excluded = 0
+        scope_limitations = (
+            [f"{excluded} record(s) outside consumer scope were not touched"]
+            if excluded
+            else []
+        )
+
         if mode == "PREVIEW":
             planned_deletes = 0
             planned_retentions = 0
@@ -476,7 +504,7 @@ class OrderService:
                 "plannedDeletes": planned_deletes if policy == "ERASE" else 0,
                 "plannedAnonymizations": len(affected) if policy == "ANONYMIZE" else 0,
                 "plannedRetentions": planned_retentions,
-                "limitations": [],
+                "limitations": list(scope_limitations),
                 "completedAt": now_iso(),
             }
 
@@ -564,7 +592,7 @@ class OrderService:
             "retainedRecords": retained,
             "skippedRecords": skipped,
             "failedRecords": failed,
-            "limitations": [],
+            "limitations": list(scope_limitations),
             "completedAt": now_iso(),
         }
 

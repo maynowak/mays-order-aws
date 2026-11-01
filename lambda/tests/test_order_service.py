@@ -881,3 +881,113 @@ class TestIdentityPersistenceP02A(unittest.TestCase):
 
         from identity import SOURCE_LEGACY_SUBJECT, classify_ownership
         self.assertEqual(classify_ownership(stored)["ownerSource"], SOURCE_LEGACY_SUBJECT)
+
+
+class TestPrivacyConsumerScopeP02B(unittest.TestCase):
+    """MO-RC4-P02B: Consumer-Scope filtert Privacy-Ergebnisse (nur einschränkend)."""
+
+    def _ctx(self, consumer=None):
+        context = {"project": "mays-orders", "authorized": True,
+                   "privacy_inspect": True, "privacy_export": True,
+                   "privacy_erase": True, "internal_token": "test-secret"}
+        if consumer is not None:
+            context["consumerId"] = consumer
+        return context
+
+    def _items(self):
+        return [
+            make_order(orderId="ord_a", subjectId="user-123",
+                       consumerId="consumer-a", identityVersion=1,
+                       identityVerification="verified_jwt"),
+            make_order(orderId="ord_b", subjectId="user-123",
+                       consumerId="consumer-b", identityVersion=1,
+                       identityVerification="verified_jwt"),
+            make_order(orderId="ord_legacy", subjectId="user-123"),
+        ]
+
+    def test_inspect_without_scope_returns_all(self):
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": self._items()}}),
+        )
+        result = service.inspect_subject("user-123", context=self._ctx())
+        self.assertEqual(result["affectedRecords"], 3)
+
+    def test_inspect_with_scope_returns_only_matching_consumer(self):
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": self._items()}}),
+        )
+        result = service.inspect_subject("user-123", context=self._ctx("consumer-a"))
+        self.assertEqual(result["orderReferences"], ["ord_a"])
+
+    def test_export_with_scope_hides_other_consumer_and_legacy(self):
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": self._items()}}),
+        )
+        result = service.export_subject("user-123", context=self._ctx("consumer-b"))
+        self.assertEqual(result["recordCount"], 1)
+        self.assertEqual(result["orders"][0]["orderId"], "ord_b")
+        # consumerId ist kein Exportfeld
+        self.assertNotIn("consumerId", result["orders"][0])
+
+    def test_erase_with_scope_does_not_touch_foreign_consumer(self):
+        deleted = []
+
+        def on_delete(**kwargs):
+            deleted.append(kwargs["Key"])
+            return {}
+
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": self._items()},
+                         "delete_item": on_delete}),
+        )
+        result = service.erase_subject(
+            "user-123", context=self._ctx("consumer-a"),
+            options={"mode": "EXECUTE", "policy": "ERASE"},
+        )
+
+        self.assertEqual(result["deletedRecords"], 1)
+        expected_pk = self._items()[0]["pk"]
+        self.assertEqual(deleted, [{"pk": expected_pk, "sk": "#ORDER"}])
+        self.assertTrue(any("outside consumer scope" in note for note in result["limitations"]))
+
+    def test_erase_without_scope_keeps_previous_behavior(self):
+        deleted = []
+
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": self._items()},
+                         "delete_item": lambda **kw: deleted.append(kw["Key"]) or {}}),
+        )
+        result = service.erase_subject(
+            "user-123", context=self._ctx(),
+            options={"mode": "EXECUTE", "policy": "ERASE"},
+        )
+        self.assertEqual(result["deletedRecords"], 3)
+        self.assertEqual(result["limitations"], [])
+
+    def test_status_update_does_not_touch_identity_fields(self):
+        captured = {}
+
+        def on_get(**kwargs):
+            return {"Item": make_order(subjectId="user-123", version=1,
+                                       consumerId="consumer-a", identityVersion=1,
+                                       identityVerification="verified_jwt")}
+
+        def on_update(**kwargs):
+            captured.update(kwargs)
+            return {"Attributes": make_order(status="CONFIRMED", version=2,
+                                             subjectId="user-123")}
+
+        service = create_order_service(
+            "mays-orders", make_client({"get_item": on_get, "update_item": on_update})
+        )
+        service.update_order_status(ORDER_ID, "CONFIRMED")
+
+        expression = captured["UpdateExpression"]
+        for field in ("subjectId", "consumerId", "ownerId", "actorId",
+                      "identityVersion", "identityVerification"):
+            self.assertNotIn(field, expression)

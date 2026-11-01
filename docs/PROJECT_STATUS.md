@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02A — Identity-Resolution (Consumer/Owner/Actor), Legacy-Kompatibilität; Delegation BLOCKED
+MO-RC4-P02B — Interner Identitätsvertrag + Privacy-Scope; RIS-Bindung BLOCKED
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin

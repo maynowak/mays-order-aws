@@ -8,6 +8,7 @@ from identity import (
     IDENTITY_VERSION,
     IDENTITY_VERSION_LEGACY,
     SOURCE_API_V1,
+    SOURCE_INCONSISTENT,
     SOURCE_LEGACY_SUBJECT,
     SOURCE_LEGACY_UNOWNED,
     OrderIdentity,
@@ -177,11 +178,25 @@ class TestLegacyClassification(unittest.TestCase):
             "actorType": "user",
             "actorId": "user-1",
             "identityVersion": 1,
+            "identityVerification": "verified_jwt",
         }
         result = classify_ownership(item)
         self.assertEqual(result["ownerSource"], SOURCE_API_V1)
         self.assertEqual(result["consumerId"], "cognito:iss#client")
         self.assertEqual(result["identityVersion"], 1)
+        self.assertEqual(result["verificationContext"], "verified_jwt")
+
+    def test_binding_without_verification_context_is_inconsistent(self):
+        """Eine Bindung ohne Verifikationsnachweis gilt NICHT als verifiziert."""
+        item = {
+            "subjectId": "user-1",
+            "consumerId": "cognito:iss#client",
+            "ownerId": "user-1",
+            "identityVersion": 1,
+        }
+        result = classify_ownership(item)
+        self.assertEqual(result["ownerSource"], SOURCE_INCONSISTENT)
+        self.assertIsNone(result["verificationContext"])
 
     def test_legacy_item_with_subject_only(self):
         result = classify_ownership({"subjectId": "user-1"})
@@ -201,3 +216,126 @@ class TestLegacyClassification(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestInternalIdentityResolutionP02B(unittest.TestCase):
+    """Interne Consumer (RIS) erhalten nur mit verifiziertem Kontext eine Bindung."""
+
+    CONTEXT = {
+        "verificationContext": "verified_jwt",
+        "consumerId": "cognito:iss#client",
+        "ownerType": "user",
+        "ownerId": "user-1",
+        "actorType": "user",
+        "actorId": "user-1",
+    }
+
+    def test_verified_user_context_yields_binding(self):
+        from identity import InternalOrderIdentity, resolve_internal_order_identity
+        identity = resolve_internal_order_identity(dict(self.CONTEXT))
+        self.assertIsInstance(identity, InternalOrderIdentity)
+        self.assertEqual(identity.owner_id, "user-1")
+        self.assertEqual(identity.actor_id, "user-1")
+        self.assertEqual(identity.verification_context, "verified_jwt")
+        self.assertEqual(identity.to_item_fields()["identityVerification"], "verified_jwt")
+
+    def test_unverified_or_missing_context_is_blocked(self):
+        from identity import resolve_internal_order_identity
+        for broken in (
+            {},
+            {"verificationContext": "none"},
+            {"verificationContext": "verified_internal_signed"},  # nicht implementiert
+            {"verificationContext": "trust_me"},
+            None,
+            "verified_jwt",
+        ):
+            with self.subTest(context=broken):
+                with self.assertRaises(OrderError) as ctx:
+                    resolve_internal_order_identity(broken)
+                self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+
+    def test_order_data_is_never_an_identity_source(self):
+        from identity import resolve_internal_order_identity
+        forged_order = {"subjectId": "victim", "ownerId": "victim", "consumerId": "x#y"}
+        with self.assertRaises(OrderError):
+            resolve_internal_order_identity({}, forged_order)
+
+    def test_owner_actor_separation_requires_signed_context(self):
+        from identity import resolve_internal_order_identity
+        separated = dict(self.CONTEXT, actorType="agent", actorId="agent-7")
+        with self.assertRaises(OrderError) as ctx:
+            resolve_internal_order_identity(separated)
+        self.assertIn("signed verification context", ctx.exception.message)
+
+    def test_non_user_owner_types_are_not_enabled(self):
+        from identity import resolve_internal_order_identity
+        for owner_type in ("agent", "service"):
+            with self.subTest(owner_type=owner_type):
+                with self.assertRaises(OrderError):
+                    resolve_internal_order_identity(
+                        dict(self.CONTEXT, ownerType=owner_type, actorType=owner_type)
+                    )
+
+    def test_manipulated_components_are_rejected(self):
+        from identity import resolve_internal_order_identity
+        for field, bad in (
+            ("consumerId", ""),
+            ("consumerId", "x\x00y"),
+            ("ownerId", "  "),
+            ("ownerId", "u" * 257),
+            ("ownerId", 123),
+        ):
+            with self.subTest(field=field, value=repr(bad)):
+                with self.assertRaises(OrderError):
+                    resolve_internal_order_identity(dict(self.CONTEXT, **{field: bad}))
+
+    def test_repeated_resolution_is_stable(self):
+        from identity import resolve_internal_order_identity
+        keys = {
+            resolve_internal_order_identity(dict(self.CONTEXT)).canonical_key()
+            for _ in range(5)
+        }
+        self.assertEqual(len(keys), 1)
+
+    def test_identity_rejects_unverified_verification_context(self):
+        with self.assertRaises(OrderError):
+            OrderIdentity(
+                consumer_id="c#x", owner_type="user", owner_id="u",
+                actor_type="user", actor_id="u", verification_context="none",
+            )
+
+
+class TestPrivacyScopeP02B(unittest.TestCase):
+    """Consumer-Isolation: gleiche Owner-ID, unterschiedliche Consumer."""
+
+    def test_scope_is_optional(self):
+        from identity import item_in_privacy_scope, privacy_scope_consumer
+        self.assertIsNone(privacy_scope_consumer({}))
+        self.assertIsNone(privacy_scope_consumer(None))
+        self.assertEqual(
+            privacy_scope_consumer({"consumerId": "cognito:iss#client"}),
+            "cognito:iss#client",
+        )
+        self.assertEqual(
+            privacy_scope_consumer({"consumer": "cognito:iss#client"}),
+            "cognito:iss#client",
+        )
+
+    def test_no_scope_keeps_everything_visible(self):
+        from identity import item_in_privacy_scope
+        self.assertTrue(item_in_privacy_scope({"subjectId": "u"}, None))
+        self.assertTrue(item_in_privacy_scope({}, None))
+
+    def test_scope_excludes_other_consumers_and_legacy(self):
+        from identity import item_in_privacy_scope
+        mine = {"subjectId": "u1", "consumerId": "consumer-a"}
+        other = {"subjectId": "u1", "consumerId": "consumer-b"}
+        legacy = {"subjectId": "u1"}
+
+        self.assertTrue(item_in_privacy_scope(mine, "consumer-a"))
+        self.assertFalse(item_in_privacy_scope(other, "consumer-a"))
+        self.assertFalse(item_in_privacy_scope(legacy, "consumer-a"))
+
+    def test_legacy_items_have_no_consumer(self):
+        from identity import classify_ownership
+        self.assertIsNone(classify_ownership({"subjectId": "u1"})["consumerId"])

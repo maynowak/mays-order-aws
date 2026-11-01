@@ -151,6 +151,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P01: **COMPLETE (Analyse)** — Contract-Inventar, Orphan-/Secret-Design, ADR-008 (PROPOSED), 23 offene Fragen; keine Implementierung, keine AWS-Operation
 - MO-RC4-P02: **COMPLETE (Implementierung, lokal)** — Ownership erzwungen, Privacy-Konsistenz, 93/93 Tests; Delegationsvertrag für technische Consumer bleibt offen; kein Push
 - MO-RC4-P02A: **COMPLETE (lokal)** — zentrale Identity-Resolution, Legacy-Kompatibilität, GSI2/Privacy unverändert, 120/120 Lambda; Delegation BLOCKED
+- MO-RC4-P02B: **COMPLETE (lokal, teilweise BLOCKED)** — interner Identitätsvertrag + Privacy-Scope, 139/139 Lambda; RIS-Bindung und Mehr-Consumer-Isolation BLOCKED
 
 ==================================================
 
@@ -310,3 +311,6 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02A-IDENTITY-RESOLUTION → docs/reports/MO-RC4-P02A-IDENTITY-RESOLUTION.md (OrderIdentity, Consumer/Owner/Actor, kollisionsfreier Schlüssel, 18+9 Tests)
 - MO-RC4-P02A-LEGACY-COMPATIBILITY → docs/reports/MO-RC4-P02A-LEGACY-COMPATIBILITY.md (Fälle A–E, RIS `orders_reader` schreibt direkt, GSI2 unverändert)
 - MO-RC4-P02A-INTEGRATION-GATES → docs/reports/MO-RC4-P02A-INTEGRATION-GATES.md (13 Gates, Delegation/Agent/Service BLOCKED, V-1…V-6 offen)
+- MO-RC4-P02B-INTERNAL-IDENTITY-CONTRACT → docs/reports/MO-RC4-P02B-INTERNAL-IDENTITY-CONTRACT.md (identityVerification, interne Auflösung nur mit verifiziertem Kontext, Owner≠Actor BLOCKED)
+- MO-RC4-P02B-RIS-COMPATIBILITY → docs/reports/MO-RC4-P02B-RIS-COMPATIBILITY.md (RIS schreibt direkt; Put/Update verifiziert; RIS-Eigentümerbindung BLOCKED; Vertragszusatz V-1/V-3)
+- MO-RC4-P02B-PRIVACY-ISOLATION → docs/reports/MO-RC4-P02B-PRIVACY-ISOLATION.md (GSI2 ohne Consumer-Trennung; opt-in Scope nur einschränkend; Mehr-Consumer-Isolation BLOCKED inkl. Migrationsentwurf)
