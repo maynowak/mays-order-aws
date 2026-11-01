@@ -29,6 +29,12 @@ resource "aws_lambda_event_source_mapping" "sqs_worker" {
   function_name    = aws_lambda_function.worker.arn
   batch_size       = 5
   enabled          = true
+
+  # MO-RC4-P02C: Der Handler meldet fehlgeschlagene Nachrichten einzeln
+  # (batchItemFailures), damit erfolgreiche Nachrichten eines Batches nicht
+  # erneut zugestellt werden. Fehlgeschlagene Nachrichten werden bis
+  # maxReceiveCount erneut zugestellt und danach in die DLQ ueberfuehrt.
+  function_response_types = ["ReportBatchItemFailures"]
 }
 
 output "function_name" {

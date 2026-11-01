@@ -188,6 +188,12 @@ module "sqs" {
   project_name = var.project_name
   tags         = var.tags
   queue_name   = "${var.project_name}-orders-queue"
+
+  # MO-RC4-P02C: DLQ + konfigurierbare Ablaufzeiten
+  visibility_timeout_seconds    = var.sqs_visibility_timeout_seconds
+  message_retention_seconds     = var.sqs_message_retention_seconds
+  dlq_message_retention_seconds = var.sqs_dlq_message_retention_seconds
+  max_receive_count             = var.sqs_max_receive_count
 }
 
 # SQS Worker Lambda - processes messages from SQS queue

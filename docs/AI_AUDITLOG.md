@@ -152,6 +152,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P02: **COMPLETE (Implementierung, lokal)** — Ownership erzwungen, Privacy-Konsistenz, 93/93 Tests; Delegationsvertrag für technische Consumer bleibt offen; kein Push
 - MO-RC4-P02A: **COMPLETE (lokal)** — zentrale Identity-Resolution, Legacy-Kompatibilität, GSI2/Privacy unverändert, 120/120 Lambda; Delegation BLOCKED
 - MO-RC4-P02B: **COMPLETE (lokal, teilweise BLOCKED)** — interner Identitätsvertrag + Privacy-Scope, 139/139 Lambda; RIS-Bindung und Mehr-Consumer-Isolation BLOCKED
+- MO-RC4-P02C: **COMPLETE (lokal)** — Worker kollisionssicher (Condition+Version), SQS-DLQ/Retention/Visibility, partielle Batch-Fehler; 157/157 Lambda, terraform validate PASS
 
 ==================================================
 
@@ -314,3 +315,5 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02B-INTERNAL-IDENTITY-CONTRACT → docs/reports/MO-RC4-P02B-INTERNAL-IDENTITY-CONTRACT.md (identityVerification, interne Auflösung nur mit verifiziertem Kontext, Owner≠Actor BLOCKED)
 - MO-RC4-P02B-RIS-COMPATIBILITY → docs/reports/MO-RC4-P02B-RIS-COMPATIBILITY.md (RIS schreibt direkt; Put/Update verifiziert; RIS-Eigentümerbindung BLOCKED; Vertragszusatz V-1/V-3)
 - MO-RC4-P02B-PRIVACY-ISOLATION → docs/reports/MO-RC4-P02B-PRIVACY-ISOLATION.md (GSI2 ohne Consumer-Trennung; opt-in Scope nur einschränkend; Mehr-Consumer-Isolation BLOCKED inkl. Migrationsentwurf)
+- MO-RC4-P02C-WORKER-SQS-SAFETY → docs/reports/MO-RC4-P02C-WORKER-SQS-SAFETY.md (Worker-Condition/Version, DLQ + maxReceiveCount=1, Retention/Visibility konfigurierbar, ReportBatchItemFailures)
+- MO-RC4-P02C-WORKER-COLLISION-SAFETY → docs/reports/MO-RC4-P02C-WORKER-COLLISION-SAFETY.md (Kollisions-/Access-Sicht: Ownership beim Lesen fehlt, Worker-Routing OPEN)
