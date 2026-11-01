@@ -99,7 +99,8 @@ class TestCreateOrder(unittest.TestCase):
                     {"sku": "SKU-1002", "quantity": 1, "unitPrice": 499},
                 ],
                 "currency": "EUR",
-            }
+            },
+            subject_id="user-123",
         )
 
         self.assertEqual(order["status"], "PENDING")
@@ -151,7 +152,8 @@ class TestCreateOrder(unittest.TestCase):
                 "customer": {"name": "Max Mustermann", "email": "max@example.com"},
                 "items": [{"sku": "SKU-1001", "quantity": 1, "unitPrice": 1999}],
                 "currency": "EUR",
-            }
+            },
+            subject_id="user-123",
         )
 
         self.assertNotIn("isTestData", put_item["item"])
@@ -562,3 +564,213 @@ class TestRuntimeFixRegression(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(captured.get("ExpressionAttributeNames"), {"#status": "status"})
         self.assertIn("#status", captured.get("ProjectionExpression", ""))
+
+
+class TestOrderOwnershipPersistence(unittest.TestCase):
+    """MO-RC4-P02: subjectId wird Pflicht, persistiert und bleibt unveraendert."""
+
+    BODY = {
+        "customer": {"name": "Max Mustermann", "email": "max@example.com"},
+        "items": [{"sku": "SKU-1001", "quantity": 1, "unitPrice": 1999}],
+        "currency": "EUR",
+    }
+
+    def test_create_order_persists_subject_and_gsi2(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        order = service.create_order(self.BODY, subject_id="user-123")
+
+        self.assertEqual(stored["subjectId"], "user-123")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")
+        self.assertTrue(stored["gsi2sk"].startswith(f"{ORDER_ID_PREFIX}{order['orderId']}#"))
+        # interne Felder bleiben aus der API-Antwort heraus
+        self.assertNotIn("subjectId", order)
+        self.assertNotIn("gsi2pk", order)
+
+    def test_create_order_requires_owner(self):
+        cases = (None, "", "   ", "user\x00id", "x" * 257)
+        for bad in cases:
+            with self.subTest(subject=repr(bad)):
+                called = []
+                service = create_order_service(
+                    "mays-orders",
+                    make_client({"put_item": lambda **kw: called.append(kw) or {}}),
+                )
+                with self.assertRaises(OrderError) as ctx:
+                    service.create_order(self.BODY, subject_id=bad)
+                self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+                self.assertEqual(called, [])
+
+    def test_status_update_keeps_original_owner(self):
+        update_args = {}
+
+        def on_get(**kwargs):
+            return {"Item": make_order(version=1, subjectId="user-123",
+                                       gsi2pk="SUBJECT#user-123",
+                                       gsi2sk=f"{ORDER_ID_PREFIX}{ORDER_ID}#x")}
+
+        def on_update(**kwargs):
+            update_args.update(kwargs)
+            updated = make_order(status="CONFIRMED", version=2, subjectId="user-123",
+                                 gsi2pk="SUBJECT#user-123",
+                                 gsi2sk=f"{ORDER_ID_PREFIX}{ORDER_ID}#x")
+            return {"Attributes": updated}
+
+        service = create_order_service(
+            "mays-orders", make_client({"get_item": on_get, "update_item": on_update})
+        )
+        result = service.update_order_status(ORDER_ID, "CONFIRMED")
+
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertNotIn("subjectId", result)
+        self.assertNotIn("subjectId", update_args["UpdateExpression"])
+        self.assertNotIn("gsi2pk", update_args["UpdateExpression"])
+
+    def test_body_cannot_smuggle_subject_id(self):
+        called = []
+        body = dict(self.BODY)
+        body["subjectId"] = "attacker"
+        service = create_order_service(
+            "mays-orders", make_client({"put_item": lambda **kw: called.append(kw) or {}})
+        )
+        with self.assertRaises(OrderError) as ctx:
+            service.create_order(body, subject_id="user-123")
+        self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(called, [])
+
+    def test_two_users_get_distinct_gsi2_partitions(self):
+        stored = []
+
+        def on_put(**kwargs):
+            stored.append(kwargs["Item"]["gsi2pk"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        service.create_order(self.BODY, subject_id="user-a")
+        service.create_order(self.BODY, subject_id="user-b")
+        self.assertEqual(stored, ["SUBJECT#user-a", "SUBJECT#user-b"])
+
+
+class TestPrivacyConsistency(unittest.TestCase):
+    """MO-RC4-P02: Privacy-Funktionen nutzen die Zuordnung vollstaendig und sicher."""
+
+    CONTEXT = {"project": "mays-orders", "authorized": True,
+               "privacy_inspect": True, "privacy_export": True, "privacy_erase": True,
+               "internal_token": "test-secret"}
+
+    def test_inspect_paginates_all_pages(self):
+        pages = [
+            {"Items": [make_order(orderId="ord_1")], "LastEvaluatedKey": {"k": "1"}},
+            {"Items": [make_order(orderId="ord_2")], "LastEvaluatedKey": {"k": "2"}},
+            {"Items": [make_order(orderId="ord_3")]},
+        ]
+        calls = []
+
+        def on_query(**kwargs):
+            calls.append(kwargs)
+            return pages[len(calls) - 1]
+
+        service = create_order_service("mays-orders", make_client({"query": on_query}))
+        result = service.inspect_subject("user-123", context=self.CONTEXT)
+
+        self.assertEqual(len(calls), 3)
+        self.assertIn("ExclusiveStartKey", calls[1])
+        self.assertEqual(result["affectedRecords"], 3)
+        self.assertCountEqual(result["orderReferences"], ["ord_1", "ord_2", "ord_3"])
+
+    def test_erase_is_idempotent_when_item_already_gone(self):
+        items = [make_order(subjectId="user-123", version=1)]
+
+        def on_query(**kwargs):
+            return {"Items": items}
+
+        def on_delete(**kwargs):
+            raise FakeClientError("ConditionalCheckFailedException")
+
+        service = create_order_service(
+            "mays-orders", make_client({"query": on_query, "delete_item": on_delete})
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT, options={"mode": "EXECUTE", "policy": "ERASE"}
+        )
+
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["deletedRecords"], 0)
+        self.assertEqual(result["skippedRecords"], 1)
+        self.assertEqual(result["failedRecords"], 0)
+
+    def test_erase_guard_binds_subject_in_condition(self):
+        items = [make_order(subjectId="user-123", version=2)]
+        captured = {}
+
+        def on_delete(**kwargs):
+            captured.update(kwargs)
+            return {}
+
+        service = create_order_service(
+            "mays-orders", make_client({"query": lambda **kw: {"Items": items},
+                                        "delete_item": on_delete})
+        )
+        service.erase_subject(
+            "user-123", context=self.CONTEXT, options={"mode": "EXECUTE", "policy": "ERASE"}
+        )
+
+        self.assertIn("subjectId = :sid", captured["ConditionExpression"])
+        self.assertIn("version = :ver", captured["ConditionExpression"])
+        self.assertEqual(captured["ExpressionAttributeValues"][":sid"], "user-123")
+
+    def test_erase_only_deletes_own_records(self):
+        """Fremde Bestellungen tauchen in der GSI2-Query gar nicht erst auf."""
+        deleted_keys = []
+
+        def on_query(**kwargs):
+            self.assertEqual(kwargs["ExpressionAttributeValues"][":pk"], "SUBJECT#user-123")
+            return {"Items": [make_order(subjectId="user-123", version=1)]}
+
+        def on_delete(**kwargs):
+            deleted_keys.append(kwargs["Key"])
+            return {}
+
+        service = create_order_service(
+            "mays-orders", make_client({"query": on_query, "delete_item": on_delete})
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT, options={"mode": "EXECUTE", "policy": "ERASE"}
+        )
+        self.assertEqual(result["deletedRecords"], 1)
+        self.assertEqual(deleted_keys, [{"pk": f"{ORDER_ID_PREFIX}{ORDER_ID}", "sk": "#ORDER"}])
+
+    def test_anonymize_removes_owner_link(self):
+        items = [make_order(subjectId="user-123", version=1)]
+        captured = {}
+
+        def on_update(**kwargs):
+            captured.update(kwargs)
+            return {}
+
+        service = create_order_service(
+            "mays-orders", make_client({"query": lambda **kw: {"Items": items},
+                                        "update_item": on_update})
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT, options={"mode": "EXECUTE", "policy": "ANONYMIZE"}
+        )
+
+        self.assertEqual(result["anonymizedRecords"], 1)
+        self.assertIn("REMOVE subjectId, gsi2pk, gsi2sk", captured["UpdateExpression"])
+        self.assertEqual(captured["ExpressionAttributeValues"][":sid"], "user-123")
+
+    def test_erase_requires_explicit_policy(self):
+        service = create_order_service(
+            "mays-orders", make_client({"query": lambda **kw: {"Items": [make_order()]}})
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT, options={"mode": "EXECUTE"}
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("Missing explicit retention policy", result["limitations"])

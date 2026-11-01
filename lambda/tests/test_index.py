@@ -11,7 +11,9 @@ from errors import order_not_found
 
 class FakeService:
     def __init__(self, create=None, get=None, list_orders=None, update=None):
-        self.create_order = create or (lambda raw: {"orderId": "ord_1", "status": "PENDING"})
+        self.create_order = create or (
+            lambda raw, subject_id=None: {"orderId": "ord_1", "status": "PENDING"}
+        )
         self.get_order = get or (lambda order_id: {"orderId": order_id, "status": "PENDING"})
         self.list_orders = list_orders or (
             lambda limit, next_token=None: {"orders": [], "count": 0}
@@ -19,6 +21,16 @@ class FakeService:
         self.update_order_status = update or (
             lambda order_id, status: {"orderId": order_id, "status": status}
         )
+
+
+def auth_event(route_key, sub="user-123", **extra):
+    """Event mit verifiziertem JWT-Kontext (HTTP API v2, Payload 2.0)."""
+    event = {
+        "routeKey": route_key,
+        "requestContext": {"authorizer": {"jwt": {"claims": {"sub": sub}}}},
+    }
+    event.update(extra)
+    return event
 
 
 @contextmanager
@@ -42,32 +54,36 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_returns_201_and_parses_body(self):
         captured = {}
 
-        def create(raw):
+        def create(raw, subject_id=None):
             captured["raw"] = raw
+            captured["subject_id"] = subject_id
             return {"orderId": "ord_1", "status": "PENDING", "totalAmount": 2000}
 
         fake = FakeService(create=create)
         with patch_service(fake):
             response = index.handler(
-                {
-                    "routeKey": "POST /orders",
-                    "body": json.dumps(
+                auth_event(
+                    "POST /orders",
+                    sub="user-abc",
+                    body=json.dumps(
                         {
                             "customer": {"name": "Max", "email": "max@example.com"},
                             "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 2000}],
                             "currency": "EUR",
                         }
                     ),
-                },
+                ),
                 None,
             )
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(captured["raw"]["customer"]["name"], "Max")
+        # MO-RC4-P02: Eigentuemer stammt aus dem JWT-Kontext
+        self.assertEqual(captured["subject_id"], "user-abc")
 
     def test_post_orders_decodes_base64_body(self):
         captured = {}
 
-        def create(raw):
+        def create(raw, subject_id=None):
             captured["raw"] = raw
             return {"orderId": "ord_1", "status": "PENDING"}
 
@@ -77,11 +93,11 @@ class TestHandlerRoutes(unittest.TestCase):
                               "currency": "EUR"})
         with patch_service(fake):
             index.handler(
-                {
-                    "routeKey": "POST /orders",
-                    "body": base64.b64encode(payload.encode("utf-8")).decode("utf-8"),
-                    "isBase64Encoded": True,
-                },
+                auth_event(
+                    "POST /orders",
+                    body=base64.b64encode(payload.encode("utf-8")).decode("utf-8"),
+                    isBase64Encoded=True,
+                ),
                 None,
             )
         self.assertEqual(captured["raw"]["customer"]["name"], "Max")
@@ -89,7 +105,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_invalid_json_returns_400(self):
         fake = FakeService()
         with patch_service(fake):
-            response = index.handler({"routeKey": "POST /orders", "body": "not json"}, None)
+            response = index.handler(auth_event("POST /orders", body="not json"), None)
         self.assertEqual(response["statusCode"], 400)
         self.assertEqual(json.loads(response["body"])["error"]["code"], "VALIDATION_ERROR")
 
@@ -225,13 +241,16 @@ class TestHandlerErrors(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "ORDER_NOT_FOUND")
 
     def test_unexpected_error_maps_to_500(self):
-        def create_boom(raw):
+        def create_boom(raw, subject_id=None):
             raise RuntimeError("boom")
 
         fake = FakeService(create=create_boom)
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "POST /orders", "body": json.dumps({"customer": {}, "items": [], "currency": ""})},
+                auth_event(
+                    "POST /orders",
+                    body=json.dumps({"customer": {}, "items": [], "currency": ""}),
+                ),
                 None,
             )
         self.assertEqual(response["statusCode"], 500)
@@ -307,3 +326,108 @@ class TestInternalPrivacyDispatch(unittest.TestCase):
                 None,
             )
         self.assertEqual(response["statusCode"], 400)
+
+
+class TestOrderOwnership(unittest.TestCase):
+    """MO-RC4-P02: Eigentuemer kommt ausschliesslich aus dem verifizierten JWT."""
+
+    def test_post_without_authorizer_is_rejected(self):
+        fake = FakeService()
+        with patch_service(fake):
+            response = index.handler(
+                {
+                    "routeKey": "POST /orders",
+                    "body": json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                                        "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                                        "currency": "EUR"}),
+                },
+                None,
+            )
+        self.assertEqual(response["statusCode"], 401)
+        self.assertEqual(json.loads(response["body"])["error"]["code"], "UNAUTHORIZED")
+
+    def test_post_with_blank_subject_is_rejected(self):
+        for blank in ("", "   "):
+            with self.subTest(sub=repr(blank)):
+                fake = FakeService()
+                with patch_service(fake):
+                    response = index.handler(
+                        auth_event("POST /orders", sub=blank,
+                                   body=json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                                                    "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                                                    "currency": "EUR"})),
+                        None,
+                    )
+                self.assertEqual(response["statusCode"], 401)
+
+    def test_post_with_malformed_subject_is_rejected(self):
+        cases = ("x" * 257, "user\x00id", "user\nid")
+        for bad in cases:
+            with self.subTest(sub=repr(bad)):
+                fake = FakeService()
+                with patch_service(fake):
+                    response = index.handler(
+                        auth_event("POST /orders", sub=bad,
+                                   body=json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                                                    "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                                                    "currency": "EUR"})),
+                        None,
+                    )
+                self.assertEqual(response["statusCode"], 401)
+
+    def test_body_subject_id_cannot_override_jwt(self):
+        captured_subject = {}
+
+        def create(raw, subject_id=None):
+            captured_subject["value"] = subject_id
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+        with patch_service(fake):
+            response = index.handler(
+                auth_event(
+                    "POST /orders",
+                    sub="real-user",
+                    body=json.dumps({
+                        "customer": {"name": "Max", "email": "max@example.com"},
+                        "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                        "currency": "EUR",
+                        "subjectId": "attacker",
+                    }),
+                ),
+                None,
+            )
+        # Der Handler uebernimmt ausschliesslich den JWT-Wert; das Body-Feld
+        # wird nie als Eigentuemer verwendet (Ablehnung erfolgt im Service-
+        # Validator, siehe test_order_service).
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(captured_subject["value"], "real-user")
+
+    def test_flat_authorizer_claims_are_accepted(self):
+        captured = {}
+
+        def create(raw, subject_id=None):
+            captured["subject_id"] = subject_id
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+        with patch_service(fake):
+            response = index.handler(
+                {
+                    "routeKey": "POST /orders",
+                    "requestContext": {"authorizer": {"sub": "flat-user"}},
+                    "body": json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                                        "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                                        "currency": "EUR"}),
+                },
+                None,
+            )
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(captured["subject_id"], "flat-user")
+
+    def test_get_orders_does_not_require_authorizer(self):
+        """Lesende Routen bleiben unveraendert (keine Regressionswirkung)."""
+        fake = FakeService()
+        with patch_service(fake):
+            response = index.handler({"routeKey": "GET /orders"}, None)
+        self.assertEqual(response["statusCode"], 200)

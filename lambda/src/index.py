@@ -7,13 +7,59 @@ import sys
 import uuid
 from typing import Any, Dict, Optional
 
-from errors import OrderError, error_body, internal_error, json_default, validation_error
+from errors import (
+    OrderError,
+    error_body,
+    internal_error,
+    json_default,
+    unauthorized_error,
+    validation_error,
+)
 from order_service import create_order_service
 from validation import validate_list_params, validate_order_id, validate_status_update_body
 
 JSON_HEADERS = {"Content-Type": "application/json"}
 
 SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+
+# Eigentümer-Identität (MO-RC4-P02): ausschließlich aus dem verifizierten
+# JWT-Autorisator-Kontext, nie aus dem Request-Body. Cognito-`sub` ist eine
+# stabile, unveränderliche Benutzer-ID.
+_MAX_SUBJECT_ID_LENGTH = 256
+
+
+def extract_subject_id(event: Dict[str, Any]) -> str:
+    """Liefert die verifizierte Benutzeridentität (JWT `sub`) oder wirft 401.
+
+    HTTP API v2 (Payload 2.0) legt die Claims unter
+    `requestContext.authorizer.jwt.claims` ab. Ein flaches `authorizer`-Objekt
+    (REST-API-Stil) wird defensiv ebenfalls akzeptiert. Fehlt die Identität,
+    wird bewusst KEIN Ersatz abgeleitet — der Aufruf wird kontrolliert
+    abgelehnt (fail-closed).
+    """
+    request_context = event.get("requestContext") or {}
+    authorizer = request_context.get("authorizer") or {}
+
+    claims: Dict[str, Any] = {}
+    jwt = authorizer.get("jwt") if isinstance(authorizer, dict) else None
+    if isinstance(jwt, dict):
+        raw_claims = jwt.get("claims")
+        if isinstance(raw_claims, dict):
+            claims = raw_claims
+
+    subject = claims.get("sub")
+    if subject is None and isinstance(authorizer, dict):
+        subject = authorizer.get("sub")
+
+    if not isinstance(subject, str):
+        raise unauthorized_error("Missing authenticated user identity")
+
+    subject = subject.strip()
+    if not subject or len(subject) > _MAX_SUBJECT_ID_LENGTH:
+        raise unauthorized_error("Invalid authenticated user identity")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in subject):
+        raise unauthorized_error("Invalid authenticated user identity")
+    return subject
 
 # Bestehenden Helper wiederverwenden (zentral in errors.json_default).
 _json_default = json_default
@@ -140,7 +186,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         route = route_key(event)
 
         if route == "POST /orders":
-            order = service.create_order(parse_body(event))
+            # Identität zuerst prüfen (fail-closed), dann Body validieren.
+            subject_id = extract_subject_id(event)
+            order = service.create_order(parse_body(event), subject_id=subject_id)
             order_id = order.get("orderId")
             if order_id and SQS_QUEUE_URL:
                 _send_to_sqs(order_id)

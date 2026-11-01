@@ -16,6 +16,7 @@ def json_default(o: Any) -> Any:
     raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 VALIDATION_ERROR = "VALIDATION_ERROR"
+UNAUTHORIZED = "UNAUTHORIZED"
 ORDER_NOT_FOUND = "ORDER_NOT_FOUND"
 INVALID_TRANSITION = "INVALID_TRANSITION"
 CONFLICTED_UPDATE = "CONFLICTED_UPDATE"
@@ -41,6 +42,18 @@ class OrderError(Exception):
 
 def validation_error(message: str, details: Optional[Dict[str, Any]] = None) -> OrderError:
     return OrderError(VALIDATION_ERROR, message, 400, details)
+
+
+def unauthorized_error(message: str = "Missing or invalid authenticated identity") -> OrderError:
+    """Fehlender/unbrauchbarer Identitätsnachweis (MO-RC4-P02).
+
+    Die API-Gateway-JWT-Autorisierung weist unbekannte Aufrufer bereits ab; dieser
+    Fehler ist die zweite Verteidigungslinie im Handler (fail-closed), falls ein
+    Aufruf ohne verifizierte Claims ankommt (interne Fehlkonfiguration, direkter
+    Lambda-Invoke ohne authorizer etc.). Es wird bewusst KEIN Ersatz-Eigentümer
+    abgeleitet.
+    """
+    return OrderError(UNAUTHORIZED, message, 401)
 
 
 def order_not_found(order_id: str) -> OrderError:

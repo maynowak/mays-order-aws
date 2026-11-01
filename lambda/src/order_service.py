@@ -17,6 +17,23 @@ from validation import validate_create_order
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
 INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId"}
 
+# MO-RC4-P02: Eigentuemer-Identitaet ist Pflicht. Der Wert stammt aus dem
+# verifizierten JWT-Kontext (index.extract_subject_id) und wird hier erneut
+# geprueft (Defense in Depth, damit kein interner Aufruf ohne Eigentuemer
+# durchkommt).
+MAX_SUBJECT_ID_LENGTH = 256
+
+
+def _require_valid_subject_id(subject_id: Any) -> str:
+    if not isinstance(subject_id, str):
+        raise validation_error("Missing order owner identity")
+    candidate = subject_id.strip()
+    if not candidate or len(candidate) > MAX_SUBJECT_ID_LENGTH:
+        raise validation_error("Invalid order owner identity")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in candidate):
+        raise validation_error("Invalid order owner identity")
+    return candidate
+
 _dynamodb_resource = None
 
 
@@ -123,6 +140,10 @@ class OrderService:
             raise validation_error("Internal trust boundary violation")
 
     def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
+        # MO-RC4-P02: Jede Bestellung gehoert genau einem verifizierten Benutzer.
+        # Der Body kann die Zuordnung nicht setzen (validate_create_order lehnt
+        # Fremdfelder wie "subjectId" mit 400 ab).
+        subject_id = _require_valid_subject_id(subject_id)
         input_data = validate_create_order(raw_body)
         now = now_iso()
         order_id = generate_order_id()
@@ -149,12 +170,11 @@ class OrderService:
             "gsi1sk": now,
         }
 
-        if subject_id:
-            item["subjectId"] = subject_id
-            from order_types import GSI2_PK_PREFIX, GSI2_NAME
-            # GSI2 not required for public API, but prepared for privacy capability
-            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
-            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
+        # Ownership ist ab MO-RC4-P02 garantiert (siehe oben) und wird dauerhaft
+        # gespeichert; GSI2 macht die Bestellung fuer Privacy-Lookups auffindbar.
+        item["subjectId"] = subject_id
+        item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
+        item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
 
         self._table.put_item(Item=item)
 
@@ -230,15 +250,27 @@ class OrderService:
         if not subject_id or not isinstance(subject_id, str):
             raise validation_error("Invalid subjectId")
 
-        # Query GSI2 for orders linked to subject
+        # Query GSI2 for orders linked to subject (vollstaendig paginiert:
+        # MO-RC4-P02 — ein Benutzer kann mehr Bestellungen haben als eine
+        # DynamoDB-Seite (1 MB) zurueckgibt).
+        items = []
+        last_evaluated_key = None
         try:
-            result = self._table.query(
-                IndexName=GSI2_NAME,
-                KeyConditionExpression="gsi2pk = :pk",
-                ExpressionAttributeValues={":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                ProjectionExpression="orderId,#status,createdAt,updatedAt,customer",
-                ExpressionAttributeNames={"#status": "status"},
-            )
+            while True:
+                query_kwargs: Dict[str, Any] = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
+                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer",
+                    "ExpressionAttributeNames": {"#status": "status"},
+                }
+                if last_evaluated_key:
+                    query_kwargs["ExclusiveStartKey"] = last_evaluated_key
+                result = self._table.query(**query_kwargs)
+                items.extend(result.get("Items", []))
+                last_evaluated_key = result.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
         except Exception:
             # Technical failure must not be reported as successful empty result
             return {
@@ -249,8 +281,6 @@ class OrderService:
                 "dataCategories": [],
                 "limitations": ["GSI2 query failed"],
             }
-
-        items = result.get("Items", [])
         order_refs = []
         for item in items:
             oid = item.get("orderId")
@@ -436,6 +466,7 @@ class OrderService:
                 "deletedRecords": 0,
                 "anonymizedRecords": 0,
                 "retainedRecords": 0,
+                "skippedRecords": 0,
                 "failedRecords": 0,
                 "limitations": ["Missing explicit retention policy"],
                 "completedAt": now_iso(),
@@ -445,6 +476,7 @@ class OrderService:
         anonymized = 0
         retained = 0
         failed = 0
+        skipped = 0
         for item in affected:
             pk = item.get("pk")
             sk = item.get("sk")
@@ -483,8 +515,15 @@ class OrderService:
                         ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", **cond_values},
                     )
                     anonymized += 1
-            except Exception:
-                failed += 1
+            except Exception as err:
+                # MO-RC4-P02: Idempotenz. Wurde der Datensatz zwischen Query und
+                # Schreiboperation bereits geloescht oder parallel geaendert,
+                # ist das KEIN Fehler — es wurde nichts Fremdes veraendert.
+                # Der Aufruf bleibt gefahrlos wiederholbar.
+                if is_conditional_check_failed(err):
+                    skipped += 1
+                else:
+                    failed += 1
 
         status = "COMPLETED"
         if failed > 0 or retained > 0:
@@ -499,6 +538,7 @@ class OrderService:
             "deletedRecords": deleted,
             "anonymizedRecords": anonymized,
             "retainedRecords": retained,
+            "skippedRecords": skipped,
             "failedRecords": failed,
             "limitations": [],
             "completedAt": now_iso(),

@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P01 — Contract-Inventar, Orphan-Cleanup- und SecretProvider-Design, ADR-008 (PROPOSED) abgeschlossen
+MO-RC4-P02 — Order-Ownership erzwungen (JWT-sub), Privacy-Konsistenz; RIS-Delegation dokumentiert offen
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin

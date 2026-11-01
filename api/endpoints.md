@@ -58,6 +58,14 @@
 
 **Semantik:** `totalAmount` = Σ (quantity × unitPrice). Server berechnet den Betrag, nie der Client.
 
+**Eigentümer (MO-RC4-P02):** Jede Bestellung gehört genau einem Benutzer. Der Eigentümer
+wird **ausschließlich** aus dem verifizierten JWT-Kontext gelesen (`sub` aus
+`requestContext.authorizer.jwt.claims`) und dauerhaft gespeichert (`subjectId` + GSI2).
+Der Request-Body kann keinen Eigentümer setzen: ein Feld `subjectId` ist ein unbekanntes
+Feld und wird mit **400 `VALIDATION_ERROR`** abgelehnt. Fehlt die verifizierte Identität
+(z. B. direkter Lambda-Invoke ohne Autorizer), antwortet der Handler mit
+**401 `UNAUTHORIZED`** — es wird kein Ersatz-Eigentümer abgeleitet (fail-closed).
+
 ### 2.2 `GET /orders/{orderId}`
 
 **Auth:** erforderlich.
