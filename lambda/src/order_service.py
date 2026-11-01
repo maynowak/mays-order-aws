@@ -21,6 +21,7 @@ from identity import (
     IDENTITY_ITEM_FIELDS,
     OrderIdentity,
     OWNER_TYPE_USER,
+    authorize_order_access,
     item_in_privacy_scope,
     privacy_scope_consumer,
 )
@@ -39,6 +40,9 @@ INTERNAL_FIELDS = {
 # geprueft (Defense in Depth, damit kein interner Aufruf ohne Eigentuemer
 # durchkommt).
 MAX_SUBJECT_ID_LENGTH = 256
+
+# Schutz vor unbegrenzten Query-Schleifen bei starker Filterung (P02H-A).
+MAX_LIST_PAGES = 10
 
 # MO-RC4-P02F: Zustellzustand (additiv, KEIN fachlicher Order-Status).
 DELIVERY_PENDING = "pending"
@@ -247,60 +251,134 @@ class OrderService:
             ExpressionAttributeValues={":state": state, ":now": now_iso(), ":zero": 0, ":one": 1},
         )
 
-    def get_order(self, order_id: str) -> Dict[str, Any]:
+    def _get_raw_order(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Vollstaendiges Order-Item (ConsistentRead), ohne Autorisierung."""
         result = self._table.get_item(
-            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK}
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            ConsistentRead=True,
         )
-        item = result.get("Item")
-        if item is None:
+        return result.get("Item")
+
+    def get_order(self, order_id: str, *, identity: OrderIdentity) -> Dict[str, Any]:
+        """Liest eine Order nur bei passender Owner- UND Consumer-Identitaet.
+
+        Fremde und Legacy-Orders ohne vollstaendige Identitaet liefern 404
+        (keine Existenzoffenlegung).
+        """
+        item = self._get_raw_order(order_id)
+        if item is None or not authorize_order_access(item, identity):
             raise order_not_found(order_id)
         return to_public_order(item)
 
-    def list_orders(self, limit: int, next_token: Optional[str] = None) -> Dict[str, Any]:
-        query_kwargs: Dict[str, Any] = {
-            "IndexName": TABLE_INDEX_NAME,
-            "KeyConditionExpression": "gsi1pk = :pk",
-            "ExpressionAttributeValues": {":pk": GSI1_PK},
-            "ScanIndexForward": False,
-            "Limit": limit,
-        }
-        if next_token:
-            query_kwargs["ExclusiveStartKey"] = decode_next_token(next_token)
+    def list_orders(
+        self,
+        limit: int,
+        next_token: Optional[str] = None,
+        *,
+        identity: OrderIdentity,
+    ) -> Dict[str, Any]:
+        """Listet ausschliesslich Orders des verifizierten Owners+Consumers.
+
+        GSI2 partitioniert nach `SUBJECT#<subjectId>`; da der Index `consumerId`
+        nicht projiziert, wird jedes Item vollstaendig geladen und gefiltert
+        (P02G-A-Muster). Der Cursor ist ein GSI2-`LastEvaluatedKey`.
+        """
+        last_key = decode_next_token(next_token) if next_token else None
+        collected: List[Dict[str, Any]] = []
+        seen = set()
+        pages = 0
 
         try:
-            result = self._table.query(**query_kwargs)
+            while len(collected) < limit and pages < MAX_LIST_PAGES:
+                pages += 1
+                query_kwargs: Dict[str, Any] = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{GSI2_PK_PREFIX}{identity.owner_id}"
+                    },
+                    # Nur projizierte Attribute anfragen (P02G-A-Befund).
+                    "ProjectionExpression": "orderId",
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+                if last_key:
+                    query_kwargs["ExclusiveStartKey"] = last_key
+                result = self._table.query(**query_kwargs)
+
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id or order_id in seen:
+                        continue
+                    seen.add(order_id)
+                    item = self._load_order_item(order_id)
+                    if item is None or not authorize_order_access(item, identity):
+                        continue
+                    collected.append(item)
+                    if len(collected) >= limit:
+                        break
+
+                last_key = result.get("LastEvaluatedKey")
+                if not last_key:
+                    break
         except Exception as err:
             if is_validation_exception(err):
+                # z. B. alter GSI1-Cursor, der zu GSI2 nicht passt
                 raise validation_error(
                     "Invalid pagination token or query",
                     {"path": "nextToken"},
                 ) from err
             raise
 
-        orders = [to_list_item(item) for item in result.get("Items", [])]
+        collected.sort(key=lambda entry: entry.get("createdAt", ""), reverse=True)
+        orders = [to_list_item(item) for item in collected]
 
         response: Dict[str, Any] = {"orders": orders, "count": len(orders)}
-        encoded = encode_next_token(result.get("LastEvaluatedKey"))
+        encoded = encode_next_token(last_key)
         if encoded:
             response["nextToken"] = encoded
         return response
 
-    def update_order_status(self, order_id: str, status: str) -> Dict[str, Any]:
-        current = self.get_order(order_id)
+    def update_order_status(
+        self, order_id: str, status: str, *, identity: OrderIdentity
+    ) -> Dict[str, Any]:
+        """Aendert den Status nur bei passender Owner- UND Consumer-Identitaet.
 
-        if not can_transition(current["status"], status):
-            raise invalid_transition(current["status"], status)
+        Die Autorisierung ist Teil DERSELBEN Conditional-Expression wie Status
+        und Version (kein TOCTOU, kein ungeschuetzter Fallback-Write).
+        """
+        item = self._get_raw_order(order_id)
+        if item is None or not authorize_order_access(item, identity):
+            raise order_not_found(order_id)
+
+        current_status = item.get("status")
+        if not can_transition(current_status, status):
+            raise invalid_transition(current_status, status)
 
         try:
             result = self._table.update_item(
                 Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
-                UpdateExpression="SET #status = :newStatus, updatedAt = :now, #version = #version + :one",
-                ConditionExpression="attribute_exists(pk) AND #status = :currentStatus",
-                ExpressionAttributeNames={"#status": "status", "#version": "version"},
+                UpdateExpression=(
+                    "SET #status = :newStatus, updatedAt = :now, "
+                    "#version = if_not_exists(#version, :zero) + :one"
+                ),
+                ConditionExpression=(
+                    "attribute_exists(pk) AND #status = :currentStatus "
+                    "AND #subjectId = :owner AND #consumerId = :consumer"
+                ),
+                ExpressionAttributeNames={
+                    "#status": "status",
+                    "#version": "version",
+                    "#subjectId": "subjectId",
+                    "#consumerId": "consumerId",
+                },
                 ExpressionAttributeValues={
                     ":newStatus": status,
-                    ":currentStatus": current["status"],
+                    ":currentStatus": current_status,
+                    ":owner": identity.owner_id,
+                    ":consumer": identity.consumer_id,
                     ":now": now_iso(),
+                    ":zero": 0,
                     ":one": 1,
                 },
                 ReturnValues="ALL_NEW",
@@ -308,6 +386,10 @@ class OrderService:
             return to_public_order(result["Attributes"])
         except Exception as err:
             if is_conditional_check_failed(err):
+                fresh = self._get_raw_order(order_id)
+                # Kein Fallback-Write: fremd/verschwunden -> 404, sonst 409.
+                if fresh is None or not authorize_order_access(fresh, identity):
+                    raise order_not_found(order_id) from err
                 raise conflicted_update() from err
             raise
 

@@ -307,6 +307,24 @@ def resolve_order_identity_from_event(event: Mapping[str, Any]) -> OrderIdentity
     return resolve_order_identity(_claims_from_event(event))
 
 
+def authorize_order_access(item: Mapping[str, Any], identity: Optional[OrderIdentity]) -> bool:
+    """Prueft Owner- UND Consumer-Berechtigung einer gespeicherten Order.
+
+    Fail-closed: `subjectId` und `consumerId` muessen vorhanden sein und
+    beide exakt zur verifizierten Identitaet passen. Legacy-Orders ohne
+    vollstaendige Identitaet sind damit automatisch nicht zugaenglich.
+    """
+    if identity is None or not isinstance(item, Mapping):
+        return False
+    subject = item.get("subjectId")
+    consumer = item.get("consumerId")
+    if not isinstance(subject, str) or not subject:
+        return False
+    if not isinstance(consumer, str) or not consumer:
+        return False
+    return subject == identity.owner_id and consumer == identity.consumer_id
+
+
 def extract_verified_subject(event: Mapping[str, Any]) -> str:
     """Nur die verifizierte Benutzer-ID (Kompatibilitaets-Helper zu P02)."""
     return resolve_order_identity_from_event(event).owner_id

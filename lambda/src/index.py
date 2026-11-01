@@ -226,21 +226,28 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return ok(201, order)
 
         if route == "GET /orders":
+            # MO-RC4-P02H-A: auch lesende Routen brauchen die verifizierte
+            # Identitaet; Liste wird auf Owner+Consumer eingeschraenkt.
+            identity = resolve_order_identity_from_event(event)
             params = validate_list_params(event.get("queryStringParameters"))
-            result = service.list_orders(params["limit"], params.get("nextToken"))
+            result = service.list_orders(
+                params["limit"], params.get("nextToken"), identity=identity
+            )
             return ok(200, result)
 
         if route == "GET /orders/{orderId}":
+            identity = resolve_order_identity_from_event(event)
             path_params = event.get("pathParameters") or {}
             order_id = validate_order_id(path_params.get("orderId"))
-            order = service.get_order(order_id)
+            order = service.get_order(order_id, identity=identity)
             return ok(200, order)
 
         if route == "PATCH /orders/{orderId}/status":
+            identity = resolve_order_identity_from_event(event)
             path_params = event.get("pathParameters") or {}
             order_id = validate_order_id(path_params.get("orderId"))
             status = validate_status_update_body(parse_body(event))
-            order = service.update_order_status(order_id, status)
+            order = service.update_order_status(order_id, status, identity=identity)
             return ok(200, order)
 
         return fail(validation_error(f"Unsupported route: {route}"))

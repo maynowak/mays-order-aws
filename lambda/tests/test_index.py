@@ -15,12 +15,14 @@ class FakeService:
             lambda raw, subject_id=None, identity=None: {"orderId": "ord_1", "status": "PENDING"}
         )
         self.mark_delivery_state = lambda order_id, state: None
-        self.get_order = get or (lambda order_id: {"orderId": order_id, "status": "PENDING"})
+        self.get_order = get or (
+            lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING"}
+        )
         self.list_orders = list_orders or (
-            lambda limit, next_token=None: {"orders": [], "count": 0}
+            lambda limit, next_token=None, identity=None: {"orders": [], "count": 0}
         )
         self.update_order_status = update or (
-            lambda order_id, status: {"orderId": order_id, "status": status}
+            lambda order_id, status, identity=None: {"orderId": order_id, "status": status}
         )
 
 
@@ -57,7 +59,7 @@ def patch_service(fake):
 class TestHandlerConfig(unittest.TestCase):
     def test_missing_orders_table_returns_500(self):
         with mock.patch.dict("index.os.environ", {"ORDERS_TABLE": ""}):
-            response = index.handler({"routeKey": "GET /orders"}, None)
+            response = index.handler(auth_event("GET /orders"), None)
         self.assertEqual(response["statusCode"], 500)
         body = json.loads(response["body"])
         self.assertEqual(body["error"]["code"], "INTERNAL_ERROR")
@@ -125,7 +127,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_get_orders_returns_200_with_list(self):
         captured = {}
 
-        def list_orders(limit, next_token=None):
+        def list_orders(limit, next_token=None, identity=None):
             captured["limit"] = limit
             captured["next_token"] = next_token
             return {"orders": [], "count": 0}
@@ -133,7 +135,7 @@ class TestHandlerRoutes(unittest.TestCase):
         fake = FakeService(list_orders=list_orders)
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders", "queryStringParameters": {"limit": "10", "nextToken": "abc"}},
+                auth_event("GET /orders", queryStringParameters={"limit": "10", "nextToken": "abc"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 200)
@@ -144,16 +146,16 @@ class TestHandlerRoutes(unittest.TestCase):
         fake = FakeService()
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders", "queryStringParameters": {"limit": "abc"}},
+                auth_event("GET /orders", queryStringParameters={"limit": "abc"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 400)
 
     def test_get_order_returns_200(self):
-        fake = FakeService(get=lambda order_id: {"orderId": order_id, "status": "PENDING"})
+        fake = FakeService(get=lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING"})
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_abc"}},
+                auth_event("GET /orders/{orderId}", pathParameters={"orderId": "ord_abc"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 200)
@@ -163,7 +165,7 @@ class TestHandlerRoutes(unittest.TestCase):
         fake = FakeService()
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "order-123"}},
+                auth_event("GET /orders/{orderId}", pathParameters={"orderId": "order-123"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 400)
@@ -171,18 +173,18 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_patch_status_returns_200(self):
         captured = {}
 
-        def update(order_id, status):
+        def update(order_id, status, identity=None):
             captured["status"] = status
             return {"orderId": order_id, "status": status}
 
         fake = FakeService(update=update)
         with patch_service(fake):
             response = index.handler(
-                {
-                    "routeKey": "PATCH /orders/{orderId}/status",
-                    "pathParameters": {"orderId": "ord_abc"},
-                    "body": json.dumps({"status": "CONFIRMED"}),
-                },
+                auth_event(
+                    "PATCH /orders/{orderId}/status",
+                    pathParameters={"orderId": "ord_abc"},
+                    body=json.dumps({"status": "CONFIRMED"}),
+                ),
                 None,
             )
         self.assertEqual(response["statusCode"], 200)
@@ -192,11 +194,11 @@ class TestHandlerRoutes(unittest.TestCase):
         fake = FakeService()
         with patch_service(fake):
             response = index.handler(
-                {
-                    "routeKey": "PATCH /orders/{orderId}/status",
-                    "pathParameters": {"orderId": "ord_abc"},
-                    "body": json.dumps({}),
-                },
+                auth_event(
+                    "PATCH /orders/{orderId}/status",
+                    pathParameters={"orderId": "ord_abc"},
+                    body=json.dumps({}),
+                ),
                 None,
             )
         self.assertEqual(response["statusCode"], 400)
@@ -204,13 +206,15 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_route_key_fallback_http_method_and_path(self):
         captured = {}
 
-        def list_orders(limit, next_token=None):
+        def list_orders(limit, next_token=None, identity=None):
             captured["called"] = True
             return {"orders": [], "count": 0}
 
         fake = FakeService(list_orders=list_orders)
         with patch_service(fake):
-            response = index.handler({"httpMethod": "GET", "rawPath": "/orders"}, None)
+            response = index.handler(
+                auth_event("GET /orders", httpMethod="GET", rawPath="/orders"), None
+            )
         self.assertEqual(response["statusCode"], 200)
         self.assertTrue(captured["called"])
 
@@ -240,13 +244,13 @@ class TestDecimalSerialization(unittest.TestCase):
 
 class TestHandlerErrors(unittest.TestCase):
     def test_order_error_mapped_to_status_code(self):
-        def get_missing(order_id):
+        def get_missing(order_id, identity=None):
             raise order_not_found(order_id)
 
         fake = FakeService(get=get_missing)
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_missing"}},
+                auth_event("GET /orders/{orderId}", pathParameters={"orderId": "ord_missing"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 404)
@@ -277,19 +281,19 @@ class TestHandlerDecimalRegression(unittest.TestCase):
     """MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01: GET/LIST mit DynamoDB-Decimal."""
 
     def test_get_order_with_decimal_returns_200(self):
-        fake = FakeService(get=lambda order_id: {"orderId": order_id, "status": "PENDING", "totalAmount": Decimal("39.98")})
+        fake = FakeService(get=lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING", "totalAmount": Decimal("39.98")})
         with patch_service(fake):
             response = index.handler(
-                {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_1"}},
+                auth_event("GET /orders/{orderId}", pathParameters={"orderId": "ord_1"}),
                 None,
             )
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(json.loads(response["body"])["totalAmount"], 39.98)
 
     def test_list_orders_with_decimal_returns_200(self):
-        fake = FakeService(list_orders=lambda limit, next_token=None: {"orders": [{"orderId": "ord_1", "totalAmount": Decimal("10")}], "count": 1})
+        fake = FakeService(list_orders=lambda limit, next_token=None, identity=None: {"orders": [{"orderId": "ord_1", "totalAmount": Decimal("10")}], "count": 1})
         with patch_service(fake):
-            response = index.handler({"routeKey": "GET /orders", "queryStringParameters": {}}, None)
+            response = index.handler(auth_event("GET /orders", queryStringParameters={}), None)
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
         self.assertEqual(body["orders"][0]["totalAmount"], 10.0)
@@ -439,12 +443,13 @@ class TestOrderOwnership(unittest.TestCase):
         self.assertEqual(response["statusCode"], 201)
         self.assertEqual(captured["subject_id"], "flat-user")
 
-    def test_get_orders_does_not_require_authorizer(self):
-        """Lesende Routen bleiben unveraendert (keine Regressionswirkung)."""
+    def test_get_orders_requires_identity_since_p02h_a(self):
+        """MO-RC4-P02H-A: auch lesende Routen verlangen eine Identitaet."""
         fake = FakeService()
         with patch_service(fake):
-            response = index.handler({"routeKey": "GET /orders"}, None)
-        self.assertEqual(response["statusCode"], 200)
+            response = index.handler({"routeKey": "GET /orders", "requestContext": {}}, None)
+        self.assertEqual(response["statusCode"], 401)
+        self.assertEqual(json.loads(response["body"])["error"]["code"], "UNAUTHORIZED")
 
 
 class TestIdentityResolutionP02A(unittest.TestCase):
@@ -616,15 +621,17 @@ class TestProcessingFieldsNotPublicP02GA(unittest.TestCase):
                 "createdAt": "2026-11-01T12:00:00.000Z", "updatedAt": "2026-11-01T12:00:00.000Z",
                 "result": {"secret": 1}, "processingState": "succeeded"}
 
-        fake = FakeService(get=lambda order_id: {
+        fake = FakeService(get=lambda order_id, identity=None: {
             k: v for k, v in item.items()
             if k not in {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version",
                          "isTestData", "subjectId", "result", "processingState",
                          "processingAttemptId", "completedAt", "processingError"}
         })
         with patch_service(fake):
-            response = index.handler({"routeKey": "GET /orders/{orderId}",
-                                      "pathParameters": {"orderId": "ord_1"}}, None)
+            response = index.handler(
+                auth_event("GET /orders/{orderId}", pathParameters={"orderId": "ord_1"}),
+                None,
+            )
         self.assertEqual(response["statusCode"], 200)
         payload = json.loads(response["body"])
         self.assertNotIn("result", payload)

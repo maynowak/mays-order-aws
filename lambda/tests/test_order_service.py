@@ -8,6 +8,7 @@ os.environ.setdefault("ORDERS_PROJECT_NAME", "mays-orders")
 os.environ.setdefault("PRIVACY_INTERNAL_SECRET", "test-secret")
 
 from errors import OrderError, json_default
+from identity import OrderIdentity
 from order_service import create_order_service, decode_next_token
 from order_types import GSI1_PK, ORDER_ID_PREFIX
 
@@ -84,6 +85,14 @@ def make_client(handlers):
 
 ORDER_ID = "ord_2f4b1c9e0000000000000000"
 
+TEST_IDENTITY = OrderIdentity(
+    consumer_id="cognito:test#client",
+    owner_type="user",
+    owner_id="user-123",
+    actor_type="user",
+    actor_id="user-123",
+)
+
 
 def make_order(**overrides):
     item = {
@@ -100,6 +109,8 @@ def make_order(**overrides):
         "version": 1,
         "gsi1pk": GSI1_PK,
         "gsi1sk": "2026-08-17T12:00:00.000Z",
+        "subjectId": "user-123",
+        "consumerId": "cognito:test#client",
     }
     item.update(overrides)
     # pk haengt fachlich an der orderId (wichtig fuer get_item-Lookups).
@@ -201,7 +212,7 @@ class TestGetOrder(unittest.TestCase):
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
 
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, identity=TEST_IDENTITY)
         self.assertEqual(order["orderId"], item["orderId"])
         self.assertEqual(order["status"], "PENDING")
         self.assertNotIn("pk", order)
@@ -215,7 +226,7 @@ class TestGetOrder(unittest.TestCase):
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
 
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, identity=TEST_IDENTITY)
         self.assertNotIn("isTestData", order)
 
     def test_raises_order_not_found(self):
@@ -225,7 +236,7 @@ class TestGetOrder(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.get_order(ORDER_ID)
+            service.get_order(ORDER_ID, identity=TEST_IDENTITY)
         self.assertEqual(ctx.exception.code, "ORDER_NOT_FOUND")
         self.assertEqual(ctx.exception.http_status, 404)
 
@@ -243,8 +254,11 @@ class TestListOrders(unittest.TestCase):
             client=make_client({"query": on_query}),
         )
 
-        result = service.list_orders(20)
-        self.assertEqual(query_input["IndexName"], "gsi1")
+        result = service.list_orders(20, identity=TEST_IDENTITY)
+        self.assertEqual(query_input["IndexName"], "gsi2")
+        self.assertIn("gsi2pk = :pk", query_input["KeyConditionExpression"])
+        self.assertEqual(query_input["ExpressionAttributeValues"][":pk"],
+                         f"SUBJECT#{TEST_IDENTITY.owner_id}")
         self.assertFalse(query_input["ScanIndexForward"])
         self.assertEqual(query_input["Limit"], 20)
         self.assertEqual(result["count"], 1)
@@ -270,7 +284,7 @@ class TestListOrders(unittest.TestCase):
             ),
         )
 
-        result = service.list_orders(5)
+        result = service.list_orders(5, identity=TEST_IDENTITY)
         self.assertEqual(result["nextToken"], encode_token(lek))
 
     def test_sets_exclusive_start_key_from_next_token(self):
@@ -287,7 +301,7 @@ class TestListOrders(unittest.TestCase):
             client=make_client({"query": on_query}),
         )
 
-        service.list_orders(20, token)
+        service.list_orders(20, token, identity=TEST_IDENTITY)
         self.assertEqual(query_input["ExclusiveStartKey"], lek)
 
     def test_rejects_invalid_next_token(self):
@@ -297,7 +311,7 @@ class TestListOrders(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.list_orders(20, "!!!not-base64-json!!!")
+            service.list_orders(20, "!!!not-base64-json!!!", identity=TEST_IDENTITY)
         self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
 
 
@@ -318,12 +332,13 @@ class TestUpdateOrderStatus(unittest.TestCase):
             ),
         )
 
-        order = service.update_order_status(ORDER_ID, "CONFIRMED")
+        order = service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
         self.assertEqual(order["status"], "CONFIRMED")
         self.assertIn("#status = :currentStatus", update_input["ConditionExpression"])
         self.assertEqual(update_input["ExpressionAttributeValues"][":currentStatus"], "PENDING")
         self.assertEqual(update_input["ExpressionAttributeValues"][":newStatus"], "CONFIRMED")
-        self.assertIn("#version = #version + :one", update_input["UpdateExpression"])
+        self.assertIn("#version = if_not_exists(#version, :zero) + :one",
+                      update_input["UpdateExpression"])
         self.assertEqual(update_input["ExpressionAttributeValues"][":one"], 1)
         self.assertNotIn("version", order)
         self.assertNotIn("isTestData", order)
@@ -337,7 +352,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CANCELLED")
+            service.update_order_status(ORDER_ID, "CANCELLED", identity=TEST_IDENTITY)
         error = ctx.exception
         self.assertEqual(error.code, "INVALID_TRANSITION")
         self.assertEqual(error.details, {"currentStatus": "PROCESSING", "requestedStatus": "CANCELLED"})
@@ -349,7 +364,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CONFIRMED")
+            service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
         self.assertEqual(ctx.exception.code, "ORDER_NOT_FOUND")
         self.assertEqual(ctx.exception.http_status, 404)
 
@@ -365,7 +380,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CONFIRMED")
+            service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
         self.assertEqual(ctx.exception.code, "CONFLICTED_UPDATE")
         self.assertEqual(ctx.exception.http_status, 409)
 
@@ -545,7 +560,7 @@ class TestRuntimeFixRegression(unittest.TestCase):
             table_name="mays-orders",
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, identity=TEST_IDENTITY)
         body = json.loads(json.dumps(order, default=json_default))
         self.assertEqual(body["totalAmount"], 39.98)
 
@@ -559,7 +574,7 @@ class TestRuntimeFixRegression(unittest.TestCase):
             table_name="mays-orders",
             client=make_client({"query": on_query}),
         )
-        result = service.list_orders(20)
+        result = service.list_orders(20, identity=TEST_IDENTITY)
         self.assertIn("nextToken", result)
         # Token muss dekodierbar sein (Decimal im LEK darf nicht scheitern)
         decoded = decode_next_token(result["nextToken"])
@@ -660,7 +675,7 @@ class TestOrderOwnershipPersistence(unittest.TestCase):
         service = create_order_service(
             "mays-orders", make_client({"get_item": on_get, "update_item": on_update})
         )
-        result = service.update_order_status(ORDER_ID, "CONFIRMED")
+        result = service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
 
         self.assertEqual(result["status"], "CONFIRMED")
         self.assertNotIn("subjectId", result)
@@ -1010,7 +1025,8 @@ class TestPrivacyConsumerScopeP02B(unittest.TestCase):
 
         def on_get(**kwargs):
             return {"Item": make_order(subjectId="user-123", version=1,
-                                       consumerId="consumer-a", identityVersion=1,
+                                       consumerId=TEST_IDENTITY.consumer_id,
+                                       identityVersion=1,
                                        identityVerification="verified_jwt")}
 
         def on_update(**kwargs):
@@ -1021,7 +1037,7 @@ class TestPrivacyConsumerScopeP02B(unittest.TestCase):
         service = create_order_service(
             "mays-orders", make_client({"get_item": on_get, "update_item": on_update})
         )
-        service.update_order_status(ORDER_ID, "CONFIRMED")
+        service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
 
         expression = captured["UpdateExpression"]
         for field in ("subjectId", "consumerId", "ownerId", "actorId",
@@ -1251,7 +1267,7 @@ class TestProcessingResultPrivacyP02GA(unittest.TestCase):
             return {"Item": item}
 
         service = create_order_service("mays-orders", make_client({"get_item": on_get}))
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, identity=TEST_IDENTITY)
 
         for field in ("result", "processingState", "processingAttemptId",
                       "completedAt", "processingError"):
@@ -1267,5 +1283,5 @@ class TestProcessingResultPrivacyP02GA(unittest.TestCase):
             "mays-orders",
             make_client({"get_item": lambda **kw: {"Item": item}, "update_item": on_update}),
         )
-        order = service.update_order_status(ORDER_ID, "CONFIRMED")
+        order = service.update_order_status(ORDER_ID, "CONFIRMED", identity=TEST_IDENTITY)
         self.assertNotIn("result", order)
