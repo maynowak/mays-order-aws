@@ -137,6 +137,13 @@ Ja. Es werden **keine** neuen Pflichtfelder eingeführt. Genutzt wird der vorhan
 `subjectId`-Mechanismus (Feld, GSI2) sowie der JWT-Claim `sub`. Der API-Body bleibt
 unverändert (`customer`, `items`, `currency`).
 
+*Nachtrag P02A (2026-11-01, implementiert, additiv):* Consumer, Owner und Actor sind
+getrennt (`consumerId`, `ownerType`, `ownerId`, `actorType`, `actorId`,
+`identityVersion`). Consumer = `cognito:<issuer>#<client>`, Owner/Actor = `sub`.
+Agenten-/Dienst-Delegation bleibt **BLOCKED**, bis ein verifizierter Delegationsvertrag
+entschieden ist; der kanonische Schlüssel ist kollisionsfrei (Längenpräfixe) und wird
+**nicht** als neuer DynamoDB-Schlüssel eingeführt (GSI2/Privacy bleiben unverändert).
+
 **D-2 — Orphan Detection**
 Verwaist = Nutzer nachweislich weg **und** Frist abgelaufen **und** nicht `RETAIN`.
 Bestellungen **ohne** Nutzerbezug gelten **nicht** als verwaist. Nicht prüfbare Zuordnung

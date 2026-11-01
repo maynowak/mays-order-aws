@@ -9,13 +9,16 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
+from identity import IDENTITY_ITEM_FIELDS, OrderIdentity, OWNER_TYPE_USER
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId"}
+INTERNAL_FIELDS = {
+    "pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId",
+} | set(IDENTITY_ITEM_FIELDS)
 
 # MO-RC4-P02: Eigentuemer-Identitaet ist Pflicht. Der Wert stammt aus dem
 # verifizierten JWT-Kontext (index.extract_subject_id) und wird hier erneut
@@ -139,10 +142,27 @@ class OrderService:
         if not secrets.compare_digest(str(token), str(internal_secret)):
             raise validation_error("Internal trust boundary violation")
 
-    def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
+    def create_order(
+        self,
+        raw_body: Any,
+        subject_id: Optional[str] = None,
+        identity: Optional[OrderIdentity] = None,
+    ) -> Dict[str, Any]:
         # MO-RC4-P02: Jede Bestellung gehoert genau einem verifizierten Benutzer.
         # Der Body kann die Zuordnung nicht setzen (validate_create_order lehnt
         # Fremdfelder wie "subjectId" mit 400 ab).
+        # MO-RC4-P02A: Aufgeloeste Identitaet (Consumer/Owner/Actor) ist optional
+        # additiv; ohne sie bleibt der P02-Vertrag (nur subjectId) gueltig.
+        identity_fields: Dict[str, Any] = {}
+        if identity is not None:
+            if identity.owner_type != OWNER_TYPE_USER:
+                raise validation_error(
+                    f"Unsupported order owner type '{identity.owner_type}'"
+                )
+            if subject_id is not None and subject_id != identity.owner_id:
+                raise validation_error("Order owner identity mismatch")
+            subject_id = identity.owner_id
+            identity_fields = identity.to_item_fields()
         subject_id = _require_valid_subject_id(subject_id)
         input_data = validate_create_order(raw_body)
         now = now_iso()
@@ -175,6 +195,10 @@ class OrderService:
         item["subjectId"] = subject_id
         item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
         item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
+        # P02A: Consumer-/Owner-/Actor-Trennung (nur bei aufgeloester Identitaet).
+        # subjectId und GSI2 bleiben unveraendert -> Privacy-Abfragen bleiben gueltig.
+        if identity_fields:
+            item.update(identity_fields)
 
         self._table.put_item(Item=item)
 

@@ -15,6 +15,7 @@ from errors import (
     unauthorized_error,
     validation_error,
 )
+from identity import extract_verified_subject, resolve_order_identity_from_event
 from order_service import create_order_service
 from validation import validate_list_params, validate_order_id, validate_status_update_body
 
@@ -29,37 +30,13 @@ _MAX_SUBJECT_ID_LENGTH = 256
 
 
 def extract_subject_id(event: Dict[str, Any]) -> str:
-    """Liefert die verifizierte Benutzeridentität (JWT `sub`) oder wirft 401.
+    """Verifizierte Benutzer-ID (JWT `sub`) oder 401.
 
-    HTTP API v2 (Payload 2.0) legt die Claims unter
-    `requestContext.authorizer.jwt.claims` ab. Ein flaches `authorizer`-Objekt
-    (REST-API-Stil) wird defensiv ebenfalls akzeptiert. Fehlt die Identität,
-    wird bewusst KEIN Ersatz abgeleitet — der Aufruf wird kontrolliert
-    abgelehnt (fail-closed).
+    Duenne Kompatibilitaets-Huelle um `identity.extract_verified_subject`;
+    die eigentliche Aufloesung (inkl. Consumer-Namensraum) liegt zentral in
+    `identity.py` (MO-RC4-P02A).
     """
-    request_context = event.get("requestContext") or {}
-    authorizer = request_context.get("authorizer") or {}
-
-    claims: Dict[str, Any] = {}
-    jwt = authorizer.get("jwt") if isinstance(authorizer, dict) else None
-    if isinstance(jwt, dict):
-        raw_claims = jwt.get("claims")
-        if isinstance(raw_claims, dict):
-            claims = raw_claims
-
-    subject = claims.get("sub")
-    if subject is None and isinstance(authorizer, dict):
-        subject = authorizer.get("sub")
-
-    if not isinstance(subject, str):
-        raise unauthorized_error("Missing authenticated user identity")
-
-    subject = subject.strip()
-    if not subject or len(subject) > _MAX_SUBJECT_ID_LENGTH:
-        raise unauthorized_error("Invalid authenticated user identity")
-    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in subject):
-        raise unauthorized_error("Invalid authenticated user identity")
-    return subject
+    return extract_verified_subject(event)
 
 # Bestehenden Helper wiederverwenden (zentral in errors.json_default).
 _json_default = json_default
@@ -186,9 +163,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         route = route_key(event)
 
         if route == "POST /orders":
-            # Identität zuerst prüfen (fail-closed), dann Body validieren.
-            subject_id = extract_subject_id(event)
-            order = service.create_order(parse_body(event), subject_id=subject_id)
+            # Identitaet zuerst aufloesen (fail-closed), dann Body validieren.
+            identity = resolve_order_identity_from_event(event)
+            order = service.create_order(
+                parse_body(event), subject_id=identity.owner_id, identity=identity
+            )
             order_id = order.get("orderId")
             if order_id and SQS_QUEUE_URL:
                 _send_to_sqs(order_id)

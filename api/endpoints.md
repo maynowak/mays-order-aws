@@ -65,6 +65,8 @@ Der Request-Body kann keinen Eigentümer setzen: ein Feld `subjectId` ist ein un
 Feld und wird mit **400 `VALIDATION_ERROR`** abgelehnt. Fehlt die verifizierte Identität
 (z. B. direkter Lambda-Invoke ohne Autorizer), antwortet der Handler mit
 **401 `UNAUTHORIZED`** — es wird kein Ersatz-Eigentümer abgeleitet (fail-closed).
+Zusätzlich muss der Consumer aus dem Token ableitbar sein (`iss` + `client_id` bzw. `aud`);
+fehlt er, wird der Aufruf mit 401 abgelehnt (MO-RC4-P02A).
 
 ### 2.2 `GET /orders/{orderId}`
 

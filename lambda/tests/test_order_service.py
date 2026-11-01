@@ -774,3 +774,110 @@ class TestPrivacyConsistency(unittest.TestCase):
         )
         self.assertEqual(result["status"], "BLOCKED")
         self.assertIn("Missing explicit retention policy", result["limitations"])
+
+
+class TestIdentityPersistenceP02A(unittest.TestCase):
+    """MO-RC4-P02A: Identity-Felder additiv, subjectId/GSI2 unveraendert."""
+
+    BODY = TestOrderOwnershipPersistence.BODY
+
+    def _identity(self, owner="user-123", consumer="cognito:iss#client",
+                  owner_type="user", actor_type="user", actor=None):
+        from identity import OrderIdentity
+        return OrderIdentity(
+            consumer_id=consumer,
+            owner_type=owner_type,
+            owner_id=owner,
+            actor_type=actor_type,
+            actor_id=actor or owner,
+        )
+
+    def test_identity_fields_are_persisted_and_hidden(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        identity = self._identity()
+        order = service.create_order(self.BODY, subject_id="user-123", identity=identity)
+
+        self.assertEqual(stored["consumerId"], "cognito:iss#client")
+        self.assertEqual(stored["ownerType"], "user")
+        self.assertEqual(stored["ownerId"], "user-123")
+        self.assertEqual(stored["actorType"], "user")
+        self.assertEqual(stored["actorId"], "user-123")
+        self.assertEqual(stored["identityVersion"], 1)
+        # Privacy-Vertrag unveraendert:
+        self.assertEqual(stored["subjectId"], "user-123")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")
+        # Keine internen Felder in der Antwort:
+        for field in ("consumerId", "ownerType", "ownerId", "actorType", "actorId",
+                      "identityVersion", "subjectId"):
+            self.assertNotIn(field, order)
+
+    def test_actor_may_differ_from_owner(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        identity = self._identity(owner="user-123", actor_type="agent", actor="agent-7")
+        service.create_order(self.BODY, identity=identity)
+
+        self.assertEqual(stored["ownerId"], "user-123")
+        self.assertEqual(stored["actorId"], "agent-7")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")
+
+    def test_owner_mismatch_is_rejected(self):
+        service = create_order_service(
+            "mays-orders", make_client({"put_item": lambda **kw: {}})
+        )
+        with self.assertRaises(OrderError) as ctx:
+            service.create_order(self.BODY, subject_id="other",
+                                 identity=self._identity(owner="user-123"))
+        self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+
+    def test_non_user_owner_type_is_rejected(self):
+        service = create_order_service(
+            "mays-orders", make_client({"put_item": lambda **kw: {}})
+        )
+        with self.assertRaises(OrderError) as ctx:
+            service.create_order(self.BODY, identity=self._identity(owner_type="service"))
+        self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+
+    def test_identity_without_subject_argument_derives_owner(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        service.create_order(self.BODY, identity=self._identity(owner="user-xyz"))
+        self.assertEqual(stored["subjectId"], "user-xyz")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-xyz")
+
+    def test_legacy_subject_only_call_remains_supported(self):
+        """P02-Vertrag bleibt gueltig: Aufruf ohne Identity schreibt keine
+        Identity-Felder, subjectId/GSI2 unveraendert (keine erfundene Identitaet)."""
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        service.create_order(self.BODY, subject_id="user-123")
+
+        self.assertEqual(stored["subjectId"], "user-123")
+        self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")
+        for field in ("consumerId", "ownerType", "ownerId", "actorType", "actorId",
+                      "identityVersion"):
+            self.assertNotIn(field, stored)
+
+        from identity import SOURCE_LEGACY_SUBJECT, classify_ownership
+        self.assertEqual(classify_ownership(stored)["ownerSource"], SOURCE_LEGACY_SUBJECT)

@@ -150,6 +150,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P00: **COMPLETE (Planung)** — Baseline verifiziert, Branch angelegt, Inventar + Plan + offene Fragen dokumentiert; **keine Implementierung, keine AWS-Operation**
 - MO-RC4-P01: **COMPLETE (Analyse)** — Contract-Inventar, Orphan-/Secret-Design, ADR-008 (PROPOSED), 23 offene Fragen; keine Implementierung, keine AWS-Operation
 - MO-RC4-P02: **COMPLETE (Implementierung, lokal)** — Ownership erzwungen, Privacy-Konsistenz, 93/93 Tests; Delegationsvertrag für technische Consumer bleibt offen; kein Push
+- MO-RC4-P02A: **COMPLETE (lokal)** — zentrale Identity-Resolution, Legacy-Kompatibilität, GSI2/Privacy unverändert, 120/120 Lambda; Delegation BLOCKED
 
 ==================================================
 
@@ -306,3 +307,6 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P01-OPEN-QUESTIONS → docs/reports/MO-RC4-P01-OPEN-QUESTIONS.md (23 Entscheidungen, 6 blockierend)
 - ADR-008 (Auftrag: ADR-007) → architecture/architecture-decisions.md (`ADR-008: Privacy-Secret-Management, Retention und Orphan-Cleanup`, Status PROPOSED; Nummer 007 war vergeben)
 - MO-RC4-P02-ORDER-OWNERSHIP → docs/reports/MO-RC4-P02-ORDER-OWNERSHIP.md (subjectId aus JWT, 401 ohne Identität, GSI2-Persistenz, inspect-Pagination, idempotentes Erase; 93/93 Lambda; RIS-Delegation BLOCKED)
+- MO-RC4-P02A-IDENTITY-RESOLUTION → docs/reports/MO-RC4-P02A-IDENTITY-RESOLUTION.md (OrderIdentity, Consumer/Owner/Actor, kollisionsfreier Schlüssel, 18+9 Tests)
+- MO-RC4-P02A-LEGACY-COMPATIBILITY → docs/reports/MO-RC4-P02A-LEGACY-COMPATIBILITY.md (Fälle A–E, RIS `orders_reader` schreibt direkt, GSI2 unverändert)
+- MO-RC4-P02A-INTEGRATION-GATES → docs/reports/MO-RC4-P02A-INTEGRATION-GATES.md (13 Gates, Delegation/Agent/Service BLOCKED, V-1…V-6 offen)

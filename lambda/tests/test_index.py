@@ -12,7 +12,7 @@ from errors import order_not_found
 class FakeService:
     def __init__(self, create=None, get=None, list_orders=None, update=None):
         self.create_order = create or (
-            lambda raw, subject_id=None: {"orderId": "ord_1", "status": "PENDING"}
+            lambda raw, subject_id=None, identity=None: {"orderId": "ord_1", "status": "PENDING"}
         )
         self.get_order = get or (lambda order_id: {"orderId": order_id, "status": "PENDING"})
         self.list_orders = list_orders or (
@@ -23,11 +23,23 @@ class FakeService:
         )
 
 
-def auth_event(route_key, sub="user-123", **extra):
-    """Event mit verifiziertem JWT-Kontext (HTTP API v2, Payload 2.0)."""
+ISSUER = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TESTPOOL"
+CLIENT_ID = "test-client-id"
+
+
+def auth_event(route_key, sub="user-123", iss=ISSUER, client_id=CLIENT_ID, **extra):
+    """Event mit verifiziertem JWT-Kontext (HTTP API v2, Payload 2.0).
+
+    `iss` + `client_id` bilden den Consumer-Namensraum (MO-RC4-P02A).
+    """
+    claims = {"sub": sub}
+    if iss is not None:
+        claims["iss"] = iss
+    if client_id is not None:
+        claims["client_id"] = client_id
     event = {
         "routeKey": route_key,
-        "requestContext": {"authorizer": {"jwt": {"claims": {"sub": sub}}}},
+        "requestContext": {"authorizer": {"jwt": {"claims": claims}}},
     }
     event.update(extra)
     return event
@@ -54,7 +66,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_returns_201_and_parses_body(self):
         captured = {}
 
-        def create(raw, subject_id=None):
+        def create(raw, subject_id=None, identity=None):
             captured["raw"] = raw
             captured["subject_id"] = subject_id
             return {"orderId": "ord_1", "status": "PENDING", "totalAmount": 2000}
@@ -83,7 +95,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_decodes_base64_body(self):
         captured = {}
 
-        def create(raw, subject_id=None):
+        def create(raw, subject_id=None, identity=None):
             captured["raw"] = raw
             return {"orderId": "ord_1", "status": "PENDING"}
 
@@ -241,7 +253,7 @@ class TestHandlerErrors(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "ORDER_NOT_FOUND")
 
     def test_unexpected_error_maps_to_500(self):
-        def create_boom(raw, subject_id=None):
+        def create_boom(raw, subject_id=None, identity=None):
             raise RuntimeError("boom")
 
         fake = FakeService(create=create_boom)
@@ -378,7 +390,7 @@ class TestOrderOwnership(unittest.TestCase):
     def test_body_subject_id_cannot_override_jwt(self):
         captured_subject = {}
 
-        def create(raw, subject_id=None):
+        def create(raw, subject_id=None, identity=None):
             captured_subject["value"] = subject_id
             return {"orderId": "ord_1", "status": "PENDING"}
 
@@ -406,7 +418,7 @@ class TestOrderOwnership(unittest.TestCase):
     def test_flat_authorizer_claims_are_accepted(self):
         captured = {}
 
-        def create(raw, subject_id=None):
+        def create(raw, subject_id=None, identity=None):
             captured["subject_id"] = subject_id
             return {"orderId": "ord_1", "status": "PENDING"}
 
@@ -415,7 +427,8 @@ class TestOrderOwnership(unittest.TestCase):
             response = index.handler(
                 {
                     "routeKey": "POST /orders",
-                    "requestContext": {"authorizer": {"sub": "flat-user"}},
+                    "requestContext": {"authorizer": {"sub": "flat-user", "iss": ISSUER,
+                                                     "client_id": CLIENT_ID}},
                     "body": json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
                                         "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
                                         "currency": "EUR"}),
@@ -431,3 +444,68 @@ class TestOrderOwnership(unittest.TestCase):
         with patch_service(fake):
             response = index.handler({"routeKey": "GET /orders"}, None)
         self.assertEqual(response["statusCode"], 200)
+
+
+class TestIdentityResolutionP02A(unittest.TestCase):
+    """MO-RC4-P02A: Consumer-Namensraum + Owner/Actor-Trennung im Handler."""
+
+    BODY = json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                       "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                       "currency": "EUR"})
+
+    def test_missing_consumer_identity_is_rejected(self):
+        for kwargs in ({"iss": None}, {"client_id": None}):
+            with self.subTest(kwargs=kwargs):
+                fake = FakeService()
+                with patch_service(fake):
+                    response = index.handler(
+                        auth_event("POST /orders", body=self.BODY, **kwargs), None
+                    )
+                self.assertEqual(response["statusCode"], 401)
+                self.assertEqual(json.loads(response["body"])["error"]["code"], "UNAUTHORIZED")
+
+    def test_identity_with_consumer_and_separated_actor_is_passed(self):
+        captured = {}
+
+        def create(raw, subject_id=None, identity=None):
+            captured["subject_id"] = subject_id
+            captured["identity"] = identity
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+        with patch_service(fake):
+            response = index.handler(
+                auth_event("POST /orders", sub="user-42", body=self.BODY), None
+            )
+
+        self.assertEqual(response["statusCode"], 201)
+        identity = captured["identity"]
+        self.assertEqual(captured["subject_id"], "user-42")
+        self.assertEqual(identity.consumer_id,
+                         "cognito:cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TESTPOOL"
+                         "#test-client-id")
+        self.assertEqual(identity.owner_id, "user-42")
+        self.assertEqual(identity.actor_id, "user-42")
+        self.assertEqual(identity.owner_type, "user")
+
+    def test_aud_claim_is_accepted_as_consumer_client(self):
+        captured = {}
+
+        def create(raw, subject_id=None, identity=None):
+            captured["identity"] = identity
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+        with patch_service(fake):
+            response = index.handler(
+                {
+                    "routeKey": "POST /orders",
+                    "requestContext": {"authorizer": {"jwt": {"claims": {
+                        "sub": "user-42", "iss": ISSUER, "aud": "aud-client",
+                    }}}},
+                    "body": self.BODY,
+                },
+                None,
+            )
+        self.assertEqual(response["statusCode"], 201)
+        self.assertTrue(captured["identity"].consumer_id.endswith("#aud-client"))
