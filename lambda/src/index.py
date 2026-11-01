@@ -16,7 +16,7 @@ from errors import (
     validation_error,
 )
 from identity import extract_verified_subject, resolve_order_identity_from_event
-from order_service import create_order_service
+from order_service import DELIVERY_FAILED, DELIVERY_SENT, create_order_service
 from validation import validate_list_params, validate_order_id, validate_status_update_body
 
 JSON_HEADERS = {"Content-Type": "application/json"}
@@ -127,9 +127,57 @@ def route_key(event: Dict[str, Any]) -> str:
 # OrderService._require_privacy_auth (fail-closed).
 _INTERNAL_PRIVACY_ACTIONS = ("privacy/inspect", "privacy/export", "privacy/erase")
 
+# MO-RC4-P02F: Recovery wird ausschliesslich per direktem Lambda-Invoke
+# (EventBridge Scheduler oder Operator) ausgeloest. Es gibt KEINE HTTP-Route.
+# Die Autorisierung ist IAM-basiert (lambda:InvokeFunction nur fuer die
+# Scheduler-Rolle); ein Secret im Scheduler-Payload waere ein Leak im State.
+INTERNAL_RECOVERY_ACTION = "recovery/scan"
+
+
+def _mark_delivery(service: Any, order_id: str, state: str) -> None:
+    """Best-effort-Zustellvermerk; darf die API-Antwort nicht veraendern."""
+    try:
+        service.mark_delivery_state(order_id, state)
+    except Exception as exc:
+        print(f"Delivery state update failed for {order_id}: {exc}")
+
+
+def _handle_recovery(event: Dict[str, Any]) -> Dict[str, Any]:
+    from recovery import run_recovery
+
+    options = event.get("options") or {}
+
+    def send(order_id: str) -> None:
+        if not _send_to_sqs(order_id):
+            raise RuntimeError(f"SQS delivery failed for {order_id}")
+
+    import boto3
+
+    table_name = os.environ.get("ORDERS_TABLE")
+    if not table_name:
+        return fail(internal_error("Lambda is not configured (ORDERS_TABLE missing)"))
+    table = boto3.resource(
+        "dynamodb", region_name=os.environ.get("AWS_REGION", "eu-central-1")
+    ).Table(table_name)
+
+    report = run_recovery(
+        table,
+        send,
+        window_minutes=options.get("windowMinutes", 60),
+        limit=options.get("limit", 50),
+        min_age_seconds=options.get("minAgeSeconds", 60),
+        lease_seconds=options.get("leaseSeconds", 300),
+    )
+    return ok(200, report)
+
 
 def _handle_internal(service: Any, event: Dict[str, Any]) -> Dict[str, Any]:
     action = event.get("internalAction")
+    if action == INTERNAL_RECOVERY_ACTION:
+        try:
+            return _handle_recovery(event)
+        except Exception as err:
+            return fail(err)
     if action not in _INTERNAL_PRIVACY_ACTIONS:
         return fail(validation_error(f"Unsupported internal action: {action}"))
     payload = event.get("payload") or {}
@@ -169,8 +217,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 parse_body(event), subject_id=identity.owner_id, identity=identity
             )
             order_id = order.get("orderId")
-            if order_id and SQS_QUEUE_URL:
-                _send_to_sqs(order_id)
+            if order_id:
+                if SQS_QUEUE_URL and _send_to_sqs(order_id):
+                    _mark_delivery(service, order_id, DELIVERY_SENT)
+                else:
+                    # Zustellung fehlgeschlagen/unmoeglich: Recovery uebernimmt.
+                    _mark_delivery(service, order_id, DELIVERY_FAILED)
             return ok(201, order)
 
         if route == "GET /orders":

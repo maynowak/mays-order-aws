@@ -212,6 +212,22 @@ module "sqs_worker" {
   lambda_execution_boundary = var.lambda_execution_boundary
 }
 
+# PENDING-Recovery (MO-RC4-P02F): ruft den bestehenden Handler periodisch auf.
+# Opt-in (recovery_enabled=false), keine Ressource ohne Aktivierung.
+module "recovery" {
+  source       = "./modules/recovery"
+  enabled      = var.recovery_enabled
+  project_name = var.project_name
+  tags         = var.tags
+  function_arn = module.lambda.function_arn
+
+  schedule_expression = var.recovery_schedule_expression
+  window_minutes      = var.recovery_window_minutes
+  min_age_seconds     = var.recovery_min_age_seconds
+  limit               = var.recovery_limit
+  lease_seconds       = var.recovery_lease_seconds
+}
+
 # Cognito User Data Backup Storage (optional via var.enable_cognito_backup,
 # Standard true = bisheriges Verhalten; moved-Block erhält bestehenden State).
 module "cognito_backup" {

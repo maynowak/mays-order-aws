@@ -32,6 +32,13 @@ INTERNAL_FIELDS = {
 # durchkommt).
 MAX_SUBJECT_ID_LENGTH = 256
 
+# MO-RC4-P02F: Zustellzustand (additiv, KEIN fachlicher Order-Status).
+DELIVERY_PENDING = "pending"
+DELIVERY_SENDING = "sending"
+DELIVERY_SENT = "sent"
+DELIVERY_FAILED = "failed"
+DELIVERY_STATES = (DELIVERY_PENDING, DELIVERY_SENDING, DELIVERY_SENT, DELIVERY_FAILED)
+
 
 def _require_valid_subject_id(subject_id: Any) -> str:
     if not isinstance(subject_id, str):
@@ -196,6 +203,8 @@ class OrderService:
             "version": 1,
             "gsi1pk": GSI1_PK,
             "gsi1sk": now,
+            # Zustellung ist von der fachlichen Verarbeitung getrennt.
+            "deliveryState": DELIVERY_PENDING,
         }
 
         # Ownership ist ab MO-RC4-P02 garantiert (siehe oben) und wird dauerhaft
@@ -211,6 +220,24 @@ class OrderService:
         self._table.put_item(Item=item)
 
         return to_public_order(item)
+
+    def mark_delivery_state(self, order_id: str, state: str) -> None:
+        """Setzt den Zustellzustand nach einem Sendeversuch (MO-RC4-P02F).
+
+        Bewusst OHNE Bedingung: Der Aufrufer besitzt in diesem Moment keinen
+        Lease-Anspruch (POST-Pfad). Der Recovery-Pfad nutzt eigene Claims.
+        Ein Fehler hier darf die API-Antwort nicht veraendern (Aufrufer faengt).
+        """
+        if state not in DELIVERY_STATES:
+            raise validation_error(f"Invalid delivery state '{state}'")
+        self._table.update_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            UpdateExpression=(
+                "SET deliveryState = :state, lastDeliveryAt = :now, "
+                "deliveryAttempts = if_not_exists(deliveryAttempts, :zero) + :one"
+            ),
+            ExpressionAttributeValues={":state": state, ":now": now_iso(), ":zero": 0, ":one": 1},
+        )
 
     def get_order(self, order_id: str) -> Dict[str, Any]:
         result = self._table.get_item(

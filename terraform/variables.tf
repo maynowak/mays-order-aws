@@ -170,3 +170,41 @@ variable "sqs_max_receive_count" {
   type        = number
   default     = 1
 }
+
+# MO-RC4-P02F: PENDING-Recovery (opt-in). Der Scheduler ruft den bestehenden
+# Order-Handler regelmaessig auf; ohne Aktivierung entstehen keine Ressourcen.
+variable "recovery_enabled" {
+  description = "Aktiviert den Recovery-Scheduler (EventBridge Scheduler -> bestehender Handler). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "recovery_schedule_expression" {
+  description = "Schedule-Ausdruck fuer den Recovery-Lauf (Default: rate(5 minutes))."
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
+variable "recovery_window_minutes" {
+  description = "Recovery-Zeitfenster in Minuten (GSI1-Range-Query). Muss groesser als das Schedule-Intervall sein."
+  type        = number
+  default     = 60
+}
+
+variable "recovery_min_age_seconds" {
+  description = "Mindestalter einer PENDING-Order, bevor Recovery sie erneut zustellt."
+  type        = number
+  default     = 60
+}
+
+variable "recovery_limit" {
+  description = "Maximale Kandidaten pro Recovery-Lauf (Schutz vor Massenlauf)."
+  type        = number
+  default     = 50
+}
+
+variable "recovery_lease_seconds" {
+  description = "Lease-Dauer fuer den Recovery-Claim (Schutz vor parallelen Laeufen)."
+  type        = number
+  default     = 300
+}

@@ -35,6 +35,7 @@ COMPLETE_MODULES: List[str] = [
     "iam",
     "lambda",
     "monitoring",
+    "recovery",
     "sqs",
     "sqs-worker",
 ]

@@ -154,6 +154,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P02B: **COMPLETE (lokal, teilweise BLOCKED)** — interner Identitätsvertrag + Privacy-Scope, 139/139 Lambda; RIS-Bindung und Mehr-Consumer-Isolation BLOCKED
 - MO-RC4-P02C: **COMPLETE (lokal)** — Worker kollisionssicher (Condition+Version), SQS-DLQ/Retention/Visibility, partielle Batch-Fehler; 157/157 Lambda, terraform validate PASS
 - MO-RC4-P02E: **COMPLETE (lokal)** — internes Order-Routing (orderType, Registry, generischer Handler), 180/180 Lambda; Statusmaschine unverändert
+- MO-RC4-P02F: **COMPLETE (lokal)** — PENDING-Recovery (deliveryState, GSI1-Fenster, Lease, recovery/scan, Scheduler opt-in); 204/204 Lambda, terraform validate PASS
 
 ==================================================
 
@@ -319,3 +320,4 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02C-WORKER-SQS-SAFETY → docs/reports/MO-RC4-P02C-WORKER-SQS-SAFETY.md (Worker-Condition/Version, DLQ + maxReceiveCount=1, Retention/Visibility konfigurierbar, ReportBatchItemFailures)
 - MO-RC4-P02C-WORKER-COLLISION-SAFETY → docs/reports/MO-RC4-P02C-WORKER-COLLISION-SAFETY.md (Kollisions-/Access-Sicht: Ownership beim Lesen fehlt, Worker-Routing OPEN)
 - MO-RC4-P02E-INTERNAL-ORDER-ROUTING → docs/reports/MO-RC4-P02E-INTERNAL-ORDER-ROUTING.md (orderType + interne Handler-Registry, unbekannter Typ → DLQ, Legacy → generic; 180/180 Lambda)
+- MO-RC4-P02F-PENDING-RECOVERY → docs/reports/MO-RC4-P02F-PENDING-RECOVERY.md (Zustellattribute + GSI1-Recovery + Claim/Lease + 5-min-Scheduler, opt-in; 204/204 Lambda)

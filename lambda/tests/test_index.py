@@ -14,6 +14,7 @@ class FakeService:
         self.create_order = create or (
             lambda raw, subject_id=None, identity=None: {"orderId": "ord_1", "status": "PENDING"}
         )
+        self.mark_delivery_state = lambda order_id, state: None
         self.get_order = get or (lambda order_id: {"orderId": order_id, "status": "PENDING"})
         self.list_orders = list_orders or (
             lambda limit, next_token=None: {"orders": [], "count": 0}
@@ -509,3 +510,78 @@ class TestIdentityResolutionP02A(unittest.TestCase):
             )
         self.assertEqual(response["statusCode"], 201)
         self.assertTrue(captured["identity"].consumer_id.endswith("#aud-client"))
+
+
+class TestDeliveryMarkingP02F(unittest.TestCase):
+    """MO-RC4-P02F: POST vermerkt den Zustellausgang (best effort)."""
+
+    BODY = json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                       "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                       "currency": "EUR"})
+
+    def _run(self, send_ok):
+        marked = []
+
+        def create(raw, subject_id=None, identity=None):
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+        fake.mark_delivery_state = lambda order_id, state: marked.append((order_id, state))
+        with patch_service(fake), \
+             mock.patch.object(index, "SQS_QUEUE_URL", "https://sqs/queue"), \
+             mock.patch.object(index, "_send_to_sqs", return_value=send_ok):
+            response = index.handler(auth_event("POST /orders", body=self.BODY), None)
+        return response, marked
+
+    def test_successful_delivery_is_marked_sent(self):
+        response, marked = self._run(True)
+        self.assertEqual(response["statusCode"], 201)
+        self.assertEqual(marked, [("ord_1", "sent")])
+
+    def test_failed_delivery_is_marked_failed(self):
+        response, marked = self._run(False)
+        self.assertEqual(response["statusCode"], 201)  # API-Vertrag unverändert
+        self.assertEqual(marked, [("ord_1", "failed")])
+
+    def test_mark_failure_does_not_break_response(self):
+        def create(raw, subject_id=None, identity=None):
+            return {"orderId": "ord_1", "status": "PENDING"}
+
+        fake = FakeService(create=create)
+
+        def boom(order_id, state):
+            raise RuntimeError("ddb down")
+
+        fake.mark_delivery_state = boom
+        with patch_service(fake), \
+             mock.patch.object(index, "SQS_QUEUE_URL", "https://sqs/queue"), \
+             mock.patch.object(index, "_send_to_sqs", return_value=True):
+            response = index.handler(auth_event("POST /orders", body=self.BODY), None)
+        self.assertEqual(response["statusCode"], 201)
+
+
+class TestRecoveryInternalActionP02F(unittest.TestCase):
+    def test_recovery_action_returns_report(self):
+        fake = FakeService()
+        with patch_service(fake), \
+             mock.patch("boto3.resource"), \
+             mock.patch("recovery.run_recovery", return_value={"status": "COMPLETED", "sent": 2}) as runner:
+            response = index.handler({"internalAction": "recovery/scan",
+                                      "options": {"limit": 5}}, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(json.loads(response["body"])["sent"], 2)
+        self.assertEqual(runner.call_args.kwargs["limit"], 5)
+
+    def test_unknown_internal_action_is_rejected(self):
+        fake = FakeService()
+        with patch_service(fake):
+            response = index.handler({"internalAction": "recovery/other"}, None)
+        self.assertEqual(response["statusCode"], 400)
+
+    def test_recovery_requires_no_public_route(self):
+        """Recovery ist nicht über eine HTTP-Route erreichbar (nur direkter Invoke)."""
+        fake = FakeService()
+        with patch_service(fake):
+            response = index.handler({"routeKey": "POST /recovery"}, None)
+        self.assertEqual(response["statusCode"], 400)

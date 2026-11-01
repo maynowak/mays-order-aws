@@ -1038,3 +1038,45 @@ class TestOrderTypeP02E(unittest.TestCase):
         stored, _ = self._stored(dict(self.BODY, orderType="jobsearch.match"))
         self.assertEqual(stored["subjectId"], "user-123")
         self.assertEqual(stored["gsi2pk"], "SUBJECT#user-123")
+
+
+class TestDeliveryStateP02F(unittest.TestCase):
+    """MO-RC4-P02F: Zustellzustand getrennt vom fachlichen Status."""
+
+    BODY = TestOrderOwnershipPersistence.BODY
+
+    def test_create_order_starts_with_delivery_pending(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"put_item": on_put}))
+        service.create_order(self.BODY, subject_id="user-123")
+        self.assertEqual(stored["deliveryState"], "pending")
+        self.assertEqual(stored["status"], "PENDING")
+
+    def test_mark_delivery_state_sets_state_and_increments_attempts(self):
+        updates = []
+
+        def on_update(**kwargs):
+            updates.append(kwargs)
+            return {}
+
+        service = create_order_service("mays-orders", make_client({"update_item": on_update}))
+        service.mark_delivery_state(ORDER_ID, "sent")
+        service.mark_delivery_state(ORDER_ID, "failed")
+
+        self.assertEqual(len(updates), 2)
+        first = updates[0]
+        self.assertIn("deliveryState = :state", first["UpdateExpression"])
+        self.assertIn("deliveryAttempts = if_not_exists(deliveryAttempts, :zero) + :one",
+                      first["UpdateExpression"])
+        self.assertEqual(first["ExpressionAttributeValues"][":state"], "sent")
+        self.assertNotIn("subjectId", first["UpdateExpression"])
+
+    def test_invalid_delivery_state_is_rejected(self):
+        service = create_order_service("mays-orders", make_client({"update_item": lambda **kw: {}}))
+        with self.assertRaises(OrderError):
+            service.mark_delivery_state(ORDER_ID, "processed")

@@ -36,6 +36,8 @@ MODULE_CATALOG: Dict[str, Dict] = {
     "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"], "optional_deps": []},
     "api": {"dir": "api", "deps": ["cognito", "lambda"], "optional_deps": []},
     "monitoring": {"dir": "monitoring", "deps": ["api", "dynamodb", "lambda"], "optional_deps": []},
+    # MO-RC4-P02F: Recovery-Scheduler ruft den bestehenden Handler (lambda).
+    "recovery": {"dir": "recovery", "deps": ["lambda"], "optional_deps": []},
     "cognito_backup_automation": {
         "dir": "cognito_backup_automation",
         "deps": ["cognito", "cognito_backup"],
@@ -56,6 +58,13 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "sqs_dlq_message_retention_seconds": ["sqs"],
     "sqs_visibility_timeout_seconds": ["sqs"],
     "sqs_max_receive_count": ["sqs"],
+    # MO-RC4-P02F: Recovery-Betriebsparameter
+    "recovery_enabled": ["recovery"],
+    "recovery_schedule_expression": ["recovery"],
+    "recovery_window_minutes": ["recovery"],
+    "recovery_min_age_seconds": ["recovery"],
+    "recovery_limit": ["recovery"],
+    "recovery_lease_seconds": ["recovery"],
     "lambda_execution_boundary": ["sqs_worker"],
     "dashboard_enabled": ["monitoring"],
     "alarm_period_seconds": ["monitoring"],
