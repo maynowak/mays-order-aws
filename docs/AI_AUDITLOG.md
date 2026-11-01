@@ -148,6 +148,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC3-P06-RIS-E2E: **VERIFIED** — RIS-MO-RC-01 (2026-10-30) Full-Lifecycle in Account 262370457690 auf Builder-Pin `1dbb0cb`; Delta zu `8b61922` nur Whitespace (`git diff -w` leer) → RC.3 = **GO**, Produktion **BLOCKED** (Privacy)
 - MO-RC3-P07-P08-PACKAGING: **COMPLETE** — Dossier (MD+PDF), Release Notes, Changelog, Gate-Report; **kein Tag/Release** (P09 menschlich)
 - MO-RC4-P00: **COMPLETE (Planung)** — Baseline verifiziert, Branch angelegt, Inventar + Plan + offene Fragen dokumentiert; **keine Implementierung, keine AWS-Operation**
+- MO-RC4-P01: **COMPLETE (Analyse)** — Contract-Inventar, Orphan-/Secret-Design, ADR-008 (PROPOSED), 23 offene Fragen; keine Implementierung, keine AWS-Operation
 
 ==================================================
 
@@ -298,3 +299,8 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P00-BASELINE → docs/reports/MO-RC4-P00-BASELINE.md (RC4-Basis `086a8be`, Branch `feature/mo-rc4-kms-privacy-retention`, Architektur-Inventar; Hinweis: `v0.5.0-rc.3` ist NICHT getaggt)
 - MO-RC4-P00-MODULE-PLAN → docs/reports/MO-RC4-P00-MODULE-PLAN.md (15 Arbeitspakete P-01…P-15, ~18,5 PT, Abhängigkeitsgraph, Risiken)
 - MO-RC4-P00-OPEN-QUESTIONS → docs/reports/MO-RC4-P00-OPEN-QUESTIONS.md (14 Entscheidungen Q-01…Q-14, 6 blockierend)
+- MO-RC4-P01-CONTRACT-INVENTORY → docs/reports/MO-RC4-P01-CONTRACT-INVENTORY.md (Ist-Verträge: kein subjectId im API-Pfad, kein userId/tenantId/retention, COMPLETED/FAILED nicht implementiert, RIS-Fremdschreibpfad)
+- MO-RC4-P01-ORPHAN-CLEANUP-DESIGN → docs/reports/MO-RC4-P01-ORPHAN-CLEANUP-DESIGN.md (enges Orphan-Kriterium, 5 Auslöser bewertet, TTL nicht als Lösch-Nachweis, Dry-Run/Idempotenz)
+- MO-RC4-P01-SECRET-PROVIDER-DESIGN → docs/reports/MO-RC4-P01-SECRET-PROVIDER-DESIGN.md (AWS_MANAGED/APP_MANAGED/geführte Rotation; keine Eigenbau-Chiffre)
+- MO-RC4-P01-OPEN-QUESTIONS → docs/reports/MO-RC4-P01-OPEN-QUESTIONS.md (23 Entscheidungen, 6 blockierend)
+- ADR-008 (Auftrag: ADR-007) → architecture/architecture-decisions.md (`ADR-008: Privacy-Secret-Management, Retention und Orphan-Cleanup`, Status PROPOSED; Nummer 007 war vergeben)
