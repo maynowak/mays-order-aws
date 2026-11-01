@@ -9,6 +9,14 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
+from processing_result import (
+    FIELD_PROCESSING_ATTEMPT_ID,
+    FIELD_PROCESSING_ERROR,
+    FIELD_PROCESSING_STATE,
+    FIELD_RESULT,
+    PROCESSING_FIELDS,
+    processing_summary,
+)
 from identity import (
     IDENTITY_ITEM_FIELDS,
     OrderIdentity,
@@ -24,7 +32,7 @@ from validation import validate_create_order
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
 INTERNAL_FIELDS = {
     "pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId",
-} | set(IDENTITY_ITEM_FIELDS)
+} | set(IDENTITY_ITEM_FIELDS) | set(PROCESSING_FIELDS)
 
 # MO-RC4-P02: Eigentuemer-Identitaet ist Pflicht. Der Wert stammt aus dem
 # verifizierten JWT-Kontext (index.extract_subject_id) und wird hier erneut
@@ -303,6 +311,19 @@ class OrderService:
                 raise conflicted_update() from err
             raise
 
+    def _load_order_item(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Laedt das vollstaendige Order-Item (ConsistentRead).
+
+        GSI2 projiziert nur einen Teil der Attribute (kein `consumerId`, keine
+        Verarbeitungsfelder). Eine Query mit nicht projizierten Feldern wuerde
+        in DynamoDB fehlschlagen; deshalb wird nach der Query je Order geladen.
+        """
+        result = self._table.get_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            ConsistentRead=True,
+        )
+        return result.get("Item")
+
     def inspect_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         self._require_privacy_auth(context, "privacy_inspect")
 
@@ -321,16 +342,23 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,consumerId",
-                    "ExpressionAttributeNames": {"#status": "status"},
+                    # Nur projizierte Attribute anfragen (GSI2 kennt die
+                    # Verarbeitungsfelder nicht) und je Order vollstaendig laden.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
-                page_items = result.get("Items", [])
-                items.extend(
-                    item for item in page_items if item_in_privacy_scope(item, scope)
-                )
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
+                    if not item_in_privacy_scope(item, scope):
+                        continue
+                    items.append(item)
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
                     break
@@ -360,12 +388,22 @@ class OrderService:
                 if "email" in cust:
                     data_categories.append("customer.email")
 
+        # MO-RC4-P02G-A: datensparsame Kennzeichnung, KEINE Ergebnisinhalte.
+        summary = processing_summary(items)
+        if summary["hasProcessingResult"]:
+            data_categories.append("processing.result")
+        if summary["hasProcessingError"]:
+            data_categories.append("processing.error")
+
         return {
             "subjectId": subject_id,
             "status": "COMPLETED",
             "affectedRecords": len(order_refs),
             "orderReferences": order_refs,
             "dataCategories": data_categories,
+            "hasProcessingResult": summary["hasProcessingResult"],
+            "hasProcessingError": summary["hasProcessingError"],
+            "processingStates": summary["processingStates"],
             "limitations": [],
         }
 
@@ -387,14 +425,19 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency,consumerId",
-                    "ExpressionAttributeNames": {"#status": "status"},
+                    # Nur projizierte Attribute anfragen; Details je Order laden.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
-                items = result.get("Items", [])
-                for item in items:
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
                     if not item_in_privacy_scope(item, scope):
                         continue
                     # Build minimal export view, exclude internal fields
@@ -412,6 +455,17 @@ class OrderService:
                         export_item["totalAmount"] = item["totalAmount"]
                     if "currency" in item:
                         export_item["currency"] = item["currency"]
+                    # MO-RC4-P02G-A: Ergebnis-/Verarbeitungsfelder vollstaendig
+                    # in die Auskunft aufnehmen (nur vorhandene Felder).
+                    for field in (
+                        FIELD_PROCESSING_STATE,
+                        FIELD_PROCESSING_ATTEMPT_ID,
+                        FIELD_RESULT,
+                        "completedAt",
+                        FIELD_PROCESSING_ERROR,
+                    ):
+                        if field in item:
+                            export_item[field] = item[field]
                     orders.append(export_item)
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -590,9 +644,19 @@ class OrderService:
                         cond_expr += " AND version = :ver"
                     self._table.update_item(
                         Key={"pk": pk, "sk": sk},
-                        UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk",
+                        UpdateExpression=(
+                            "SET #c.#n = :anon, #c.#e = :anon_email "
+                            "REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt"
+                        ),
                         ConditionExpression=cond_expr,
-                        ExpressionAttributeNames={"#c": "customer", "#n": "name", "#e": "email"},
+                        ExpressionAttributeNames={
+                            "#c": "customer", "#n": "name", "#e": "email",
+                            # MO-RC4-P02G-A: Ergebnisse werden NICHT selektiv
+                            # bereinigt, sondern vollstaendig entfernt.
+                            "#result": "result",
+                            "#perr": "processingError",
+                            "#patt": "processingAttemptId",
+                        },
                         ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", **cond_values},
                     )
                     anonymized += 1

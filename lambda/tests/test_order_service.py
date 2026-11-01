@@ -48,6 +48,37 @@ class FakeClientError(Exception):
 
 
 def make_client(handlers):
+    """Client-Stub mit automatischem Item-Store.
+
+    Privacy-Funktionen laden nach der GSI2-Query das vollstaendige Item per
+    get_item. Damit bestehende Tests nur `query` stubben muessen, merkt sich
+    der Stub die Query-Items und beantwortet get_item daraus (sofern der Test
+    keinen eigenen get_item-Handler vorgibt).
+    """
+    handlers = dict(handlers)
+    store = {}
+
+    original_query = handlers.get("query")
+
+    def query(**kwargs):
+        result = original_query(**kwargs) if original_query else {"Items": []}
+        for item in result.get("Items", []):
+            pk = item.get("pk")
+            if pk:
+                store[pk] = item
+        return result
+
+    if original_query is not None:
+        handlers["query"] = query
+
+    if "get_item" not in handlers:
+        def get_item(**kwargs):
+            pk = (kwargs.get("Key") or {}).get("pk")
+            item = store.get(pk)
+            return {"Item": item} if item else {}
+
+        handlers["get_item"] = get_item
+
     return FakeTable(handlers)
 
 
@@ -71,6 +102,8 @@ def make_order(**overrides):
         "gsi1sk": "2026-08-17T12:00:00.000Z",
     }
     item.update(overrides)
+    # pk haengt fachlich an der orderId (wichtig fuer get_item-Lookups).
+    item["pk"] = f"{ORDER_ID_PREFIX}{item['orderId']}"
     return item
 
 
@@ -546,8 +579,11 @@ class TestRuntimeFixRegression(unittest.TestCase):
         result = service.inspect_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_inspect": True, "internal_token": "test-secret"})
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(result["affectedRecords"], 1)
-        self.assertEqual(captured.get("ExpressionAttributeNames"), {"#status": "status"})
-        self.assertIn("#status", captured.get("ProjectionExpression", ""))
+        # MO-RC4-P02G-A: Die GSI2-Query projiziert nur projizierte Attribute
+        # (kein nicht-projiziertes Feld, kein Alias noetig); Details kommen
+        # per get_item.
+        self.assertEqual(captured.get("ProjectionExpression"), "orderId")
+        self.assertNotIn("ExpressionAttributeNames", captured)
 
     def test_export_aliases_reserved_status(self):
         captured = {}
@@ -562,8 +598,8 @@ class TestRuntimeFixRegression(unittest.TestCase):
         )
         result = service.export_subject("user-123", context={"project": "mays-orders", "authorized": True, "privacy_export": True, "internal_token": "test-secret"})
         self.assertEqual(result["status"], "COMPLETED")
-        self.assertEqual(captured.get("ExpressionAttributeNames"), {"#status": "status"})
-        self.assertIn("#status", captured.get("ProjectionExpression", ""))
+        self.assertEqual(captured.get("ProjectionExpression"), "orderId")
+        self.assertNotIn("ExpressionAttributeNames", captured)
 
 
 class TestOrderOwnershipPersistence(unittest.TestCase):
@@ -1080,3 +1116,156 @@ class TestDeliveryStateP02F(unittest.TestCase):
         service = create_order_service("mays-orders", make_client({"update_item": lambda **kw: {}}))
         with self.assertRaises(OrderError):
             service.mark_delivery_state(ORDER_ID, "processed")
+
+
+class TestProcessingResultPrivacyP02GA(unittest.TestCase):
+    """MO-RC4-P02G-A: Ergebnisse in Inspect/Export/Anonymize, nie oeffentlich."""
+
+    CONTEXT = {"project": "mays-orders", "authorized": True,
+               "privacy_inspect": True, "privacy_export": True,
+               "privacy_erase": True, "internal_token": "test-secret"}
+
+    def _item(self, **extra):
+        return make_order(subjectId="user-123", consumerId="consumer-a",
+                          identityVersion=1, identityVerification="verified_jwt", **extra)
+
+    # ---------- Inspect ----------
+    def test_inspect_reports_result_presence_without_content(self):
+        item = self._item(result={"secretValue": "PII"}, processingState="succeeded",
+                          processingError={"code": "X"})
+        service = create_order_service("mays-orders",
+                                       make_client({"query": lambda **kw: {"Items": [item]}}))
+        result = service.inspect_subject("user-123", context=self.CONTEXT)
+
+        self.assertTrue(result["hasProcessingResult"])
+        self.assertTrue(result["hasProcessingError"])
+        self.assertEqual(result["processingStates"], ["succeeded"])
+        self.assertIn("processing.result", result["dataCategories"])
+        self.assertIn("processing.error", result["dataCategories"])
+        self.assertNotIn("PII", str(result))
+        self.assertNotIn("secretValue", str(result))
+
+    def test_inspect_without_result_fields(self):
+        service = create_order_service("mays-orders",
+                                       make_client({"query": lambda **kw: {"Items": [self._item()]}}))
+        result = service.inspect_subject("user-123", context=self.CONTEXT)
+        self.assertFalse(result["hasProcessingResult"])
+        self.assertFalse(result["hasProcessingError"])
+        self.assertEqual(result["processingStates"], [])
+
+    def test_inspect_scope_isolation_still_applies(self):
+        foreign = make_order(orderId="ord_other", subjectId="user-123",
+                             consumerId="consumer-b", result={"x": 1})
+        service = create_order_service("mays-orders",
+                                       make_client({"query": lambda **kw: {"Items": [foreign]}}))
+        result = service.inspect_subject(
+            "user-123", context=dict(self.CONTEXT, consumerId="consumer-a")
+        )
+        self.assertFalse(result["hasProcessingResult"])
+        self.assertEqual(result["orderReferences"], [])
+
+    # ---------- Export ----------
+    def test_export_includes_result_fields(self):
+        item = self._item(result={"ok": True}, processingState="succeeded",
+                          processingAttemptId="attempt-1",
+                          completedAt="2026-11-01T12:00:00.000Z",
+                          processingError={"code": "WARN", "message": "m"})
+        service = create_order_service("mays-orders",
+                                       make_client({"query": lambda **kw: {"Items": [item]}}))
+        result = service.export_subject("user-123", context=self.CONTEXT)
+
+        export = result["orders"][0]
+        self.assertEqual(export["result"], {"ok": True})
+        self.assertEqual(export["processingState"], "succeeded")
+        self.assertEqual(export["processingAttemptId"], "attempt-1")
+        self.assertEqual(export["completedAt"], "2026-11-01T12:00:00.000Z")
+        self.assertEqual(export["processingError"], {"code": "WARN", "message": "m"})
+
+    def test_export_legacy_order_omits_absent_fields(self):
+        service = create_order_service("mays-orders",
+                                       make_client({"query": lambda **kw: {"Items": [self._item()]}}))
+        result = service.export_subject("user-123", context=self.CONTEXT)
+        export = result["orders"][0]
+        for field in ("result", "processingState", "processingAttemptId",
+                      "completedAt", "processingError"):
+            self.assertNotIn(field, export)
+
+    # ---------- Anonymize ----------
+    def test_anonymize_removes_result_and_error_fields(self):
+        captured = {}
+
+        def on_update(**kwargs):
+            captured.update(kwargs)
+            return {}
+
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": [self._item(version=1)]},
+                         "update_item": on_update}),
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT,
+            options={"mode": "EXECUTE", "policy": "ANONYMIZE"},
+        )
+
+        self.assertEqual(result["anonymizedRecords"], 1)
+        expression = captured["UpdateExpression"]
+        self.assertIn("REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt", expression)
+        names = captured["ExpressionAttributeNames"]
+        self.assertEqual(names["#result"], "result")
+        self.assertEqual(names["#perr"], "processingError")
+        self.assertEqual(names["#patt"], "processingAttemptId")
+        # Technische, nicht personenbezogene Felder bleiben erhalten
+        self.assertNotIn("processingState", expression)
+        self.assertNotIn("completedAt", expression)
+        # Bedingung unveraendert (Ownership + Version)
+        self.assertIn("subjectId = :sid", captured["ConditionExpression"])
+        self.assertIn("version = :ver", captured["ConditionExpression"])
+
+    def test_repeated_anonymize_is_safe(self):
+        calls = []
+
+        def on_delete(**kwargs):
+            calls.append(kwargs)
+            raise FakeClientError("ConditionalCheckFailedException")
+
+        service = create_order_service(
+            "mays-orders",
+            make_client({"query": lambda **kw: {"Items": []}, "delete_item": on_delete}),
+        )
+        result = service.erase_subject(
+            "user-123", context=self.CONTEXT,
+            options={"mode": "EXECUTE", "policy": "ANONYMIZE"},
+        )
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["deletedRecords"], 0)
+
+    # ---------- Oeffentliche API ----------
+    def test_public_projection_hides_processing_fields(self):
+        item = make_order(result={"secret": 1}, processingState="succeeded",
+                          processingAttemptId="attempt-1",
+                          completedAt="2026-11-01T12:00:00.000Z",
+                          processingError={"code": "X"})
+
+        def on_get(**kwargs):
+            return {"Item": item}
+
+        service = create_order_service("mays-orders", make_client({"get_item": on_get}))
+        order = service.get_order(ORDER_ID)
+
+        for field in ("result", "processingState", "processingAttemptId",
+                      "completedAt", "processingError"):
+            self.assertNotIn(field, order)
+
+    def test_patch_response_hides_processing_fields(self):
+        item = make_order(result={"secret": 1})
+
+        def on_update(**kwargs):
+            return {"Attributes": make_order(status="CONFIRMED", result={"secret": 1})}
+
+        service = create_order_service(
+            "mays-orders",
+            make_client({"get_item": lambda **kw: {"Item": item}, "update_item": on_update}),
+        )
+        order = service.update_order_status(ORDER_ID, "CONFIRMED")
+        self.assertNotIn("result", order)

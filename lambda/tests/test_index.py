@@ -585,3 +585,47 @@ class TestRecoveryInternalActionP02F(unittest.TestCase):
         with patch_service(fake):
             response = index.handler({"routeKey": "POST /recovery"}, None)
         self.assertEqual(response["statusCode"], 400)
+
+
+class TestProcessingFieldsNotPublicP02GA(unittest.TestCase):
+    """MO-RC4-P02G-A: interne Verarbeitungsfelder sind nicht Teil der API."""
+
+    BODY = json.dumps({"customer": {"name": "Max", "email": "max@example.com"},
+                       "items": [{"sku": "SKU-1", "quantity": 1, "unitPrice": 100}],
+                       "currency": "EUR"})
+
+    def test_post_rejects_processing_fields_in_body(self):
+        """Der Validator (nicht der Handler-Stub) lehnt interne Felder ab."""
+        from errors import OrderError
+        from validation import validate_create_order
+
+        for field, value in (("result", {"x": 1}), ("processingState", "succeeded"),
+                             ("processingAttemptId", "a-1"),
+                             ("completedAt", "2026-11-01T12:00:00.000Z"),
+                             ("processingError", {"code": "X"})):
+            with self.subTest(field=field):
+                body = json.loads(self.BODY)
+                body[field] = value
+                with self.assertRaises(OrderError) as ctx:
+                    validate_create_order(body)
+                self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
+
+    def test_get_response_has_no_processing_fields(self):
+        item = {"orderId": "ord_1", "status": "PENDING", "customer": {"name": "Max"},
+                "items": [], "currency": "EUR", "totalAmount": 100,
+                "createdAt": "2026-11-01T12:00:00.000Z", "updatedAt": "2026-11-01T12:00:00.000Z",
+                "result": {"secret": 1}, "processingState": "succeeded"}
+
+        fake = FakeService(get=lambda order_id: {
+            k: v for k, v in item.items()
+            if k not in {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version",
+                         "isTestData", "subjectId", "result", "processingState",
+                         "processingAttemptId", "completedAt", "processingError"}
+        })
+        with patch_service(fake):
+            response = index.handler({"routeKey": "GET /orders/{orderId}",
+                                      "pathParameters": {"orderId": "ord_1"}}, None)
+        self.assertEqual(response["statusCode"], 200)
+        payload = json.loads(response["body"])
+        self.assertNotIn("result", payload)
+        self.assertNotIn("processingState", payload)

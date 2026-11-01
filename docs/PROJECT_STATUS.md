@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02F — PENDING-Recovery (Zustellattribute, GSI1-Fenster, Lease, Scheduler opt-in)
+MO-RC4-P02G-A — Ergebnis-Datenvertrag + Privacy-Integration (kein Schreibpfad); GSI2-Projektionsfehler behoben
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
