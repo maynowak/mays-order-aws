@@ -156,6 +156,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P02E: **COMPLETE (lokal)** — internes Order-Routing (orderType, Registry, generischer Handler), 180/180 Lambda; Statusmaschine unverändert
 - MO-RC4-P02F: **COMPLETE (lokal)** — PENDING-Recovery (deliveryState, GSI1-Fenster, Lease, recovery/scan, Scheduler opt-in); 204/204 Lambda, terraform validate PASS
 - MO-RC4-P02G-A: **COMPLETE (lokal)** — Ergebnis-Datenvertrag + Privacy-Integration, keine Schreibfunktion; 233/233 Lambda
+- MO-RC4-P02G-B: **COMPLETE (lokal)** — Processing-Claim + atomarer Abschluss (result/error), Anonymize/Cancel blockieren Abschluss; 255/255 Lambda
 
 ==================================================
 
@@ -323,3 +324,4 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02E-INTERNAL-ORDER-ROUTING → docs/reports/MO-RC4-P02E-INTERNAL-ORDER-ROUTING.md (orderType + interne Handler-Registry, unbekannter Typ → DLQ, Legacy → generic; 180/180 Lambda)
 - MO-RC4-P02F-PENDING-RECOVERY → docs/reports/MO-RC4-P02F-PENDING-RECOVERY.md (Zustellattribute + GSI1-Recovery + Claim/Lease + 5-min-Scheduler, opt-in; 204/204 Lambda)
 - MO-RC4-P02G-A-PROCESSING-RESULT-PRIVACY-CONTRACT → docs/reports/MO-RC4-P02G-A-PROCESSING-RESULT-PRIVACY-CONTRACT.md (Ergebnisvertrag + Inspect/Export/Anonymize, GSI2-Projektionsfehler behoben; 233/233 Lambda)
+- MO-RC4-P02G-B-PROCESSING-LIFECYCLE-AND-RESULT-PERSISTENCE → docs/reports/MO-RC4-P02G-B-PROCESSING-LIFECYCLE-AND-RESULT-PERSISTENCE.md (Claim/Lease, atomare Ergebnisübernahme, Privacy-Race-Schutz; 255/255 Lambda)

@@ -42,3 +42,33 @@ class TestHandlerRegistry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestProcessingCapabilityP02GB(unittest.TestCase):
+    """Handler deklarieren ihre Processing-Fähigkeit explizit."""
+
+    def test_generic_is_status_handler(self):
+        from order_handlers import get_handler_spec, is_processing_handler
+        self.assertFalse(is_processing_handler("generic"))
+        self.assertFalse(get_handler_spec("generic").processing)
+
+    def test_processing_flag_is_explicit(self):
+        from order_handlers import get_handler_spec, is_processing_handler, register
+
+        @register("test.processing.flag", processing=True)
+        def handler(order, payload, context):
+            return {"ok": True}
+
+        self.assertTrue(is_processing_handler("test.processing.flag"))
+        self.assertTrue(get_handler_spec("test.processing.flag").processing)
+
+    def test_processing_failure_carries_code_and_message(self):
+        from order_handlers import ProcessingFailure
+        failure = ProcessingFailure("UPSTREAM", "nope")
+        self.assertEqual(failure.code, "UPSTREAM")
+        self.assertEqual(failure.message, "nope")
+        self.assertIsInstance(failure, Exception)
+
+    def test_unknown_type_has_no_spec(self):
+        from order_handlers import get_handler_spec
+        self.assertIsNone(get_handler_spec("never.registered.processing"))

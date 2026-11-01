@@ -1,45 +1,77 @@
-"""Interne Order-Handler-Registry (MO-RC4-P02E).
+"""Interne Order-Handler-Registry (MO-RC4-P02E, erweitert P02G-B).
 
 Der Worker bestimmt anhand von `orderType` (aus dem gespeicherten Order-Item,
 NICHT aus der SQS-Nachricht), welche interne Verarbeitungsroutine laeuft.
 
-Regeln:
-- Explizite Registrierung ueber `@register("<typ>")` — keine dynamischen Imports,
-  keine Modul-/Dateipfade, keine externe Agenten-Registry.
-- Der Handler fuehrt ausschliesslich fachliche Arbeit aus. Statusuebergaenge
-  schreibt IMMER der Worker ueber `sqs_handler._process_order` (P02C-Schutz).
-- Handler werfen bei Fehlern; der Worker quittiert das nicht als Erfolg
-  (Item-Failure -> Retry -> DLQ).
-- Unbekannte Typen werden abgelehnt (kein stiller Fallback auf `generic`);
-  nur ein FEHLENDES Feld (`orderType` fehlt) gilt als Legacy und laeuft als
-  `generic`.
+Zwei Handler-Klassen:
+
+1. **Status-Handler** (`processing=False`, z. B. `generic`)
+   Verhalten wie bisher: der Worker fuehrt nach erfolgreicher Ausfuehrung den
+   Statusuebergang aus (P02C). Kein Processing-State, kein Ergebnis.
+
+2. **Processing-Handler** (`processing=True`)
+   Der Worker setzt vorher einen Processing-Claim (`processingState=running`,
+   `processingAttemptId`), ruft den Handler mit einem Kontext auf und uebernimmt
+   das Ergebnis atomar. Der Handler gibt ein strukturiertes Ergebnis zurueck
+   oder wirft `ProcessingFailure` fuer einen kontrollierten fachlichen Fehler.
+
+Regeln (unveraendert):
+- Explizite Registrierung, keine dynamischen Imports, keine Duplikate.
+- Handler schreiben NIE Status, Ownership oder Ergebnis selbst.
+- Unbekannte Typen werden abgelehnt; nur ein FEHLENDES `orderType` gilt als
+  Legacy und laeuft als `generic`.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Mapping
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from order_types import DEFAULT_ORDER_TYPE
 from validation import validate_order_type
 
-# Handler-Signatur: (order_item, payload) -> None
-OrderHandler = Callable[[Mapping[str, Any], Mapping[str, Any]], None]
+# Status-Handler: (order_item, payload) -> None
+StatusHandler = Callable[[Mapping[str, Any], Mapping[str, Any]], None]
+# Processing-Handler: (order_item, payload, context) -> strukturiertes Ergebnis
+ProcessingHandler = Callable[[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], Any]
 
-_HANDLERS: Dict[str, OrderHandler] = {}
+Handler = Any
 
 
-def register(order_type: str, handler: OrderHandler = None):
-    """Registriert einen Handler explizit (deterministisch, ohne Duplikate).
+class ProcessingFailure(Exception):
+    """Kontrollierter fachlicher Fehler eines Processing-Handlers.
 
-    Nutzbar als `register("typ", funktion)` oder als Dekorator
-    `@register("typ")`. Keine dynamischen Imports, keine Duplikate.
+    Wird vom Worker als `processingState=failed` mit validiertem
+    `processingError` gespeichert (kein Stacktrace, keine freie Exception).
     """
 
-    def _register(fn: OrderHandler) -> OrderHandler:
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+@dataclass(frozen=True)
+class HandlerSpec:
+    handler: Handler
+    processing: bool = False
+
+
+_HANDLERS: Dict[str, HandlerSpec] = {}
+
+
+def register(order_type: str, handler: Handler = None, *, processing: bool = False):
+    """Registriert einen Handler explizit (deterministisch, ohne Duplikate).
+
+    Nutzbar als `register("typ", funktion)`, `register("typ", processing=True)`
+    oder als Dekorator `@register("typ", processing=True)`.
+    """
+
+    def _register(fn: Handler) -> Handler:
         validated = validate_order_type(order_type)
         if validated in _HANDLERS:
             raise ValueError(f"Handler for orderType '{validated}' is already registered")
-        _HANDLERS[validated] = fn
+        _HANDLERS[validated] = HandlerSpec(handler=fn, processing=processing)
         return fn
 
     if handler is None:
@@ -47,13 +79,23 @@ def register(order_type: str, handler: OrderHandler = None):
     return _register(handler)
 
 
-def get_handler(order_type: str):
-    """Liefert den registrierten Handler oder None (unbekannter Typ)."""
+def get_handler_spec(order_type: str) -> Optional[HandlerSpec]:
     return _HANDLERS.get(order_type)
+
+
+def get_handler(order_type: str):
+    """Liefert die registrierte Funktion oder None (Kompatibilitaets-API)."""
+    spec = _HANDLERS.get(order_type)
+    return spec.handler if spec else None
 
 
 def is_registered(order_type: str) -> bool:
     return order_type in _HANDLERS
+
+
+def is_processing_handler(order_type: str) -> bool:
+    spec = _HANDLERS.get(order_type)
+    return bool(spec and spec.processing)
 
 
 def registered_types():
@@ -65,11 +107,12 @@ def _generic_handler(order: Mapping[str, Any], payload: Mapping[str, Any]) -> No
     """Bewahrt das bisherige Verhalten: keine zusaetzliche Fachlogik.
 
     Der Statusuebergang (PENDING -> CONFIRMED) erfolgt wie bisher durch den
-    Worker nach erfolgreicher Handler-Ausfuehrung.
+    Worker nach erfolgreicher Handler-Ausfuehrung. Dieser Handler ist bewusst
+    NICHT processing-faehig.
     """
     return None
 
 
-# Einziger produktiver Handler. Weitere interne Handler werden hier explizit
-# ergaenzt (z. B. @register("internal.report.generate")).
+# Einziger produktiver Handler. Processing-Handler werden explizit mit
+# `processing=True` registriert (kein stilles Umschalten bestehender Handler).
 register(DEFAULT_ORDER_TYPE, _generic_handler)
