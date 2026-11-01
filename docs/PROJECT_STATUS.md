@@ -17,7 +17,7 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC3-P07-P08 — Release-Packaging v0.5.0-rc.3 abgeschlossen; P09 (Tag/Release) wartet auf Freigabe
+MO-RC4-P00 — Baseline, Architektur-Inventar und Entwicklungsplan (KMS/Privacy/Retention) abgeschlossen
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -37,7 +37,7 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-feature/t011-11-cloudwatch-monitoring (T011-11 — CloudWatch Monitoring as Code; kein apply)
+feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00 dokumentiert, keine Implementierung)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 
 AWS Resources:

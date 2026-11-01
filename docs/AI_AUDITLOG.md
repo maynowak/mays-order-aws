@@ -147,6 +147,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC3-P05-RIS-EVIDENCE: COMPLETE (Nachtrag 2026-10-31: RIS-Repo read-only ausgewertet)
 - MO-RC3-P06-RIS-E2E: **VERIFIED** — RIS-MO-RC-01 (2026-10-30) Full-Lifecycle in Account 262370457690 auf Builder-Pin `1dbb0cb`; Delta zu `8b61922` nur Whitespace (`git diff -w` leer) → RC.3 = **GO**, Produktion **BLOCKED** (Privacy)
 - MO-RC3-P07-P08-PACKAGING: **COMPLETE** — Dossier (MD+PDF), Release Notes, Changelog, Gate-Report; **kein Tag/Release** (P09 menschlich)
+- MO-RC4-P00: **COMPLETE (Planung)** — Baseline verifiziert, Branch angelegt, Inventar + Plan + offene Fragen dokumentiert; **keine Implementierung, keine AWS-Operation**
 
 ==================================================
 
@@ -294,3 +295,6 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC3-P07-P08-RELEASE-PACKAGING → docs/reports/MO-RC3-P07-P08-RELEASE-PACKAGING.md (Packaging v0.5.0-rc.3: Gates aus Evidence verifiziert, kein Tag/Release)
 - RELEASE-v0.5.0-rc.3 (Dossier + PDF) → docs/release/RELEASE-v0.5.0-rc.3.md / .pdf (5 Seiten A4, LibreOffice)
 - RELEASE-GATES-v0.5.0-rc.3 → docs/release/RELEASE-GATES-v0.5.0-rc.3.md (18 Gates, GO für RC, BLOCKED für Produktion)
+- MO-RC4-P00-BASELINE → docs/reports/MO-RC4-P00-BASELINE.md (RC4-Basis `086a8be`, Branch `feature/mo-rc4-kms-privacy-retention`, Architektur-Inventar; Hinweis: `v0.5.0-rc.3` ist NICHT getaggt)
+- MO-RC4-P00-MODULE-PLAN → docs/reports/MO-RC4-P00-MODULE-PLAN.md (15 Arbeitspakete P-01…P-15, ~18,5 PT, Abhängigkeitsgraph, Risiken)
+- MO-RC4-P00-OPEN-QUESTIONS → docs/reports/MO-RC4-P00-OPEN-QUESTIONS.md (14 Entscheidungen Q-01…Q-14, 6 blockierend)
