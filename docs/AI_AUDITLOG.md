@@ -161,6 +161,7 @@ Overall Status: GREEN (RC) - RC v0.5.0-rc.3 **GO, Packaging COMPLETE** (Tag/Rele
 - MO-RC4-P02I-A: **COMPLETE (lokal)** — Recovery-Safety-Klassifikation + Runbook; automatische Processing-Recovery bleibt OPEN
 - MO-RC4-P02I-B2: **COMPLETE (lokal, nicht deployed)** — GSI3-Recovery, separater Schedule (default aus), DLQ-Alarm; 321/321 Lambda, terraform validate PASS
 - MO-RC4-P02I-C1: **COMPLETE (lokal)** — Lambda-Artefakt vollständig (11 Module, deterministisch), Builder+Installer fail-closed; nicht deployed
+- MO-RC4-P02I-C2: **COMPLETE (lokal)** — CI-Artefakt-Gate in Validate (verify → rebuild → cmp → Tests); CodeBuild-Lauf offen
 
 ==================================================
 
@@ -333,3 +334,4 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02I-A-PROCESSING-RECOVERY-SAFETY → docs/reports/MO-RC4-P02I-A-PROCESSING-RECOVERY-SAFETY.md (präzise Claim-Klassifikation, payload-freies Ereignis-Logging, Runbook; 298/298 Lambda)
 - MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY → docs/reports/MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY.md (GSI3 + processing/scan + DLQ-Alarm, default aus; 321/321 Lambda)
 - MO-RC4-P02I-C1-LAMBDA-ARTIFACT-INTEGRITY → docs/reports/MO-RC4-P02I-C1-LAMBDA-ARTIFACT-INTEGRITY.md (ZIP 7→11 Module, deterministischer Build, Builder-Gate fail-closed, 508 Tests)
+- MO-RC4-P02I-C2-CI-ARTIFACT-QUALITY-GATE → docs/reports/MO-RC4-P02I-C2-CI-ARTIFACT-QUALITY-GATE.md (Validate-Buildspec: Artefaktprüfung vor Rebuild, cmp-Reproduzierbarkeit, Packaging-Tests; 514 Tests)

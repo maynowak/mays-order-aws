@@ -73,10 +73,28 @@ phases:
 
   build:
     commands:
+      # MO-RC4-P02I-C2: Lambda Artifact Quality Gate (fail-closed, keine Reparatur
+      # durch Rebuild). Zuerst das EINGECHECKTE Artefakt pruefen, erst danach
+      # reproduzierbar neu bauen und byte-identisch vergleichen.
+      - echo "Verifying committed Lambda artifact (fail-closed, before any rebuild)..."
+      - |
+        python3 -c "
+        from installer.core.artifact_integrity import verify_lambda_zip
+        ok, msg = verify_lambda_zip('lambda')
+        print(msg)
+        raise SystemExit(0 if ok else 1)
+        "
+      - echo "Rebuilding Lambda artifact deterministically and comparing with committed ZIP..."
+      - cd lambda && python3 -c "import pathlib, build_zip; build_zip.build(pathlib.Path('/tmp/lambda-rebuild.zip'))" && cd ..
+      - cmp lambda/dist/lambda.zip /tmp/lambda-rebuild.zip
+      - echo "Running packaging regression tests (artifact integrity)..."
+      - cd lambda && PYTHONPATH=src python3 -m unittest tests.test_build_zip && cd ..
+      - python3 -m unittest installer.tests.test_artifact_integrity
+      - python3 -m unittest module_builder.tests.test_module_builder.TestArtifactIntegrityGate
       - echo "Running installer validation..."
       - python3 -m installer.cli.main validate --output json
       - echo "Running unit tests..."
-      - echo "Skipping unit tests in CI (run locally)"
+      - echo "Skipping full unit tests in CI (run locally); packaging gate above is mandatory"
       - echo "Running code quality checks..."
       - python3 -m py_compile installer/cli/main.py installer/core/context.py installer/core/deployment_identity.py
       - echo "Running Terraform validation..."
