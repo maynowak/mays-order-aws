@@ -5,7 +5,7 @@ Reine lokale Tests: kein Terraform, kein AWS.
 
 from __future__ import annotations
 
-import hashlib
+import inspect
 import json
 import tempfile
 import unittest
@@ -205,6 +205,16 @@ class TestApplyPathBinding(ManifestTestCase):
         self.assertFalse(
             cli._verify_plan_manifest(self._context(), self.plan, PlanOperation.DESTROY)
         )
+
+    def test_deploy_verifies_deploy_operation_only(self):
+        source = inspect.getsource(InstallerCLI._cmd_deploy)
+        self.assertIn("_verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY)", source)
+        self.assertNotIn("PlanOperation.DESTROY", source)
+
+    def test_destroy_verifies_destroy_operation_only(self):
+        source = inspect.getsource(InstallerCLI._cmd_destroy)
+        self.assertIn("_verify_plan_manifest(context, plan_file, PlanOperation.DESTROY)", source)
+        self.assertNotIn("PlanOperation.DEPLOY", source)
 
     def test_legacy_plan_without_manifest_is_allowed(self):
         manifest_path_for(self.plan).unlink()

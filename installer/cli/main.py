@@ -849,12 +849,6 @@ class InstallerCLI:
         if not self._verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY):
             return 1
 
-        # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
-        # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
-        # bevor der Plan kopiert oder angewendet wird.
-        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
-            return 1
-
         # Validate plan matches deployment identity BEFORE copying
         plan_discovery = PlanDiscovery()
         is_valid, error_msg = plan_discovery.validate_plan_context(plan_file, deployment_context.deployment_id)
@@ -1108,6 +1102,12 @@ class InstallerCLI:
         plan_file = Path(parsed.plan)
         if not plan_file.is_absolute():
             plan_file = Path(".") / parsed.plan
+
+        # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
+        # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
+        # bevor der Destroy-Plan kopiert oder angewendet wird.
+        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
+            return 1
 
         # Validate plan matches deployment identity BEFORE copying
         plan_discovery = PlanDiscovery()
