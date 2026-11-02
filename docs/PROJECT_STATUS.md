@@ -17,8 +17,8 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02I-E1B — Namespace Safety Repair (Backup-Bucket-Namensvertrag, Workspace fail-closed,
-Destroy-Projektkontext, Resource-Identity) — KEIN Deployment; Plan/Apply weiterhin nicht freigegeben
+MO-RC4-P02I-E2B — Controlled Plan Lifecycle Safety (--remote-Plan, fail-closed Backend-Init,
+Plan-Manifest, Cleanup-Vertrag) — KEIN Deployment; Apply/Destroy weiterhin nicht freigegeben
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -42,6 +42,8 @@ feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion
+→ P02I-E2B: Installer `plan --remote` (S3-Backend, explizite Identität, `-input=false`), Plan-Manifest
+  (sha256 + Account/Projekt/Region/Workspace/Backend), Recovery-Flags explizit false, Cleanup-Vertrag
 
 AWS Resources:
 NONE
