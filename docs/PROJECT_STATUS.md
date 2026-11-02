@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-10-31)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-02)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -17,7 +17,8 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02I-C2 — CI-Artefakt-Gate in Validate (Integrität + Reproduzierbarkeit + Packaging-Tests)
+MO-RC4-P02I-E1B — Namespace Safety Repair (Backup-Bucket-Namensvertrag, Workspace fail-closed,
+Destroy-Projektkontext, Resource-Identity) — KEIN Deployment; Plan/Apply weiterhin nicht freigegeben
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -39,6 +40,8 @@ RC.3 Status:
 Current Checkpoint:
 feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00 dokumentiert, keine Implementierung)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
+→ P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
+  Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion
 
 AWS Resources:
 NONE
