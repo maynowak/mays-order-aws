@@ -701,6 +701,24 @@ class InstallerCLI:
             sanitize=False  # Skip sanitization to avoid provider initialization
         )
 
+        # MO-RC4-P02I-E2B: Manifest fuer die Identitaetsbindung (nur Remote-Plan).
+        if remote:
+            from installer.core.plan_manifest import PlanManifest
+
+            manifest = PlanManifest.create(
+                saved_plan,
+                deployment_id=deployment_context.deployment_id,
+                operation=operation,
+                region=context.aws_region,
+                workspace=context.terraform_workspace,
+                backend=backend_contract,
+                variables=var,
+                git_commit=plan_metadata.git_commit,
+            )
+            manifest_path = manifest.write(saved_plan)
+            print(f"  Plan manifest: {manifest_path}")
+            print(f"  Plan sha256: {manifest.plan_sha256}")
+
         # Print summary using plan_result directly
         run_plan_path = saved_plan
         cmd = "destroy" if parsed.destroy else "deploy"
@@ -720,6 +738,54 @@ class InstallerCLI:
         # `--out` bleibt unveraendert: kein stiller Default-Pfad. Ein
         # Remote-Plan verlangt --out ausdruecklich (siehe _cmd_plan).
         return self._cmd_plan(context, parsed, run_dir)
+
+    def _verify_plan_manifest(self, context, plan_file: Path, operation: PlanOperation) -> bool:
+        """Prueft das Plan-Manifest (falls vorhanden) gegen den aktuellen Kontext.
+
+        Legacy-Plaene ohne Manifest bleiben zulaessig (bestehende Pruefungen
+        greifen weiter), aber Remote-Plaene tragen immer ein Manifest.
+        """
+        from installer.core.plan_contract import BackendContractError, load_backend_contract
+        from installer.core.plan_manifest import PlanManifest
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"Plan manifest invalid: {exc}")
+            return False
+
+        if manifest is None:
+            print(
+                "WARNING: Plan has no manifest (legacy artifact); "
+                "falling back to filename/context checks."
+            )
+            return True
+
+        try:
+            backend = load_backend_contract(context.terraform_dir)
+        except BackendContractError as exc:
+            print(f"Plan manifest cannot be verified: {exc}")
+            return False
+
+        deployment_context = context.get_deployment_context()
+        ok, message = manifest.verify(
+            plan_file,
+            deployment_id=deployment_context.deployment_id,
+            region=context.aws_region,
+            workspace=context.terraform_workspace,
+            backend=backend,
+            operation=operation,
+        )
+        if not ok:
+            print(f"Plan manifest mismatch: {message}")
+            return False
+
+        print(
+            f"Plan manifest verified (project={manifest.deployment_id.project}, "
+            f"workspace={manifest.workspace}, region={manifest.region}, "
+            f"sha256={manifest.plan_sha256[:12]}...)"
+        )
+        return True
 
     def _cmd_deploy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Apply a saved deployment plan with H2 deployment identity validation."""
@@ -770,6 +836,18 @@ class InstallerCLI:
         plan_file = Path(parsed.plan)
         if not plan_file.is_absolute():
             plan_file = Path(".") / parsed.plan
+
+        # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
+        # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
+        # bevor der Plan kopiert oder angewendet wird.
+        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY):
+            return 1
+
+        # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
+        # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
+        # bevor der Plan kopiert oder angewendet wird.
+        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
+            return 1
 
         # Validate plan matches deployment identity BEFORE copying
         plan_discovery = PlanDiscovery()
