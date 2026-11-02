@@ -41,3 +41,61 @@ class TestWorkspaceSafety(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestWorkspaceFailClosed(unittest.TestCase):
+    """MO-RC4-P02I-E1B: kein stiller Fallback auf den "default"-Workspace."""
+
+    def _ctx(self):
+        ctx = MagicMock()
+        ctx.to_env.return_value = {}
+        ctx.validated = True
+        return ctx
+
+    def test_default_workspace_rejected_for_project_isolated_runner(self):
+        with self.assertRaises(ValueError):
+            TerraformRunner(
+                '/tmp', aws_context=self._ctx(), workspace='default',
+                require_explicit_workspace=True,
+            )
+
+    def test_empty_workspace_rejected(self):
+        with self.assertRaises(ValueError):
+            TerraformRunner('/tmp', aws_context=self._ctx(), workspace='  ')
+
+    def test_project_workspace_accepted(self):
+        runner = TerraformRunner(
+            '/tmp', aws_context=self._ctx(), workspace='mays-orders-rc4',
+            require_explicit_workspace=True,
+        )
+        self.assertEqual(runner.workspace, 'mays-orders-rc4')
+
+    def test_context_derives_workspace_from_project_name(self):
+        from installer.core.context import InstallationContext
+        ctx = InstallationContext(project_name='mays-orders-rc4')
+        self.assertEqual(ctx.terraform_workspace, 'mays-orders-rc4')
+
+    def test_context_never_keeps_default_workspace(self):
+        from installer.core.context import InstallationContext
+        ctx = InstallationContext(project_name='mays-orders-rc4',
+                                  terraform_workspace='default')
+        self.assertEqual(ctx.terraform_workspace, 'mays-orders-rc4')
+
+    def test_context_rejects_blank_project_name(self):
+        from installer.core.context import InstallationContext
+        with self.assertRaises(ValueError):
+            InstallationContext(project_name='   ')
+
+    def test_cli_runner_enforces_explicit_workspace(self):
+        from installer.cli.main import InstallerCLI
+        ctx = MagicMock()
+        ctx.terraform_dir = '/tmp'
+        ctx.aws_execution_context = MagicMock(validated=True)
+        ctx.terraform_workspace = 'default'
+        with self.assertRaises(ValueError):
+            InstallerCLI._make_runner(ctx)
+
+        ctx.terraform_workspace = 'mays-orders-rc4'
+        runner = InstallerCLI._make_runner(ctx)
+        self.assertEqual(runner.workspace, 'mays-orders-rc4')
+        self.assertTrue(runner.require_explicit_workspace)

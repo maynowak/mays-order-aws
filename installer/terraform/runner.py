@@ -106,7 +106,8 @@ class TerraformRunner:
         aws_context: "AWSExecutionContext",
         terraform_bin: str = "terraform",
         env: Optional[dict] = None,
-        workspace: str = "default"
+        workspace: str = "default",
+        require_explicit_workspace: bool = False
     ):
         """
         Initialize TerraformRunner.
@@ -117,15 +118,32 @@ class TerraformRunner:
             terraform_bin: Path to terraform binary
             env: Additional environment variables
             workspace: Terraform workspace name for parallel deployments
+            require_explicit_workspace: Fail-closed guard for project-isolated
+                deployments (MO-RC4-P02I-E1B). When True, an empty workspace or
+                the Terraform "default" workspace is rejected at construction
+                time. Project-isolated callers must pass workspace=project_name.
         """
         if not aws_context.validated:
             raise ValueError("AWSExecutionContext must be validated")
+
+        workspace = (workspace or "").strip()
+        if not workspace:
+            raise ValueError(
+                "workspace must not be empty; project-isolated deployments "
+                "must use workspace=project_name"
+            )
+        if require_explicit_workspace and workspace == "default":
+            raise ValueError(
+                "workspace 'default' is not allowed for project-isolated "
+                "deployments (silent fallback); expected workspace=project_name"
+            )
         
         self.working_dir = Path(working_dir).resolve()
         self.terraform_bin = "terraform"
         self.aws_context = aws_context
         self.env = {}
         self.workspace = workspace
+        self.require_explicit_workspace = require_explicit_workspace
     
     def _get_terraform_env(self) -> dict:
         """Build explicit subprocess env from validated context.
@@ -231,9 +249,16 @@ class TerraformRunner:
         """Show plan in JSON format."""
         return self.run_and_get_result(["show", "-json", plan_file])
     
-    def plan_destroy(self, out_file: Optional[str] = None) -> "TerraformResult":
-        """Generate destroy plan."""
-        return self.plan(out_file=out_file, destroy=True)
+    def plan_destroy(self, out_file: Optional[str] = None, var: Optional[dict] = None,
+                     var_file: Optional[str] = None) -> "TerraformResult":
+        """Generate destroy plan.
+
+        MO-RC4-P02I-E1B: destroy plans must carry the same project context as
+        deploy plans. Without `var` the Terraform default of `project_name`
+        ("mays-orders") would be used, silently targeting the default project
+        namespace instead of the selected one.
+        """
+        return self.plan(out_file=out_file, destroy=True, var=var, var_file=var_file)
     
     def show(self, plan_file: str) -> "TerraformResult":
         """Show plan (human readable)."""
@@ -411,7 +436,12 @@ class TerraformRunner:
         return True, ""
 
     def _ensure_workspace(self) -> None:
-        """Select workspace, create if missing, verify selection."""
+        """Select workspace, create if missing, verify selection.
+
+        The "default" workspace is only reachable for callers that explicitly
+        opt out of project isolation; project-isolated runners reject it at
+        construction time (require_explicit_workspace=True, MO-RC4-P02I-E1B).
+        """
         if self.workspace == "default":
             return
         # Select workspace

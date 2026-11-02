@@ -24,6 +24,30 @@ from installer.terraform.plan_analysis import evaluate_plan_safety
 from installer.run.manager import RunDirectoryManager, PlanArtifactManager
 
 
+def build_plan_variables(context, parsed) -> dict:
+    """Terraform `-var` values shared by deploy and destroy plans.
+
+    MO-RC4-P02I-E1B: both plan kinds must carry the same project context.
+    `project_name` is always injected (unless explicitly overridden via
+    `--var`), so a missing parameter can never fall back to the Terraform
+    default ("mays-orders") and address a foreign project namespace.
+    """
+    var = {}
+    for raw in getattr(parsed, "var", None) or []:
+        if "=" in raw:
+            key, value = raw.split("=", 1)
+            var[key] = value
+
+    if "project_name" not in var:
+        var["project_name"] = context.project_name
+
+    notification_email = getattr(parsed, "notification_email", None)
+    if notification_email and "notification_email" not in var:
+        var["notification_email"] = notification_email
+
+    return var
+
+
 class InstallerCLI:
     """Main CLI entry point for Mays Installer."""
 
@@ -389,11 +413,17 @@ class InstallerCLI:
 
     @staticmethod
     def _make_runner(context, terraform_dir=None) -> "TerraformRunner":
-        """Create TerraformRunner with explicit workspace (no env globals)."""
+        """Create TerraformRunner with explicit workspace (no env globals).
+
+        MO-RC4-P02I-E1B: project-isolated deployments are fail-closed — the
+        runner refuses the Terraform "default" workspace instead of silently
+        operating on a shared state.
+        """
         return TerraformRunner(
             terraform_dir if terraform_dir is not None else context.terraform_dir,
             context.aws_execution_context,
             workspace=context.terraform_workspace,
+            require_explicit_workspace=True,
         )
 
     def _cmd_validate(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
@@ -515,28 +545,25 @@ class InstallerCLI:
         original_cwd = os.getcwd()
         try:
             os.chdir(context.terraform_dir)
+            # MO-RC4-P02I-E1B: deploy- und destroy-Plan teilen denselben
+            # Projektkontext. Ohne explizites -var project_name wuerde Terraform
+            # auf den Default ("mays-orders") zurueckfallen und damit einen
+            # fremden Projekt-Namespace adressieren.
+            var = build_plan_variables(context, parsed)
+            var_file = getattr(parsed, "var_file", None) or None
+
             if parsed.destroy:
-                plan_result = runner.plan_destroy(out_file=out_filename)
+                plan_result = runner.plan_destroy(
+                    out_file=out_filename,
+                    var=var,
+                    var_file=var_file,
+                )
                 mode = "destroy"
             else:
-                # Parse variables
-                var = {}
-                if parsed.var:
-                    for v in parsed.var:
-                        if "=" in v:
-                            k, v_val = v.split("=", 1)
-                            var[k] = v_val
-                # Auto-inject project_name for parallel project support
-                if "project_name" not in var:
-                    var["project_name"] = context.project_name
-                # Auto-inject notification_email if provided via CLI
-                if parsed.notification_email and "notification_email" not in var:
-                    var["notification_email"] = parsed.notification_email
-
                 plan_result = runner.plan(
                     out_file=out_filename,
                     var=var if var else None,
-                    var_file=parsed.var_file if hasattr(parsed, 'var_file') and parsed.var_file else None
+                    var_file=var_file,
                 )
                 mode = "deploy"
         finally:
