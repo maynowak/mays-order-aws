@@ -86,6 +86,12 @@ resource "aws_s3_bucket_policy" "trail_policy" {
         Resource = "${aws_s3_bucket.trail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
         Condition = {
           StringEquals = {
+            # MO-RC4-P02I-E1B: bewusste Ausnahme von der
+            # Ressourcenidentitaets-Regel. `aws_cloudtrail.trail.arn` ist hier
+            # nicht verwendbar: die Bucket-Policy muss vor dem Trail existieren
+            # (aws_cloudtrail.trail.s3_bucket_name -> aws_s3_bucket.trail),
+            # ein Verweis auf den Trail-ARN erzeugt einen Terraform-Zyklus.
+            # Der ARN ist rein deterministisch (Region/Account/Trail-Name).
             "aws:SourceArn" = "arn:aws:cloudtrail:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:trail/${var.project_name}-trail"
             "s3:x-amz-acl"  = "bucket-owner-full-control"
           }
