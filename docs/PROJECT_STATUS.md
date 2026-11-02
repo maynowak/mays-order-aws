@@ -17,8 +17,8 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC4-P02I-E2B — Controlled Plan Lifecycle Safety (--remote-Plan, fail-closed Backend-Init,
-Plan-Manifest, Cleanup-Vertrag) — KEIN Deployment; Apply/Destroy weiterhin nicht freigegeben
+MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 — abgeschlossen: Verify PASS, E2E 9/9 PASS, Destroy 58/58,
+RC4-State (inkl. Versionen) entfernt; Main-Integration BLOCKED (Auto-Apply-Pipeline `directAWSGit`)
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -44,6 +44,8 @@ feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion
 → P02I-E2B: Installer `plan --remote` (S3-Backend, explizite Identität, `-input=false`), Plan-Manifest
   (sha256 + Account/Projekt/Region/Workspace/Backend), Recovery-Flags explizit false, Cleanup-Vertrag
+→ RC4-Lifecycle-Test (2026-11-02): Apply 58 Ressourcen, E2E 9/9 PASS, Policy-Gate- und Timeout-Fix,
+  Destroy 58/58, RC4-State entfernt; Main-Integration offen (Pipeline-Sicherheitsgate)
 
 AWS Resources:
 NONE

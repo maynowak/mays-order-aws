@@ -335,3 +335,8 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY → docs/reports/MO-RC4-P02I-B2-AUTOMATIC-PROCESSING-RECOVERY.md (GSI3 + processing/scan + DLQ-Alarm, default aus; 321/321 Lambda)
 - MO-RC4-P02I-C1-LAMBDA-ARTIFACT-INTEGRITY → docs/reports/MO-RC4-P02I-C1-LAMBDA-ARTIFACT-INTEGRITY.md (ZIP 7→11 Module, deterministischer Build, Builder-Gate fail-closed, 508 Tests)
 - MO-RC4-P02I-C2-CI-ARTIFACT-QUALITY-GATE → docs/reports/MO-RC4-P02I-C2-CI-ARTIFACT-QUALITY-GATE.md (Validate-Buildspec: Artefaktprüfung vor Rebuild, cmp-Reproduzierbarkeit, Packaging-Tests; 514 Tests)
+- MO-RC4-POLICY-GATE-REPAIR-01 → Commit `94c706a` (7 Allowlist-Typen für Cognito-Backup/SNS, ressourcenspezifisches Lambda-Timeout 10 s/300 s, gezielte S3-/IAM-/SNS-Prüfungen)
+- MO-RC4-TERRAFORM-TIMEOUT-FIX-01 → Commit `64e1a25` (Apply/Destroy 900 s, Plan/State/Read 180 s, `MAYS_TERRAFORM_APPLY_TIMEOUT`, fail-closed, kein Retry)
+- MO-RC4-DEV-APPLY-03 → RC4-Development-Apply: 58/58 Ressourcen, Policy Gate PASS, E2E 9/9 PASS (Cognito/API/DDB/Worker/DLQ/Observability/Backup-Config), Testdaten bereinigt
+- MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 → docs/reports/MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01-EXECUTION_LOG.md (Verify PASS, Apply 58, Destroy 58, RC4-State inkl. Versionen entfernt, Shared Backend + RIS unverändert)
+- MO-RC4-MAIN-INTEGRATION-01 → BLOCKED: `directAWSGit-Mays-Order-AWS` triggert bei Push auf `main` `terraform apply -auto-approve` ohne Approval; Push/Merge bis Pipeline-Sicherheitsgate nicht durchgeführt
