@@ -26,6 +26,57 @@ POLICY_PATH = Path(__file__).with_name("resource-policy.json")
 _S3_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 
+def _normalize_address(address: str) -> str:
+    """Terraform-Adresse ohne Index-Segmente (`[0]`, `["key"]`) fuer stabiles Matching."""
+    return re.sub(r"\[[^\]]*\]", "", address)
+
+
+def _address_matches(address: str, pattern: str) -> bool:
+    """Matcht eine Terraform-Adresse gegen ein Muster (nur `*` ist ein Wildcard)."""
+    addr = _normalize_address(address)
+    regex = re.escape(_normalize_address(pattern)).replace(r"\*", ".*")
+    return re.match(rf"^{regex}$", addr) is not None
+
+
+def _lambda_timeout_limit(address: str, policy: dict[str, Any]) -> int:
+    """Ressourcenspezifisches Lambda-Timeout-Limit (Default: globales Limit).
+
+    Unbekannte Lambdas erhalten NIE ein Override-Limit; die Zuordnung erfolgt
+    ausschliesslich ueber die Terraform-Ressourcenadresse.
+    """
+    lambda_policy = policy.get("lambda", {})
+    default = int(lambda_policy.get("max_timeout_seconds", 10))
+    for override in lambda_policy.get("timeout_overrides") or []:
+        if not isinstance(override, dict):
+            continue
+        if _address_matches(address, str(override.get("address", ""))):
+            try:
+                return int(override.get("max_timeout_seconds", default))
+            except (TypeError, ValueError):
+                continue
+    return default
+
+
+def _check_policy_document_actions(address: str, policy_doc: Any, errors: list[str]) -> None:
+    """Lehnt Wildcard-Actions in einem (plan-bekannten) IAM-Policy-Dokument ab."""
+    if not isinstance(policy_doc, str):
+        return
+    try:
+        doc = json.loads(policy_doc)
+    except (TypeError, ValueError):
+        return
+    for statement in doc.get("Statement") or []:
+        if not isinstance(statement, dict):
+            continue
+        action = statement.get("Action")
+        actions = action if isinstance(action, list) else [action]
+        for entry in actions:
+            if entry == "*" or (isinstance(entry, str) and entry.endswith(":*")):
+                errors.append(
+                    f"{address}: IAM policy must not grant wildcard actions ('{entry}')."
+                )
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as handle:
@@ -150,10 +201,12 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
                 errors.append(f"{address}: Lambda runtime '{runtime}' is not allowed.")
 
             timeout = resource.get("timeout")
-            if isinstance(timeout, (int, float)) and timeout > policy["lambda"]["max_timeout_seconds"]:
-                errors.append(
-                    f"{address}: Lambda timeout {timeout}s exceeds {policy['lambda']['max_timeout_seconds']}s."
-                )
+            if isinstance(timeout, (int, float)):
+                limit = _lambda_timeout_limit(address, policy)
+                if timeout > limit:
+                    errors.append(
+                        f"{address}: Lambda timeout {timeout}s exceeds the resource-specific limit of {limit}s."
+                    )
 
         elif resource_type == "aws_cloudwatch_log_group":
             retention = resource.get("retention_in_days")
@@ -221,6 +274,54 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
                 errors.append(f"{address}: CloudTrail global service events must be enabled.")
             if resource.get("enable_log_file_validation") is not True:
                 errors.append(f"{address}: CloudTrail log-file validation must be enabled.")
+
+        elif resource_type == "aws_s3_bucket_versioning":
+            configs = resource.get("versioning_configuration") or []
+            statuses = [cfg.get("status") for cfg in configs if isinstance(cfg, dict)]
+            if "Enabled" not in statuses:
+                errors.append(f"{address}: S3 bucket versioning must be Enabled.")
+
+        elif resource_type == "aws_s3_bucket_lifecycle_configuration":
+            rules = resource.get("rule") or []
+            if not any(isinstance(rule, dict) and rule.get("status") == "Enabled" for rule in rules):
+                errors.append(
+                    f"{address}: S3 lifecycle configuration requires at least one enabled rule."
+                )
+
+        elif resource_type == "aws_iam_policy":
+            name = resource.get("name")
+            if isinstance(name, str) and not name.startswith(f"{project}-"):
+                errors.append(
+                    f"{address}: IAM policy name '{name}' is outside the project namespace '{project}-*'."
+                )
+            _check_policy_document_actions(address, resource.get("policy"), errors)
+
+        elif resource_type == "aws_iam_role_policy_attachment":
+            role = resource.get("role")
+            if isinstance(role, str) and not role.startswith(f"{project}-"):
+                errors.append(
+                    f"{address}: IAM role policy attachment targets role '{role}' outside the "
+                    f"project namespace '{project}-*'."
+                )
+
+        elif resource_type == "aws_sns_topic":
+            name = resource.get("name")
+            if isinstance(name, str) and not name.startswith(f"{project}-"):
+                errors.append(
+                    f"{address}: SNS topic name '{name}' is outside the project namespace '{project}-*'."
+                )
+
+        elif resource_type == "aws_sns_topic_subscription":
+            protocol = resource.get("protocol")
+            endpoint = resource.get("endpoint")
+            if protocol not in ("email", "email-json", "https"):
+                errors.append(
+                    f"{address}: SNS subscription protocol '{protocol}' is not allowed "
+                    "(email, email-json, https only)."
+                )
+            elif isinstance(endpoint, str) and protocol in ("email", "email-json"):
+                if "@" not in endpoint or endpoint.startswith("@") or endpoint.endswith("@"):
+                    errors.append(f"{address}: SNS email subscription endpoint is invalid.")
 
         elif resource_type == "aws_iam_role":
             name = resource.get("name")
