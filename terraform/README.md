@@ -440,6 +440,15 @@ Struktur in `terraform/outputs.tf`:
 - **Empfehlung:** `project_name` kurz halten (≲ 32 Zeichen), da Lambda-/IAM-Namen
   (`${project_name}-handler`, `-handler-role`) 64-Zeichen-Limits und der CloudTrail-Bucket
   (`${project_name}-cloudtrail-<account-id>`) das 63-Zeichen-Limit haben.
+- **Cognito-Backup-Bucket (MO-RC4-P02I-E1B):** Die Default-Installation
+  (`project_name = "mays-orders"`) behält ihren historischen Namen
+  `mays-orders-cognito-backup-<environment>-mays-orders` — **kein Replacement**.
+  Jedes andere Projekt erhält `<project_name>-cognito-backup-<environment>` und liegt
+  damit im eigenen Projekt-Namespace (Policy-Gate-konform). Ein explizit gesetztes
+  `bucket_name_prefix` erzwingt weiterhin das Legacy-Format
+  `<prefix>-<environment>-<project_name>` (Bestandsschutz). Ungültige oder zu lange
+  Namen (> 63 Zeichen) brechen bereits den Plan ab (Precondition im Modul).
+  Mit projektgebundener Benennung liegt das effektive Längenlimit bei ≈ 36 Zeichen.
 
 ### 9.3 Vor / Nach Apply Warnung
 

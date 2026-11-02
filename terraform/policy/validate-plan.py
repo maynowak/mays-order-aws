@@ -15,11 +15,15 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 POLICY_PATH = Path(__file__).with_name("resource-policy.json")
+
+# S3-Bucket-Namen: 3..63 Zeichen, Kleinbuchstaben/Ziffern/'.'/'-'.
+_S3_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -168,10 +172,24 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
         elif resource_type == "aws_s3_bucket":
             if policy["s3"]["project_bucket_required"]:
                 bucket = resource.get("bucket")
-                if isinstance(bucket, str) and not bucket.startswith(f"{project}-"):
-                    errors.append(
-                        f"{address}: S3 bucket '{bucket}' is outside the project namespace '{project}-*'."
-                    )
+                if isinstance(bucket, str):
+                    if not bucket.startswith(f"{project}-"):
+                        errors.append(
+                            f"{address}: S3 bucket '{bucket}' is outside the project namespace '{project}-*'."
+                        )
+                    # S3-Bucket-Namen sind global eindeutig, <= 63 Zeichen und
+                    # nur aus Kleinbuchstaben, Ziffern, '.' und '-' gebildet
+                    # (MO-RC4-P02I-E1B: Namespace-Vertrag fail-closed pruefen).
+                    if len(bucket) > 63:
+                        errors.append(
+                            f"{address}: S3 bucket name '{bucket}' exceeds the 63-character limit "
+                            f"({len(bucket)} characters)."
+                        )
+                    if not _S3_BUCKET_RE.match(bucket):
+                        errors.append(
+                            f"{address}: S3 bucket name '{bucket}' contains invalid characters "
+                            "(allowed: lowercase letters, digits, '.' and '-'; no leading character other than a letter/digit)."
+                        )
 
         elif resource_type == "aws_s3_bucket_public_access_block":
             required = {
