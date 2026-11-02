@@ -41,6 +41,12 @@ def build_plan_variables(context, parsed) -> dict:
     if "project_name" not in var:
         var["project_name"] = context.project_name
 
+    # MO-RC4-P02I-E2B: Recovery-Schedules bleiben fuer den ersten RC4-Plan
+    # aus. Die Defaults werden explizit gesetzt (statt sich auf Terraform-
+    # Defaults zu verlassen); ein bewusstes --var ...=true gewinnt.
+    for flag in ("recovery_enabled", "processing_recovery_enabled"):
+        var.setdefault(flag, "false")
+
     notification_email = getattr(parsed, "notification_email", None)
     if notification_email and "notification_email" not in var:
         var["notification_email"] = notification_email
@@ -1177,6 +1183,24 @@ class InstallerCLI:
             print(f"WARNING: Could not parse plan metadata from filename: {plan_file.name}")
             print("Proceeding with basic validation only.")
 
+        # MO-RC4-P02I-E2B: Cleanup-Ziel muss exakt der State des Projekts sein.
+        from installer.core.cleanup_contract import validate_cleanup_target
+        from installer.core.plan_contract import BackendContractError, load_backend_contract
+
+        try:
+            backend = load_backend_contract(context.terraform_dir)
+        except BackendContractError as exc:
+            print(f"Destroy blocked: {exc}")
+            return 1
+        state_key = backend.state_key(context.terraform_workspace)
+        cleanup_errors = validate_cleanup_target(state_key, context.project_name)
+        if cleanup_errors:
+            print("Destroy blocked (cleanup contract):")
+            for error in cleanup_errors:
+                print(f"  - {error}")
+            return 1
+        print(f"State target: s3://{backend.bucket}/{state_key}")
+
         # Display destroy plan summary before approval
         print(f"\n=== DESTROY APPROVAL ===")
         print(f"Profile: {context.aws_profile}")
@@ -1235,13 +1259,26 @@ class InstallerCLI:
 
         print("Destruction successful!")
 
-        # Post-destroy verification
+        # Post-destroy verification (Cleanup-Vertrag)
         print("\nRunning post-destroy verification...")
+        from installer.core.cleanup_contract import residual_resources
+
         verify_result = runner.state_list()
         if verify_result.success:
-            print("✓ Terraform state accessible")
+            remaining = residual_resources(verify_result.stdout)
+            if remaining:
+                print(f"⚠ {len(remaining)} resource(s) still present in state:")
+                for address in remaining:
+                    print(f"    {address}")
+                print(
+                    "Cleanup contract NOT satisfied: no state cleanup before a "
+                    "successful, verified empty state. Aborting."
+                )
+                return 1
+            print("✓ Terraform state accessible and empty (0 resources)")
         else:
             print("⚠ Could not verify Terraform state")
+            return 1
 
         print("\nDestruction completed successfully!")
         return 0

@@ -237,7 +237,8 @@ class TerraformRunner:
             var_file: Path to .tfvars file
             var: Variables to pass
         """
-        args = ["plan"]
+        # MO-RC4-P02I-E2B: Plaene laufen nie interaktiv (keine Variablen-Prompts).
+        args = ["plan", "-input=false"]
         if destroy:
             args.append("-destroy")
         if out_file:

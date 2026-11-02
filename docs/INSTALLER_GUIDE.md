@@ -136,6 +136,35 @@ Projektbezogene Terraform-Workspaces trennen die State-Dateien, auch wenn ein ge
 
 Cognito-Backup-Module können optional sein. Die Privacy-Testinstallation nutzte deaktivierte Backup-Module; andere Installationen können davon abweichen.
 
+## 8a. Controlled Remote Plan (`--remote`)
+
+Ein **Remote-Plan** nutzt das konfigurierte S3-Backend und den Projekt-Workspace. Er ist
+ausdrücklich vom Offline-Dry-Run getrennt und führt **niemals** ein Apply aus.
+
+```bash
+./Mays-Order-AWS-installer \
+  --profile mayaws --region eu-central-1 \
+  --project-name mays-orders-rc4 --environment development \
+  plan --remote --out .mays-installer/runs/<run>/plans
+```
+
+Voraussetzungen (fail-closed, sonst Abbruch):
+
+- `--project-name`, `--environment` und `--out` sind **ausdrücklich** gesetzt.
+- Workspace = Projektname, nicht `default`.
+- Region = Backend-Region (`terraform/backend.tf`).
+- S3-Backend mit `encrypt = true` und Locking (`dynamodb_table` oder `use_lockfile`).
+- Kein lokaler `terraform.tfstate` mit Ressourcen (sonst würde Terraform eine
+  State-Migration anbieten — das ist kein Teil eines Plans).
+- `terraform init` läuft immer mit `-input=false`; jeder Prompt bricht ab.
+
+Artefakt: `<plan>.tfplan` **plus** `<plan>.manifest.json` (Account, Projekt, Environment,
+Region, Workspace, Backend, State-Key, Operation, Git-Commit, SHA-256). `deploy`/`destroy`
+verweigern einen Plan, dessen Manifest nicht zum aktuellen Kontext passt.
+
+Der Offline-Dry-Run (`plan` ohne `--remote`) bleibt ein lokaler Simulationslauf **ohne**
+Aussage über den tatsächlichen AWS-Plan.
+
 ## 9. Lambda-Artefaktintegrität
 
 Ein historischer Fehler entstand durch ein veraltetes `lambda/dist/lambda.zip`, obwohl der Quellcode bereits korrigiert war. Das **Staleness Gate** prüft deshalb das Paket gegen den Source vor der Planung.

@@ -35,7 +35,21 @@ class TestBuildPlanVariables(unittest.TestCase):
     def test_project_name_is_always_injected(self):
         parsed = argparse.Namespace(var=None, notification_email=None)
         var = build_plan_variables(_context("mays-orders-rc4"), parsed)
-        self.assertEqual(var, {"project_name": "mays-orders-rc4"})
+        self.assertEqual(var["project_name"], "mays-orders-rc4")
+
+    def test_recovery_flags_are_explicitly_disabled(self):
+        parsed = argparse.Namespace(var=None, notification_email=None)
+        var = build_plan_variables(_context(), parsed)
+        self.assertEqual(var["recovery_enabled"], "false")
+        self.assertEqual(var["processing_recovery_enabled"], "false")
+
+    def test_explicit_recovery_override_is_respected(self):
+        parsed = argparse.Namespace(
+            var=["recovery_enabled=true"], notification_email=None
+        )
+        var = build_plan_variables(_context(), parsed)
+        self.assertEqual(var["recovery_enabled"], "true")
+        self.assertEqual(var["processing_recovery_enabled"], "false")
 
     def test_explicit_project_override_wins(self):
         parsed = argparse.Namespace(var=["project_name=custom"], notification_email=None)
@@ -50,7 +64,8 @@ class TestBuildPlanVariables(unittest.TestCase):
     def test_malformed_var_entries_are_ignored(self):
         parsed = argparse.Namespace(var=["broken"], notification_email=None)
         var = build_plan_variables(_context(), parsed)
-        self.assertEqual(var, {"project_name": "mays-orders-rc4"})
+        self.assertEqual(var["project_name"], "mays-orders-rc4")
+        self.assertNotIn("broken", var)
 
 
 class TestDestroyPlanProjectContext(unittest.TestCase):
@@ -72,6 +87,7 @@ class TestDestroyPlanProjectContext(unittest.TestCase):
         self.assertEqual(len(plan_calls), 1)
         argv = plan_calls[0].args[0]
         self.assertIn("-destroy", argv)
+        self.assertIn("-input=false", argv)
         self.assertIn("-var", argv)
         self.assertIn("project_name=mays-orders-rc4", argv)
 
