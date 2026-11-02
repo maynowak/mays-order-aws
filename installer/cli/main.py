@@ -82,8 +82,9 @@ class InstallerCLI:
         )
         parser.add_argument(
             "--project-name",
-            default=os.environ.get("PROJECT_NAME", "mays-orders"),
-            help="Project name (default: mays-orders)"
+            default=None,
+            help="Project name (default: $PROJECT_NAME or mays-orders). "
+                 "Required explicitly for --remote plans."
         )
         parser.add_argument(
             "--aws-region",
@@ -92,8 +93,9 @@ class InstallerCLI:
         )
         parser.add_argument(
             "--environment",
-            default=os.environ.get("ENVIRONMENT", "Development"),
-            help="Environment (default: Development)"
+            default=None,
+            help="Environment (default: $ENVIRONMENT or Development). "
+                 "Required explicitly for --remote plans."
         )
         parser.add_argument(
             "--terraform-dir",
@@ -169,8 +171,16 @@ class InstallerCLI:
         )
         plan_parser.add_argument(
             "--out",
-            default="deploy.tfplan",
-            help="Output plan file (default: deploy.tfplan)"
+            default=None,
+            help="Plan artifact path (file with identity filename or directory). "
+                 "Required for --remote plans."
+        )
+        plan_parser.add_argument(
+            "--remote",
+            action="store_true",
+            default=False,
+            help="Controlled remote plan: uses the configured S3 backend and the "
+                 "project workspace, stores a verifiable artifact, never applies."
         )
         plan_parser.add_argument(
             "--var-file",
@@ -199,8 +209,16 @@ class InstallerCLI:
         )
         destroy_parser.add_argument(
             "--out",
-            default="destroy.tfplan",
-            help="Output destroy plan file (default: destroy.tfplan)"
+            default=None,
+            help="Destroy plan artifact path (file with identity filename or directory). "
+                 "Required for --remote plans."
+        )
+        destroy_parser.add_argument(
+            "--remote",
+            action="store_true",
+            default=False,
+            help="Controlled remote destroy plan: uses the configured S3 backend and "
+                 "the project workspace, stores a verifiable artifact, never applies."
         )
         destroy_parser.add_argument(
             "--var-file",
@@ -342,6 +360,9 @@ class InstallerCLI:
     def run(self, args: Optional[list] = None) -> int:
         """Run the CLI."""
         parsed = self.parser.parse_args(args)
+        # MO-RC4-P02I-E2B: merken, ob --out ausdruecklich gesetzt wurde
+        # (Default ist None; ein Remote-Plan verlangt einen expliziten Pfad).
+        parsed._out_explicit = getattr(parsed, "out", None) is not None
 
         if getattr(parsed, "guide", False):
             from installer.cli.guide import render_guide_info
@@ -392,8 +413,22 @@ class InstallerCLI:
         context = InstallationContext.from_env()
         context.aws_profile = parsed.profile
         context.aws_region = parsed.aws_region
-        context.project_name = parsed.project_name
-        context.environment = parsed.environment
+
+        # MO-RC4-P02I-E2B: Explizitheit von project_name/environment merken.
+        # Ein Remote-Plan verlangt beide ausdruecklich; Defaults (Env oder
+        # eingebaut) sind fuer den kontrollierten Plan nicht ausreichend.
+        parsed._project_name_explicit = parsed.project_name is not None
+        parsed._environment_explicit = parsed.environment is not None
+        context.project_name = (
+            parsed.project_name
+            or os.environ.get("PROJECT_NAME")
+            or context.project_name
+        )
+        context.environment = (
+            parsed.environment
+            or os.environ.get("ENVIRONMENT")
+            or context.environment
+        )
         context.terraform_dir = parsed.terraform_dir
         context.run_dir = parsed.run_dir
         context.dry_run = parsed.dry_run
@@ -503,10 +538,61 @@ class InstallerCLI:
             print("AWS context validation failed. Cannot proceed with plan.")
             return 1
 
+        # MO-RC4-P02I-E2B: Controlled Remote Plan (expliziter Modus).
+        remote = bool(getattr(parsed, "remote", False))
+        backend_contract = None
+        if remote:
+            from installer.core.plan_contract import (
+                BackendContractError,
+                load_backend_contract,
+                validate_remote_plan,
+            )
+            from installer.core.state_guard import (
+                StateMigrationBlocked,
+                assert_no_state_migration,
+            )
+
+            try:
+                backend_contract = load_backend_contract(context.terraform_dir)
+            except BackendContractError as exc:
+                print(f"Remote plan blocked: {exc}")
+                return 1
+
+            contract_errors = validate_remote_plan(
+                backend_contract,
+                project_name=context.project_name,
+                environment=context.environment,
+                region=context.aws_region,
+                workspace=context.terraform_workspace,
+                project_name_explicit=bool(getattr(parsed, "_project_name_explicit", False)),
+                environment_explicit=bool(getattr(parsed, "_environment_explicit", False)),
+                output_explicit=bool(getattr(parsed, "_out_explicit", False)),
+                operation="destroy" if parsed.destroy else "deploy",
+            )
+            if contract_errors:
+                print("Remote plan blocked (preconditions not met):")
+                for error in contract_errors:
+                    print(f"  - {error}")
+                return 1
+
+            try:
+                assert_no_state_migration(context.terraform_dir)
+            except StateMigrationBlocked as exc:
+                print(f"Remote plan blocked: {exc}")
+                return 1
+
+            print("Remote plan identity:")
+            print(f"  Account:   {context.aws_execution_context.account_id}")
+            print(f"  Region:    {context.aws_region}")
+            print(f"  Project:   {context.project_name}")
+            print(f"  Workspace: {context.terraform_workspace}")
+            print(f"  Backend:   s3://{backend_contract.bucket}/"
+                  f"{backend_contract.state_key(context.terraform_workspace)}")
+
         runner = self._make_runner(context)
 
-        # Check if backend should be configured
-        init_result = runner.init(backend=not context.dry_run)
+        # Remote plan: the S3 backend is mandatory (no local-state fallback).
+        init_result = runner.init(backend=True if remote else not context.dry_run)
         if not init_result.success:
             print(f"Terraform init failed: {init_result.stderr}")
             return 1
@@ -540,7 +626,24 @@ class InstallerCLI:
 
         # Generate H2 plan filename
         out_filename = plan_metadata.to_filename()
-        print(f"\nGenerating plan: {out_filename}")
+
+        # MO-RC4-P02I-E2B: expliziter Plan-Ausgabepfad (--out) mit erhaltener
+        # Deployment-Identitaet im Dateinamen. Ohne --out bleibt es beim
+        # kanonischen Namen im Terraform-Verzeichnis.
+        from installer.core.plan_contract import PlanOutputError, resolve_plan_output
+
+        try:
+            plan_output = resolve_plan_output(
+                context.terraform_dir,
+                getattr(parsed, "out", None),
+                out_filename,
+                plan_metadata,
+            )
+        except PlanOutputError as exc:
+            print(f"Plan output rejected: {exc}")
+            return 1
+        plan_output.parent.mkdir(parents=True, exist_ok=True)
+        print(f"\nGenerating plan: {plan_output}")
 
         original_cwd = os.getcwd()
         try:
@@ -554,14 +657,14 @@ class InstallerCLI:
 
             if parsed.destroy:
                 plan_result = runner.plan_destroy(
-                    out_file=out_filename,
+                    out_file=str(plan_output),
                     var=var,
                     var_file=var_file,
                 )
                 mode = "destroy"
             else:
                 plan_result = runner.plan(
-                    out_file=out_filename,
+                    out_file=str(plan_output),
                     var=var if var else None,
                     var_file=var_file,
                 )
@@ -576,31 +679,34 @@ class InstallerCLI:
         print("Plan generated successfully")
 
         # Save plan artifacts with H2 metadata
-        plan_file_in_terraform = Path(context.terraform_dir) / out_filename
+        plan_file_name = plan_output.name
         run_manager = RunDirectoryManager()
-        run_manager.save_plan_file(run_dir, str(Path(context.terraform_dir) / out_filename), "destroy" if parsed.destroy else "deploy")
+        saved_plan = run_manager.save_plan_file(
+            run_dir, str(plan_output), "destroy" if parsed.destroy else "deploy"
+        )
 
         # Save plan metadata alongside plan file
-        plan_metadata_path = run_dir / "plans" / f"{out_filename}.meta.json"
+        plan_metadata_path = run_dir / "plans" / f"{plan_file_name}.meta.json"
         plan_metadata_path.write_text(plan_metadata.to_json())
 
         # Also save deployment context for reference
         deployment_context = context.get_deployment_context()
-        deployment_context_path = run_dir / "plans" / f"{out_filename}.context.json"
+        deployment_context_path = run_dir / "plans" / f"{plan_file_name}.context.json"
         deployment_context_path.write_text(deployment_context.to_json())
 
         from installer.run.manager import PlanArtifactManager
         PlanArtifactManager.save_plan_safely(
-            str(Path(context.terraform_dir) / out_filename),
-            Path(f".mays-installer/runs/{datetime.now().strftime('%Y%m%d-%H%M%S')}/plans/{out_filename}"),
+            str(plan_output),
+            Path(f".mays-installer/runs/{datetime.now().strftime('%Y%m%d-%H%M%S')}/plans/{plan_file_name}"),
             sanitize=False  # Skip sanitization to avoid provider initialization
         )
 
         # Print summary using plan_result directly
-        run_plan_path = run_dir / "plans" / out_filename
+        run_plan_path = saved_plan
         cmd = "destroy" if parsed.destroy else "deploy"
         print(f"\nPlan Summary:")
-        print(f"  Plan file: {out_filename}")
+        print(f"  Plan file: {plan_file_name}")
+        print(f"  Plan artifact: {saved_plan}")
         print(f"  Plan metadata: {plan_metadata_path.name}")
         print(f"  {cmd.capitalize()} with: ./Mays-Order-AWS-installer {cmd} --plan {run_plan_path}")
         print(f"  Status: Generated successfully")
@@ -611,8 +717,8 @@ class InstallerCLI:
         """Generate destroy plan."""
         # Reuse plan command with destroy flag
         parsed.destroy = True
-        if not hasattr(parsed, 'out') or parsed.out == "deploy.tfplan":
-            parsed.out = "destroy.tfplan"
+        # `--out` bleibt unveraendert: kein stiller Default-Pfad. Ein
+        # Remote-Plan verlangt --out ausdruecklich (siehe _cmd_plan).
         return self._cmd_plan(context, parsed, run_dir)
 
     def _cmd_deploy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
@@ -865,8 +971,8 @@ class InstallerCLI:
         """Generate destroy plan."""
         # Reuse plan command with destroy flag
         parsed.destroy = True
-        if not hasattr(parsed, 'out') or parsed.out == "deploy.tfplan":
-            parsed.out = "destroy.tfplan"
+        # `--out` bleibt unveraendert: kein stiller Default-Pfad. Ein
+        # Remote-Plan verlangt --out ausdruecklich (siehe _cmd_plan).
         return self._cmd_plan(context, parsed, run_dir)
 
     def _cmd_destroy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:

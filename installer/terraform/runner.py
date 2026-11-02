@@ -202,8 +202,13 @@ class TerraformRunner:
             backend: Whether to configure backend (False for local validation only)
             upgrade: Upgrade modules and providers
             reconfigure: Reconfigure backend
+
+        MO-RC4-P02I-E2B: `-input=false` ist immer gesetzt. Terraform darf im
+        Installer nie interaktiv nachfragen (insbesondere nicht "copy existing
+        state to the new backend?"); ein solcher Prompt bricht den Lauf ab,
+        statt still eine State-Migration durchzufuehren.
         """
-        args = ["init"]
+        args = ["init", "-input=false"]
         if not backend:
             args.append("-backend=false")
         if upgrade:
