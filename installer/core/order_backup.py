@@ -607,7 +607,16 @@ def execute_order_backup(
         max_attempts=max_attempts,
     )
 
-    pitr = check_pitr(client, expected, checked_at=_iso(wall_clock()))
+    try:
+        pitr = check_pitr(client, expected, checked_at=_iso(wall_clock()))
+    except OrderBackupError:
+        # Ein PITR-Lesefehler darf ein bereits verifiziertes Backup nicht
+        # verschwinden lassen: getrennt als UNKNOWN ausweisen.
+        pitr = PitrEvidence(
+            status=PITR_UNKNOWN,
+            checked_at=_iso(wall_clock()),
+            error_code=CODE_PITR_UNVERIFIED,
+        )
     if status == BACKUP_AVAILABLE:
         overall = OVERALL_VERIFIED if pitr.verified else OVERALL_PARTIAL
     else:

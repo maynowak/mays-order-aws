@@ -373,6 +373,16 @@ class TestBackupExecution(unittest.TestCase):
         self.assertEqual(evidence.overall_status, OVERALL_VERIFIED)
         self.assertTrue(evidence.earliest_restorable_at.startswith("2026-11-01"))
 
+    def test_pitr_read_error_keeps_verified_backup_as_partial(self) -> None:
+        client = FakeDynamo(make_expected())
+        client.pitr_error = FakeClientError("AccessDeniedException")
+        evidence = run_backup(client)
+        self.assertEqual(evidence.backup_status, BACKUP_AVAILABLE)
+        self.assertEqual(evidence.pitr_status, PITR_UNKNOWN)
+        self.assertEqual(evidence.overall_status, OVERALL_PARTIAL)
+        self.assertEqual(evidence.error_code, CODE_PITR_UNVERIFIED)
+        self.assertIsNotNone(evidence.backup_verified_at)
+
     def test_backup_failed_is_failed(self) -> None:
         client = FakeDynamo(make_expected(), statuses=("CREATING", "FAILED"))
         evidence = run_backup(client)
