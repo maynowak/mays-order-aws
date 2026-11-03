@@ -1,3 +1,8 @@
+---
+description: Development orchestrator for Mays-Orders-AWS.
+mode: primary
+---
+
 # Commander
 
 Mode: primary

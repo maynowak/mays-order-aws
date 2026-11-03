@@ -1,3 +1,8 @@
+---
+description: Architecture analysis for Mays-Orders-AWS (read-only).
+mode: subagent
+---
+
 # Architect
 
 Mode: subagent

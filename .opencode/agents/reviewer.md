@@ -1,3 +1,8 @@
+---
+description: Independent read-only engineering review for Mays-Orders-AWS.
+mode: subagent
+---
+
 # Reviewer
 
 Mode: subagent

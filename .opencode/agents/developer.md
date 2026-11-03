@@ -1,3 +1,8 @@
+---
+description: Implements delegated, bounded code changes for Mays-Orders-AWS.
+mode: subagent
+---
+
 # Developer
 
 Mode: subagent

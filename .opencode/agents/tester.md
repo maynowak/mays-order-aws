@@ -1,3 +1,8 @@
+---
+description: Runs and assesses tests for Mays-Orders-AWS (read-only).
+mode: subagent
+---
+
 # Tester
 
 Mode: subagent
