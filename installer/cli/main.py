@@ -41,6 +41,9 @@ def build_plan_variables(context, parsed) -> dict:
     if "project_name" not in var:
         var["project_name"] = context.project_name
 
+    # MO-P0B: Zielversion im State dokumentieren (Output mo_version).
+    var.setdefault("deployment_version", context.deployment_version)
+
     # MO-RC4-P02I-E2B: Recovery-Schedules bleiben fuer den ersten RC4-Plan
     # aus. Die Defaults werden explizit gesetzt (statt sich auf Terraform-
     # Defaults zu verlassen); ein bewusstes --var ...=true gewinnt.
@@ -118,6 +121,20 @@ class InstallerCLI:
             action="store_true",
             default=False,
             help="Run in dry-run mode (default: False)"
+        )
+        parser.add_argument(
+            "--allow-dirty-source",
+            action="store_true",
+            default=False,
+            help="Allow remote plans/applies from a dirty tracked working tree "
+                 "(documented in the manifest; default: block)."
+        )
+        parser.add_argument(
+            "--allow-legacy-source",
+            action="store_true",
+            default=False,
+            help="Allow applying an upgrade plan whose installed source version is "
+                 "LEGACY_UNKNOWN (default: block; no version is assumed)."
         )
         parser.add_argument(
             "--notification-email",
@@ -612,6 +629,23 @@ class InstallerCLI:
             return 1
         print("Terraform validate passed")
 
+        # MO-P0B: Quellcode-Identitaet fuer verbindliche Remote-Plaene.
+        source_identity = None
+        if remote:
+            from installer.core.source_identity import resolve_source_identity
+            from installer.core.version_binding import check_source_for_plan
+
+            source_identity = resolve_source_identity()
+            source_check = check_source_for_plan(
+                source_identity,
+                allow_dirty_source=bool(getattr(parsed, "allow_dirty_source", False)),
+            )
+            if not source_check.ok:
+                print(source_check.message())
+                return 1
+            dirty_note = " (dirty)" if source_identity.dirty else ""
+            print(f"Source: {source_identity.commit[:12]}{dirty_note}")
+
         # H2: Get deployment context for plan identity
         deployment_context = context.get_deployment_context()
         operation = PlanOperation.DESTROY if parsed.destroy else PlanOperation.DEPLOY
@@ -697,6 +731,21 @@ class InstallerCLI:
             if not self._enforce_upgrade_safety(context, Path(saved_plan), run_dir):
                 return 1
 
+        # MO-P0B: installierte Ausgangsversion ermitteln (nur Remote-Plan).
+        installed = None
+        if remote:
+            from installer.core.version_binding import UNREADABLE, detect_installed_version
+
+            installed = detect_installed_version(runner)
+            if installed.status == UNREADABLE:
+                print(
+                    "UPGRADE_STATE_UNREADABLE: Der installierte State ist nicht lesbar; "
+                    "eine Neuinstallation darf nicht angenommen werden (fail-closed)."
+                )
+                return 1
+            detail = f" {installed.version}" if installed.version else ""
+            print(f"Installed version: {installed.status}{detail}")
+
         # Save plan metadata alongside plan file
         plan_metadata_path = run_dir / "plans" / f"{plan_file_name}.meta.json"
         plan_metadata_path.write_text(plan_metadata.to_json())
@@ -725,7 +774,12 @@ class InstallerCLI:
                 workspace=context.terraform_workspace,
                 backend=backend_contract,
                 variables=var,
-                git_commit=plan_metadata.git_commit,
+                git_commit=(source_identity.commit if source_identity else None),
+                source_version=(installed.version if installed and installed.status == "VERIFIED" else None),
+                target_version=context.deployment_version,
+                git_dirty=(source_identity.dirty if source_identity else None),
+                version_status=(installed.status if installed else None),
+                version_source=(installed.source if installed else None),
             )
             manifest_path = manifest.write(saved_plan)
             print(f"  Plan manifest: {manifest_path}")
@@ -751,11 +805,19 @@ class InstallerCLI:
         # Remote-Plan verlangt --out ausdruecklich (siehe _cmd_plan).
         return self._cmd_plan(context, parsed, run_dir)
 
-    def _verify_plan_manifest(self, context, plan_file: Path, operation: PlanOperation) -> bool:
-        """Prueft das Plan-Manifest (falls vorhanden) gegen den aktuellen Kontext.
+    def _verify_plan_manifest(
+        self,
+        context,
+        plan_file: Path,
+        operation: PlanOperation,
+        require_manifest: bool = True,
+        allow_legacy_manifest: bool = False,
+    ) -> bool:
+        """Prueft das Plan-Manifest gegen den aktuellen Kontext.
 
-        Legacy-Plaene ohne Manifest bleiben zulaessig (bestehende Pruefungen
-        greifen weiter), aber Remote-Plaene tragen immer ein Manifest.
+        Deploy verlangt ein Manifest (Schema 2 mit Versionsbindung); Destroy
+        akzeptiert Legacy-Plaene (v1) ohne Versionsbindung, da ein Destroy kein
+        Upgrade ist.
         """
         from installer.core.plan_contract import BackendContractError, load_backend_contract
         from installer.core.plan_manifest import PlanManifest
@@ -767,9 +829,16 @@ class InstallerCLI:
             return False
 
         if manifest is None:
+            if require_manifest:
+                print(
+                    "UPGRADE_VERSION_BINDING_MISSING: Der Plan hat kein Manifest "
+                    "(keine Versions-/Identitaetsbindung). Bitte mit `plan --remote` "
+                    "neu planen."
+                )
+                return False
             print(
                 "WARNING: Plan has no manifest (legacy artifact); "
-                "falling back to filename/context checks."
+                "destroy continues with filename/context/cleanup checks only."
             )
             return True
 
@@ -787,6 +856,7 @@ class InstallerCLI:
             workspace=context.terraform_workspace,
             backend=backend,
             operation=operation,
+            allow_legacy_manifest=allow_legacy_manifest,
         )
         if not ok:
             print(f"Plan manifest mismatch: {message}")
@@ -796,6 +866,55 @@ class InstallerCLI:
             f"Plan manifest verified (project={manifest.deployment_id.project}, "
             f"workspace={manifest.workspace}, region={manifest.region}, "
             f"sha256={manifest.plan_sha256[:12]}...)"
+        )
+        return True
+
+    def _verify_version_binding(self, context, plan_file: Path, parsed) -> bool:
+        """Prueft die Versionsbindung eines gespeicherten Plans vor dem Apply.
+
+        Ein gueltiger Plan-Hash legitimiert keine widerspruechlichen
+        Versionsinformationen. Fehlende/unlesbare Informationen blockieren.
+        """
+        from installer.core.plan_manifest import PlanManifest
+        from installer.core.source_identity import resolve_source_identity
+        from installer.core.version_binding import (
+            check_version_binding,
+            detect_installed_version,
+        )
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_VERSION_BINDING_MISMATCH: {exc}")
+            return False
+
+        if manifest is None:
+            print(
+                "UPGRADE_VERSION_BINDING_MISSING: kein Plan-Manifest vorhanden "
+                "(plan --remote erforderlich)."
+            )
+            return False
+
+        runner = self._make_runner(context)
+        installed = detect_installed_version(runner)
+        identity = resolve_source_identity()
+        check = check_version_binding(
+            manifest,
+            current_target_version=context.deployment_version,
+            identity=identity,
+            installed=installed,
+            allow_dirty_source=bool(getattr(parsed, "allow_dirty_source", False)),
+            allow_legacy_source=bool(getattr(parsed, "allow_legacy_source", False)),
+        )
+        if not check.ok:
+            print(f"Upgrade version binding: BLOCKED ({check.code})")
+            print(check.message())
+            return False
+
+        source = manifest.source_version or manifest.version_status
+        print(
+            f"Version binding: OK (target={manifest.target_version}, "
+            f"source={source}, commit={(manifest.git_commit or '')[:12]})"
         )
         return True
 
@@ -928,7 +1047,14 @@ class InstallerCLI:
         # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Plan kopiert oder angewendet wird.
-        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY):
+        if not self._verify_plan_manifest(
+            context, plan_file, PlanOperation.DEPLOY, require_manifest=True
+        ):
+            return 1
+
+        # MO-P0B: verbindliche Versionsbindung (Zielversion, Commit, Dirty,
+        # installierte Ausgangsversion) — vor jedem Apply.
+        if not self._verify_version_binding(context, plan_file, parsed):
             return 1
 
         # P0A-02: Auch ein gespeicherter Plan mit gueltigem Manifest/SHA-256
@@ -1193,7 +1319,13 @@ class InstallerCLI:
         # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Destroy-Plan kopiert oder angewendet wird.
-        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
+        if not self._verify_plan_manifest(
+            context,
+            plan_file,
+            PlanOperation.DESTROY,
+            require_manifest=False,
+            allow_legacy_manifest=True,
+        ):
             return 1
 
         # P0A-03: Destroy darf nicht als Bypass fuer das Upgrade-Gate dienen;

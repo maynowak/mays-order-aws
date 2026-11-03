@@ -119,11 +119,56 @@ class TestDestroyPlanGuard(UpgradeGateTestCase):
         self.assertFalse(ok)
 
 
+class TestVersionBindingGate(UpgradeGateTestCase):
+    def test_missing_manifest_blocks(self):
+        cli = InstallerCLI()
+        parsed = SimpleNamespace(allow_dirty_source=False, allow_legacy_source=False)
+        self.assertFalse(cli._verify_version_binding(self._context(), self.plan_file, parsed))
+
+    def test_target_version_mismatch_blocks(self):
+        from installer.core.deployment_identity import PlanOperation
+        from installer.core.plan_manifest import PlanManifest
+
+        manifest = PlanManifest.create(
+            self.plan_file,
+            deployment_id=DeploymentId("240571105849", "mays-orders-rc4", "development"),
+            operation=PlanOperation.DEPLOY,
+            region="eu-central-1",
+            workspace="mays-orders-rc4",
+            backend={"type": "s3", "bucket": "b", "key": "terraform.tfstate",
+                     "region": "eu-central-1", "workspace_key_prefix": "env:"},
+            git_commit="a" * 40,
+            target_version="9.9.9",
+            git_dirty=False,
+            version_status="UNVERIFIED",
+            version_source="no_remote_state",
+        )
+        manifest.write(self.plan_file)
+
+        cli = InstallerCLI()
+        runner = MagicMock()
+        runner.state_list.return_value = SimpleNamespace(success=True, stdout="", stderr="")
+        runner.output.return_value = SimpleNamespace(success=True, stdout="{}", stderr="")
+        cli._make_runner = MagicMock(return_value=runner)
+        parsed = SimpleNamespace(allow_dirty_source=False, allow_legacy_source=False)
+        self.assertFalse(cli._verify_version_binding(self._context(), self.plan_file, parsed))
+
+    def test_binding_block_prevents_apply(self):
+        cli, runner = self._cli_with_plan(SAFE_PLAN)
+        parsed = SimpleNamespace(plan=str(self.plan_file), yes=False)
+        with patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True), \
+             patch.object(InstallerCLI, "_verify_version_binding", return_value=False):
+            exit_code = cli._cmd_deploy(self._context(), parsed, self.run_dir)
+        self.assertEqual(exit_code, 1)
+        runner.apply.assert_not_called()
+
+
 class TestDeployBlockedNoApply(UpgradeGateTestCase):
     def test_blocked_gate_prevents_apply(self):
         cli, runner = self._cli_with_plan(SAFE_PLAN)
         parsed = SimpleNamespace(plan=str(self.plan_file), yes=False)
         with patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True), \
+             patch.object(InstallerCLI, "_verify_version_binding", return_value=True), \
              patch.object(InstallerCLI, "_enforce_upgrade_safety", return_value=False):
             exit_code = cli._cmd_deploy(self._context(), parsed, self.run_dir)
         self.assertEqual(exit_code, 1)

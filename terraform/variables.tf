@@ -13,6 +13,20 @@ variable "project_name" {
   }
 }
 
+# MO-P0B: dokumentierte Zielversion der Bereitstellung. Wird als
+# Terraform-Output `mo_version` im Remote-State abgelegt (State-Output, kein
+# unabhaengiger Nachweis des laufenden Lambda-Codes).
+variable "deployment_version" {
+  description = "Semantische Version dieser Bereitstellung (major.minor.patch); wird als Output mo_version dokumentiert."
+  type        = string
+  default     = "0.1.0"
+
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.deployment_version))
+    error_message = "deployment_version muss dem Format major.minor.patch entsprechen (z. B. 0.1.0)."
+  }
+}
+
 variable "aws_region" {
   description = "AWS-Region, in der die Infrastruktur erzeugt wird."
   type        = string
