@@ -1095,6 +1095,80 @@ Baseline-Prüfung ist eine zusätzliche, nachvollziehbare Schicht.
   außerhalb des States (die wiederum als Drift erscheinen können).
 - Keine automatische Datenmigration, kein Rollback.
 
+## Upgrade Orchestration (P1)
+
+**Ziel:** Ein bestehendes System kontrolliert auf eine neue Version vorbereiten —
+ohne automatische Ausführung, ohne Datenmigration.
+
+### CLI
+
+```bash
+./Mays-Order-AWS-installer \
+  --project-name mays-orders-rc4 --environment development \
+  --deployment-version 0.2.0 \
+  plan --remote --upgrade --out .mays-installer/runs/<run>/plans
+```
+
+Der Apply bleibt der bestehende Pfad: `deploy --plan <artefakt>`.
+
+### Voraussetzungen (`--upgrade`)
+
+| Prüfung | Verhalten |
+|---|---|
+| `--remote` erforderlich | sonst `UPGRADE_REQUIRES_REMOTE` |
+| Bestehende Installation | `VERIFIED` oder `LEGACY_UNKNOWN`; kein State → `UPGRADE_SOURCE_INSTALLATION_MISSING` |
+| Unlesbarer State | `UPGRADE_STATE_UNREADABLE` (keine Neuinstallations-Annahme) |
+| Zielversion | `--deployment-version` (SemVer, validiert) |
+
+### Versionskompatibilität
+
+| Konstellation | Status |
+|---|---|
+| gleiche Version | `COMPATIBLE` |
+| Patch-Upgrade | `COMPATIBLE` |
+| Minor-Upgrade ohne Nachweis | `REVIEW_REQUIRED` |
+| Minor-Upgrade mit Nachweis | `COMPATIBLE` (im aktuellen CLI noch nicht verdrahtet) |
+| Major-Upgrade | `MIGRATION_REQUIRED` |
+| Downgrade | `INCOMPATIBLE` |
+| Legacy/unbekannte Quelle | `UNKNOWN` |
+| ungültige Version | `UNKNOWN` |
+
+`MIGRATION_REQUIRED`, `INCOMPATIBLE` und `UNKNOWN` blockieren.
+`REVIEW_REQUIRED` verlangt beim Apply `--accept-upgrade-review`.
+`COMPATIBLE` ersetzt **keine** P0A-/P0B-/P0C-Prüfung.
+
+### Change-Klassifikation
+
+- `SAFE`: neue, unkritische Ressourcen; No-op.
+- `REVIEW`: Updates, neue öffentliche/sicherheitsrelevante Ressourcen,
+  DELETE/REPLACE nicht geschützter Typen, nicht-kritische Drift.
+- `CRITICAL`: P0A-kritische Änderungen, Drift geschützter Typen, unbekannte
+  Aktionen, unverifizierte Drift/No-op, blockierende Kompatibilität.
+- Gesamtbewertung = höchste Kategorie.
+
+### Readiness-Bericht
+
+`upgrade-readiness.json` + `.md` im Run-Verzeichnis:
+
+Projekt/Environment, AWS-Account/Region, Backend/Workspace, State-Lineage/Serial,
+Ausgangs-/Zielversion, Git-Commit, Kompatibilität, Drift-/No-op-Status, geplante
+Änderungen, SAFE/REVIEW/CRITICAL, migrationspflichtige Änderungen, blockierende
+Gründe, nächste Schritte, Nachweisgrenzen.
+
+Status: `READY` · `REVIEW_REQUIRED` · `BLOCKED` · `NO_CHANGES`.
+**Keine Ausführungsfreigabe:** Der Apply-Pfad liest die Datei nicht als Freigabe,
+sondern prüft Manifest, Plan-Hash, Versionsbindung, State-Baseline, Kompatibilität
+und P0A erneut.
+
+### Grenzen
+
+- Keine automatische Migration, kein Rollback/Resume.
+- SemVer-Differenz ist kein technischer Kompatibilitätsnachweis; eine
+  Kompatibilitätsmatrix/Evidenz ist noch nicht hinterlegt (Minor → REVIEW).
+- Legacy-Installationen (`LEGACY_UNKNOWN`) blockieren ein Upgrade als `UNKNOWN`
+  (kontrollierte Legacy-Übernahme bleibt offen).
+- TOCTOU: Prüfungen vor Apply verhindern keine späteren Änderungen.
+
 ## Security Considerations
 
 ### Plan File Sensitivity
