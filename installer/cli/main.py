@@ -691,6 +691,12 @@ class InstallerCLI:
             run_dir, str(plan_output), "destroy" if parsed.destroy else "deploy"
         )
 
+        # P0A-02: Upgrade-Safety-Gate bereits bei der Planerstellung.
+        # Destroy-Plaene werden hier nicht bewertet (siehe _verify_destroy_plan).
+        if not parsed.destroy:
+            if not self._enforce_upgrade_safety(context, Path(saved_plan), run_dir):
+                return 1
+
         # Save plan metadata alongside plan file
         plan_metadata_path = run_dir / "plans" / f"{plan_file_name}.meta.json"
         plan_metadata_path.write_text(plan_metadata.to_json())
@@ -793,6 +799,82 @@ class InstallerCLI:
         )
         return True
 
+    def _enforce_upgrade_safety(self, context, plan_path: Path, run_dir: Path) -> bool:
+        """P0A: block delete/replace of protected resources (fail-closed).
+
+        Runs for deploy plans at creation time and again immediately before a
+        saved plan is applied. A valid manifest/SHA-256 alone does not make a
+        plan safe. Explicit destroy plans are handled separately
+        (_verify_destroy_plan) and are not subject to this gate.
+        """
+        from installer.core.upgrade_safety import (
+            STATUS_SAFE,
+            analyze_plan,
+            build_migration_plan,
+            format_block_message,
+            sha256_file,
+            write_migration_plan,
+        )
+
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            print("UPGRADE_BLOCKED_PLAN_UNREADABLE")
+            print(
+                "Plan-JSON konnte nicht gelesen werden (fail-closed): "
+                f"{(result.stderr or '').strip()[:400]}"
+            )
+            return False
+
+        try:
+            plan_json = json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            print("UPGRADE_BLOCKED_PLAN_UNREADABLE")
+            print(f"Plan-JSON ist nicht interpretierbar (fail-closed): {exc}")
+            return False
+
+        assessment = analyze_plan(plan_json, sha256_file(plan_path))
+        if assessment.status == STATUS_SAFE:
+            print("Upgrade safety: PASS (keine geschuetzte Ressource wird geloescht/ersetzt)")
+            return True
+
+        migration_plan = build_migration_plan(
+            assessment,
+            project=context.project_name,
+            environment=context.environment,
+            workspace=context.terraform_workspace,
+        )
+        json_path, md_path = write_migration_plan(run_dir, migration_plan, assessment)
+        print(format_block_message(assessment))
+        print(f"Migrationsplan (JSON): {json_path}")
+        print(f"Migrationsbericht (MD): {md_path}")
+        return False
+
+    def _verify_destroy_plan(self, context, plan_path: Path) -> tuple:
+        """P0A: a destroy command may only apply a genuine destroy plan.
+
+        Prevents using `destroy --plan <deploy-plan>` as a bypass of the
+        upgrade safety gate.
+        """
+        from installer.core.upgrade_safety import is_destroy_plan
+
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            return False, (
+                "Plan-JSON konnte nicht gelesen werden (fail-closed): "
+                f"{(result.stderr or '').strip()[:400]}"
+            )
+        try:
+            plan_json = json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            return False, f"Plan-JSON ist nicht interpretierbar (fail-closed): {exc}"
+
+        ok, reason = is_destroy_plan(plan_json)
+        if not ok:
+            return False, reason
+        return True, ""
+
     def _cmd_deploy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Apply a saved deployment plan with H2 deployment identity validation."""
         print(f"Deploying plan: {parsed.plan if parsed.plan else 'auto-detect'}")
@@ -847,6 +929,11 @@ class InstallerCLI:
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Plan kopiert oder angewendet wird.
         if not self._verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY):
+            return 1
+
+        # P0A-02: Auch ein gespeicherter Plan mit gueltigem Manifest/SHA-256
+        # muss das Upgrade-Safety-Gate erneut bestehen.
+        if not self._enforce_upgrade_safety(context, plan_file, run_dir):
             return 1
 
         # Validate plan matches deployment identity BEFORE copying
@@ -1107,6 +1194,15 @@ class InstallerCLI:
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Destroy-Plan kopiert oder angewendet wird.
         if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
+            return 1
+
+        # P0A-03: Destroy darf nicht als Bypass fuer das Upgrade-Gate dienen;
+        # es werden ausschliesslich echte Destroy-Plaene angewendet.
+        destroy_ok, destroy_reason = self._verify_destroy_plan(context, plan_file)
+        if not destroy_ok:
+            print("DESTROY_PLAN_REQUIRED")
+            print(destroy_reason)
+            print("Es wurde kein Destroy ausgefuehrt.")
             return 1
 
         # Validate plan matches deployment identity BEFORE copying
