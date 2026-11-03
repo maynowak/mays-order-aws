@@ -471,14 +471,16 @@ All commands use validated `AWSExecutionContext`.
 - Merges with existing tags preserving unrelated tags
 - Canonical tags take precedence for identity/version metadata
 
-#### 7. Existing Resource / Upgrade Awareness
-- `OwnershipAnalyzer` classifies existing resources:
-  - `OWNED` — belongs to current deployment
-  - `FOREIGN` — belongs to different project/environment/account
-  - `AMBIGUOUS` — same deployment ID but different version/phase
-  - `UNMANAGED` — no deployment metadata
-- Ambiguous ownership surfaced, not silently adopted
-- Existing resources considered in future upgrade planning
+#### 7. Existing Resource / Upgrade Awareness (Stand P0A)
+- **Implementiert:** das aktionsbasierte **Upgrade-Safety-Gate** (siehe
+  „Upgrade Safety Gate (P0A)" unten) blockiert DELETE/REPLACE geschützter
+  Ressourcen bei Planerstellung **und** vor dem Apply eines gespeicherten Plans.
+- **Nicht implementiert (Korrektur):** `OwnershipAnalyzer`/`ResourceOwnership`
+  existieren im Code (`installer/core/deployment_identity.py`), werden aber von
+  keinem Produktionspfad aufgerufen; eine Ownership-Klassifikation findet derzeit
+  **nicht** statt.
+- Ebenso ist `DevelopmentState.compare` (Versionsvergleich) vorhanden, aber nicht
+  verdrahtet — es gibt noch keine automatische Kompatibilitätsprüfung.
 
 #### 8. Configuration / Context Separation
 - **INSTALLER CONTEXT:** installer name, version, commit
@@ -561,18 +563,20 @@ All commands use validated `AWSExecutionContext`.
 - Metadata validated before DEPLOY/DESTROY
 
 #### 7. AWS Resource Tagging
-- Uses H2 TagSet canonical model
-- Identity tags: Project, Environment, DeploymentId
-- Version tags: Version, DevelopmentPhase, DevelopmentStep
-- Governance tags: ManagedBy, Owner, Maker
-- Custom tags prefixed with `Custom:`
-- Preserves existing unrelated tags
+- **Korrektur:** `TagSet` ist als Modell definiert
+  (`installer/core/deployment_identity.py`), wird aber **nicht** auf Ressourcen
+  angewendet. Die tatsächlichen Tags setzt Terraform: `Project` je Ressource plus
+  `default_tags` (`Project`, `Maker`, `Environment`) im Root-Modul.
+- `DeploymentId`/`Version`/`DevelopmentPhase`-Tags werden derzeit **nicht** gesetzt.
 
 #### 8. Existing Resource / Upgrade Boundary
-- OwnershipAnalyzer classifies resources: OWNED, FOREIGN, AMBIGUOUS, UNMANAGED
-- Ambiguous ownership surfaced, not silently adopted
-- Migration execution NOT implemented - HARD STOP on MIGRATION_REQUIRED/INCOMPATIBLE
-- No automatic destroy/recreate as workaround
+- **HARD STOP ist implementiert** — aber aktionsbasiert: DELETE/REPLACE von
+  DynamoDB-Tabellen, S3-Buckets, Cognito User Pools und SQS Queues wird bei
+  Planerstellung und vor dem Apply blockiert (`UPGRADE_BLOCKED_MIGRATION_REQUIRED`).
+- **Nicht implementiert:** automatische Versions-/Kompatibilitätsprüfung
+  (`DevelopmentState.compare` ungenutzt), Ownership-Klassifikation
+  (`OwnershipAnalyzer` ungenutzt), automatische Migration, Rollback.
+- Kein automatisches Destroy/Recreate als Workaround.
 
 #### 9. Environment Progression Support
 - Architecture supports: development → test → integration → staging → production
@@ -861,6 +865,65 @@ If `--plan` is omitted from `deploy` or `destroy`, the installer automatically f
 This eliminates manual path copying and ensures the correct plan is always used.
 
 ---
+
+## Upgrade Safety Gate (P0A)
+
+**Ziel:** Ein Upgrade eines bestehenden Systems darf keine zustandsbehafteten
+Ressourcen löschen oder ersetzen, ohne dass eine Migrationsprüfung stattgefunden hat.
+
+### Geschützte Ressourcentypen
+
+| Typ | DELETE | REPLACE |
+|---|---|---|
+| `aws_dynamodb_table` | **BLOCK** | **BLOCK** |
+| `aws_s3_bucket` | **BLOCK** | **BLOCK** |
+| `aws_cognito_user_pool` | **BLOCK** | **BLOCK** |
+| `aws_sqs_queue` | **BLOCK** | **BLOCK** |
+
+Die Klassifikation erfolgt ausschließlich über die **Terraform-Plan-Aktionen**
+(`delete`, `create`+`delete`, `delete`+`create`) — nie über Namenspräfixe.
+`replace_paths` werden im Bericht ausgewiesen.
+
+### Wo das Gate greift
+
+1. **Planerstellung (Deploy):** Nach `terraform plan` wird das Plan-JSON analysiert.
+   Bei kritischen Änderungen: `UPGRADE_BLOCKED_MIGRATION_REQUIRED`, Exit 1,
+   **kein Manifest** (der Plan ist nicht anwendbar).
+2. **Apply (gespeicherter Plan):** Nach der Manifest-/SHA-256-Prüfung und **vor**
+   dem Kopieren/Anwenden wird das Gate erneut ausgeführt. Ein gültiger Hash allein
+   macht einen Plan **nicht** sicher.
+3. **Destroy:** Der Destroy-Befehl akzeptiert nur echte Destroy-Pläne
+   (ausschließlich `delete`/`no-op`/`read`); ein Deploy-Plan kann nicht über
+   `destroy --plan …` angewendet werden. Der bestehende Destroy-Lifecycle
+   (State-Ziel, Cleanup-Vertrag, Freigabe) bleibt unverändert.
+
+### Fail-closed
+
+Fehlendes, unlesbares oder unbekanntes Plan-JSON (z. B. unbekannte Aktion,
+fehlende `resource_changes`) führt zum **Abbruch**, nicht zu einer Warnung.
+Es wird kein `terraform apply` gestartet.
+
+### Migrationsplan
+
+Bei einer Blockade schreibt der Installer ins Run-Verzeichnis:
+
+- `upgrade-migration-plan.json` (Schema-Version 1, Ressourcen, Aktionen,
+  `replacePaths`, Risiko, `approved: false`)
+- `upgrade-migration-plan.md` (Ausgangs-/Zielumgebung, Planidentität, kritische
+  Änderungen, Datenverlustrisiken, Strategien A–D, Vorbedingungen,
+  Abnahmekriterien, offene Entscheidungen)
+
+Der Bericht ist eine **Planung**, keine Ausführungsfreigabe. Es wird **keine**
+Migration ausgeführt.
+
+### Bekannte Einschränkungen
+
+- Versionsbindung fehlt weiterhin (`sourceVersion`/`targetVersion` sind `null`;
+  `git_commit` im Manifest ist derzeit `null`).
+- Keine automatische Kompatibilitäts-/Ownership-Prüfung.
+- Nicht geschützte Typen (Lambda, API, IAM) werden nur über die bestehende
+  Safety-Analyse (Destroys blockiert) und den Plan-Review betrachtet.
+- Kein Rollback/Resume.
 
 ## Security Considerations
 
