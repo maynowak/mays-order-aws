@@ -1,0 +1,28 @@
+-- Restore-Stichprobe: denselben Schluessel in Original- und Restore-Tabelle
+-- pruefen. PartiQL kann nicht joinen; beide Abfragen getrennt ausfuehren und
+-- die Ergebnisse manuell vergleichen.
+-- Restore-Tabellen heissen <TABLE_NAME>-restore-<timestamp> und sind nicht produktiv.
+
+-- 1) Original: Schluessel und nicht sensible Metadaten.
+SELECT "pk", "sk", "orderId", "status", "version", "createdAt", "updatedAt"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- 2) Restore-Tabelle: gleicher Schluessel.
+SELECT "pk", "sk", "orderId", "status", "version", "createdAt", "updatedAt"
+FROM "<RESTORE_TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- 3) Existenzstichprobe im Restore (ohne PII).
+SELECT "pk", "sk"
+FROM "<RESTORE_TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Grenzen der Aussagekraft:
+-- * Ein Treffer beweist nur, dass dieser eine Schluessel vorhanden ist.
+-- * Kein vollstaendiger Migrationsnachweis: dazu sind Key-Set-Diff und
+--   Counts je Status/Consumer in einem separaten, freigegebenen Lauf noetig.
+-- * Keine unbegrenzten Scans als Vergleichsmethode.

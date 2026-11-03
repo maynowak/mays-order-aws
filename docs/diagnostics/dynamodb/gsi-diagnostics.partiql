@@ -1,0 +1,31 @@
+-- GSI1: Listen-Index (gsi1pk = 'LIST', gsi1sk = createdAt).
+-- Gezieltes Zeitfenster statt offenem Scan; PII nicht mitprojizieren.
+SELECT "orderId", "status", "createdAt", "updatedAt"
+FROM "<TABLE_NAME>"."gsi1"
+WHERE "gsi1pk" = 'LIST'
+  AND "gsi1sk" BETWEEN '<FROM_ISO>' AND '<TO_ISO>';
+
+-- GSI2: Subject-Index (gsi2pk = 'SUBJECT#<subjectId>').
+-- Nur nicht sensible Metadaten projizieren (customer bewusst ausgelassen).
+SELECT "orderId", "status", "createdAt", "updatedAt", "version"
+FROM "<TABLE_NAME>"."gsi2"
+WHERE "gsi2pk" = 'SUBJECT#<SUBJECT_ID>';
+
+-- GSI3: Claim-Index, Projektion KEYS_ONLY.
+-- Liefert nur Schluessel; Details erfordern einen zweiten GetItem-Zugriff
+-- ueber die Basistabelle (kein Join in PartiQL).
+SELECT "pk", "sk", "gsi3pk", "gsi3sk"
+FROM "<TABLE_NAME>"."gsi3"
+WHERE "gsi3pk" = 'PROCESSING#RUNNING';
+
+-- Zweiter Schritt fuer einen konkreten Claim: Basistabelle per pk/sk lesen.
+SELECT "pk", "sk", "orderId", "status", "processingState",
+       "processingAttempts", "processingClaimedAt"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Grenzen:
+-- * gsi2 projiziert kein consumerId; Consumer-Pruefung braucht das volle Item.
+-- * gsi1/gsi2 projizieren customer (PII) - in Diagnosen nicht mit ausgeben.
+-- * Kein ORDER BY, keine Aggregationen: Sortierung erfolgt ueber den Sort Key.
