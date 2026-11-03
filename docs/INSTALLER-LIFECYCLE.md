@@ -925,6 +925,90 @@ Migration ausgeführt.
   Safety-Analyse (Destroys blockiert) und den Plan-Review betrachtet.
 - Kein Rollback/Resume.
 
+## Version Binding (P0B)
+
+**Ziel:** Nachvollziehbare, prüfbare Bindung von Quellcode, Plan und installierter
+Version — ohne eine installierte Version zu erfinden.
+
+### Felder (Manifest-Schema `manifest_version = 2`)
+
+| Feld | Bedeutung |
+|---|---|
+| `source_version` | nachweislich installierte Ausgangsversion (`null`, wenn unbekannt) |
+| `target_version` | Zielversion des Plans (= `--deployment-version`, SemVer) |
+| `git_commit` | vollständige 40-stellige Commit-SHA des verwendeten MO-Quellcodes |
+| `git_dirty` | Working Tree enthält Änderungen an **getrackten** Dateien |
+| `version_status` | `VERIFIED` · `LEGACY_UNKNOWN` · `UNVERIFIED` |
+| `version_source` | Herkunft: `terraform_output` · `state_without_version` · `no_remote_state` |
+
+Unverändert erhalten bleiben: Plan-SHA-256, Account, Region, Workspace,
+Backend-Identität, State-Key, Projektidentität, Operation.
+
+### Quellcode-Identität
+
+- Ermittelt aus dem Installer-Repository (`git rev-parse HEAD`), **nicht** aus
+  einem fremden Repository oder CWD.
+- **Dirty** = getrackte Änderungen (`git status --porcelain --untracked-files=no`).
+  Ein Commit allein beschreibt lokal geänderten Code nicht.
+- Detached HEAD wird unterstützt; fehlende Git-Metadaten (kein `.git`, kein
+  `git`-Binary) ⇒ Remote-Plan wird **blockiert** (`UPGRADE_SOURCE_UNVERIFIED`).
+- Remote-Pläne sind bei dirty Tree standardmäßig blockiert
+  (`UPGRADE_SOURCE_DIRTY`); Freigabe nur mit `--allow-dirty-source`
+  (wird im Manifest dokumentiert). Offline-Dry-Run ist nicht betroffen.
+
+### Installierte Version
+
+- Gelesen aus dem Remote-State: `terraform state list` (Existenz) und
+  `terraform output -json` (`mo_version`).
+- `VERIFIED` = Output vorhanden · `LEGACY_UNKNOWN` = State existiert, aber ohne
+  Versionskennung · `UNVERIFIED` = kein State (Neuinstallation) ·
+  `UNREADABLE` = State nicht lesbar ⇒ **Abbruch** (keine Neuinstallations-Annahme).
+- Es wird **nie** `0.1.0` oder eine andere Version angenommen.
+
+### Versionskennung im Stack
+
+- Root-Variable `deployment_version` (SemVer, Default `0.1.0`), die der Installer
+  als `-var deployment_version=<version>` setzt.
+- Terraform-Output `mo_version` dokumentiert die Zielversion im State.
+- **Grenze:** Der Output ist State-Metadaten, kein unabhängiger Nachweis des
+  tatsächlich laufenden Lambda-Codes. Bestehende Stacks erhalten ihn erst beim
+  nächsten Apply.
+
+### Plan-/Apply-Prüfung
+
+Vor dem Apply wird geprüft: Plan-Hash (bestehend), Projekt-/Backend-/Workspace-
+Identität (bestehend), **Zielversion**, **Commit**, **Dirty-Status**,
+**installierte Ausgangsversion** und P0A-Safety. Abweichungen brechen ab:
+
+```text
+UPGRADE_VERSION_BINDING_MISSING     (Manifest < v2 oder fehlend)
+UPGRADE_VERSION_BINDING_MISMATCH    (Zielversion/Commit/Dirty/Quellversion)
+UPGRADE_SOURCE_DIRTY                (dirty, ohne --allow-dirty-source)
+UPGRADE_LEGACY_SOURCE_UNKNOWN       (LEGACY_UNKNOWN, ohne --allow-legacy-source)
+UPGRADE_STATE_UNREADABLE            (State nicht lesbar)
+UPGRADE_SOURCE_UNVERIFIED           (keine Git-Metadaten)
+```
+
+Ein gültiger Plan-Hash legitimiert **keine** widersprüchlichen Versionsangaben.
+
+### Manifest-Kompatibilität
+
+- v1-Manifeste bleiben lesbar, gelten aber **nicht** als upgradefähig:
+  Deploy blockiert (`UPGRADE_VERSION_BINDING_MISSING`, Hinweis auf
+  `plan --remote`); Destroy akzeptiert sie weiterhin (kein Upgrade).
+- Keine automatische Migration alter Manifeste.
+
+### Bekannte Grenzen
+
+- Das Manifest ist **nicht signiert**; es enthält nur Integritäts-/Identitätsdaten
+  und die Plan-SHA-256. Wer Schreibzugriff auf das Run-Verzeichnis hat, kann
+  Manifest und Plan gemeinsam austauschen — die Prüfung schützt vor Verwechslung,
+  nicht vor einem lokal manipulierten Gesamtauftritt.
+- Keine automatische Kompatibilitätsprüfung (`DevelopmentState.compare` ungenutzt),
+  keine Datenmigration, kein Rollback/Resume.
+- Version im Stack nur so gut wie der letzte Apply (Legacy-Stacks bleiben
+  `LEGACY_UNKNOWN` bis zu einem kontrollierten Upgrade).
+
 ## Security Considerations
 
 ### Plan File Sensitivity
