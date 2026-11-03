@@ -206,6 +206,14 @@ class InstallerCLI:
                  "project workspace, stores a verifiable artifact, never applies."
         )
         plan_parser.add_argument(
+            "--upgrade",
+            action="store_true",
+            default=False,
+            help="Explicit upgrade mode: requires an existing remote installation, "
+                 "evaluates version compatibility and writes an upgrade readiness "
+                 "report. Never applies."
+        )
+        plan_parser.add_argument(
             "--var-file",
             help="Path to .tfvars file"
         )
@@ -563,6 +571,13 @@ class InstallerCLI:
 
         # MO-RC4-P02I-E2B: Controlled Remote Plan (expliziter Modus).
         remote = bool(getattr(parsed, "remote", False))
+        upgrade = bool(getattr(parsed, "upgrade", False))
+        if upgrade and not remote:
+            print(
+                "UPGRADE_REQUIRES_REMOTE: Ein Upgrade benoetigt einen Remote-Plan "
+                "(State-Bezug). Bitte `plan --remote --upgrade` verwenden."
+            )
+            return 1
         backend_contract = None
         if remote:
             from installer.core.plan_contract import (
@@ -747,6 +762,15 @@ class InstallerCLI:
                 return 1
             detail = f" {installed.version}" if installed.version else ""
             print(f"Installed version: {installed.status}{detail}")
+
+            if upgrade:
+                from installer.core.upgrade_mode import check_upgrade_source
+
+                ok, code, message = check_upgrade_source(installed, remote=remote)
+                if not ok:
+                    print(message)
+                    return 1
+                print("Upgrade mode: existing installation detected")
 
             # MO-P0C: State-Baseline + Drift-/No-op-Bewertung.
             from installer.core.drift import (
