@@ -169,6 +169,7 @@ class TestDeployBlockedNoApply(UpgradeGateTestCase):
         parsed = SimpleNamespace(plan=str(self.plan_file), yes=False)
         with patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True), \
              patch.object(InstallerCLI, "_verify_version_binding", return_value=True), \
+             patch.object(InstallerCLI, "_verify_state_baseline", return_value=True), \
              patch.object(InstallerCLI, "_enforce_upgrade_safety", return_value=False):
             exit_code = cli._cmd_deploy(self._context(), parsed, self.run_dir)
         self.assertEqual(exit_code, 1)

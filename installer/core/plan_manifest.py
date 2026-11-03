@@ -69,6 +69,11 @@ class PlanManifest:
     git_dirty: Optional[bool] = None
     version_status: Optional[str] = None
     version_source: Optional[str] = None
+    # MO-P0C: State-Baseline und Drift-/No-op-Klassifikation (v2-kompatibel,
+    # optionale Felder; Apply verlangt die Baseline explizit).
+    state_baseline: Optional[Dict[str, Any]] = None
+    drift_status: Optional[str] = None
+    noop_status: Optional[str] = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -92,6 +97,9 @@ class PlanManifest:
         git_dirty: Optional[bool] = None,
         version_status: Optional[str] = None,
         version_source: Optional[str] = None,
+        state_baseline: Optional[Dict[str, Any]] = None,
+        drift_status: Optional[str] = None,
+        noop_status: Optional[str] = None,
     ) -> "PlanManifest":
         plan = Path(plan_path)
         safe_vars = {
@@ -117,6 +125,9 @@ class PlanManifest:
             git_dirty=git_dirty,
             version_status=version_status,
             version_source=version_source,
+            state_baseline=state_baseline,
+            drift_status=drift_status,
+            noop_status=noop_status,
         )
 
     # -- Persistenz --------------------------------------------------------
@@ -153,6 +164,9 @@ class PlanManifest:
             git_dirty=data.get("gitDirty", data.get("git_dirty")),
             version_status=data.get("versionStatus", data.get("version_status")),
             version_source=data.get("versionSource", data.get("version_source")),
+            state_baseline=data.get("stateBaseline", data.get("state_baseline")),
+            drift_status=data.get("driftStatus", data.get("drift_status")),
+            noop_status=data.get("noopStatus", data.get("noop_status")),
             created_at=data.get("created_at", ""),
             manifest_version=int(data.get("manifest_version", MANIFEST_VERSION)),
         )

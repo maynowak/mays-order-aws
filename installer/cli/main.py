@@ -733,6 +733,8 @@ class InstallerCLI:
 
         # MO-P0B: installierte Ausgangsversion ermitteln (nur Remote-Plan).
         installed = None
+        baseline = None
+        drift_assessment = None
         if remote:
             from installer.core.version_binding import UNREADABLE, detect_installed_version
 
@@ -745,6 +747,79 @@ class InstallerCLI:
                 return 1
             detail = f" {installed.version}" if installed.version else ""
             print(f"Installed version: {installed.status}{detail}")
+
+            # MO-P0C: State-Baseline + Drift-/No-op-Bewertung.
+            from installer.core.drift import (
+                DRIFT_UNKNOWN,
+                assess_plan,
+                build_drift_report,
+                write_drift_report,
+            )
+            from installer.core.state_baseline import capture_state_baseline
+            from installer.core.upgrade_safety import (
+                PROTECTED_RESOURCE_TYPES,
+                analyze_plan,
+            )
+
+            baseline = capture_state_baseline(runner)
+            if baseline.status == "UNREADABLE":
+                print(
+                    "UPGRADE_STATE_UNREADABLE: State-Baseline nicht ermittelbar "
+                    "(fail-closed)."
+                )
+                return 1
+
+            plan_json = self._load_plan_json(context, Path(saved_plan))
+            if plan_json is None:
+                return 1
+
+            drift_assessment = assess_plan(
+                plan_json, has_prior_state=(baseline.resources or 0) > 0
+            )
+            safety_assessment = analyze_plan(plan_json)
+
+            blocking_reasons = []
+            if drift_assessment.drift_status == DRIFT_UNKNOWN:
+                blocking_reasons.append(
+                    "UPGRADE_DRIFT_UNVERIFIED: Drift konnte nicht belastbar bewertet "
+                    "werden (kein Refresh-Nachweis)."
+                )
+            protected_drift = [
+                finding
+                for finding in drift_assessment.drift_findings
+                if finding.resource_type in PROTECTED_RESOURCE_TYPES
+            ]
+            if protected_drift:
+                blocking_reasons.append(
+                    "UPGRADE_BLOCKED_MIGRATION_REQUIRED: Drift an geschuetzten "
+                    "Ressourcen: "
+                    + ", ".join(f.address for f in protected_drift)
+                )
+
+            report = build_drift_report(
+                drift_assessment,
+                project=context.project_name,
+                environment=context.environment,
+                workspace=context.terraform_workspace,
+                baseline=baseline.to_dict(),
+                source_version=(installed.version if installed else None),
+                target_version=context.deployment_version,
+                git_commit=(source_identity.commit if source_identity else None),
+                critical_changes=[f.to_dict() for f in safety_assessment.findings],
+                blocking_reasons=blocking_reasons,
+            )
+            drift_json, drift_md = write_drift_report(run_dir, report)
+            print(
+                f"Drift: {drift_assessment.drift_status} | "
+                f"No-op: {drift_assessment.noop_status}"
+            )
+            if blocking_reasons:
+                for reason in blocking_reasons:
+                    print(reason)
+                print(f"Drift-Bericht: {drift_json}")
+                print(f"Drift-Zusammenfassung: {drift_md}")
+                return 1
+            print(f"Drift-Bericht: {drift_json}")
 
         # Save plan metadata alongside plan file
         plan_metadata_path = run_dir / "plans" / f"{plan_file_name}.meta.json"
@@ -780,6 +855,9 @@ class InstallerCLI:
                 git_dirty=(source_identity.dirty if source_identity else None),
                 version_status=(installed.status if installed else None),
                 version_source=(installed.source if installed else None),
+                state_baseline=(baseline.to_dict() if baseline else None),
+                drift_status=(drift_assessment.drift_status if drift_assessment else None),
+                noop_status=(drift_assessment.noop_status if drift_assessment else None),
             )
             manifest_path = manifest.write(saved_plan)
             print(f"  Plan manifest: {manifest_path}")
@@ -867,6 +945,62 @@ class InstallerCLI:
             f"workspace={manifest.workspace}, region={manifest.region}, "
             f"sha256={manifest.plan_sha256[:12]}...)"
         )
+        return True
+
+    def _load_plan_json(self, context, plan_path: Path):
+        """Liest das Plan-JSON (fail-closed). Gibt None bei Fehlern zurueck."""
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            print(
+                "UPGRADE_PLAN_UNREADABLE: Plan-JSON konnte nicht gelesen werden "
+                f"(fail-closed): {(result.stderr or '').strip()[:400]}"
+            )
+            return None
+        try:
+            return json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            print(f"UPGRADE_PLAN_UNREADABLE: Plan-JSON ungueltig (fail-closed): {exc}")
+            return None
+
+    def _verify_state_baseline(self, context, plan_file: Path) -> bool:
+        """Vergleicht die im Manifest gebundene State-Baseline mit dem State."""
+        from installer.core.drift import DRIFT_UNKNOWN
+        from installer.core.plan_manifest import PlanManifest
+        from installer.core.state_baseline import (
+            capture_state_baseline,
+            compare_state_baseline,
+        )
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_STATE_BASELINE_MISMATCH: {exc}")
+            return False
+
+        if manifest is None:
+            print(
+                "UPGRADE_STATE_BASELINE_MISSING: kein Plan-Manifest vorhanden "
+                "(plan --remote erforderlich)."
+            )
+            return False
+
+        if manifest.drift_status == DRIFT_UNKNOWN:
+            print(
+                "UPGRADE_DRIFT_UNVERIFIED: Der Plan traegt keinen belastbaren "
+                "Drift-Nachweis; Apply ist blockiert."
+            )
+            return False
+
+        current = capture_state_baseline(self._make_runner(context))
+        ok, code, message = compare_state_baseline(manifest.state_baseline, current)
+        if not ok:
+            print(f"State baseline: BLOCKED ({code})")
+            print(message)
+            return False
+
+        serial = (manifest.state_baseline or {}).get("serial")
+        print(f"State baseline: OK (serial={serial})")
         return True
 
     def _verify_version_binding(self, context, plan_file: Path, parsed) -> bool:
@@ -1055,6 +1189,10 @@ class InstallerCLI:
         # MO-P0B: verbindliche Versionsbindung (Zielversion, Commit, Dirty,
         # installierte Ausgangsversion) — vor jedem Apply.
         if not self._verify_version_binding(context, plan_file, parsed):
+            return 1
+
+        # MO-P0C: State-Baseline (Serial/Lineage/Fingerprint) vor dem Apply.
+        if not self._verify_state_baseline(context, plan_file):
             return 1
 
         # P0A-02: Auch ein gespeicherter Plan mit gueltigem Manifest/SHA-256
