@@ -1009,6 +1009,92 @@ Ein gültiger Plan-Hash legitimiert **keine** widersprüchlichen Versionsangaben
 - Version im Stack nur so gut wie der letzte Apply (Legacy-Stacks bleiben
   `LEGACY_UNKNOWN` bis zu einem kontrollierten Upgrade).
 
+## State Baseline and Drift Safety (P0C)
+
+**Ziel:** Vor einem Upgrade nachweisen, ob der Terraform-State unverändert ist
+und ob Abweichungen (Drift) oder geplante Änderungen vorliegen — ohne
+State-Inhalte offenzulegen.
+
+### State-Baseline
+
+Beim Remote-Plan wird `terraform state pull` gelesen und **nur** Folgendes
+gespeichert/im Manifest gebunden:
+
+| Feld | Bedeutung |
+|---|---|
+| `serial` | Terraform-State-Serial |
+| `lineage` | Terraform-State-Lineage |
+| `resources` | Anzahl der Ressourcen im State |
+| `fingerprint` | SHA-256 des Roh-States (nicht rückführbar) |
+| `status` | `VERIFIED` · `NO_STATE` · `MISSING_LINEAGE` · `MISSING_SERIAL` · `UNREADABLE` |
+| `captured_at` | Zeitpunkt der Bestandsaufnahme |
+
+Regeln:
+
+- Keine State-Werte in Manifest/Berichten; der Fingerprint ersetzt keine
+  inhaltliche Prüfung.
+- Fehlende Lineage/Serial wird ausdrücklich gekennzeichnet, nicht erfunden.
+- Unlesbarer State ⇒ Abbruch (`UPGRADE_STATE_UNREADABLE`), **keine**
+  Neuinstallations-Annahme.
+- Ein leerer State (`NO_STATE`) ist eine gültige Baseline mit Serial/Lineage.
+
+### Drift-Erkennung
+
+- Quelle: `resource_drift` im Terraform-Plan-JSON (Refresh-Ergebnis),
+  getrennt von `resource_changes` (geplante Änderungen).
+- `NO_DRIFT` nur, wenn ein Refresh nachweislich stattfand und keine
+  Drift-Einträge mit Aktionen außerhalb `no-op`/`read` vorliegen.
+- Fehlendes/nicht interpretierbares `resource_drift` ⇒ `DRIFT_UNKNOWN` und
+  **`UPGRADE_DRIFT_UNVERIFIED`** (fail-closed).
+- Ohne vorherigen State (verifiziert leer) ist Drift nicht anwendbar
+  (`NO_DRIFT`, dokumentiert).
+- Drift an geschützten Ressourcentypen (P0A) blockiert das Upgrade.
+
+### No-op-Klassifikation
+
+| Ergebnis | Bedingung |
+|---|---|
+| `NO_OP_VERIFIED` | keine relevanten `resource_changes`, keine Output-Änderungen, Drift geprüft und ohne Drift, Plan vollständig |
+| `CHANGES_PLANNED` | geplante Ressourcen- **oder** Output-Änderungen |
+| `NO_OP_UNVERIFIED` | unvollständiger Plan, unbekannte Aktion, fehlende Drift-Bewertung oder erkannte Drift |
+
+Ein leerer `resource_changes`-Block allein ist **kein** No-op-Nachweis.
+
+### Manifest und Apply-Gate
+
+- Manifest v2 bleibt kompatibel und erhält optionale Felder:
+  `state_baseline`, `drift_status`, `noop_status`.
+- Vor dem Apply werden geprüft: Manifest → Plan-Hash → Versionsbindung (P0B) →
+  **State-Baseline** (Serial/Lineage/Fingerprint) → P0A-Safety.
+- Abweichung ⇒ `UPGRADE_STATE_BASELINE_MISMATCH` (bzw.
+  `UPGRADE_STATE_BASELINE_MISSING` für alte Pläne ohne Baseline,
+  `UPGRADE_DRIFT_UNVERIFIED` ohne Drift-Nachweis). Kein Apply.
+- Ältere v2-Pläne ohne Baseline müssen neu geplant werden (Destroy bleibt
+  weiterhin möglich).
+
+### Berichte
+
+`upgrade-drift-report.json` + `.md` im Run-Verzeichnis: Projekt, Environment,
+Workspace, State-Identität, Baseline, Quell-/Zielversion, Git-Commit,
+Drift-Status, No-op-Status, geplante Änderungen, Drift-Funde, kritische
+Änderungen (P0A), blockierende Gründe, Nachweisgrenzen. Keine Freigabe.
+
+### Terraform-eigene Schutzmechanismen
+
+Ein gespeicherter Terraform-Plan wird von Terraform selbst abgelehnt, wenn der
+State sich seit der Planerstellung geändert hat (Serial/Lineage). Der Installer
+umgeht das nicht und erstellt während eines Apply keinen neuen Plan. Die
+Baseline-Prüfung ist eine zusätzliche, nachvollziehbare Schicht.
+
+### Grenzen
+
+- **TOCTOU:** Eine Prüfung unmittelbar vor Apply verhindert keine Änderungen
+  danach.
+- Drift erfasst nur Ressourcen, die Terraform beim Refresh liest.
+- Der Fingerprint erkennt State-Schreibvorgänge, aber keine Änderungen
+  außerhalb des States (die wiederum als Drift erscheinen können).
+- Keine automatische Datenmigration, kein Rollback.
+
 ## Security Considerations
 
 ### Plan File Sensitivity

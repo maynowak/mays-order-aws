@@ -2,11 +2,12 @@
 
 **Migrationsfahrplan für bestehende MO-Installationen**
 
-**Stand:** 2026-11-03 (P0A + P0B umgesetzt)
+**Stand:** 2026-11-03 (P0A + P0B + P0C umgesetzt)
 **Charakter:** Entwicklungs- und Betriebsvorlage — **autorisiert keine AWS-Änderungen**
 **Bezug:** `docs/reports/MO-BUILDER-INSTALLER-UPGRADE-READINESS-01.md`,
 `docs/reports/MO-INSTALLER-UPGRADE-SAFETY-P0A-01.md`,
-`docs/reports/MO-INSTALLER-UPGRADE-VERSIONING-P0B-01.md`
+`docs/reports/MO-INSTALLER-UPGRADE-VERSIONING-P0B-01.md`,
+`docs/reports/MO-INSTALLER-UPGRADE-DRIFT-SAFETY-P0C-01.md`
 
 Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 
@@ -14,16 +15,16 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 
 | # | Phase | Ziel | Status | Was vorhanden ist | Was fehlt |
 |---|---|---|---|---|---|
-| 1 | Identifikation | Vorhandene Installation und State identifizieren | **PARTIALLY** | `validate` (Backend-Heuristik, Namenskollisionen), `plan --remote` liest den State, Manifest bindet Workspace/Backend | Explizite Ressourcen-Inventur vor dem Plan; State-Zugehörigkeit nur über Terraform |
+| 1 | Identifikation | Vorhandene Installation und State identifizieren | **PARTIALLY** | `validate` (Backend-Heuristik, Namenskollisionen), `plan --remote` liest den State, Manifest bindet Workspace/Backend; **P0C: State-Baseline (Serial/Lineage/Fingerprint)** | Explizite Ressourcen-Inventur vor dem Plan; State-Zugehörigkeit nur über Terraform |
 | 2 | Versionsstatus | Installierte Version verifizieren oder Legacy feststellen | **IMPLEMENTED** | `mo_version`-Output, `detect_installed_version` (`VERIFIED`/`LEGACY_UNKNOWN`/`UNVERIFIED`/`UNREADABLE`) | Bestehende Stacks haben den Output erst nach dem nächsten Apply |
-| 3 | Inventur | Konfiguration und Datenressourcen erfassen | **PLANNED** | Plan zeigt Ressourcen; P0A kennt geschützte Typen | Automatisierte Inventur/Report (Kandidat P0C) |
+| 3 | Inventur | Konfiguration und Datenressourcen erfassen | **PLANNED** | Plan zeigt Ressourcen; P0A kennt geschützte Typen | Automatisierte Inventur/Report (Kandidat P1) |
 | 4 | Zielversion/Kompatibilität | Ziel festlegen, Kompatibilität prüfen | **PARTIALLY** | `target_version` gebunden (`--deployment-version`), Commit-/Dirty-Bindung | `DevelopmentState.compare` ist ungenutzt; keine Versionsmatrix/Kompatibilitätsregeln |
-| 5 | Upgrade-Plan | Geschützten Plan erzeugen | **IMPLEMENTED** | `plan --remote` + Manifest (v2) + P0A-Safety-Gate | Kein eigener `--upgrade`-Modus |
-| 6 | Klassifikation | Kritische Änderungen klassifizieren | **PARTIALLY** | P0A blockt DELETE/REPLACE geschützter Typen; Safety blockt Destroys | Vollständige Klassifikation `safe/review/critical` inkl. IAM/Datenmodell |
+| 5 | Upgrade-Plan | Geschützten Plan erzeugen | **IMPLEMENTED** | `plan --remote` + Manifest (v2) + P0A-Safety-Gate + **P0C Drift-/No-op-Bericht** | Kein eigener `--upgrade`-Modus |
+| 6 | Klassifikation | Kritische Änderungen klassifizieren | **PARTIALLY** | P0A blockt DELETE/REPLACE geschützter Typen; Safety blockt Destroys; **P0C trennt Drift von geplanten Änderungen und klassifiziert No-op** | Vollständige Klassifikation `safe/review/critical` inkl. IAM/Datenmodell |
 | 7 | Migrationsvorbereitung | Migrationsstrategie und Vorbedingungen | **PARTIALLY** | `upgrade-migration-plan.json/.md` bei Blockade (Strategien A–D, Vorbedingungen) | Keine Ausführung, keine Backup-Verifikation, kein Freigabe-Workflow |
-| 8 | Kontrollierter Apply | Gespeicherten Plan anwenden | **IMPLEMENTED** | `deploy --plan` mit Manifest-, Versions-, Safety- und Policy-Prüfung | Kein Resume/Rollback (Kandidat P3) |
-| 9 | Verifikation | Installation und Datenintegrität prüfen | **PARTIALLY** | Post-Apply-State-Zugriff, Destroy-Residual-Audit | Automatisierte Datenintegritäts-/No-op-Verifikation (P0C) |
-| 10 | Nachweise | Version und Abschluss dokumentieren | **PARTIALLY** | Manifest + State-Output `mo_version` | Upgrade-Report/Changelog-Artefakt, signierte Nachweise |
+| 8 | Kontrollierter Apply | Gespeicherten Plan anwenden | **IMPLEMENTED** | `deploy --plan` mit Manifest-, Versions-, **State-Baseline-**, Safety- und Policy-Prüfung | Kein Resume/Rollback (Kandidat P3) |
+| 9 | Verifikation | Installation und Datenintegrität prüfen | **PARTIALLY** | Post-Apply-State-Zugriff, Destroy-Residual-Audit; **P0C: No-op-Klassifikation und Drift-Bericht als Verifikationsgrundlage** | Automatisierte Datenintegritätsprüfung (P1) |
+| 10 | Nachweise | Version und Abschluss dokumentieren | **PARTIALLY** | Manifest + State-Output `mo_version`; **P0C: `upgrade-drift-report.json/.md`** | Upgrade-Abschlussreport/Changelog, signierte Nachweise |
 
 ---
 
@@ -36,9 +37,20 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 4. Destroy bleibt ein separater, explizit freigegebener Lifecycle.
 5. RIS- und Shared-Infrastruktur (State-Bucket, Lock-Tabelle) bleiben unberührt.
 
-## Nächste Schritte (P0C)
+## Nächste Schritte (P1)
 
-- Automatisierte Inventur (Phase 3) und No-op-Verifikation (Phase 9).
+- Automatisierte Inventur (Phase 3) und Datenintegritätsprüfung (Phase 9).
 - `DevelopmentState.compare` verdrahten (Phase 4).
 - Vollständige Change-Klassifikation (Phase 6).
+- Upgrade-Abschlussreport/Attestation (Phase 10).
 - Builder-Upgrade-Modus (separater Strang).
+
+## P0C — umgesetzt (2026-11-03)
+
+- State-Baseline (Serial/Lineage/Fingerprint) im Manifest und Apply-Gate
+  (`UPGRADE_STATE_BASELINE_MISMATCH` / `_MISSING`).
+- Drift-Erkennung aus `resource_drift` mit fail-closed
+  (`UPGRADE_DRIFT_UNVERIFIED`) und Blockade bei Drift geschützter Typen.
+- No-op-Klassifikation (`NO_OP_VERIFIED`/`CHANGES_PLANNED`/`NO_OP_UNVERIFIED`).
+- `upgrade-drift-report.json/.md` im Run-Verzeichnis.
+- Grenze: TOCTOU und State-Fingerprint ersetzen keine Datenintegritätsprüfung.
