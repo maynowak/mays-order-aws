@@ -50,7 +50,7 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 - Übergabe: Builder liefert Dateien; Installer bleibt für
   `plan --remote --upgrade` und Infrastruktur verantwortlich.
 
-## P3 — Planung, P3A, P3D und P3E-01 (2026-11-03)
+## P3 — Planung, P3A, P3D, P3E-01/P3E-02 (2026-11-03)
 
 - P3-Planung: `docs/reports/MO-ORDER-DATA-MIGRATION-P3-PLANNING-01.md`
   (Backup → Restore → Migration → Cutover, DSGVO/Erasure-Ledger, P0A–P2-Integration).
@@ -70,7 +70,12 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
   `EXECUTION_NOT_VERIFIED`, `CUTOVER_BLOCKED`. Keine Persistenz, kein Restore,
   keine Änderung am Erasure-Consumer.
   Bericht: `docs/reports/MO-ORDER-ERASURE-LEDGER-P3E-01.md`.
-- Offen: P3B Restore, P3C Migration, produktiver Ledger-Store, P3F Cutover/Recovery.
+- **P3E-02 Scope-Gate:** `POST_RC4` — keine Ledger-Persistenz für den RC4-In-place-
+  Upgrade-Pfad; Restore/Cutover bleiben gesperrt. Precheck: `CONDITIONAL`.
+  Berichte: `docs/reports/MO-ORDER-LEDGER-PERSISTENCE-P3E-02.md`,
+  `docs/reports/MO-RC4-READINESS-PRECHECK-01.md`.
+- Offen: P3B Restore, P3C Migration, produktiver Ledger-Store (nach RC4),
+  P3F Cutover/Recovery, realer AWS-Upgrade-/Backup-Nachweis.
 
 ## Nächste Schritte (P3)
 
