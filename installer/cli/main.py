@@ -137,6 +137,13 @@ class InstallerCLI:
                  "LEGACY_UNKNOWN (default: block; no version is assumed)."
         )
         parser.add_argument(
+            "--accept-upgrade-review",
+            action="store_true",
+            default=False,
+            help="Explicitly accept REVIEW_REQUIRED upgrade changes after manual "
+                 "review (compatibility/classification). Default: block."
+        )
+        parser.add_argument(
             "--notification-email",
             default=None,
             help="Optional email for Cognito backup SNS notifications"
@@ -741,8 +748,9 @@ class InstallerCLI:
         )
 
         # P0A-02: Upgrade-Safety-Gate bereits bei der Planerstellung.
+        # Remote-Plaene werden weiter unten zusammen mit P0B/P0C bewertet;
         # Destroy-Plaene werden hier nicht bewertet (siehe _verify_destroy_plan).
-        if not parsed.destroy:
+        if not parsed.destroy and not remote:
             if not self._enforce_upgrade_safety(context, Path(saved_plan), run_dir):
                 return 1
 
@@ -751,6 +759,7 @@ class InstallerCLI:
         baseline = None
         drift_assessment = None
         compatibility = None
+        readiness = None
         if remote:
             from installer.core.version_binding import UNREADABLE, detect_installed_version
 
@@ -785,12 +794,6 @@ class InstallerCLI:
                     f"Compatibility: {compatibility.status} "
                     f"({compatibility.reason})"
                 )
-                if compatibility.blocked:
-                    print(
-                        "UPGRADE_BLOCKED_COMPATIBILITY: "
-                        f"{compatibility.reason}"
-                    )
-                    return 1
 
             # MO-P0C: State-Baseline + Drift-/No-op-Bewertung.
             from installer.core.drift import (
@@ -799,6 +802,7 @@ class InstallerCLI:
                 build_drift_report,
                 write_drift_report,
             )
+            from installer.core.plan_manifest import sha256_file
             from installer.core.state_baseline import capture_state_baseline
             from installer.core.upgrade_safety import (
                 PROTECTED_RESOURCE_TYPES,
@@ -822,6 +826,19 @@ class InstallerCLI:
             )
             safety_assessment = analyze_plan(plan_json)
 
+            # P1C: Change-Klassifikation (SAFE/REVIEW/CRITICAL).
+            from installer.core.change_classification import classify_changes
+
+            classification = classify_changes(
+                safety_findings=[finding.to_dict() for finding in safety_assessment.findings],
+                drift_status=drift_assessment.drift_status,
+                drift_findings=drift_assessment.drift_findings,
+                planned_changes=drift_assessment.planned_changes,
+                noop_status=drift_assessment.noop_status,
+                compatibility_status=(compatibility.status if compatibility else None),
+                protected_types=PROTECTED_RESOURCE_TYPES,
+            )
+
             blocking_reasons = []
             if drift_assessment.drift_status == DRIFT_UNKNOWN:
                 blocking_reasons.append(
@@ -838,6 +855,15 @@ class InstallerCLI:
                     "UPGRADE_BLOCKED_MIGRATION_REQUIRED: Drift an geschuetzten "
                     "Ressourcen: "
                     + ", ".join(f.address for f in protected_drift)
+                )
+            for finding in safety_assessment.findings:
+                blocking_reasons.append(
+                    f"UPGRADE_BLOCKED_MIGRATION_REQUIRED: {finding.address} "
+                    f"({finding.resource_type}) — {finding.reason}"
+                )
+            if compatibility is not None and compatibility.blocked:
+                blocking_reasons.append(
+                    f"UPGRADE_BLOCKED_COMPATIBILITY: {compatibility.reason}"
                 )
 
             report = build_drift_report(
@@ -857,11 +883,47 @@ class InstallerCLI:
                 f"Drift: {drift_assessment.drift_status} | "
                 f"No-op: {drift_assessment.noop_status}"
             )
+
+            # P1D: Upgrade-Readiness-Bericht.
+            from installer.core.upgrade_readiness import (
+                ReadinessInput,
+                build_readiness_report,
+                write_readiness_report,
+            )
+
+            readiness = build_readiness_report(
+                ReadinessInput(
+                    project=context.project_name,
+                    environment=context.environment,
+                    region=context.aws_region,
+                    account_id=getattr(
+                        context.aws_execution_context, "account_id", None
+                    ),
+                    backend=backend_contract.comparison_dict(),
+                    workspace=context.terraform_workspace,
+                    baseline=baseline.to_dict(),
+                    source_version=(installed.version if installed else None),
+                    target_version=context.deployment_version,
+                    git_commit=(source_identity.commit if source_identity else None),
+                    plan_sha256=sha256_file(Path(saved_plan)),
+                    compatibility_status=(compatibility.status if compatibility else None),
+                    compatibility_reason=(compatibility.reason if compatibility else None),
+                    drift_status=drift_assessment.drift_status,
+                    noop_status=drift_assessment.noop_status,
+                    planned_changes=[c.to_dict() for c in drift_assessment.planned_changes],
+                    classification=classification.to_dict(),
+                    blocking_reasons=blocking_reasons,
+                )
+            )
+            readiness_json, readiness_md = write_readiness_report(run_dir, readiness)
+            print(f"Readiness: {readiness['status']}")
+            print(f"Readiness-Bericht: {readiness_json}")
+
             if blocking_reasons:
                 for reason in blocking_reasons:
                     print(reason)
-                print(f"Drift-Bericht: {drift_json}")
                 print(f"Drift-Zusammenfassung: {drift_md}")
+                print(f"Readiness-Zusammenfassung: {readiness_md}")
                 return 1
             print(f"Drift-Bericht: {drift_json}")
 
@@ -902,6 +964,8 @@ class InstallerCLI:
                 state_baseline=(baseline.to_dict() if baseline else None),
                 drift_status=(drift_assessment.drift_status if drift_assessment else None),
                 noop_status=(drift_assessment.noop_status if drift_assessment else None),
+                compatibility_status=(compatibility.status if compatibility else None),
+                readiness_status=(readiness.get("status") if readiness else None),
             )
             manifest_path = manifest.write(saved_plan)
             print(f"  Plan manifest: {manifest_path}")
@@ -1006,6 +1070,48 @@ class InstallerCLI:
         except (TypeError, ValueError) as exc:
             print(f"UPGRADE_PLAN_UNREADABLE: Plan-JSON ungueltig (fail-closed): {exc}")
             return None
+
+    def _verify_upgrade_readiness(self, context, plan_file: Path, parsed) -> bool:
+        """Prueft die Upgrade-Kompatibilitaet erneut (Readiness ist keine Freigabe)."""
+        from installer.core.compatibility import assess_compatibility
+        from installer.core.plan_manifest import PlanManifest
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_READINESS_INVALID: {exc}")
+            return False
+
+        if manifest is None:
+            print("UPGRADE_READINESS_MISSING: kein Plan-Manifest vorhanden.")
+            return False
+
+        if not manifest.compatibility_status:
+            print("Upgrade readiness: n/a (kein Upgrade-Plan)")
+            return True
+
+        assessment = assess_compatibility(
+            manifest.source_version,
+            context.deployment_version,
+            source_status=(manifest.version_status or "UNVERIFIED"),
+        )
+        if assessment.blocked:
+            print(f"Upgrade readiness: BLOCKED ({assessment.status})")
+            print(assessment.reason)
+            return False
+        if assessment.review_required and not getattr(
+            parsed, "accept_upgrade_review", False
+        ):
+            print(
+                "UPGRADE_REVIEW_APPROVAL_REQUIRED: Upgrade erfordert eine "
+                "ausdrueckliche Freigabe (--accept-upgrade-review) nach manueller "
+                "Pruefung."
+            )
+            print(assessment.reason)
+            return False
+
+        print(f"Upgrade readiness: {assessment.status}")
+        return True
 
     def _verify_state_baseline(self, context, plan_file: Path) -> bool:
         """Vergleicht die im Manifest gebundene State-Baseline mit dem State."""
@@ -1237,6 +1343,11 @@ class InstallerCLI:
 
         # MO-P0C: State-Baseline (Serial/Lineage/Fingerprint) vor dem Apply.
         if not self._verify_state_baseline(context, plan_file):
+            return 1
+
+        # P1D: Upgrade-Readiness (Kompatibilitaet) erneut pruefen — die
+        # Readiness-Datei ist keine Freigabe.
+        if not self._verify_upgrade_readiness(context, plan_file, parsed):
             return 1
 
         # P0A-02: Auch ein gespeicherter Plan mit gueltigem Manifest/SHA-256

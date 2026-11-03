@@ -74,6 +74,8 @@ class PlanManifest:
     state_baseline: Optional[Dict[str, Any]] = None
     drift_status: Optional[str] = None
     noop_status: Optional[str] = None
+    compatibility_status: Optional[str] = None
+    readiness_status: Optional[str] = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -100,6 +102,8 @@ class PlanManifest:
         state_baseline: Optional[Dict[str, Any]] = None,
         drift_status: Optional[str] = None,
         noop_status: Optional[str] = None,
+        compatibility_status: Optional[str] = None,
+        readiness_status: Optional[str] = None,
     ) -> "PlanManifest":
         plan = Path(plan_path)
         safe_vars = {
@@ -128,6 +132,8 @@ class PlanManifest:
             state_baseline=state_baseline,
             drift_status=drift_status,
             noop_status=noop_status,
+            compatibility_status=compatibility_status,
+            readiness_status=readiness_status,
         )
 
     # -- Persistenz --------------------------------------------------------
@@ -167,6 +173,8 @@ class PlanManifest:
             state_baseline=data.get("stateBaseline", data.get("state_baseline")),
             drift_status=data.get("driftStatus", data.get("drift_status")),
             noop_status=data.get("noopStatus", data.get("noop_status")),
+            compatibility_status=data.get("compatibilityStatus", data.get("compatibility_status")),
+            readiness_status=data.get("readinessStatus", data.get("readiness_status")),
             created_at=data.get("created_at", ""),
             manifest_version=int(data.get("manifest_version", MANIFEST_VERSION)),
         )

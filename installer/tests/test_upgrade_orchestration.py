@@ -5,8 +5,12 @@ Rein lokal: keine AWS-/Terraform-Aufrufe.
 
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from installer.cli.main import InstallerCLI
 from installer.core.change_classification import (
@@ -23,6 +27,18 @@ from installer.core.compatibility import (
     REVIEW_REQUIRED,
     UNKNOWN,
     assess_compatibility,
+)
+from installer.core.plan_manifest import PlanManifest
+from installer.core.deployment_identity import DeploymentId, PlanOperation
+from installer.core.upgrade_readiness import (
+    BLOCKED as READINESS_BLOCKED,
+    NO_CHANGES,
+    READY,
+    REVIEW_REQUIRED as READINESS_REVIEW,
+    ReadinessInput,
+    build_readiness_report,
+    decide_status,
+    render_readiness_markdown,
 )
 from installer.core.upgrade_mode import (
     CODE_MISSING_INSTALLATION,
@@ -205,6 +221,170 @@ class TestChangeClassification(unittest.TestCase):
         )
         self.assertEqual(result.overall, REVIEW)
         self.assertEqual(len(result.by_category(SAFE)), 1)
+
+
+def _readiness_input(**overrides):
+    data = dict(
+        project="mays-orders-rc4",
+        environment="development",
+        region="eu-central-1",
+        account_id="240571105849",
+        backend={"type": "s3", "bucket": "b", "key": "terraform.tfstate",
+                 "workspace_key_prefix": "env:"},
+        workspace="mays-orders-rc4",
+        baseline={"serial": 7, "lineage": "l", "resources": 3, "status": "VERIFIED"},
+        source_version="0.1.0",
+        target_version="0.2.0",
+        git_commit="a" * 40,
+        plan_sha256="deadbeef",
+        compatibility_status="COMPATIBLE",
+        compatibility_reason="Patch-Upgrade",
+        drift_status="NO_DRIFT",
+        noop_status="CHANGES_PLANNED",
+        planned_changes=[{"address": "module.x.aws_sqs_queue.q",
+                          "type": "aws_sqs_queue", "actions": ["create"]}],
+        classification={"overall": "SAFE", "changes": [], "reasons": []},
+        blocking_reasons=[],
+    )
+    data.update(overrides)
+    return ReadinessInput(**data)
+
+
+class TestReadiness(unittest.TestCase):
+    def test_ready(self):
+        report = build_readiness_report(_readiness_input())
+        self.assertEqual(report["status"], READY)
+        self.assertFalse(report["approved"])
+
+    def test_review_by_compatibility(self):
+        payload = _readiness_input(compatibility_status="REVIEW_REQUIRED")
+        self.assertEqual(decide_status(payload), READINESS_REVIEW)
+
+    def test_review_by_classification(self):
+        payload = _readiness_input(classification={"overall": "REVIEW", "changes": []})
+        self.assertEqual(decide_status(payload), READINESS_REVIEW)
+
+    def test_blocked_by_reasons(self):
+        payload = _readiness_input(blocking_reasons=["UPGRADE_BLOCKED_COMPATIBILITY: x"])
+        self.assertEqual(decide_status(payload), READINESS_BLOCKED)
+
+    def test_blocked_by_critical_classification(self):
+        payload = _readiness_input(classification={"overall": "CRITICAL", "changes": []})
+        self.assertEqual(decide_status(payload), READINESS_BLOCKED)
+
+    def test_no_changes(self):
+        payload = _readiness_input(noop_status="NO_OP_VERIFIED", planned_changes=[])
+        self.assertEqual(decide_status(payload), NO_CHANGES)
+
+    def test_report_fields_and_markdown(self):
+        report = build_readiness_report(_readiness_input())
+        for key in ("schemaVersion", "status", "project", "environment", "aws",
+                    "backend", "workspace", "state", "sourceVersion",
+                    "targetVersion", "gitCommit", "compatibility", "driftStatus",
+                    "noopStatus", "plannedChanges", "classification",
+                    "migrationRequired", "blockingReasons", "nextSteps",
+                    "evidenceLimits"):
+            self.assertIn(key, report)
+        md = render_readiness_markdown(report)
+        for section in ("## 1. Projekt und Umgebung", "## 8. Versionskompatibilitaet",
+                        "## 12. SAFE-/REVIEW-/CRITICAL-Klassifikation",
+                        "## 14. Blockierende Gruende",
+                        "## 15. Ergebnis und naechste Schritte"):
+            self.assertIn(section, md)
+        self.assertIn("keine Ausfuehrungsfreigabe", md)
+
+
+class TestReadinessGate(unittest.TestCase):
+    def _context(self, version="0.2.0"):
+        ctx = MagicMock()
+        ctx.deployment_version = version
+        return ctx
+
+    def _manifest(self, plan, *, compatibility=None, target="0.2.0"):
+        PlanManifest.create(
+            plan,
+            deployment_id=DeploymentId("240571105849", "mays-orders-rc4", "development"),
+            operation=PlanOperation.DEPLOY,
+            region="eu-central-1",
+            workspace="mays-orders-rc4",
+            backend={"type": "s3", "bucket": "b", "key": "terraform.tfstate"},
+            git_commit="a" * 40,
+            source_version="0.1.0",
+            target_version=target,
+            git_dirty=False,
+            version_status="VERIFIED",
+            version_source="terraform_output",
+            compatibility_status=compatibility,
+            readiness_status="READY",
+        ).write(plan)
+
+    def _check(self, compatibility, *, accept=False, target="0.2.0", context_version=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = Path(tmp) / "plan.tfplan"
+            plan.write_bytes(b"plan")
+            self._manifest(plan, compatibility=compatibility, target=target)
+            cli = InstallerCLI()
+            parsed = SimpleNamespace(accept_upgrade_review=accept)
+            return cli._verify_upgrade_readiness(
+                self._context(context_version or target), plan, parsed
+            )
+
+    def test_non_upgrade_plan_passes(self):
+        self.assertTrue(self._check(None))
+
+    def test_compatible_passes(self):
+        # Patch-Upgrade 0.1.0 -> 0.1.1 ist ohne Zusatznachweis COMPATIBLE.
+        self.assertTrue(self._check("COMPATIBLE", target="0.1.1"))
+
+    def test_review_blocks_without_flag(self):
+        self.assertFalse(self._check("REVIEW_REQUIRED"))
+
+    def test_review_allowed_with_flag(self):
+        self.assertTrue(self._check("REVIEW_REQUIRED", accept=True))
+
+    def test_migration_blocks(self):
+        self.assertFalse(self._check("MIGRATION_REQUIRED"))
+
+    def test_incompatible_blocks(self):
+        self.assertFalse(self._check("INCOMPATIBLE"))
+
+    def test_apply_not_started_when_readiness_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            plan = run_dir / "plan.tfplan"
+            plan.write_bytes(b"plan")
+            self._manifest(plan, compatibility="MIGRATION_REQUIRED")
+            cli = InstallerCLI()
+            runner = MagicMock()
+            runner.show_plan.return_value = SimpleNamespace(success=True, stdout="{}", stderr="")
+            cli._make_runner = MagicMock(return_value=runner)
+            ctx = MagicMock()
+            ctx.allow_aws_operations = True
+            ctx.dry_run = False
+            ctx.terraform_dir = "terraform"
+            ctx.aws_region = "eu-central-1"
+            ctx.aws_profile = "mayaws"
+            ctx.project_name = "mays-orders-rc4"
+            ctx.environment = "development"
+            ctx.terraform_workspace = "mays-orders-rc4"
+            ctx.deployment_version = "0.2.0"
+            ctx.development_phase = "H2"
+            ctx.development_step = 0
+            ctx.development_status = "development"
+            ctx.run_id = "run"
+            ctx.validate_aws_context.return_value = True
+            ctx.get_deployment_context.return_value = SimpleNamespace(
+                deployment_id=DeploymentId("240571105849", "mays-orders-rc4", "development")
+            )
+            parsed = SimpleNamespace(plan=str(plan), yes=False,
+                                     allow_dirty_source=False, allow_legacy_source=False,
+                                     accept_upgrade_review=False)
+            with patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True), \
+                 patch.object(InstallerCLI, "_verify_version_binding", return_value=True), \
+                 patch.object(InstallerCLI, "_verify_state_baseline", return_value=True):
+                code = cli._cmd_deploy(ctx, parsed, run_dir)
+            self.assertEqual(code, 1)
+            runner.apply.assert_not_called()
 
 
 class TestUpgradeCliFlag(unittest.TestCase):
