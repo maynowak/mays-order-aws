@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from installer.core.deployment_identity import SemanticVersion
+from installer.core.version_matrix import lookup_compatibility
 
 COMPATIBLE = "COMPATIBLE"
 REVIEW_REQUIRED = "REVIEW_REQUIRED"
@@ -112,6 +113,17 @@ def assess_compatibility(
             ),
         )
     if target.minor != source.minor:
+        matrix_entry = lookup_compatibility(str(source), str(target))
+        if matrix_entry is not None:
+            return CompatibilityAssessment(
+                status=COMPATIBLE,
+                source_version=str(source),
+                target_version=str(target),
+                reason=(
+                    "Minor-Upgrade durch Evidenzmatrix belegt: "
+                    f"{matrix_entry.reason}"
+                ),
+            )
         if known_compatible:
             return CompatibilityAssessment(
                 status=COMPATIBLE,

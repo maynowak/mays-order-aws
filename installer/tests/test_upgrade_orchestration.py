@@ -93,8 +93,13 @@ class TestCompatibility(unittest.TestCase):
     def test_patch_upgrade_compatible(self):
         self.assertEqual(self._assess("0.1.0", "0.1.1").status, COMPATIBLE)
 
-    def test_minor_upgrade_requires_review(self):
-        self.assertEqual(self._assess("0.1.0", "0.2.0").status, REVIEW_REQUIRED)
+    def test_minor_upgrade_requires_review_without_matrix(self):
+        self.assertEqual(self._assess("0.2.0", "0.3.0").status, REVIEW_REQUIRED)
+
+    def test_rc3_rc4_minor_upgrade_is_matrix_compatible(self):
+        assessment = self._assess("0.1.0", "0.2.0")
+        self.assertEqual(assessment.status, COMPATIBLE)
+        self.assertIn("Evidenzmatrix", assessment.reason)
 
     def test_minor_upgrade_with_evidence_compatible(self):
         self.assertEqual(
@@ -337,23 +342,23 @@ class TestReadinessGate(unittest.TestCase):
         self.assertTrue(self._check("COMPATIBLE", target="0.1.1"))
 
     def test_review_blocks_without_flag(self):
-        self.assertFalse(self._check("REVIEW_REQUIRED"))
+        self.assertFalse(self._check("REVIEW_REQUIRED", target="0.3.0"))
 
     def test_review_allowed_with_flag(self):
-        self.assertTrue(self._check("REVIEW_REQUIRED", accept=True))
+        self.assertTrue(self._check("REVIEW_REQUIRED", accept=True, target="0.3.0"))
 
     def test_migration_blocks(self):
-        self.assertFalse(self._check("MIGRATION_REQUIRED"))
+        self.assertFalse(self._check("MIGRATION_REQUIRED", target="1.0.0"))
 
     def test_incompatible_blocks(self):
-        self.assertFalse(self._check("INCOMPATIBLE"))
+        self.assertFalse(self._check("INCOMPATIBLE", target="0.0.9"))
 
     def test_apply_not_started_when_readiness_blocks(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             plan = run_dir / "plan.tfplan"
             plan.write_bytes(b"plan")
-            self._manifest(plan, compatibility="MIGRATION_REQUIRED")
+            self._manifest(plan, compatibility="MIGRATION_REQUIRED", target="1.0.0")
             cli = InstallerCLI()
             runner = MagicMock()
             runner.show_plan.return_value = SimpleNamespace(success=True, stdout="{}", stderr="")
@@ -367,7 +372,7 @@ class TestReadinessGate(unittest.TestCase):
             ctx.project_name = "mays-orders-rc4"
             ctx.environment = "development"
             ctx.terraform_workspace = "mays-orders-rc4"
-            ctx.deployment_version = "0.2.0"
+            ctx.deployment_version = "1.0.0"
             ctx.development_phase = "H2"
             ctx.development_step = 0
             ctx.development_status = "development"
