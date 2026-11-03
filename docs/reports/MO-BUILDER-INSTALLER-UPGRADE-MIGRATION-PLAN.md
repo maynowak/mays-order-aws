@@ -50,6 +50,18 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 - Übergabe: Builder liefert Dateien; Installer bleibt für
   `plan --remote --upgrade` und Infrastruktur verantwortlich.
 
+## P3 — Planung und P3D (2026-11-03)
+
+- P3-Planung: `docs/reports/MO-ORDER-DATA-MIGRATION-P3-PLANNING-01.md`
+  (Backup → Restore → Migration → Cutover, DSGVO/Erasure-Ledger, P0A–P2-Integration).
+- **P3D umgesetzt:** schreibgeschütztes PartiQL-Diagnosepaket unter
+  `docs/diagnostics/dynamodb/` (Schema-Referenz, Lookup/Status/GSI/Subject/Restore,
+  IAM-/DSGVO-Leitfaden) plus 15 statische Tests.
+  Bericht: `docs/reports/MO-ORDER-PARTIQL-DIAGNOSTICS-P3D-01.md`.
+  Keine AWS-Ausführung; PartiQL-Beispiele nicht gegen eine echte Tabelle verifiziert.
+- Offen: P3A Backup-Evidenz, P3B Restore, P3C Migration, P3E Erasure-Ledger,
+  P3F Cutover/Recovery.
+
 ## Nächste Schritte (P3)
 
 - Automatisierte Inventur (Phase 3) und Datenintegritätsprüfung (Phase 9).
