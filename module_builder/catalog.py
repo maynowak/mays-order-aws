@@ -47,7 +47,7 @@ MODULE_CATALOG: Dict[str, Dict] = {
 
 # Root-Variablen: immer erforderlich (provider/locals/Namen) ODER Modul-zugeordnet.
 # Basis: tatsächliche var.-Nutzung je Modulblock in main.tf (verifiziert).
-ALWAYS_VARIABLES = {"project_name", "aws_region", "tags"}
+ALWAYS_VARIABLES = {"project_name", "aws_region", "tags", "deployment_version"}
 VARIABLE_MODULES: Dict[str, List[str]] = {
     "seed_example_data": ["dynamodb"],
     "seed_file_path": ["dynamodb"],

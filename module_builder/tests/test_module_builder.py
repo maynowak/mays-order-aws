@@ -467,10 +467,12 @@ class TestModuleSelectionB1(unittest.TestCase):
             vars_kept = set(re.findall(r'^variable\s+"([a-z_]+)"',
                 (target / "terraform" / "variables.tf").read_text(), re.M))
             self.assertEqual(vars_kept, {"project_name", "aws_region", "tags",
+                                         "deployment_version",
                                          "seed_example_data", "seed_file_path"})
             outs = set(re.findall(r'^output\s+"([a-z_]+)"',
                 (target / "terraform" / "outputs.tf").read_text(), re.M))
-            self.assertEqual(outs, {"dynamodb_table_name", "dynamodb_table_arn"})
+            self.assertEqual(outs, {"dynamodb_table_name", "dynamodb_table_arn",
+                                    "mo_version"})
 
     def test_valid_combination_lambda_chain(self):
         """dynamodb,sqs,iam,lambda — gültige Kette mit Lambda-Artefakt, ohne Backup-Zip."""
@@ -499,6 +501,7 @@ class TestModuleSelectionB1(unittest.TestCase):
                 # Neu seit MODULE-CONTRACT-01: Queue-Outputs referenzieren module.sqs
                 # (in dieser Auswahl enthalten) und werden mitgefiltert:
                 "sqs_queue_url", "sqs_queue_arn", "sqs_queue_name",
+                "mo_version",
             })
 
     def test_missing_dependencies_fail_closed(self):
@@ -583,7 +586,8 @@ class TestModuleSelectionB1(unittest.TestCase):
             self.assertNotIn("module.sqs", outputs_text)
             names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
             self.assertEqual(names, {"dynamodb_table_name", "dynamodb_table_arn",
-                                     "iam_handler_role_name", "iam_handler_role_arn"})
+                                     "iam_handler_role_name", "iam_handler_role_arn",
+                                     "mo_version"})
 
     def test_lambda_without_sqs_readme_note(self):
         """Generiertes README dokumentiert den synchronen Betrieb ohne SQS."""
@@ -964,10 +968,10 @@ class TestOrdersServiceModule(unittest.TestCase):
             "iam_handler_role_name", "iam_handler_role_arn",
             "cognito_user_pool_id", "cognito_user_pool_arn",
             "cognito_user_pool_endpoint", "cognito_user_pool_client_id",
-            "cognito_user_pool_group_name",
+            "cognito_user_pool_group_name", "mo_version",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
-        self.assertEqual(len(outputs), 20)
+        self.assertEqual(len(outputs), 21)
         # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
         # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
         block = re.search(
@@ -1208,8 +1212,9 @@ class TestExternalCognitoIntegration(unittest.TestCase):
         """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 20)
+        self.assertEqual(len(names), 21)
         self.assertIn("sqs_queue_name", names)
+        self.assertIn("mo_version", names)
         # Modus-sichere Wertformen:
         self.assertIn("value       = local.cognito_endpoint", outputs)
         self.assertIn("value       = local.cognito_client_id", outputs)
