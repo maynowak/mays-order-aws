@@ -539,6 +539,30 @@ def _blocked_plan(
     )
 
 
+def _restore_context_error(restore: RestoreContext) -> Optional[Tuple[str, str]]:
+    """Validiert auch manuell konstruierte RestoreContext-Objekte (fail-closed)."""
+    restore_dt = _parse_iso(restore.restore_at)
+    if restore_dt is None:
+        return CODE_RESTORE_TIME_MISSING, "Restore-Zeitpunkt fehlt oder ist ungueltig"
+    parsed = _TABLE_ARN_RE.match(restore.restore_table_arn or "")
+    if not parsed:
+        return CODE_RESTORE_IDENTITY_MISMATCH, "Restore-Tabellen-ARN ist ungueltig"
+    if parsed.group("account") != restore.aws_account or parsed.group("region") != restore.region:
+        return CODE_RESTORE_IDENTITY_MISMATCH, "Account/Region der Restore-Tabelle weicht ab"
+    if parsed.group("table") != restore.restore_table_name:
+        return CODE_RESTORE_IDENTITY_MISMATCH, "Restore-Tabellenname weicht ab"
+    if "-restore-" not in restore.restore_table_name:
+        return CODE_RESTORE_IDENTITY_MISMATCH, "Restore-Tabellenname folgt nicht der Konvention"
+    if restore.source_table_name and not restore.restore_table_name.startswith(
+        f"{restore.source_table_name}-restore-"
+    ):
+        return CODE_RESTORE_IDENTITY_MISMATCH, "Restore-Tabelle gehoert nicht zur Quelltabelle"
+    backup_dt = _parse_iso(restore.backup_created_at)
+    if backup_dt is None or backup_dt > restore_dt:
+        return CODE_INVALID_CHRONOLOGY, "Backup-Zeitpunkt ist ungueltig"
+    return None
+
+
 def _coverage_ok(ledger: ErasureLedger, restore: RestoreContext) -> bool:
     restore_dt = _parse_iso(restore.restore_at)
     from_dt = _parse_iso(ledger.covered_from)
@@ -563,15 +587,11 @@ def plan_reconciliation(
     Fail-closed: fehlende/unvollstaendige/inkonsistente Historie blockiert.
     Ein PLAN_VERIFIED ist ausdruecklich kein Ausfuehrungs- oder Cutover-Nachweis.
     """
-    if not restore_context.restore_at:
+    context_error = _restore_context_error(restore_context)
+    if context_error is not None:
+        code, message = context_error
         return _blocked_plan(
-            code=CODE_RESTORE_TIME_MISSING, message="Restore-Zeitpunkt fehlt",
-            restore=restore_context, now=now,
-        )
-    if not restore_context.restore_table_arn:
-        return _blocked_plan(
-            code=CODE_RESTORE_IDENTITY_MISMATCH, message="Restore-Tabellen-ARN fehlt",
-            restore=restore_context, now=now,
+            code=code, message=message, restore=restore_context, now=now,
         )
     try:
         ledger = load_ledger(ledger_data)

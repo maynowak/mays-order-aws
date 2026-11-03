@@ -269,7 +269,6 @@ class TestReconciliationPositive(unittest.TestCase):
         result = plan(ledger=make_ledger([make_event(operation=OP_RETAIN)]))
         self.assertEqual(result.plan_status, PLAN_VERIFIED)
         self.assertEqual(result.actions[0].action, ACTION_RETAIN)
-        self.assertEqual(result.actions[0].action, ACTION_RETAIN)
         self.assertNotEqual(result.actions[0].action, ACTION_DELETE)
 
     def test_multiple_orders_of_one_subject(self) -> None:
