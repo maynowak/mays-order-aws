@@ -95,7 +95,10 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 - Change-Klassifikation SAFE/REVIEW/CRITICAL (Maximum).
 - `upgrade-readiness.json/.md`; Apply prüft Kompatibilität/Readiness erneut,
   `REVIEW_REQUIRED` nur mit `--accept-upgrade-review`.
-- Grenzen: keine Migration, kein Rollback, keine Kompatibilitätsmatrix.
+- **RC4-Release-Gates:** P3A-Backup-Evidenz ist in Readiness/Manifest/Apply
+  verdrahtet; Minor-Matrix `0.1.0 -> 0.2.0` belegt (GSI3 additiv). Eine
+  fehlende/ungueltige Evidenz blockiert Upgrade-Plaene mit Versionswechsel.
+- Grenzen: keine Migration, kein Rollback, kein realer AWS-Backup-Nachweis.
 
 ## P0C — umgesetzt (2026-11-03)
 

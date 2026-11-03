@@ -256,17 +256,22 @@ Ressourcen-ARNs enthalten Platzhalter, keine echten Kontonummern.
 | `ORDER_BACKUP_EVIDENCE_MISMATCH` | Evidenz passt nicht zum Kontext |
 | `ORDER_BACKUP_EXECUTION_BLOCKED` | Ausführungssperre |
 
-## 9. Spätere Integration mit P1
+## 9. Integration mit P1 (implementiert, lokal)
 
-Geplant, **nicht implementiert**:
-
-- Readiness-/Manifest-Felder `backupEvidence` (ARN, Status, Zeit),
-  `backupVerified`, `pitrVerified`.
-- Upgrade blockieren, wenn eine kritische Order-Tabellenänderung ein Backup
-  verlangt und kein `VERIFIED`-Nachweis vorliegt.
-- `--accept-upgrade-review` darf Backup-/Migrationsblockaden **nicht** aufheben.
-- Kein zweiter Terraform-Apply-Pfad; die Backup-Komponente bleibt ein separater,
-  freigegebener Schritt.
+- `plan --remote --upgrade --backup-evidence <order-backup-evidence.json>`
+  bindet die Evidenz in das Plan-Manifest: `backupRequired`, `backupEvidence`
+  mit `fileName`, `sha256`, `status`, `backupArn`, `backupVerifiedAt`,
+  `pitrStatus`, State-Lineage/Serial.
+- `upgrade-readiness.json/.md` enthält `backupRequired` und `backupEvidence`;
+  `MISSING`/`PARTIAL`/`FAILED`/`INVALID`/`STALE`/`IDENTITY_MISMATCH` blockieren
+  den Readiness-Status mit `UPGRADE_BACKUP_EVIDENCE_*`.
+- `deploy --plan` prüft die Evidenz erneut: Datei-Hash, Deployment-Identität,
+  Tabellen-ARN, Account/Region, State-Lineage/Serial und `AVAILABLE`/`VERIFIED`.
+  `backupRequired` wird zusätzlich aus `sourceVersion != targetVersion`
+  berechnet; ein manipuliertes Manifest-Flag kann die Prüfung nicht umgehen.
+- `--accept-upgrade-review` hebt **keine** Backup-/Migrations-/Privacy-Blockade auf.
+- Es gibt weiterhin keinen zweiten Apply-Pfad; die Evidenz stammt aus dem
+  separaten P3A-Backup-Schritt.
 
 ## 10. Grenzen
 

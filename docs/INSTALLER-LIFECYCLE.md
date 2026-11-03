@@ -30,6 +30,8 @@ DESTROY PLAN
 `--execute` ist doppelt gesperrt (siehe `docs/ORDER-BACKUP-LIFECYCLE.md`).
 Evidenz wird an Deployment-Kontext und Terraform-State-Baseline gebunden; nur
 `AVAILABLE` gilt als erfolgreich, PITR wird separat zur Laufzeit geprüft.
+Fuer Upgrade-Plaene mit Versionswechsel ist `--backup-evidence` verpflichtend;
+Readiness und `deploy --plan` pruefen Hash/Identitaet/State erneut.
 Kein Restore, keine Migration, kein zweiter Apply-Pfad.
 
 ### Current Milestone: D0-D5 (Foundation)

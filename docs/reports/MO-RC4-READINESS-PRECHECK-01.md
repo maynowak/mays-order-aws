@@ -7,6 +7,10 @@
 **Branch:** `feature/mo-order-ledger-persistence-p3e02`
 **Charakter:** lokaler Precheck. **Kein AWS-Test, kein Deployment, kein Release.**
 **Ergänzend:** `docs/reports/MO-ORDER-LEDGER-PERSISTENCE-P3E-02.md`
+**Nachtrag:** `docs/reports/MO-RC4-UPGRADE-RELEASE-GATES-01.md` — lokale
+Backup-/Matrix-Gates implementiert; RC4 bleibt `CONDITIONAL` ohne realen
+AWS-Backup-/Upgrade-Nachweis. Die Zeile „Upgrade-Gates vollständig“ wurde auf
+`VERIFIED (lokal)` aktualisiert.
 
 ---
 
@@ -20,7 +24,7 @@
 | Echter AWS-Backup-Nachweis vorhanden? | **NO** | `backup --orders --execute` wurde nie gegen AWS ausgeführt; kein `order-backup-evidence.json` aus einem realen Lauf. |
 | Erasure-Ledger für RC4 erforderlich? | **NO** | Scope-Gate `POST_RC4`: Ledger schützt nur Restore/Migration/Cutover; RC4 ist In-place-Upgrade ohne diese Schritte. |
 | Restore-Automatisierung erforderlich? | **NO** | P3B nicht implementiert; Restore/Cutover bleiben durch P3E-01 blockiert (`CUTOVER_BLOCKED`). |
-| Upgrade-Gates vollständig? | **BLOCKED** | P0A/P0B/P0C/P1 implementiert; P3A-Backup ist **nicht** in Readiness/Apply verdrahtet, Minor-Kompatibilitätsmatrix fehlt, kein realer AWS-Upgrade-Plan. |
+| Upgrade-Gates vollständig? | **VERIFIED (lokal)** | P0A/P0B/P0C/P1 implementiert; seit `MO-RC4-UPGRADE-RELEASE-GATES-01` sind P3A-Backup-Evidenz und Minor-Matrix `0.1.0→0.2.0` in Readiness/Manifest/Apply verdrahtet. Realer AWS-Upgrade-Plan weiterhin offen. |
 | Lokale Regression erfolgreich? | **YES** | Installer **539 PASS**, Builder **128 PASS**, Lambda **326 PASS**. |
 | **RC4-Releasefähigkeit** | **CONDITIONAL** | Lokal belastbar, aber ohne realen AWS-Upgrade-/Backup-Nachweis und mit offenen Gate-/Retention-Entscheidungen nicht `READY`. |
 
