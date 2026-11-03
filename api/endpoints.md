@@ -24,7 +24,7 @@
     "email": "max@example.com"
   },
   "items": [
-    { "sku": "SKU-1001", "quantity": 2, "unitPrice": 19.99 }
+    { "sku": "SKU-1001", "quantity": 2, "unitPrice": 20 }
   ],
   "currency": "EUR",
   "orderType": "generic"
@@ -45,7 +45,7 @@ verarbeitet. (MO-RC4-P02E)
 - `items`: Pflicht, mindestens 1 Position
 - `items[].sku`: Pflicht
 - `items[].quantity`: Ganzzahl ≥ 1
-- `items[].unitPrice`: Zahl > 0
+- `items[].unitPrice`: Ganzzahl ≥ 1 (Integer, keine Nachkommastellen)
 - `currency`: Pflicht, 3 Zeichen (ISO-4217)
 - `orderType`: optional, Default `generic`; Namensschema s. o.
 - Unbekannte Felder → 400 (strikte Validierung)
@@ -58,9 +58,9 @@ verarbeitet. (MO-RC4-P02E)
   "status": "PENDING",
   "orderType": "generic",
   "customer": { "name": "Max Mustermann", "email": "max@example.com" },
-  "items": [ { "sku": "SKU-1001", "quantity": 2, "unitPrice": 19.99, "lineTotal": 39.98 } ],
+  "items": [ { "sku": "SKU-1001", "quantity": 2, "unitPrice": 20, "lineTotal": 40 } ],
   "currency": "EUR",
-  "totalAmount": 39.98,
+  "totalAmount": 40,
   "createdAt": "2026-08-17T12:00:00.000Z",
   "updatedAt": "2026-08-17T12:00:00.000Z"
 }
@@ -110,7 +110,7 @@ Identität liefern 404 (fail-closed, keine Migration).
 
 ```json
 {
-  "orders": [ { "orderId": "...", "status": "PENDING", "customer": { "name": "..." }, "totalAmount": 39.98, "createdAt": "...", "updatedAt": "..." } ],
+  "orders": [ { "orderId": "...", "status": "PENDING", "customer": { "name": "..." }, "totalAmount": 40, "createdAt": "...", "updatedAt": "..." } ],
   "nextToken": "eyJ...",
   "count": 20
 }
