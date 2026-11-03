@@ -24,6 +24,14 @@ TEST
 DESTROY PLAN
 ```
 
+### Order data backup (P3A, local)
+
+`backup --orders --dry-run` plant ein DynamoDB-On-Demand-Backup ohne AWS-Aufruf;
+`--execute` ist doppelt gesperrt (siehe `docs/ORDER-BACKUP-LIFECYCLE.md`).
+Evidenz wird an Deployment-Kontext und Terraform-State-Baseline gebunden; nur
+`AVAILABLE` gilt als erfolgreich, PITR wird separat zur Laufzeit geprüft.
+Kein Restore, keine Migration, kein zweiter Apply-Pfad.
+
 ### Current Milestone: D0-D5 (Foundation)
 
 | Phase | Status | Description |

@@ -59,8 +59,12 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
   IAM-/DSGVO-Leitfaden) plus 15 statische Tests.
   Bericht: `docs/reports/MO-ORDER-PARTIQL-DIAGNOSTICS-P3D-01.md`.
   Keine AWS-Ausführung; PartiQL-Beispiele nicht gegen eine echte Tabelle verifiziert.
-- Offen: P3A Backup-Evidenz, P3B Restore, P3C Migration, P3E Erasure-Ledger,
-  P3F Cutover/Recovery.
+- **P3A umgesetzt (lokal):** `backup --orders --dry-run` und doppelt gesperrtes
+  `--execute`; Tabellenidentität gegen Deployment-Kontext, `AVAILABLE`-only,
+  PITR-Laufzeitprüfung, Evidenz `order-backup-evidence.json/.md`.
+  Bericht: `docs/reports/MO-ORDER-BACKUP-ORCHESTRATION-P3A-01.md`.
+  Kein echter AWS-Backup-Aufruf; Restore ungetestet.
+- Offen: P3B Restore, P3C Migration, P3E Erasure-Ledger, P3F Cutover/Recovery.
 
 ## Nächste Schritte (P3)
 
