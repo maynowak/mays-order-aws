@@ -302,6 +302,53 @@ class InstallerCLI:
             help="Skip approval prompt (use with caution)"
         )
 
+        # backup command (P3A: Order-DynamoDB On-Demand-Backup)
+        backup_parser = subparsers.add_parser(
+            "backup",
+            help="Plan or create a verified DynamoDB on-demand backup (P3A)"
+        )
+        backup_parser.add_argument(
+            "--orders",
+            action="store_true",
+            help="Target the Order table (only supported resource)."
+        )
+        backup_parser.add_argument(
+            "--dry-run",
+            dest="backup_dry_run",
+            action="store_true",
+            help="Offline plan only; never creates a backup or calls AWS."
+        )
+        backup_parser.add_argument(
+            "--execute",
+            action="store_true",
+            help="Actually create a backup. Requires ALLOW_AWS_OPERATIONS=true and "
+                 "MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true (not used in P3A development)."
+        )
+        backup_parser.add_argument(
+            "--state-baseline",
+            default=None,
+            help="Verified Terraform state baseline JSON (lineage/serial/fingerprint); "
+                 "required for --execute."
+        )
+        backup_parser.add_argument(
+            "--poll-interval",
+            type=float,
+            default=10.0,
+            help="DescribeBackup poll interval in seconds (default: 10)."
+        )
+        backup_parser.add_argument(
+            "--timeout",
+            type=float,
+            default=900.0,
+            help="Overall polling timeout in seconds (default: 900)."
+        )
+        backup_parser.add_argument(
+            "--max-attempts",
+            type=int,
+            default=90,
+            help="Maximum DescribeBackup attempts (default: 90)."
+        )
+
         # state command
         state_parser = subparsers.add_parser(
             "state",
@@ -433,6 +480,8 @@ class InstallerCLI:
             return self._cmd_deploy(context, parsed, run_dir)
         elif parsed.command == "destroy":
             return self._cmd_destroy(context, parsed, run_dir)
+        elif parsed.command == "backup":
+            return self._cmd_backup(context, parsed, run_dir)
         elif parsed.command == "state":
             return self._cmd_state(context, parsed, run_dir)
         elif parsed.command == "output":
@@ -1876,6 +1925,119 @@ class InstallerCLI:
             print(f"Error: {result.stderr}")
             return 1
         return 0
+    def _cmd_backup(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
+        """P3A: Order-DynamoDB-Backup — dry-run nur lokal, execute doppelt gesperrt."""
+        import json
+        import os
+
+        from installer.core.order_backup import (
+            CODE_EXECUTION_BLOCKED,
+            CODE_STATE_BASELINE_REQUIRED,
+            OVERALL_VERIFIED,
+            OrderBackupError,
+            execute_order_backup,
+            expected_table_identity,
+            plan_order_backup,
+            write_evidence,
+            write_plan,
+        )
+
+        if not getattr(parsed, "orders", False):
+            print("ERROR: backup requires --orders (only the Order table is supported).")
+            return 2
+        if getattr(parsed, "backup_dry_run", False) and getattr(parsed, "execute", False):
+            print("ERROR: --dry-run and --execute are mutually exclusive.")
+            return 2
+
+        baseline = None
+        baseline_path = getattr(parsed, "state_baseline", None)
+        if baseline_path:
+            try:
+                data = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+                baseline = data.get("state_baseline", data)
+                if not isinstance(baseline, dict):
+                    raise ValueError("state baseline is not an object")
+            except (OSError, ValueError) as exc:
+                print(f"ERROR: state baseline unreadable: {exc}")
+                return 2
+
+        if not getattr(parsed, "execute", False):
+            # Default und expliziter Dry-Run: kein Client, kein AWS-Aufruf.
+            try:
+                plan = plan_order_backup(
+                    project=context.project_name,
+                    environment=context.environment,
+                    aws_account=context.aws_account_id,
+                    region=context.aws_region,
+                    state_baseline=baseline,
+                )
+            except OrderBackupError as exc:
+                print(f"BLOCKED [{exc.code}]: {exc.message}")
+                return 1
+            json_path, md_path = write_plan(run_dir, plan)
+            print("Order backup DRY-RUN (no AWS call, identity/PITR UNVERIFIED)")
+            print(f"Table: {plan.table_name}")
+            print(f"Backup name: {plan.backup_name}")
+            print(f"Plan: {json_path}")
+            print(f"Plan (MD): {md_path}")
+            return 0
+
+        if os.environ.get("MAYS_ORDER_BACKUP_ALLOW_EXECUTE", "").lower() != "true":
+            print(
+                "BLOCKED [{}]: set MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true in addition to "
+                "ALLOW_AWS_OPERATIONS=true and explicit human approval.".format(
+                    CODE_EXECUTION_BLOCKED
+                )
+            )
+            return 2
+        if not context.allow_aws_operations:
+            print(
+                "BLOCKED [{}]: set ALLOW_AWS_OPERATIONS=true in addition to "
+                "MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true.".format(CODE_EXECUTION_BLOCKED)
+            )
+            return 2
+        if not baseline or baseline.get("status") != "VERIFIED":
+            print(f"BLOCKED [{CODE_STATE_BASELINE_REQUIRED}]: verified state baseline required.")
+            return 2
+        if not context.validate_aws_context():
+            print("AWS context validation failed. Cannot proceed.")
+            return 1
+        aws_ctx = context.aws_execution_context
+        account_id = aws_ctx.account_id if aws_ctx else context.aws_account_id
+
+        try:
+            expected = expected_table_identity(
+                project=context.project_name,
+                environment=context.environment,
+                aws_account=account_id,
+                region=context.aws_region,
+                state_baseline=baseline,
+            )
+            import boto3  # lazy: dry-run and tests never need it
+            session = boto3.Session(profile_name=context.aws_profile or None)
+            client = session.client("dynamodb", region_name=context.aws_region)
+            evidence = execute_order_backup(
+                client,
+                expected,
+                poll_interval=parsed.poll_interval,
+                timeout_seconds=parsed.timeout,
+                max_attempts=parsed.max_attempts,
+            )
+            json_path, md_path = write_evidence(run_dir, evidence)
+        except OrderBackupError as exc:
+            print(f"BLOCKED [{exc.code}]: {exc.message}")
+            return 1
+        except Exception as exc:  # noqa: BLE001 - keine Rohantwort ausgeben
+            print(f"BLOCKED [ORDER_BACKUP_UNEXPECTED]: {type(exc).__name__}")
+            return 1
+
+        print(f"Backup status: {evidence.backup_status}")
+        print(f"PITR status: {evidence.pitr_status}")
+        print(f"Overall: {evidence.overall_status}")
+        print(f"Evidence: {json_path}")
+        print(f"Evidence (MD): {md_path}")
+        return 0 if evidence.overall_status == OVERALL_VERIFIED else 1
+
     def _cmd_identity(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Show AWS identity information."""
         # Validate AWS context first
