@@ -175,7 +175,17 @@ ein vollständiger Plan ist nur `PLAN_VERIFIED`, **nicht** ausgeführt.
 
 ---
 
-## 5. Grenzen
+## 5. RC4-Entscheidung (P3E-02)
+
+Scope-Gate: **POST_RC4**. Der RC4-In-place-Upgrade-Pfad benötigt keine
+Ledger-Persistenz; ein Restore/Cutover ist nicht Teil von RC4. Es wird **keine**
+Ledger-Ressource angelegt. Bis zu einer späteren Freigabe bleiben Restore und Cutover
+gesperrt (`PLAN_VERIFIED` ist kein Ausführungs- oder Cutover-Nachweis).
+
+Details: `docs/reports/MO-ORDER-LEDGER-PERSISTENCE-P3E-02.md`,
+`docs/reports/MO-RC4-READINESS-PRECHECK-01.md`.
+
+## 6. Grenzen
 
 - Keine Persistenz, kein Store, keine AWS-Ressource.
 - Kein Eingriff in `erase_subject`; der Consumer schreibt noch kein Ledger.

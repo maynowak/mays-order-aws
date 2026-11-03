@@ -1,7 +1,8 @@
 # Order-Restore-Privacy-Gates (P3E-01)
 
 **Status:** Vertragsentwurf + lokaler Planner. **Keine P1-Gates verändert, keine
-produktive Freigabe.**
+produktive Freigabe.** RC4-Entscheidung: `POST_RC4` — Restore/Cutover bleiben bis zu
+einer separaten Freigabe gesperrt.
 
 ---
 
