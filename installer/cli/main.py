@@ -750,6 +750,7 @@ class InstallerCLI:
         installed = None
         baseline = None
         drift_assessment = None
+        compatibility = None
         if remote:
             from installer.core.version_binding import UNREADABLE, detect_installed_version
 
@@ -771,6 +772,25 @@ class InstallerCLI:
                     print(message)
                     return 1
                 print("Upgrade mode: existing installation detected")
+
+                # P1B: Versionskompatibilitaet (fail-closed).
+                from installer.core.compatibility import assess_compatibility
+
+                compatibility = assess_compatibility(
+                    installed.version if installed.status == "VERIFIED" else None,
+                    context.deployment_version,
+                    source_status=installed.status,
+                )
+                print(
+                    f"Compatibility: {compatibility.status} "
+                    f"({compatibility.reason})"
+                )
+                if compatibility.blocked:
+                    print(
+                        "UPGRADE_BLOCKED_COMPATIBILITY: "
+                        f"{compatibility.reason}"
+                    )
+                    return 1
 
             # MO-P0C: State-Baseline + Drift-/No-op-Bewertung.
             from installer.core.drift import (

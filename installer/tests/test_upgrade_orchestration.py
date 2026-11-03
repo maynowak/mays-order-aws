@@ -9,6 +9,14 @@ import unittest
 from types import SimpleNamespace
 
 from installer.cli.main import InstallerCLI
+from installer.core.compatibility import (
+    COMPATIBLE,
+    INCOMPATIBLE,
+    MIGRATION_REQUIRED,
+    REVIEW_REQUIRED,
+    UNKNOWN,
+    assess_compatibility,
+)
 from installer.core.upgrade_mode import (
     CODE_MISSING_INSTALLATION,
     CODE_REQUIRES_REMOTE,
@@ -50,6 +58,51 @@ class TestUpgradeSource(unittest.TestCase):
         """Legacy ist eine Installation; die Kompatibilitaet entscheidet danach."""
         ok, code, _ = check_upgrade_source(_installed("LEGACY_UNKNOWN"), remote=True)
         self.assertTrue(ok, code)
+
+
+class TestCompatibility(unittest.TestCase):
+    def _assess(self, source, target, **kwargs):
+        return assess_compatibility(source, target, **kwargs)
+
+    def test_same_version_compatible(self):
+        self.assertEqual(self._assess("0.1.0", "0.1.0").status, COMPATIBLE)
+
+    def test_patch_upgrade_compatible(self):
+        self.assertEqual(self._assess("0.1.0", "0.1.1").status, COMPATIBLE)
+
+    def test_minor_upgrade_requires_review(self):
+        self.assertEqual(self._assess("0.1.0", "0.2.0").status, REVIEW_REQUIRED)
+
+    def test_minor_upgrade_with_evidence_compatible(self):
+        self.assertEqual(
+            self._assess("0.1.0", "0.2.0", known_compatible=True).status,
+            COMPATIBLE,
+        )
+
+    def test_major_upgrade_requires_migration(self):
+        self.assertEqual(self._assess("0.1.0", "1.0.0").status, MIGRATION_REQUIRED)
+
+    def test_downgrade_incompatible(self):
+        self.assertEqual(self._assess("0.2.0", "0.1.0").status, INCOMPATIBLE)
+
+    def test_invalid_target_unknown(self):
+        self.assertEqual(self._assess("0.1.0", "not-a-version").status, UNKNOWN)
+
+    def test_invalid_source_unknown(self):
+        self.assertEqual(self._assess("x.y.z", "0.2.0").status, UNKNOWN)
+
+    def test_legacy_source_unknown(self):
+        assessment = self._assess(
+            None, "0.2.0", source_status="LEGACY_UNKNOWN"
+        )
+        self.assertEqual(assessment.status, UNKNOWN)
+        self.assertTrue(assessment.blocked)
+
+    def test_blocking_statuses(self):
+        self.assertTrue(self._assess("0.1.0", "1.0.0").blocked)
+        self.assertTrue(self._assess("0.2.0", "0.1.0").blocked)
+        self.assertTrue(self._assess("0.1.0", "x").blocked)
+        self.assertFalse(self._assess("0.1.0", "0.1.1").blocked)
 
 
 class TestUpgradeCliFlag(unittest.TestCase):
