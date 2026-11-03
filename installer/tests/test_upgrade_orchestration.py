@@ -9,6 +9,13 @@ import unittest
 from types import SimpleNamespace
 
 from installer.cli.main import InstallerCLI
+from installer.core.change_classification import (
+    CRITICAL,
+    REVIEW,
+    SAFE,
+    classify_changes,
+    classify_planned_change,
+)
 from installer.core.compatibility import (
     COMPATIBLE,
     INCOMPATIBLE,
@@ -103,6 +110,101 @@ class TestCompatibility(unittest.TestCase):
         self.assertTrue(self._assess("0.2.0", "0.1.0").blocked)
         self.assertTrue(self._assess("0.1.0", "x").blocked)
         self.assertFalse(self._assess("0.1.0", "0.1.1").blocked)
+
+
+class TestChangeClassification(unittest.TestCase):
+    def test_new_resource_safe(self):
+        result = classify_planned_change(
+            "module.dynamodb.aws_dynamodb_table.orders", "aws_dynamodb_table", ["create"]
+        )
+        self.assertEqual(result.category, SAFE)
+
+    def test_new_public_interface_review(self):
+        result = classify_planned_change(
+            "module.api.aws_apigatewayv2_api.orders", "aws_apigatewayv2_api", ["create"]
+        )
+        self.assertEqual(result.category, REVIEW)
+
+    def test_update_review(self):
+        result = classify_planned_change(
+            "module.lambda.aws_lambda_function.handler", "aws_lambda_function", ["update"]
+        )
+        self.assertEqual(result.category, REVIEW)
+
+    def test_delete_unprotected_review(self):
+        result = classify_planned_change(
+            "module.monitoring.aws_cloudwatch_metric_alarm.x",
+            "aws_cloudwatch_metric_alarm", ["delete"],
+        )
+        self.assertEqual(result.category, REVIEW)
+
+    def test_unknown_action_critical(self):
+        result = classify_planned_change("x", "aws_sqs_queue", ["frobnicate"])
+        self.assertEqual(result.category, CRITICAL)
+
+    def test_safety_finding_critical(self):
+        result = classify_changes(
+            safety_findings=[{
+                "address": "module.dynamodb.aws_dynamodb_table.orders",
+                "type": "aws_dynamodb_table",
+                "actions": ["create", "delete"],
+                "reason": "Ersetzen wuerde Daten zerstoeren.",
+            }]
+        )
+        self.assertEqual(result.overall, CRITICAL)
+
+    def test_protected_drift_critical(self):
+        drift = SimpleNamespace(
+            address="module.dynamodb.aws_dynamodb_table.orders",
+            resource_type="aws_dynamodb_table",
+            actions=["update"],
+        )
+        result = classify_changes(
+            drift_status="DRIFT_DETECTED", drift_findings=[drift],
+            protected_types=["aws_dynamodb_table"],
+        )
+        self.assertEqual(result.overall, CRITICAL)
+
+    def test_unprotected_drift_review(self):
+        drift = SimpleNamespace(
+            address="module.monitoring.aws_cloudwatch_metric_alarm.x",
+            resource_type="aws_cloudwatch_metric_alarm",
+            actions=["update"],
+        )
+        result = classify_changes(
+            drift_status="DRIFT_DETECTED", drift_findings=[drift],
+            protected_types=["aws_dynamodb_table"],
+        )
+        self.assertEqual(result.overall, REVIEW)
+
+    def test_drift_unknown_critical(self):
+        result = classify_changes(drift_status="DRIFT_UNKNOWN")
+        self.assertEqual(result.overall, CRITICAL)
+
+    def test_noop_unverified_critical(self):
+        result = classify_changes(noop_status="NO_OP_UNVERIFIED")
+        self.assertEqual(result.overall, CRITICAL)
+
+    def test_compatibility_review_and_blocking(self):
+        self.assertEqual(
+            classify_changes(compatibility_status="REVIEW_REQUIRED").overall, REVIEW
+        )
+        self.assertEqual(
+            classify_changes(compatibility_status="MIGRATION_REQUIRED").overall,
+            CRITICAL,
+        )
+
+    def test_overall_is_maximum(self):
+        planned = [SimpleNamespace(
+            address="module.x.aws_sqs_queue.q", resource_type="aws_sqs_queue",
+            actions=["create"],
+        )]
+        result = classify_changes(
+            planned_changes=planned,
+            compatibility_status="REVIEW_REQUIRED",
+        )
+        self.assertEqual(result.overall, REVIEW)
+        self.assertEqual(len(result.by_category(SAFE)), 1)
 
 
 class TestUpgradeCliFlag(unittest.TestCase):
