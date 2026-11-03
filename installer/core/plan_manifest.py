@@ -76,6 +76,10 @@ class PlanManifest:
     noop_status: Optional[str] = None
     compatibility_status: Optional[str] = None
     readiness_status: Optional[str] = None
+    # MO-RC4-UPGRADE-RELEASE-GATES-01: P3A-Backup-Evidenz (optional; nur fuer
+    # Upgrade-Plaene verbindlich). Enthaelt Metadaten, keine Evidenz-Inhalte.
+    backup_required: Optional[bool] = None
+    backup_evidence: Optional[Dict[str, Any]] = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -104,6 +108,8 @@ class PlanManifest:
         noop_status: Optional[str] = None,
         compatibility_status: Optional[str] = None,
         readiness_status: Optional[str] = None,
+        backup_required: Optional[bool] = None,
+        backup_evidence: Optional[Dict[str, Any]] = None,
     ) -> "PlanManifest":
         plan = Path(plan_path)
         safe_vars = {
@@ -134,6 +140,8 @@ class PlanManifest:
             noop_status=noop_status,
             compatibility_status=compatibility_status,
             readiness_status=readiness_status,
+            backup_required=backup_required,
+            backup_evidence=backup_evidence,
         )
 
     # -- Persistenz --------------------------------------------------------
@@ -175,6 +183,8 @@ class PlanManifest:
             noop_status=data.get("noopStatus", data.get("noop_status")),
             compatibility_status=data.get("compatibilityStatus", data.get("compatibility_status")),
             readiness_status=data.get("readinessStatus", data.get("readiness_status")),
+            backup_required=data.get("backupRequired", data.get("backup_required")),
+            backup_evidence=data.get("backupEvidence", data.get("backup_evidence")),
             created_at=data.get("created_at", ""),
             manifest_version=int(data.get("manifest_version", MANIFEST_VERSION)),
         )

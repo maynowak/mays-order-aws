@@ -221,6 +221,12 @@ class InstallerCLI:
                  "report. Never applies."
         )
         plan_parser.add_argument(
+            "--backup-evidence",
+            default=None,
+            help="Path to a P3A order-backup-evidence.json. Required for upgrade "
+                 "plans with a version change; bound into the plan manifest."
+        )
+        plan_parser.add_argument(
             "--var-file",
             help="Path to .tfvars file"
         )
@@ -809,6 +815,8 @@ class InstallerCLI:
         drift_assessment = None
         compatibility = None
         readiness = None
+        backup_assessment = None
+        backup_required = False
         if remote:
             from installer.core.version_binding import UNREADABLE, detect_installed_version
 
@@ -866,6 +874,45 @@ class InstallerCLI:
                 )
                 return 1
 
+            # MO-RC4-UPGRADE-RELEASE-GATES-01: P3A-Backup-Evidenz fuer
+            # Upgrade-Plaene mit Versionswechsel verbindlich.
+            from installer.core.backup_gate import (
+                assess_backup_evidence,
+                copy_evidence_to_run_dir,
+                requires_backup,
+            )
+
+            backup_required = bool(
+                requires_backup(
+                    installed.version if installed and installed.status == "VERIFIED" else None,
+                    context.deployment_version,
+                    operation="destroy" if parsed.destroy else "deploy",
+                )
+            )
+            backup_evidence_path = None
+            if backup_required and getattr(parsed, "backup_evidence", None):
+                try:
+                    backup_evidence_path = copy_evidence_to_run_dir(
+                        parsed.backup_evidence, Path(saved_plan).parent
+                    )
+                except OSError as exc:
+                    print(f"Backup evidence copy failed: {exc}")
+                    return 1
+            backup_assessment = assess_backup_evidence(
+                backup_evidence_path,
+                required=backup_required,
+                expected_project=context.project_name,
+                expected_environment=context.environment,
+                expected_account=context.aws_execution_context.account_id,
+                expected_region=context.aws_region,
+                state_lineage=baseline.lineage,
+                state_serial=baseline.serial,
+            )
+            print(
+                f"Backup evidence: {backup_assessment.status} "
+                f"({backup_assessment.message})"
+            )
+
             plan_json = self._load_plan_json(context, Path(saved_plan))
             if plan_json is None:
                 return 1
@@ -913,6 +960,10 @@ class InstallerCLI:
             if compatibility is not None and compatibility.blocked:
                 blocking_reasons.append(
                     f"UPGRADE_BLOCKED_COMPATIBILITY: {compatibility.reason}"
+                )
+            if backup_assessment is not None and backup_assessment.blocking:
+                blocking_reasons.append(
+                    f"{backup_assessment.code}: {backup_assessment.message}"
                 )
 
             report = build_drift_report(
@@ -962,6 +1013,10 @@ class InstallerCLI:
                     planned_changes=[c.to_dict() for c in drift_assessment.planned_changes],
                     classification=classification.to_dict(),
                     blocking_reasons=blocking_reasons,
+                    backup_required=backup_required,
+                    backup_status=(backup_assessment.status if backup_assessment else None),
+                    backup_reason=(backup_assessment.message if backup_assessment else None),
+                    backup_evidence=(backup_assessment.to_dict() if backup_assessment else None),
                 )
             )
             readiness_json, readiness_md = write_readiness_report(run_dir, readiness)
@@ -1015,6 +1070,12 @@ class InstallerCLI:
                 noop_status=(drift_assessment.noop_status if drift_assessment else None),
                 compatibility_status=(compatibility.status if compatibility else None),
                 readiness_status=(readiness.get("status") if readiness else None),
+                backup_required=backup_required,
+                backup_evidence=(
+                    backup_assessment.to_manifest()
+                    if backup_assessment is not None and backup_assessment.required
+                    else None
+                ),
             )
             manifest_path = manifest.write(saved_plan)
             print(f"  Plan manifest: {manifest_path}")
@@ -1160,6 +1221,50 @@ class InstallerCLI:
             return False
 
         print(f"Upgrade readiness: {assessment.status}")
+        return True
+
+    def _verify_backup_gate(self, context, plan_file: Path) -> bool:
+        """Prueft P3A-Backup-Evidenz bei Upgrade-Plaenen (Manifest-gebunden)."""
+        from installer.core.backup_gate import (
+            BACKUP_VERIFIED,
+            assess_manifest_evidence,
+            requires_backup,
+        )
+        from installer.core.plan_manifest import PlanManifest
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_BACKUP_EVIDENCE_UNREADABLE: {exc}")
+            return False
+        if manifest is None:
+            print("UPGRADE_BACKUP_EVIDENCE_MISSING: kein Plan-Manifest vorhanden.")
+            return False
+        required = bool(manifest.backup_required) or requires_backup(
+            manifest.source_version, manifest.target_version
+        )
+        if not required:
+            print("Upgrade backup gate: n/a (kein Versionswechsel)")
+            return True
+
+        baseline = manifest.state_baseline or {}
+        assessment = assess_manifest_evidence(
+            plan_file,
+            manifest.backup_evidence,
+            expected_project=context.project_name,
+            expected_environment=context.environment,
+            expected_account=context.aws_execution_context.account_id,
+            expected_region=context.aws_region,
+            state_lineage=baseline.get("lineage"),
+            state_serial=baseline.get("serial"),
+        )
+        if assessment.status != BACKUP_VERIFIED:
+            print(
+                f"Upgrade backup gate: BLOCKED ({assessment.status}) "
+                f"{assessment.code}: {assessment.message}"
+            )
+            return False
+        print(f"Upgrade backup gate: {assessment.status} ({assessment.backup_arn})")
         return True
 
     def _verify_state_baseline(self, context, plan_file: Path) -> bool:
@@ -1392,6 +1497,11 @@ class InstallerCLI:
 
         # MO-P0C: State-Baseline (Serial/Lineage/Fingerprint) vor dem Apply.
         if not self._verify_state_baseline(context, plan_file):
+            return 1
+
+        # MO-RC4-UPGRADE-RELEASE-GATES-01: Backup-Evidenz aus dem Manifest
+        # erneut pruefen (Hash, Identitaet, State-Bindung, VERIFIED).
+        if not self._verify_backup_gate(context, plan_file):
             return 1
 
         # P1D: Upgrade-Readiness (Kompatibilitaet) erneut pruefen — die

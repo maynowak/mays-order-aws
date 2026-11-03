@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from installer.core.backup_gate import BACKUP_VERIFIED
+
 READINESS_JSON = "upgrade-readiness.json"
 READINESS_MD = "upgrade-readiness.md"
 SCHEMA_VERSION = 1
@@ -49,10 +51,16 @@ class ReadinessInput:
     planned_changes: List[Dict[str, Any]]
     classification: Dict[str, Any]
     blocking_reasons: List[str]
+    backup_required: bool = False
+    backup_status: Optional[str] = None
+    backup_reason: Optional[str] = None
+    backup_evidence: Optional[Dict[str, Any]] = None
 
 
 def decide_status(payload: ReadinessInput) -> str:
     if payload.blocking_reasons:
+        return BLOCKED
+    if payload.backup_required and payload.backup_status != BACKUP_VERIFIED:
         return BLOCKED
     classification = payload.classification or {}
     if classification.get("overall") == "CRITICAL":
@@ -109,12 +117,21 @@ def build_readiness_report(payload: ReadinessInput) -> Dict[str, Any]:
         "plannedChanges": payload.planned_changes,
         "classification": classification,
         "migrationRequired": migration_required,
+        "backupRequired": payload.backup_required,
+        "backupEvidence": payload.backup_evidence or {
+            "status": payload.backup_status,
+            "required": payload.backup_required,
+            "message": payload.backup_reason,
+        },
         "blockingReasons": payload.blocking_reasons,
         "nextSteps": next_steps,
         "evidenceLimits": [
-            "Readiness ist keine Ausfuehrungsfreigabe; Apply prueft P0A/P0B/P0C erneut.",
+            "Readiness ist keine Ausfuehrungsfreigabe; Apply prueft P0A/P0B/P0C und "
+            "die Backup-Evidenz erneut.",
             "SemVer-Differenz ist kein technischer Kompatibilitaetsnachweis.",
+            "Die Minor-Matrix gilt nur fuer exakt belegte Deployment-Versionspaare.",
             "Drift deckt nur Ressourcen ab, die Terraform beim Refresh liest (TOCTOU).",
+            "Backup-Evidenz ist lokal geprueft; sie ersetzt keinen realen AWS-Backup-Test.",
             "Keine Datenmigration, kein Rollback.",
         ],
         "approved": False,
@@ -228,6 +245,17 @@ def render_readiness_markdown(report: Dict[str, Any]) -> str:
     lines.append("")
     for step in report.get("nextSteps") or []:
         lines.append(f"- {step}")
+    lines.append("")
+    backup = report.get("backupEvidence") or {}
+    lines.append("## 16. Backup-Evidenz (P3A)")
+    lines.append("")
+    lines.append(f"- Erforderlich: `{report.get('backupRequired')}`")
+    lines.append(f"- Status: `{backup.get('status')}`")
+    lines.append(f"- Meldung: {backup.get('message') or '-'}")
+    if backup.get("backupArn"):
+        lines.append(f"- Backup-ARN: `{backup.get('backupArn')}`")
+    if backup.get("sha256"):
+        lines.append(f"- Evidenz-SHA256: `{backup.get('sha256')}`")
     lines.append("")
     lines.append("## Nachweisgrenzen")
     lines.append("")
