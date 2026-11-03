@@ -55,3 +55,10 @@ Mays-Orders-AWS is an independent AWS serverless project with no dependency on O
 ## Auditlog
 Path: `docs/AI_AUDITLOG.md`
 All agents must inspect rules and template before work and report compliance.
+
+## Auditlog (verbindlich)
+
+- Befolge `docs/AI_AUDITLOG.md` (Execution-Log- und Index-Regeln).
+- Führe das Auditlog nach jedem Checkpoint nach; serialisiere Schreibvorgänge.
+- Keine erfundenen Prüfungen oder Nachweise; nur verifizierte Ergebnisse eintragen.
+- Subagenten liefern ihre Auditlog-Einträge an dich; du trägst sie ein.

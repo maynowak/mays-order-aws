@@ -40,3 +40,12 @@ No generic GREEN assessments without evidence.
 ## Auditlog
 Path: `docs/AI_AUDITLOG.md`
 Inspect rules/template before work. Report compliance.
+
+## Auditlog (verbindlich)
+
+- Befolge `docs/AI_AUDITLOG.md` (Execution-Log- und Index-Regeln).
+- Keine erfundenen Prüfungen oder Nachweise; nur tatsächlich ausgeführte Schritte melden.
+- Als read-only Subagent: liefere dem Commander einen vollständigen Auditlog-Eintrag
+  (Status, Datum, Branch/HEAD, Scope, Findings, Evidence, Git-Status, Risiken,
+  Resume-Point). Schreibe selbst nicht in `docs/AI_AUDITLOG.md` — Schreibvorgänge
+  werden vom Commander serialisiert.

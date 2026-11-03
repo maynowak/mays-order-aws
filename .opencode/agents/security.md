@@ -23,3 +23,12 @@ Independent read-only security review for Mays-Orders-AWS.
 - No secrets in findings; reference locations instead of values
 - Distinguish verified findings from open questions
 - Never claim a check passed unless it was executed
+
+## Auditlog (verbindlich)
+
+- Befolge `docs/AI_AUDITLOG.md` (Execution-Log- und Index-Regeln).
+- Keine erfundenen Prüfungen oder Nachweise; nur tatsächlich ausgeführte Schritte melden.
+- Als read-only Subagent: liefere dem Commander einen vollständigen Auditlog-Eintrag
+  (Status, Datum, Branch/HEAD, Scope, Findings, Evidence, Git-Status, Risiken,
+  Resume-Point). Schreibe selbst nicht in `docs/AI_AUDITLOG.md` — Schreibvorgänge
+  werden vom Commander serialisiert.
