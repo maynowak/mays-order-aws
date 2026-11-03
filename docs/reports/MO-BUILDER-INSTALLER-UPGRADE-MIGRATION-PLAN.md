@@ -2,13 +2,14 @@
 
 **Migrationsfahrplan für bestehende MO-Installationen**
 
-**Stand:** 2026-11-03 (P0A + P0B + P0C + P1 umgesetzt)
+**Stand:** 2026-11-03 (P0A + P0B + P0C + P1 + P2 umgesetzt)
 **Charakter:** Entwicklungs- und Betriebsvorlage — **autorisiert keine AWS-Änderungen**
 **Bezug:** `docs/reports/MO-BUILDER-INSTALLER-UPGRADE-READINESS-01.md`,
 `docs/reports/MO-INSTALLER-UPGRADE-SAFETY-P0A-01.md`,
 `docs/reports/MO-INSTALLER-UPGRADE-VERSIONING-P0B-01.md`,
 `docs/reports/MO-INSTALLER-UPGRADE-DRIFT-SAFETY-P0C-01.md`,
-`docs/reports/MO-INSTALLER-UPGRADE-ORCHESTRATION-P1-01.md`
+`docs/reports/MO-INSTALLER-UPGRADE-ORCHESTRATION-P1-01.md`,
+`docs/reports/MO-BUILDER-UPGRADE-P2-01.md`
 
 Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 
@@ -38,7 +39,18 @@ Legende: **IMPLEMENTED** · **PARTIALLY** · **PLANNED** · **BLOCKED**
 4. Destroy bleibt ein separater, explizit freigegebener Lifecycle.
 5. RIS- und Shared-Infrastruktur (State-Bucket, Lock-Tabelle) bleiben unberührt.
 
-## Nächste Schritte (P1)
+## P2 — umgesetzt (2026-11-03)
+
+- Builder-Manifest Schema 2 mit Datei-Fingerprints; Projektstatus
+  NEW/MANAGED/LEGACY/UNVERIFIED/CONFLICTED.
+- `module_builder upgrade --dry-run|--apply`: Diff (ADD/UPDATE_SAFE/
+  USER_MODIFIED/USER_OWNED/REMOVE_CANDIDATE/CONFLICT), Konfigurationserhalt
+  (tfvars/.env), Parameter-Vorschläge, Bericht, Staging-Apply, Manifest-Update.
+- Keine Löschung, kein Überschreiben von Benutzerdateien, Legacy nur mit Review.
+- Übergabe: Builder liefert Dateien; Installer bleibt für
+  `plan --remote --upgrade` und Infrastruktur verantwortlich.
+
+## Nächste Schritte (P3)
 
 - Automatisierte Inventur (Phase 3) und Datenintegritätsprüfung (Phase 9).
 - `DevelopmentState.compare` verdrahten (Phase 4).
