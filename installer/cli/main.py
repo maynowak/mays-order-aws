@@ -907,6 +907,8 @@ class InstallerCLI:
                 expected_region=context.aws_region,
                 state_lineage=baseline.lineage,
                 state_serial=baseline.serial,
+                state_fingerprint=baseline.fingerprint,
+                state_fingerprint_version=baseline.fingerprint_version,
             )
             print(
                 f"Backup evidence: {backup_assessment.status} "
@@ -945,6 +947,7 @@ class InstallerCLI:
                 finding
                 for finding in drift_assessment.drift_findings
                 if finding.resource_type in PROTECTED_RESOURCE_TYPES
+                and not getattr(finding, "benign", False)
             ]
             if protected_drift:
                 blocking_reasons.append(
@@ -1257,6 +1260,8 @@ class InstallerCLI:
             expected_region=context.aws_region,
             state_lineage=baseline.get("lineage"),
             state_serial=baseline.get("serial"),
+            state_fingerprint=baseline.get("fingerprint"),
+            state_fingerprint_version=baseline.get("fingerprintVersion"),
         )
         if assessment.status != BACKUP_VERIFIED:
             print(

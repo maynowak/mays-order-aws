@@ -136,6 +136,7 @@ class TableIdentity:
     state_lineage: Optional[str] = None
     state_serial: Optional[int] = None
     state_fingerprint: Optional[str] = None
+    state_fingerprint_version: Optional[str] = None
     state_baseline_status: Optional[str] = None
     captured_at: str = ""
 
@@ -150,6 +151,7 @@ class TableIdentity:
             "stateLineage": self.state_lineage,
             "stateSerial": self.state_serial,
             "stateFingerprint": self.state_fingerprint,
+            "stateFingerprintVersion": self.state_fingerprint_version,
             "stateBaselineStatus": self.state_baseline_status,
             "capturedAt": self.captured_at,
         }
@@ -202,6 +204,9 @@ def expected_table_identity(
         state_lineage=baseline.get("lineage"),
         state_serial=serial,
         state_fingerprint=baseline.get("fingerprint"),
+        state_fingerprint_version=(
+            baseline.get("fingerprintVersion") or baseline.get("fingerprint_version")
+        ),
         state_baseline_status=baseline.get("status"),
         captured_at=captured_at or (baseline.get("captured_at") or ""),
     )
@@ -247,10 +252,12 @@ def _require_verified_state_baseline(expected: TableIdentity) -> None:
         expected.state_baseline_status != "VERIFIED"
         or not expected.state_lineage
         or not isinstance(expected.state_serial, int)
+        or not expected.state_fingerprint
+        or not expected.state_fingerprint_version
     ):
         raise OrderBackupError(
             CODE_STATE_BASELINE_REQUIRED,
-            "Verifizierte Terraform-State-Baseline (Lineage/Serial) fehlt",
+            "Verifizierte Terraform-State-Baseline (Lineage/Serial/Fingerprint) fehlt",
         )
 
 
@@ -429,6 +436,7 @@ class BackupEvidence:
     state_lineage: Optional[str] = None
     state_serial: Optional[int] = None
     state_fingerprint: Optional[str] = None
+    state_fingerprint_version: Optional[str] = None
     generated_at: str = ""
     error_code: Optional[str] = None
     limitations: List[str] = field(default_factory=list)
@@ -456,6 +464,7 @@ class BackupEvidence:
             "stateLineage": self.state_lineage,
             "stateSerial": self.state_serial,
             "stateFingerprint": self.state_fingerprint,
+            "stateFingerprintVersion": self.state_fingerprint_version,
             "generatedAt": self.generated_at,
             "errorCode": self.error_code,
             "limitations": list(self.limitations),
@@ -644,6 +653,7 @@ def execute_order_backup(
         state_lineage=expected.state_lineage,
         state_serial=expected.state_serial,
         state_fingerprint=expected.state_fingerprint,
+        state_fingerprint_version=expected.state_fingerprint_version,
         generated_at=_iso(wall_clock()),
         error_code=(
             pitr.error_code
@@ -772,6 +782,10 @@ def validate_evidence_binding(evidence: BackupEvidence, expected: TableIdentity)
         "stateLineage": (evidence.state_lineage, expected.state_lineage),
         "stateSerial": (evidence.state_serial, expected.state_serial),
         "stateFingerprint": (evidence.state_fingerprint, expected.state_fingerprint),
+        "stateFingerprintVersion": (
+            evidence.state_fingerprint_version,
+            expected.state_fingerprint_version,
+        ),
     }
     for field_name, (actual, wanted) in checks.items():
         if actual != wanted:

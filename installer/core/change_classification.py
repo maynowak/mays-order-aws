@@ -177,14 +177,22 @@ def classify_changes(
     protected = set(protected_types)
     for finding in drift_findings:
         resource_type = str(getattr(finding, "resource_type", ""))
-        category = CRITICAL if resource_type in protected else REVIEW
+        benign = bool(getattr(finding, "benign", False))
+        if benign:
+            category = SAFE
+            reason = "Nachgewiesene Provider-/State-Normalisierung: " + str(
+                getattr(finding, "benign_reason", "") or "keine sicherheitsrelevante Drift."
+            )
+        else:
+            category = CRITICAL if resource_type in protected else REVIEW
+            reason = "Infrastruktur-Drift erkannt (ausserhalb des Terraform-States)."
         changes.append(
             ChangeAssessment(
                 str(getattr(finding, "address", "<unknown>")),
                 resource_type,
                 [str(a) for a in getattr(finding, "actions", [])],
                 category,
-                "Infrastruktur-Drift erkannt (ausserhalb des Terraform-States).",
+                reason,
             )
         )
 

@@ -43,6 +43,8 @@ class PlanChange:
     resource_type: str
     actions: List[str]
     replace_paths: List[str] = field(default_factory=list)
+    benign: bool = False
+    benign_reason: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -50,6 +52,8 @@ class PlanChange:
             "type": self.resource_type,
             "actions": list(self.actions),
             "replacePaths": list(self.replace_paths),
+            "benign": self.benign,
+            "benignReason": self.benign_reason,
         }
 
 
@@ -106,6 +110,93 @@ def _change_entries(plan: Any) -> Optional[List[dict]]:
     return [entry for entry in raw if isinstance(entry, dict)]
 
 
+def _changed_attributes(entry: dict) -> List[str]:
+    change = entry.get("change") or {}
+    before = change.get("before") or {}
+    after = change.get("after") or {}
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return []
+    return sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+
+
+def _canonical_json(value: Any) -> Optional[str]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _change_for(plan: Any, address: str) -> Optional[dict]:
+    for entry in _change_entries(plan) or []:
+        if str(entry.get("address") or "") == address:
+            return entry
+    return None
+
+
+def _actions(entry: Optional[dict]) -> List[str]:
+    if not entry:
+        return []
+    raw = (entry.get("change") or {}).get("actions")
+    return [str(a) for a in raw] if isinstance(raw, list) else []
+
+
+def _is_empty_normalization(before: Any, after: Any) -> bool:
+    return before in (None, []) and after in (None, [])
+
+
+def _benign_drift_reason(plan: Any, entry: dict) -> Optional[str]:
+    """Nur die forensisch belegten Darstellungsfaelle; sonst None (fail-closed)."""
+    address = str(entry.get("address") or "")
+    resource_type = str(entry.get("type") or "")
+    changed = _changed_attributes(entry)
+    change = entry.get("change") or {}
+    before = change.get("before") or {}
+    after = change.get("after") or {}
+    plan_entry = _change_for(plan, address)
+    if not plan_entry or _actions(plan_entry) != ["no-op"]:
+        return None
+
+    if resource_type == "aws_s3_bucket" and changed == ["policy"]:
+        bucket_policy = _canonical_json(after.get("policy"))
+        if bucket_policy is None:
+            return None
+        parts = address.split(".")
+        module_prefix = ".".join(parts[:2]) + "." if len(parts) >= 2 else ""
+        for candidate in _change_entries(plan) or []:
+            if str(candidate.get("type") or "") != "aws_s3_bucket_policy":
+                continue
+            if not str(candidate.get("address") or "").startswith(module_prefix):
+                continue
+            if _actions(candidate) != ["no-op"]:
+                continue
+            policy_change = candidate.get("change") or {}
+            policy_value = (policy_change.get("after") or {}).get("policy")
+            if _canonical_json(policy_value) == bucket_policy:
+                return (
+                    "S3-Bucket-Policy ist ein berechnetes Darstellungsattribut; "
+                    "die separate aws_s3_bucket_policy-Ressource ist no-op und "
+                    "kanonisch identisch mit dem Refresh-Wert."
+                )
+        return None
+
+    if resource_type == "aws_cognito_user_pool" and changed:
+        if not set(changed).issubset({"auto_verified_attributes", "username_attributes"}):
+            return None
+        for key in changed:
+            if not _is_empty_normalization(before.get(key), after.get(key)):
+                return None
+        return (
+            "Cognito null/leere Liste ist eine Provider-Normalisierung; "
+            "der Pool ist no-op und die Konfiguration unveraendert."
+        )
+    return None
+
+
 def analyze_plan_drift(
     plan: Any, *, has_prior_state: bool
 ) -> Tuple[str, List[PlanChange], str]:
@@ -145,12 +236,15 @@ def analyze_plan_drift(
             )
         if all(a in {"no-op", "read"} for a in actions):
             continue
+        reason = _benign_drift_reason(plan, entry)
         findings.append(
             PlanChange(
                 address=str(entry.get("address") or "<unknown>"),
                 resource_type=str(entry.get("type") or ""),
                 actions=actions,
                 replace_paths=_flatten_paths((entry.get("change") or {}).get("replace_paths")),
+                benign=reason is not None,
+                benign_reason=reason or "",
             )
         )
 
@@ -358,9 +452,10 @@ def render_drift_markdown(report: Dict[str, Any]) -> str:
         lines.append("| Adresse | Typ | Aktionen |")
         lines.append("|---|---|---|")
         for finding in drift:
-            lines.append("| `{a}` | `{t}` | `{x}` |".format(
+            suffix = " (benigne: " + finding.get("benignReason", "") + ")" if finding.get("benign") else ""
+            lines.append("| `{a}` | `{t}` | `{x}{s}` |".format(
                 a=finding.get("address"), t=finding.get("type"),
-                x=", ".join(finding.get("actions") or [])))
+                x=", ".join(finding.get("actions") or []), s=suffix))
     else:
         lines.append("- keine (siehe Nachweisgrenzen)")
     lines.append("")

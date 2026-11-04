@@ -61,6 +61,7 @@ BASELINE = {
     "serial": 42,
     "lineage": "lineage-abc",
     "fingerprint": "f" * 64,
+    "fingerprintVersion": "canonical-sha256-v1",
     "captured_at": "2026-11-03T11:59:00+00:00",
 }
 

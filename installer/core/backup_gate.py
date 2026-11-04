@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from installer.core.order_backup import EVIDENCE_JSON, EVIDENCE_SCHEMA_VERSION
+from installer.core.state_fingerprint import FINGERPRINT_VERSION
 
 BACKUP_NOT_REQUIRED = "NOT_REQUIRED"
 BACKUP_VERIFIED = "VERIFIED"
@@ -41,6 +42,9 @@ CODE_NOT_VERIFIED = "UPGRADE_BACKUP_EVIDENCE_NOT_VERIFIED"
 CODE_IDENTITY_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_IDENTITY_MISMATCH"
 CODE_STATE_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_STATE_MISMATCH"
 CODE_HASH_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_HASH_MISMATCH"
+CODE_FINGERPRINT_MISSING = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_MISSING"
+CODE_FINGERPRINT_VERSION_UNKNOWN = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_VERSION_UNKNOWN"
+CODE_FINGERPRINT_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,8 @@ class BackupEvidenceAssessment:
     overall_status: Optional[str] = None
     state_lineage: Optional[str] = None
     state_serial: Optional[int] = None
+    state_fingerprint: Optional[str] = None
+    state_fingerprint_version: Optional[str] = None
 
     @property
     def blocking(self) -> bool:
@@ -81,6 +87,8 @@ class BackupEvidenceAssessment:
             "overallStatus": self.overall_status,
             "stateLineage": self.state_lineage,
             "stateSerial": self.state_serial,
+            "stateFingerprint": self.state_fingerprint,
+            "stateFingerprintVersion": self.state_fingerprint_version,
         }
 
     def to_manifest(self) -> Dict[str, Any]:
@@ -95,6 +103,8 @@ class BackupEvidenceAssessment:
             "overallStatus": self.overall_status,
             "stateLineage": self.state_lineage,
             "stateSerial": self.state_serial,
+            "stateFingerprint": self.state_fingerprint,
+            "stateFingerprintVersion": self.state_fingerprint_version,
         }
 
 
@@ -152,6 +162,8 @@ def _assessment(
         overall_status=data.get("overallStatus"),
         state_lineage=data.get("stateLineage"),
         state_serial=data.get("stateSerial"),
+        state_fingerprint=data.get("stateFingerprint"),
+        state_fingerprint_version=data.get("stateFingerprintVersion"),
     )
 
 
@@ -167,6 +179,8 @@ def assess_backup_evidence(
     expected_table_arn: Optional[str] = None,
     state_lineage: Optional[str] = None,
     state_serial: Optional[int] = None,
+    state_fingerprint: Optional[str] = None,
+    state_fingerprint_version: str = FINGERPRINT_VERSION,
     expected_sha256: Optional[str] = None,
 ) -> BackupEvidenceAssessment:
     """Prueft P3A-Evidenz fail-closed; keine AWS-Aufrufe."""
@@ -278,6 +292,25 @@ def assess_backup_evidence(
             message="Backup-Evidenz gehoert zu einem anderen State-Serial.",
             path=path, sha256=digest, data=data,
         )
+    if not data.get("stateFingerprint"):
+        return _assessment(
+            BACKUP_INVALID, required=True, code=CODE_FINGERPRINT_MISSING,
+            message="Backup-Evidenz enthaelt keinen kanonischen State-Fingerprint.",
+            path=path, sha256=digest, data=data,
+        )
+    if data.get("stateFingerprintVersion") != state_fingerprint_version:
+        return _assessment(
+            BACKUP_INVALID, required=True, code=CODE_FINGERPRINT_VERSION_UNKNOWN,
+            message="State-Fingerprint-Version fehlt oder ist unbekannt "
+                    f"(erwartet {state_fingerprint_version}).",
+            path=path, sha256=digest, data=data,
+        )
+    if state_fingerprint is not None and data.get("stateFingerprint") != state_fingerprint:
+        return _assessment(
+            BACKUP_STALE, required=True, code=CODE_FINGERPRINT_MISMATCH,
+            message="Backup-Evidenz gehoert zu einem anderen kanonischen State-Fingerprint.",
+            path=path, sha256=digest, data=data,
+        )
 
     if data.get("backupStatus") != "AVAILABLE":
         return _assessment(
@@ -315,6 +348,8 @@ def assess_manifest_evidence(
     expected_region: str,
     state_lineage: Optional[str] = None,
     state_serial: Optional[int] = None,
+    state_fingerprint: Optional[str] = None,
+    state_fingerprint_version: str = FINGERPRINT_VERSION,
 ) -> BackupEvidenceAssessment:
     if not summary:
         return BackupEvidenceAssessment(
@@ -335,6 +370,8 @@ def assess_manifest_evidence(
         expected_region=expected_region,
         state_lineage=state_lineage,
         state_serial=state_serial,
+        state_fingerprint=state_fingerprint,
+        state_fingerprint_version=state_fingerprint_version,
         expected_sha256=summary.get("sha256"),
     )
 

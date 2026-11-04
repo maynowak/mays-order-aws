@@ -13,11 +13,16 @@ Sicherheit:
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Tuple
+
+from installer.core.state_fingerprint import (
+    FINGERPRINT_VERSION,
+    StateFingerprintError,
+    canonical_state_fingerprint,
+)
 
 VERIFIED = "VERIFIED"
 NO_STATE = "NO_STATE"
@@ -40,6 +45,7 @@ class StateBaseline:
     lineage: Optional[str] = None
     resources: Optional[int] = None
     fingerprint: Optional[str] = None
+    fingerprint_version: str = FINGERPRINT_VERSION
     captured_at: str = ""
     source: str = "terraform_state_pull"
     reason: str = ""
@@ -52,6 +58,7 @@ class StateBaseline:
             "lineage": self.lineage,
             "resources": self.resources,
             "fingerprint": self.fingerprint,
+            "fingerprintVersion": self.fingerprint_version,
             "captured_at": self.captured_at,
             "source": self.source,
             "reason": self.reason,
@@ -92,7 +99,14 @@ def capture_state_baseline(runner) -> StateBaseline:
     serial = data.get("serial")
     lineage = data.get("lineage")
     resources = data.get("resources")
-    fingerprint = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    try:
+        fingerprint = canonical_state_fingerprint(raw)
+    except StateFingerprintError as exc:
+        return StateBaseline(
+            status=UNREADABLE,
+            captured_at=_now(),
+            reason=f"Fingerprint: {exc}",
+        )
 
     if not isinstance(serial, int):
         return StateBaseline(
@@ -153,6 +167,7 @@ def compare_state_baseline(
     expected_serial = manifest_baseline.get("serial")
     expected_lineage = manifest_baseline.get("lineage")
     expected_fingerprint = manifest_baseline.get("fingerprint")
+    expected_fingerprint_version = manifest_baseline.get("fingerprintVersion")
 
     errors = []
     if expected_serial is None or current.serial is None:
@@ -165,8 +180,14 @@ def compare_state_baseline(
         errors.append("State-Lineage fehlt (Manifest oder aktueller State).")
     elif expected_lineage != current.lineage:
         errors.append("State-Lineage geaendert (fremder/ersetzter State).")
-    if expected_fingerprint and current.fingerprint and expected_fingerprint != current.fingerprint:
-        errors.append("State-Fingerprint geaendert (State wurde seit dem Plan geschrieben).")
+    if expected_fingerprint:
+        if expected_fingerprint_version != FINGERPRINT_VERSION:
+            errors.append(
+                "State-Fingerprint-Version fehlt oder ist unbekannt "
+                f"(erwartet {FINGERPRINT_VERSION})."
+            )
+        elif current.fingerprint != expected_fingerprint:
+            errors.append("State-Fingerprint geaendert (State wurde seit dem Plan geschrieben).")
 
     if errors:
         return (

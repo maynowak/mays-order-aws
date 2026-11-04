@@ -59,6 +59,8 @@ ACCOUNT = "240571105849"
 TABLE_ARN = f"arn:aws:dynamodb:{REGION}:{ACCOUNT}:table/{PROJECT}"
 LINEAGE = "lineage-1"
 SERIAL = 7
+FINGERPRINT = "a" * 64
+FINGERPRINT_VERSION = "canonical-sha256-v1"
 
 
 def valid_evidence(**overrides):
@@ -81,6 +83,8 @@ def valid_evidence(**overrides):
         "identityVerified": True,
         "stateLineage": LINEAGE,
         "stateSerial": SERIAL,
+        "stateFingerprint": FINGERPRINT,
+        "stateFingerprintVersion": FINGERPRINT_VERSION,
         "generatedAt": "2026-11-03T12:00:01+00:00",
     }
     data.update(overrides)
@@ -96,6 +100,7 @@ def assess(path, *, required=True, **overrides):
         expected_region=REGION,
         state_lineage=LINEAGE,
         state_serial=SERIAL,
+        state_fingerprint=FINGERPRINT,
     )
     values.update(overrides)
     return assess_backup_evidence(path, **values)
@@ -265,6 +270,7 @@ class TestBackupGate(unittest.TestCase):
                 expected_region=REGION,
                 state_lineage=LINEAGE,
                 state_serial=SERIAL,
+                state_fingerprint=FINGERPRINT,
             )
         self.assertEqual(result.status, BACKUP_VERIFIED)
 
@@ -284,6 +290,7 @@ class TestBackupGate(unittest.TestCase):
                 expected_region=REGION,
                 state_lineage=LINEAGE,
                 state_serial=SERIAL,
+                state_fingerprint=FINGERPRINT,
             )
         self.assertEqual(result.status, BACKUP_INVALID)
         self.assertEqual(result.code, CODE_HASH_MISMATCH)
@@ -430,7 +437,7 @@ class TestDeployBackupGate(unittest.TestCase):
             target_version=target,
             backup_required=required,
             backup_evidence=summary,
-            state_baseline={"status": "VERIFIED", "serial": SERIAL, "lineage": LINEAGE},
+            state_baseline={"status": "VERIFIED", "serial": SERIAL, "lineage": LINEAGE, "fingerprint": FINGERPRINT, "fingerprintVersion": FINGERPRINT_VERSION},
         ).write(plan)
 
     def _run(self, plan):
