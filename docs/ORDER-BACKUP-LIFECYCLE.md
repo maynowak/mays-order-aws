@@ -167,11 +167,20 @@ Backup nicht erfolgreich.
 ### Bindung und Integrität
 
 Die Evidenz wird gegen Projekt, Environment, Account, Region, Tabellen-ARN,
-State-Lineage, State-Serial und State-Fingerprint geprüft
-(`validate_evidence_binding`, `ORDER_BACKUP_EVIDENCE_MISMATCH`). Es gibt **keine
-kryptografische Signatur**; die Datei ist an den Deployment-Kontext gebunden, nicht
-signiert. Es werden keine Order-Inhalte, PII, Tokens oder Roh-Fehlerantworten
-gespeichert.
+State-Lineage, State-Serial, State-Fingerprint und Fingerprint-Version geprüft.
+Es gibt **keine kryptografische Signatur**; die Datei ist an den
+Deployment-Kontext gebunden, nicht signiert. Es werden keine Order-Inhalte, PII,
+Tokens oder Roh-Fehlerantworten gespeichert.
+
+Seit `MO-RC4-P0C-DRIFT-FIX-01` gilt `stateFingerprintVersion =
+canonical-sha256-v1`: Der Fingerprint wird über eine kanonische State-Repräsentation
+(sortierte Ressourcen/Instanzen, sortierte `check_results`, sortierte JSON-Keys)
+berechnet. Rohe `terraform state pull`-Bytes sind wegen nichtdeterministischer
+`check_results`-Reihenfolge **kein** gültiger kanonischer Fingerprint.
+
+Legacy-Evidenz ohne `stateFingerprintVersion` bleibt als historisches Dokument
+erhalten, wird vom neuen Gate aber **fail-closed** abgelehnt. Für einen neuen
+Upgrade-Plan ist eine neue, kanonisch gebundene Backup-Evidence erforderlich.
 
 ## 5. CLI
 
