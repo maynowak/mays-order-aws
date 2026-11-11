@@ -1575,7 +1575,10 @@ class InstallerCLI:
 
         # H2: Verify plan metadata matches deployment context
         plan_discovery = PlanDiscovery()
-        meta = PlanMetadata.parse_filename(plan_file.name)
+        meta = PlanMetadata.parse_filename(
+            plan_file.name,
+            expected_deployment_id=deployment_context.deployment_id,
+        )
         if meta:
             if not meta.matches_deployment(deployment_context.deployment_id):
                 print(f"ERROR: Plan deployment ID mismatch!")
@@ -1850,7 +1853,10 @@ class InstallerCLI:
 
         # H2: Verify plan metadata matches deployment context
         plan_discovery = PlanDiscovery()
-        meta = PlanMetadata.parse_filename(plan_file.name)
+        meta = PlanMetadata.parse_filename(
+            plan_file.name,
+            expected_deployment_id=deployment_context.deployment_id,
+        )
         if meta:
             if not meta.matches_deployment(deployment_context.deployment_id):
                 print(f"ERROR: Plan deployment ID mismatch!")

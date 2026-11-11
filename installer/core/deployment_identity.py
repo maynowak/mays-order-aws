@@ -270,51 +270,90 @@ class PlanMetadata:
         return meta.to_filename()
     
     @classmethod
-    def parse_filename(cls, filename: str) -> Optional["PlanMetadata"]:
+    def parse_filename(
+        cls,
+        filename: str,
+        *,
+        expected_deployment_id: Optional[DeploymentId] = None,
+    ) -> Optional["PlanMetadata"]:
         """
         Parse plan metadata from filename.
-        
+
         Expected format: <project>-<environment>-<version>-<phase>-<account>-<operation>-<sequence>.tfplan
+
+        Project and environment may contain hyphens. Without a trusted expected
+        deployment ID the legacy split-from-the-right logic is ambiguous and is
+        therefore *not* an identity authority. Security-relevant callers must
+        pass ``expected_deployment_id`` (derived from validated CLI context or a
+        verified manifest).
         """
         if not filename.endswith(".tfplan"):
             return None
-        
+
         name = filename[:-7]  # Remove .tfplan
+
+        if expected_deployment_id is not None:
+            # Exact, unambiguous prefix: project and environment are known
+            # independently; only the fixed metadata suffix is parsed.
+            prefix = (
+                f"{expected_deployment_id.project.lower()}-"
+                f"{expected_deployment_id.environment.lower()}-"
+            )
+            if not name.startswith(prefix):
+                return None
+            rest = name[len(prefix):]
+            parts = rest.split("-")
+            if len(parts) != 5:
+                return None
+            try:
+                version = SemanticVersion.parse(parts[0])
+                development_phase = DevelopmentPhase.parse(parts[1])
+                account_id = parts[2]
+                operation = PlanOperation(parts[3])
+                sequence_number = int(parts[4])
+                deployment_id = DeploymentId(
+                    account_id=account_id,
+                    project=expected_deployment_id.project,
+                    environment=expected_deployment_id.environment,
+                )
+            except (ValueError, IndexError):
+                return None
+            return cls(
+                deployment_id=deployment_id,
+                version=version,
+                development_phase=development_phase,
+                operation=operation,
+                sequence_number=sequence_number,
+            )
+
         parts = name.split("-")
-        
         if len(parts) < 7:
             return None
-        
+
         try:
-            # Last parts: operation, sequence
+            # Legacy fallback for display/compatibility only. Hyphenated
+            # environments cannot be resolved unambiguously here.
             operation_str = parts[-2]
             sequence_str = parts[-1]
             operation = PlanOperation(operation_str)
             sequence_number = int(sequence_str)
-            
-            # Account is before operation
+
             account_id = parts[-3]
-            
-            # Phase is before account
             phase_str = parts[-4]
             development_phase = DevelopmentPhase.parse(phase_str)
-            
-            # Version is before phase
+
             version_str = parts[-5]
             version = SemanticVersion.parse(version_str)
-            
-            # Environment is before version
+
             environment = parts[-6]
-            
-            # Project is everything before environment (could have hyphens)
             project = "-".join(parts[:-6])
-            
+
             deployment_id = DeploymentId(
                 account_id=account_id,
                 project=project,
                 environment=environment
             )
-            
+
             return cls(
                 deployment_id=deployment_id,
                 version=version,
@@ -648,7 +687,9 @@ class PlanSequenceManager:
                 for plan_file in plans_dir.iterdir():
                     if not plan_file.suffix == ".tfplan":
                         continue
-                    meta = PlanMetadata.parse_filename(plan_file.name)
+                    meta = PlanMetadata.parse_filename(
+                        plan_file.name, expected_deployment_id=deployment_id
+                    )
                     if meta and meta.deployment_id == deployment_id and meta.operation == operation:
                         max_seq = max(max_seq, meta.sequence_number)
         
@@ -691,7 +732,9 @@ class PlanDiscovery:
                 if not plan_file.suffix == ".tfplan":
                     continue
                 
-                meta = PlanMetadata.parse_filename(plan_file.name)
+                meta = PlanMetadata.parse_filename(
+                    plan_file.name, expected_deployment_id=deployment_id
+                )
                 if not meta:
                     continue
                 
@@ -728,7 +771,9 @@ class PlanDiscovery:
     
     def validate_plan_context(self, plan_path: Path, expected_deployment_id: DeploymentId) -> tuple[bool, str]:
         """Validate plan file matches expected deployment context."""
-        meta = PlanMetadata.parse_filename(plan_path.name)
+        meta = PlanMetadata.parse_filename(
+            plan_path.name, expected_deployment_id=expected_deployment_id
+        )
         if not meta:
             return False, f"Cannot parse plan metadata from filename: {plan_path.name}"
         
