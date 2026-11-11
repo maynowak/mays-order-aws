@@ -4,17 +4,89 @@ Tests for installer core components.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from installer.core.context import InstallationContext, ValidationLayer, ValidationCheck, ValidationResult
 from installer.terraform.runner import TerraformRunner, PlanResult, TerraformResult
 from installer.terraform.plan_analysis import evaluate_plan_safety, analyze_plan_safety
 from installer.run.manager import RunDirectoryManager, PlanArtifactManager
+
+
+def _make_installer_context(tmpdir: str) -> InstallationContext:
+    """Build a fully mocked, non-AWS installer context for command tests."""
+    ctx = InstallationContext(
+        aws_profile="test-profile",
+        project_name="mays-orders",
+        terraform_workspace="mays-orders",
+        terraform_dir=tmpdir,
+        dry_run=True,
+        allow_aws_operations=True,
+    )
+    ctx.aws_execution_context = SimpleNamespace(account_id="123456789012")
+    ctx.validate_aws_context = MagicMock(return_value=True)
+    ctx.get_deployment_context = MagicMock(
+        return_value=SimpleNamespace(
+            deployment_id="123456789012:mays-orders:test",
+            version="0.2.0",
+            development_state=SimpleNamespace(phase="H2"),
+        )
+    )
+    return ctx
+
+
+def _make_runner_mock() -> MagicMock:
+    """Return a Terraform runner stub; no subprocess or AWS call can escape it."""
+    runner = MagicMock()
+    runner.show_plan.return_value = SimpleNamespace(
+        success=True,
+        stdout='{"resource_changes": []}',
+        stderr="",
+    )
+    runner.verify_plan_integrity.return_value = (True, "")
+    runner.verify_plan_context_match.return_value = (True, "")
+    runner.apply.return_value = SimpleNamespace(success=True, stderr="")
+    runner.destroy.return_value = SimpleNamespace(success=True, stderr="")
+    runner.state_list.return_value = SimpleNamespace(success=True, stdout="")
+    runner.version.return_value = SimpleNamespace(success=True)
+    return runner
+
+
+def _deploy_gate_patches():
+    from installer.cli.main import InstallerCLI
+
+    return [
+        patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True),
+        patch.object(InstallerCLI, "_verify_version_binding", return_value=True),
+        patch.object(InstallerCLI, "_verify_state_baseline", return_value=True),
+        patch.object(InstallerCLI, "_verify_backup_gate", return_value=True),
+        patch.object(InstallerCLI, "_verify_upgrade_readiness", return_value=True),
+        patch.object(InstallerCLI, "_enforce_upgrade_safety", return_value=True),
+        patch("installer.cli.main.PlanDiscovery.validate_plan_context", return_value=(True, "")),
+        patch("installer.cli.main.PlanMetadata.parse_filename", return_value=None),
+    ]
+
+
+def _destroy_gate_patches():
+    from installer.cli.main import InstallerCLI
+
+    backend = MagicMock()
+    backend.state_key.return_value = "mays-orders/terraform.tfstate"
+    return [
+        patch.object(InstallerCLI, "_verify_plan_manifest", return_value=True),
+        patch.object(InstallerCLI, "_verify_destroy_plan", return_value=(True, "")),
+        patch("installer.cli.main.PlanDiscovery.validate_plan_context", return_value=(True, "")),
+        patch("installer.cli.main.PlanMetadata.parse_filename", return_value=None),
+        patch("installer.core.plan_contract.load_backend_contract", return_value=backend),
+        patch("installer.core.cleanup_contract.validate_cleanup_target", return_value=[]),
+    ]
 
 
 class TestInstallationContext(unittest.TestCase):
@@ -399,116 +471,101 @@ class TestPlanArtifactManager(unittest.TestCase):
 class TestDeployCommand(unittest.TestCase):
     """Test deploy command."""
 
-    @patch("subprocess.run")
-    def test_deploy_requires_approval(self, mock_run):
-        """Test deploy requires approval without --yes flag."""
-        # Mock successful plan generation
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout='{"resource_changes": []}',
-            stderr=""
-        )
+    def test_deploy_requires_approval(self):
+        """Deploy without --yes must stop before apply when approval is denied."""
+        from installer.cli.main import InstallerCLI
 
-        from installer.core.context import InstallationContext, ValidationLayer
-        ctx = InstallationContext(aws_profile="test-profile")
-        validation = ValidationLayer(ctx)
-        validation._check_aws_profile_validated()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan = Path(tmpdir) / "deploy.tfplan"
+            plan.write_text('{"resource_changes": []}', encoding="utf-8")
+            ctx = _make_installer_context(tmpdir)
+            parsed = SimpleNamespace(plan=str(plan), yes=False)
+            runner = _make_runner_mock()
+            make_runner = MagicMock(return_value=runner)
+            stdout = io.StringIO()
 
-        # Mock the runner to return a plan result
-        with patch("installer.cli.main.TerraformRunner") as mock_runner_class:
-            mock_runner = MagicMock()
-            mock_runner_class.return_value = mock_runner
-
-            mock_plan_result = MagicMock()
-            mock_plan_result.success = True
-            mock_runner.return_value.plan.return_value = MagicMock(success=True)
-
-            mock_apply_result = MagicMock()
-            mock_apply_result.success = True
-            mock_runner.return_value.apply.return_value = MagicMock(success=True)
-
-            runner_dummy = MagicMock()
-            runner_dummy.show_plan.return_value = MagicMock(
-                success=True,
-                stdout='{"resource_changes": []}'
-            )
-
-            # The deploy command should require approval without --yes
-            from installer.cli.main import InstallerCLI
-            import tempfile
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                ctx = InstallationContext(
-                    aws_profile="test-profile",
-                    terraform_dir=tempfile.gettempdir()
+            with ExitStack() as stack:
+                for gate in _deploy_gate_patches():
+                    stack.enter_context(gate)
+                stack.enter_context(
+                    patch.object(InstallerCLI, "_make_runner", new=make_runner)
                 )
+                input_mock = stack.enter_context(patch("builtins.input", return_value="n"))
+                subprocess_mock = stack.enter_context(patch("subprocess.run"))
+                stack.enter_context(redirect_stdout(stdout))
+                result = InstallerCLI()._cmd_deploy(ctx, parsed, Path(tmpdir))
 
-                # Create a dummy plan file
-                import tempfile
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.tfplan', delete=False) as f:
-                    f.write('{"resource_changes": []}')
-                    plan_file = f.name
-
-                import argparse
-                parser = argparse.ArgumentParser()
-                parser.add_argument("--plan", default="deploy.tfplan")
-                parser.add_argument("--yes", action="store_true")
-                parsed = argparse.Namespace(
-                    plan="deploy.tfplan",
-                    yes=False,
-                    plan_file="deploy.tfplan"
-                )
-
-                # Test without --yes flag - should prompt for approval
-                # This is hard to test with input(), so we'll test the logic differently
-                # Just verify the command structure is correct
-                self.assertTrue(True)
+            self.assertEqual(result, 0)
+            runner.apply.assert_not_called()
+            input_mock.assert_called_once_with("Proceed with deployment? [y/N]: ")
+            runner.state_list.assert_not_called()
+            runner.version.assert_not_called()
+            subprocess_mock.assert_not_called()
+            self.assertIn("Deployment cancelled.", stdout.getvalue())
+            self.assertNotIn("Applying plan", stdout.getvalue())
 
     def test_deploy_requires_plan_file(self):
-        """Test deploy command requires plan file."""
-        from installer.core.context import InstallationContext
-        import tempfile
-        import argparse
+        """Deploy with a missing plan must fail closed before any runner call."""
+        from installer.cli.main import InstallerCLI
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = InstallationContext(aws_profile="test-profile", terraform_dir="/tmp")
+            ctx = _make_installer_context(tmpdir)
+            parsed = SimpleNamespace(plan=str(Path(tmpdir) / "missing.tfplan"), yes=False)
+            runner = _make_runner_mock()
+            make_runner = MagicMock(return_value=runner)
+            stdout = io.StringIO()
 
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--plan", default="deploy.tfplan")
-            parser.add_argument("--yes", action="store_true")
-            parsed = argparse.Namespace(
-                plan="nonexistent.tfplan",
-                yes=False
-            )
+            with ExitStack() as stack:
+                for gate in _deploy_gate_patches():
+                    stack.enter_context(gate)
+                stack.enter_context(
+                    patch.object(InstallerCLI, "_make_runner", new=make_runner)
+                )
+                subprocess_mock = stack.enter_context(patch("subprocess.run"))
+                stack.enter_context(redirect_stdout(stdout))
+                result = InstallerCLI()._cmd_deploy(ctx, parsed, Path(tmpdir))
 
-            # Test that missing plan file is caught
-            from installer.core.context import InstallationContext
-            ctx = InstallationContext(aws_profile="test", terraform_dir="/tmp")
-            ctx.validate_aws_context()
-
-            # Just verify the structure - we can't easily test the CLI without full mocking
-            self.assertTrue(True)
+            self.assertEqual(result, 1)
+            make_runner.assert_not_called()
+            runner.apply.assert_not_called()
+            subprocess_mock.assert_not_called()
+            self.assertIn("Plan file not found", stdout.getvalue())
+            self.assertNotIn("Applying plan", stdout.getvalue())
 
     def test_destroy_requires_approval(self):
-        """Test destroy command requires approval."""
-        import tempfile
-        import argparse
+        """Destroy without --yes must not call destroy, apply, or backup paths."""
+        from installer.cli.main import InstallerCLI
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = InstallationContext(aws_profile="test-profile", terraform_dir="/tmp")
+            plan = Path(tmpdir) / "destroy.tfplan"
+            plan.write_text('{"resource_changes": []}', encoding="utf-8")
+            ctx = _make_installer_context(tmpdir)
+            parsed = SimpleNamespace(plan=str(plan), yes=False)
+            runner = _make_runner_mock()
+            make_runner = MagicMock(return_value=runner)
+            stdout = io.StringIO()
 
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--plan", default="destroy.tfplan")
-            parser.add_argument("--yes", action="store_true")
-            parsed = argparse.Namespace(
-                plan="nonexistent.tfplan",
-                yes=False
-            )
+            with ExitStack() as stack:
+                for gate in _destroy_gate_patches():
+                    stack.enter_context(gate)
+                stack.enter_context(
+                    patch.object(InstallerCLI, "_make_runner", new=make_runner)
+                )
+                input_mock = stack.enter_context(patch("builtins.input", return_value="n"))
+                subprocess_mock = stack.enter_context(patch("subprocess.run"))
+                stack.enter_context(redirect_stdout(stdout))
+                result = InstallerCLI()._cmd_destroy(ctx, parsed, Path(tmpdir))
 
-            # Just verify the structure is correct
-            self.assertTrue(True)
+            self.assertEqual(result, 0)
+            runner.destroy.assert_not_called()
+            runner.apply.assert_not_called()
+            runner.state_list.assert_not_called()
+            input_mock.assert_called_once_with("Proceed with DESTRUCTION? [y/N]: ")
+            subprocess_mock.assert_not_called()
+            called = {call[0] for call in runner.method_calls if call}
+            self.assertFalse(called & {"destroy", "apply", "state_list", "backup", "restore"})
+            self.assertIn("Destruction cancelled.", stdout.getvalue())
+            self.assertNotIn("Applying destroy plan", stdout.getvalue())
 
 
 class TestStateCommands(unittest.TestCase):
@@ -629,44 +686,71 @@ class TestYesFlagBehavior(unittest.TestCase):
     """Test --yes flag behavior."""
 
     def test_yes_flag_skips_approval_prompt(self):
-        """Test that --yes skips approval prompt."""
-        import tempfile
-        import argparse
+        """--yes must apply exactly once without reading from stdin."""
+        from installer.cli.main import InstallerCLI
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = InstallationContext(aws_profile="test-profile", terraform_dir="/tmp")
+            plan = Path(tmpdir) / "deploy.tfplan"
+            plan.write_text('{"resource_changes": []}', encoding="utf-8")
+            ctx = _make_installer_context(tmpdir)
+            parsed = SimpleNamespace(plan=str(plan), yes=True)
+            runner = _make_runner_mock()
+            make_runner = MagicMock(return_value=runner)
+            stdout = io.StringIO()
 
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--plan", default="deploy.tfplan")
-            parser.add_argument("--yes", action="store_true")
-            parsed = argparse.Namespace(
-                plan="deploy.tfplan",
-                yes=True
-            )
+            with ExitStack() as stack:
+                for gate in _deploy_gate_patches():
+                    stack.enter_context(gate)
+                stack.enter_context(
+                    patch.object(InstallerCLI, "_make_runner", new=make_runner)
+                )
+                input_mock = stack.enter_context(
+                    patch("builtins.input", side_effect=AssertionError("input() must not be called with --yes"))
+                )
+                subprocess_mock = stack.enter_context(patch("subprocess.run"))
+                stack.enter_context(redirect_stdout(stdout))
+                result = InstallerCLI()._cmd_deploy(ctx, parsed, Path(tmpdir))
 
-            # Just verify the structure
-            self.assertTrue(True)
+            self.assertEqual(result, 0)
+            input_mock.assert_not_called()
+            subprocess_mock.assert_not_called()
+            runner.apply.assert_called_once()
+            runner.state_list.assert_called_once()
+            runner.version.assert_called_once()
+            self.assertIn("Applying plan", stdout.getvalue())
+            self.assertIn("Deployment completed successfully!", stdout.getvalue())
 
     def test_without_yes_requires_approval(self):
-        """Test that without --yes, approval is required."""
-        import tempfile
-        import argparse
+        """An empty answer at the approval prompt is a safe default-deny."""
+        from installer.cli.main import InstallerCLI
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = InstallationContext(aws_profile="test-profile", terraform_dir="/tmp")
+            plan = Path(tmpdir) / "deploy.tfplan"
+            plan.write_text('{"resource_changes": []}', encoding="utf-8")
+            ctx = _make_installer_context(tmpdir)
+            parsed = SimpleNamespace(plan=str(plan), yes=False)
+            runner = _make_runner_mock()
+            make_runner = MagicMock(return_value=runner)
+            stdout = io.StringIO()
 
-            import argparse
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--plan", default="deploy.tfplan")
-            parser.add_argument("--yes", action="store_true")
-            parsed = argparse.Namespace(
-                plan="deploy.tfplan",
-                yes=False
-            )
+            with ExitStack() as stack:
+                for gate in _deploy_gate_patches():
+                    stack.enter_context(gate)
+                stack.enter_context(
+                    patch.object(InstallerCLI, "_make_runner", new=make_runner)
+                )
+                input_mock = stack.enter_context(patch("builtins.input", return_value=""))
+                subprocess_mock = stack.enter_context(patch("subprocess.run"))
+                stack.enter_context(redirect_stdout(stdout))
+                result = InstallerCLI()._cmd_deploy(ctx, parsed, Path(tmpdir))
 
-            # Just verify the structure
-            self.assertTrue(True)
+            self.assertEqual(result, 0)
+            runner.apply.assert_not_called()
+            input_mock.assert_called_once_with("Proceed with deployment? [y/N]: ")
+            runner.state_list.assert_not_called()
+            runner.version.assert_not_called()
+            subprocess_mock.assert_not_called()
+            self.assertIn("Deployment cancelled.", stdout.getvalue())
 
 
 class TestHardeningScenarios(unittest.TestCase):
