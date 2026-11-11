@@ -1027,9 +1027,6 @@ class InstallerCLI:
                     backup_status=(backup_assessment.status if backup_assessment else None),
                     backup_reason=(backup_assessment.message if backup_assessment else None),
                     backup_evidence=(backup_assessment.to_dict() if backup_assessment else None),
-                    backup_expected_arn=(
-                        getattr(parsed, "backup_arn", None) if backup_required else None
-                    ),
                 )
             )
             readiness_json, readiness_md = write_readiness_report(run_dir, readiness)
