@@ -267,6 +267,33 @@ class TestCognitoNormalization(unittest.TestCase):
         self.assertNotEqual(result.overall, "CRITICAL")
 
 
+class TestExistingRevalidationEvidence(unittest.TestCase):
+    def test_repository_revalidation_evidence_passes_gate(self):
+        from pathlib import Path
+        from installer.core.backup_gate import BACKUP_VERIFIED, assess_backup_evidence
+
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "docs/reports/MO-RC4-P3A-EVIDENCE-REBIND-01/order-backup-evidence.json"
+        )
+        result = assess_backup_evidence(
+            path,
+            required=True,
+            expected_project="mays-orders-rc4-test",
+            expected_environment="rc4-test",
+            expected_account="240571105849",
+            expected_region="eu-central-1",
+            state_lineage="45f61e6a-a0a4-d9ce-1427-8c9a3fad6cad",
+            state_serial=4,
+            state_fingerprint="670bc917fe4671df2ecb7b317068160c8fc452e02e87aa7a63b3b63e864f2a4a",
+            expected_backup_arn=(
+                "arn:aws:dynamodb:eu-central-1:240571105849:table/"
+                "mays-orders-rc4-test/backup/01793737895744-2f886092"
+            ),
+        )
+        self.assertEqual(result.status, BACKUP_VERIFIED)
+
+
 class TestBackupFingerprintGate(unittest.TestCase):
     def test_manifest_summary_contains_fingerprint_version(self):
         from installer.tests.test_rc4_release_gates import assess, valid_evidence

@@ -437,6 +437,7 @@ class BackupEvidence:
     state_serial: Optional[int] = None
     state_fingerprint: Optional[str] = None
     state_fingerprint_version: Optional[str] = None
+    evidence_kind: str = "CREATED"
     generated_at: str = ""
     error_code: Optional[str] = None
     limitations: List[str] = field(default_factory=list)
@@ -465,6 +466,7 @@ class BackupEvidence:
             "stateSerial": self.state_serial,
             "stateFingerprint": self.state_fingerprint,
             "stateFingerprintVersion": self.state_fingerprint_version,
+            "evidenceKind": self.evidence_kind,
             "generatedAt": self.generated_at,
             "errorCode": self.error_code,
             "limitations": list(self.limitations),

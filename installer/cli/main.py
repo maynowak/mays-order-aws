@@ -227,6 +227,12 @@ class InstallerCLI:
                  "plans with a version change; bound into the plan manifest."
         )
         plan_parser.add_argument(
+            "--backup-arn",
+            default=None,
+            help="Independently supplied expected DynamoDB backup ARN. Required "
+                 "for upgrade plans and bound into the plan manifest."
+        )
+        plan_parser.add_argument(
             "--var-file",
             help="Path to .tfvars file"
         )
@@ -909,6 +915,7 @@ class InstallerCLI:
                 state_serial=baseline.serial,
                 state_fingerprint=baseline.fingerprint,
                 state_fingerprint_version=baseline.fingerprint_version,
+                expected_backup_arn=getattr(parsed, "backup_arn", None),
             )
             print(
                 f"Backup evidence: {backup_assessment.status} "
@@ -1020,6 +1027,9 @@ class InstallerCLI:
                     backup_status=(backup_assessment.status if backup_assessment else None),
                     backup_reason=(backup_assessment.message if backup_assessment else None),
                     backup_evidence=(backup_assessment.to_dict() if backup_assessment else None),
+                    backup_expected_arn=(
+                        getattr(parsed, "backup_arn", None) if backup_required else None
+                    ),
                 )
             )
             readiness_json, readiness_md = write_readiness_report(run_dir, readiness)
@@ -1078,6 +1088,9 @@ class InstallerCLI:
                     backup_assessment.to_manifest()
                     if backup_assessment is not None and backup_assessment.required
                     else None
+                ),
+                backup_expected_arn=(
+                    getattr(parsed, "backup_arn", None) if backup_required else None
                 ),
             )
             manifest_path = manifest.write(saved_plan)
@@ -1262,6 +1275,7 @@ class InstallerCLI:
             state_serial=baseline.get("serial"),
             state_fingerprint=baseline.get("fingerprint"),
             state_fingerprint_version=baseline.get("fingerprintVersion"),
+            expected_backup_arn=manifest.backup_expected_arn,
         )
         if assessment.status != BACKUP_VERIFIED:
             print(

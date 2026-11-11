@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,6 +46,19 @@ CODE_HASH_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_HASH_MISMATCH"
 CODE_FINGERPRINT_MISSING = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_MISSING"
 CODE_FINGERPRINT_VERSION_UNKNOWN = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_VERSION_UNKNOWN"
 CODE_FINGERPRINT_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_FINGERPRINT_MISMATCH"
+CODE_BACKUP_ARN_BINDING_MISSING = "UPGRADE_BACKUP_EVIDENCE_BACKUP_ARN_BINDING_MISSING"
+CODE_BACKUP_ARN_MISMATCH = "UPGRADE_BACKUP_EVIDENCE_BACKUP_ARN_MISMATCH"
+CODE_EVIDENCE_KIND_UNKNOWN = "UPGRADE_BACKUP_EVIDENCE_KIND_UNKNOWN"
+
+EVIDENCE_KINDS = ("CREATED", "EXISTING_BACKUP_REVALIDATION")
+_TABLE_ARN_RE = re.compile(
+    r"^arn:(?P<partition>aws[a-z-]*):dynamodb:(?P<region>[a-z0-9-]+):"
+    r"(?P<account>\d{12}):table/(?P<table>[^/]+)$"
+)
+_BACKUP_ARN_RE = re.compile(
+    r"^arn:(?P<partition>aws[a-z-]*):dynamodb:(?P<region>[a-z0-9-]+):"
+    r"(?P<account>\d{12}):table/(?P<table>[^/]+)/backup/(?P<backup_id>[^/]+)$"
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +77,7 @@ class BackupEvidenceAssessment:
     state_serial: Optional[int] = None
     state_fingerprint: Optional[str] = None
     state_fingerprint_version: Optional[str] = None
+    evidence_kind: Optional[str] = None
 
     @property
     def blocking(self) -> bool:
@@ -89,6 +104,7 @@ class BackupEvidenceAssessment:
             "stateSerial": self.state_serial,
             "stateFingerprint": self.state_fingerprint,
             "stateFingerprintVersion": self.state_fingerprint_version,
+            "evidenceKind": self.evidence_kind,
         }
 
     def to_manifest(self) -> Dict[str, Any]:
@@ -105,6 +121,8 @@ class BackupEvidenceAssessment:
             "stateSerial": self.state_serial,
             "stateFingerprint": self.state_fingerprint,
             "stateFingerprintVersion": self.state_fingerprint_version,
+            "backupArn": self.backup_arn,
+            "evidenceKind": self.evidence_kind,
         }
 
 
@@ -114,6 +132,28 @@ def sha256_file(path: str | Path) -> str:
         for chunk in iter(lambda: handle.read(65536), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _parse_arn(pattern: re.Pattern[str], value: Any) -> Optional[re.Match[str]]:
+    if not isinstance(value, str):
+        return None
+    return pattern.match(value)
+
+
+def _backup_arn_matches_table(backup_arn: Any, table_arn: str) -> bool:
+    backup = _parse_arn(_BACKUP_ARN_RE, backup_arn)
+    table = _parse_arn(_TABLE_ARN_RE, table_arn)
+    if backup is None or table is None:
+        return False
+    for field in ("partition", "region", "account", "table"):
+        if backup.group(field) != table.group(field):
+            return False
+    return bool(backup.group("backup_id"))
+
+
+def validate_backup_arn(expected_backup_arn: Optional[str], table_arn: str) -> bool:
+    """Oeffentliche, rein strukturelle ARN-Pruefung fuer den Plan-Preflight."""
+    return _backup_arn_matches_table(expected_backup_arn, table_arn)
 
 
 def requires_backup(
@@ -164,6 +204,7 @@ def _assessment(
         state_serial=data.get("stateSerial"),
         state_fingerprint=data.get("stateFingerprint"),
         state_fingerprint_version=data.get("stateFingerprintVersion"),
+        evidence_kind=data.get("evidenceKind"),
     )
 
 
@@ -181,6 +222,7 @@ def assess_backup_evidence(
     state_serial: Optional[int] = None,
     state_fingerprint: Optional[str] = None,
     state_fingerprint_version: str = FINGERPRINT_VERSION,
+    expected_backup_arn: Optional[str] = None,
     expected_sha256: Optional[str] = None,
 ) -> BackupEvidenceAssessment:
     """Prueft P3A-Evidenz fail-closed; keine AWS-Aufrufe."""
@@ -250,12 +292,19 @@ def assess_backup_evidence(
         "project", "environment", "awsAccount", "region", "tableName", "tableArn",
         "backupName", "backupArn", "backupStatus", "backupVerifiedAt",
         "pitrStatus", "overallStatus", "stateLineage", "stateSerial",
+        "evidenceKind",
     )
     missing = [name for name in required_fields if not data.get(name)]
     if missing:
         return _assessment(
             BACKUP_INVALID, required=True, code=CODE_INVALID,
             message="Backup-Evidenz ist unvollstaendig.",
+            path=path, sha256=digest, data=data,
+        )
+    if data.get("evidenceKind") not in EVIDENCE_KINDS:
+        return _assessment(
+            BACKUP_INVALID, required=True, code=CODE_EVIDENCE_KIND_UNKNOWN,
+            message="Backup-Evidenz hat einen unbekannten evidenceKind.",
             path=path, sha256=digest, data=data,
         )
 
@@ -284,6 +333,24 @@ def assess_backup_evidence(
         return _assessment(
             BACKUP_STALE, required=True, code=CODE_STATE_MISMATCH,
             message="Backup-Evidenz gehoert zu einer anderen State-Lineage.",
+            path=path, sha256=digest, data=data,
+        )
+    if expected_backup_arn is None:
+        return _assessment(
+            BACKUP_INVALID, required=True, code=CODE_BACKUP_ARN_BINDING_MISSING,
+            message="Keine unabhaengige erwartete Backup-ARN gebunden.",
+            path=path, sha256=digest, data=data,
+        )
+    if not _backup_arn_matches_table(data.get("backupArn"), table_arn):
+        return _assessment(
+            BACKUP_IDENTITY_MISMATCH, required=True, code=CODE_IDENTITY_MISMATCH,
+            message="Backup-ARN passt nicht zur erwarteten Tabelle.",
+            path=path, sha256=digest, data=data,
+        )
+    if data.get("backupArn") != expected_backup_arn:
+        return _assessment(
+            BACKUP_IDENTITY_MISMATCH, required=True, code=CODE_BACKUP_ARN_MISMATCH,
+            message="Backup-ARN weicht von der explizit gebundenen Backup-ARN ab.",
             path=path, sha256=digest, data=data,
         )
     if state_serial is not None and data.get("stateSerial") != state_serial:
@@ -350,6 +417,7 @@ def assess_manifest_evidence(
     state_serial: Optional[int] = None,
     state_fingerprint: Optional[str] = None,
     state_fingerprint_version: str = FINGERPRINT_VERSION,
+    expected_backup_arn: Optional[str] = None,
 ) -> BackupEvidenceAssessment:
     if not summary:
         return BackupEvidenceAssessment(
@@ -372,6 +440,7 @@ def assess_manifest_evidence(
         state_serial=state_serial,
         state_fingerprint=state_fingerprint,
         state_fingerprint_version=state_fingerprint_version,
+        expected_backup_arn=expected_backup_arn,
         expected_sha256=summary.get("sha256"),
     )
 

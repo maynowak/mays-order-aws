@@ -23,6 +23,9 @@ from installer.core.backup_gate import (
     BACKUP_PARTIAL,
     BACKUP_STALE,
     BACKUP_VERIFIED,
+    CODE_BACKUP_ARN_BINDING_MISSING,
+    CODE_BACKUP_ARN_MISMATCH,
+    CODE_EVIDENCE_KIND_UNKNOWN,
     CODE_HASH_MISMATCH,
     CODE_IDENTITY_MISMATCH,
     CODE_MISSING,
@@ -61,6 +64,7 @@ LINEAGE = "lineage-1"
 SERIAL = 7
 FINGERPRINT = "a" * 64
 FINGERPRINT_VERSION = "canonical-sha256-v1"
+BACKUP_ARN = f"{TABLE_ARN}/backup/01793737895744-2f886092"
 
 
 def valid_evidence(**overrides):
@@ -73,7 +77,8 @@ def valid_evidence(**overrides):
         "tableName": PROJECT,
         "tableArn": TABLE_ARN,
         "backupName": f"{PROJECT}-{ENV}-orders-preupgrade-20261103T120000Z",
-        "backupArn": f"{TABLE_ARN}/backup/01700000000000-abcdef",
+        "backupArn": BACKUP_ARN,
+        "evidenceKind": "CREATED",
         "backupStatus": "AVAILABLE",
         "backupVerifiedAt": "2026-11-03T12:00:00+00:00",
         "pitrStatus": "ENABLED",
@@ -101,6 +106,7 @@ def assess(path, *, required=True, **overrides):
         state_lineage=LINEAGE,
         state_serial=SERIAL,
         state_fingerprint=FINGERPRINT,
+        expected_backup_arn=BACKUP_ARN,
     )
     values.update(overrides)
     return assess_backup_evidence(path, **values)
@@ -242,6 +248,52 @@ class TestBackupGate(unittest.TestCase):
             result = assess(path)
         self.assertEqual(result.status, BACKUP_INVALID)
 
+    def test_wrong_backup_arn_same_table_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = assess(
+                self._write(
+                    valid_evidence(backupArn=f"{TABLE_ARN}/backup/01793737895744-000000"),
+                    tmp,
+                )
+            )
+        self.assertEqual(result.status, BACKUP_IDENTITY_MISMATCH)
+        self.assertEqual(result.code, CODE_BACKUP_ARN_MISMATCH)
+
+    def test_backup_arn_other_table_blocks_structurally(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = assess(
+                self._write(
+                    valid_evidence(
+                        backupArn="arn:aws:dynamodb:eu-central-1:240571105849:table/other/backup/01793737895744-2f886092"
+                    ),
+                    tmp,
+                )
+            )
+        self.assertEqual(result.status, BACKUP_IDENTITY_MISMATCH)
+
+    def test_missing_expected_backup_arn_binding_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = assess(self._write(valid_evidence(), tmp), expected_backup_arn=None)
+        self.assertEqual(result.status, BACKUP_INVALID)
+        self.assertEqual(result.code, CODE_BACKUP_ARN_BINDING_MISSING)
+
+    def test_malformed_backup_arn_blocks(self):
+        for broken in (
+            "not-an-arn",
+            f"{TABLE_ARN}/backup/",
+            f"{TABLE_ARN}/backup/id/extra",
+            "arn:aws:dynamodb:eu-central-1:240571105849:table/mays-orders-rc4-test/backup",
+        ):
+            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as tmp:
+                result = assess(self._write(valid_evidence(backupArn=broken), tmp))
+                self.assertNotEqual(result.status, BACKUP_VERIFIED)
+
+    def test_unknown_evidence_kind_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = assess(self._write(valid_evidence(evidenceKind="UNKNOWN"), tmp))
+        self.assertEqual(result.status, BACKUP_INVALID)
+        self.assertEqual(result.code, CODE_EVIDENCE_KIND_UNKNOWN)
+
     def test_tampered_evidence_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(valid_evidence(), tmp)
@@ -271,6 +323,7 @@ class TestBackupGate(unittest.TestCase):
                 state_lineage=LINEAGE,
                 state_serial=SERIAL,
                 state_fingerprint=FINGERPRINT,
+                expected_backup_arn=BACKUP_ARN,
             )
         self.assertEqual(result.status, BACKUP_VERIFIED)
 
@@ -291,6 +344,7 @@ class TestBackupGate(unittest.TestCase):
                 state_lineage=LINEAGE,
                 state_serial=SERIAL,
                 state_fingerprint=FINGERPRINT,
+                expected_backup_arn=BACKUP_ARN,
             )
         self.assertEqual(result.status, BACKUP_INVALID)
         self.assertEqual(result.code, CODE_HASH_MISMATCH)
@@ -392,11 +446,13 @@ class TestManifestBackupBinding(unittest.TestCase):
                 backup_required=True,
                 backup_evidence={"status": BACKUP_VERIFIED, "fileName": "order-backup-evidence.json",
                                  "sha256": "f" * 64},
+                backup_expected_arn=BACKUP_ARN,
             )
             manifest.write(plan)
             loaded = PlanManifest.load(plan)
             self.assertTrue(loaded.backup_required)
             self.assertEqual(loaded.backup_evidence["status"], BACKUP_VERIFIED)
+            self.assertEqual(loaded.backup_expected_arn, BACKUP_ARN)
 
     def test_old_manifest_defaults_to_not_required(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -437,6 +493,7 @@ class TestDeployBackupGate(unittest.TestCase):
             target_version=target,
             backup_required=required,
             backup_evidence=summary,
+            backup_expected_arn=BACKUP_ARN,
             state_baseline={"status": "VERIFIED", "serial": SERIAL, "lineage": LINEAGE, "fingerprint": FINGERPRINT, "fingerprintVersion": FINGERPRINT_VERSION},
         ).write(plan)
 
@@ -496,9 +553,10 @@ class TestDeployBackupGate(unittest.TestCase):
     def test_parser_accepts_backup_evidence(self):
         parsed = InstallerCLI().parser.parse_args(
             ["--project-name", PROJECT, "plan", "--remote", "--upgrade",
-             "--backup-evidence", "evidence.json"]
+             "--backup-evidence", "evidence.json", "--backup-arn", BACKUP_ARN]
         )
         self.assertEqual(parsed.backup_evidence, "evidence.json")
+        self.assertEqual(parsed.backup_arn, BACKUP_ARN)
 
 
 if __name__ == "__main__":

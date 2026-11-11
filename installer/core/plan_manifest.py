@@ -80,6 +80,7 @@ class PlanManifest:
     # Upgrade-Plaene verbindlich). Enthaelt Metadaten, keine Evidenz-Inhalte.
     backup_required: Optional[bool] = None
     backup_evidence: Optional[Dict[str, Any]] = None
+    backup_expected_arn: Optional[str] = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -110,6 +111,7 @@ class PlanManifest:
         readiness_status: Optional[str] = None,
         backup_required: Optional[bool] = None,
         backup_evidence: Optional[Dict[str, Any]] = None,
+        backup_expected_arn: Optional[str] = None,
     ) -> "PlanManifest":
         plan = Path(plan_path)
         safe_vars = {
@@ -142,6 +144,7 @@ class PlanManifest:
             readiness_status=readiness_status,
             backup_required=backup_required,
             backup_evidence=backup_evidence,
+            backup_expected_arn=backup_expected_arn,
         )
 
     # -- Persistenz --------------------------------------------------------
@@ -185,6 +188,9 @@ class PlanManifest:
             readiness_status=data.get("readinessStatus", data.get("readiness_status")),
             backup_required=data.get("backupRequired", data.get("backup_required")),
             backup_evidence=data.get("backupEvidence", data.get("backup_evidence")),
+            backup_expected_arn=data.get(
+                "backupExpectedArn", data.get("backup_expected_arn")
+            ),
             created_at=data.get("created_at", ""),
             manifest_version=int(data.get("manifest_version", MANIFEST_VERSION)),
         )
