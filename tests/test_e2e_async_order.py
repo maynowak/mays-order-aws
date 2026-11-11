@@ -1,204 +1,190 @@
+"""RC4 live E2E tests — isolated by test run and guarded by explicit opt-in.
+
+Local harness validation lives in ``tests/test_e2e_harness.py`` and uses a fake
+HTTP transport. This module performs no network access unless ALL of the
+following are true:
+
+- ``MO_E2E_LIVE=1``
+- ``API_BASE_URL`` is set
+- a pre-provisioned ``ACCESS_TOKEN`` is present
+- a safe product cleanup capability is available
+
+The last condition is currently false. The authenticated live tests therefore
+remain **BLOCKED** by design; no order is created. There is no direct DynamoDB
+deletion workaround.
+
+The previous global SQS queue-count assertion was removed: it was not
+run-scoped and could neither prove ownership nor provide safe cleanup.
 """
-E2E Test Suite for Phase 2 — Async Order Processing
 
-Tests the full flow:
-Cognito → API Gateway → Producer Lambda → DynamoDB + SQS → Worker → DynamoDB
+from __future__ import annotations
 
-Environment:
-- AWS profile: mayaws
-- AWS region: eu-central-1
-- PROJECT_NAME: project name, defaults to mays-orders
-- API_BASE_URL: API Gateway base URL, defaults to mays-orders deployment
-- SQS_QUEUE_URL: SQS queue URL, defaults to {PROJECT_NAME}-orders-queue
-- TEST_USER_PASSWORD: environment variable for test user password
-
-Usage:
-    export AWS_PROFILE=mayaws
-    export PROJECT_NAME=mays-orders
-    export TEST_USER_PASSWORD="test_password_123!"
-    export API_BASE_URL="https://..."
-    python3 -m pytest tests/test_e2e_async_order.py -v
-"""
 import json
 import os
-import sys
 import time
 import unittest
 
-import urllib3
+from tests.e2e_harness import (
+    BLOCKED,
+    ApiClient,
+    CleanupError,
+    CleanupUnavailable,
+    Diagnostic,
+    E2ERun,
+    Urllib3Transport,
+    resolve_auth,
+    response_json,
+)
 
-http = urllib3.PoolManager()
+# No safe, owner-scoped order-delete operation exists in the RC4 API.
+# Do not add direct DynamoDB deletion as a workaround.
+LIVE_CLEANUP_AVAILABLE = False
 
-PROJECT_NAME = os.environ.get("PROJECT_NAME", "mays-orders")
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://ki2rbzvk99.execute-api.eu-central-1.amazonaws.com")
-TEST_USER_EMAIL = os.environ.get("TEST_USER_EMAIL", "test-user@example.com")
-TEST_USER_PASSWORD = os.environ.get("TEST_USER_PASSWORD", "")
-
-SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL", f"https://sqs.eu-central-1.amazonaws.com/240571105849/{PROJECT_NAME}-orders-queue")
+CONFIRM_TIMEOUT_SECONDS = int(os.environ.get("E2E_CONFIRM_TIMEOUT_SECONDS", "60"))
+POLL_INTERVAL_SECONDS = float(os.environ.get("E2E_POLL_INTERVAL_SECONDS", "3"))
 
 
-def get_access_token():
-    """Authenticate with Cognito and return access token."""
-    import boto3
-    client_id = os.environ.get("COGNITO_CLIENT_ID", "")
-    username = os.environ.get("TEST_USER_EMAIL", "")
-    password = os.environ.get("TEST_USER_PASSWORD", "")
+def _live_endpoint():
+    if os.environ.get("MO_E2E_LIVE") != "1":
+        return None
+    return (os.environ.get("API_BASE_URL") or "").strip() or None
 
-    if not all([client_id, username, password]):
-        raise ValueError("COGNITO_CLIENT_ID, TEST_USER_EMAIL, and TEST_USER_PASSWORD must be set")
 
-    cognito = boto3.client("cognito-idp", region_name="eu-central-1")
-    response = cognito.initiate_auth(
-        ClientId=client_id,
-        AuthFlow="USER_PASSWORD_AUTH",
-        AuthParameters={
-            "USERNAME": username,
-            "PASSWORD": password,
-        }
+def _safe_cleanup(_order):
+    raise CleanupUnavailable(
+        "no safe owner-scoped order delete operation; live cleanup is BLOCKED"
     )
-    return response["AuthenticationResult"]["AccessToken"]
 
 
-class TestAsyncOrderFlow(unittest.TestCase):
-    """Test the async order processing flow through SQS."""
+class LiveE2EBase(unittest.TestCase):
+    """Independent live tests; each test creates and tracks its own order."""
 
     @classmethod
     def setUpClass(cls):
-        cls.access_token = os.environ.get("ACCESS_TOKEN")
-        if not cls.access_token:
-            if TEST_USER_PASSWORD:
-                cls.access_token = get_access_token()
-            else:
-                raise unittest.SkipTest("TEST_USER_PASSWORD not set, skipping E2E tests")
+        cls.auth = resolve_auth(os.environ)
 
-    def test_01_post_order_sends_to_sqs(self):
-        """POST /orders should create order and send to SQS."""
-        order_data = {
-            "customer": {"name": "Test User", "email": "test-user@example.com"},
-            "items": [{"sku": "TEST-SKU-001", "quantity": 1, "unitPrice": 1000}],
-            "currency": "EUR"
-        }
-
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-        }
-
-        response = http.request(
-            "POST",
-            f"{API_BASE_URL}/orders",
-            body=json.dumps(order_data).encode("utf-8"),
-            headers=headers
+    def setUp(self):
+        if not self.auth.ready:
+            self.skipTest(f"BLOCKED: {self.auth.blocked_reason}")
+        if not LIVE_CLEANUP_AVAILABLE:
+            self.skipTest(
+                "BLOCKED: no safe owner-scoped order cleanup capability; "
+                "live order creation is intentionally disabled"
+            )
+        self.run = E2ERun()
+        self.client = ApiClient(
+            self.auth.api_base_url,
+            access_token=self.auth.access_token,
+            transport=Urllib3Transport(),
         )
 
-        self.assertEqual(response.status, 201, f"Expected 201, got {response.status}: {response.data}")
+    def tearDown(self):
+        if not getattr(self, "run", None) or not self.run.orders:
+            return
+        try:
+            self.run.cleanup_all(_safe_cleanup)
+        except CleanupError:
+            # This branch is unreachable while LIVE_CLEANUP_AVAILABLE is false;
+            # it makes a future incomplete cleanup fail visibly rather than
+            # silently dropping test data.
+            for order in self.run.orders:
+                order.cleanup_status = BLOCKED
+            raise
 
-        order = json.loads(response.data.decode("utf-8"))
-        self.assertIn("orderId", order)
-        self.assertEqual(order["status"], "PENDING")
-
-        self.order_id = order["orderId"]
-
-    def test_02_order_eventually_confirmed(self):
-        """Order should transition from PENDING to CONFIRMED via SQS worker."""
-        if not hasattr(self, "order_id"):
-            self.skipTest("No order_id from previous test")
-
-        max_wait = 60  # seconds
-        poll_interval = 3
-
-        start_time = time.time()
-
-        while time.time() - start_time < max_wait:
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
-            }
-
-            response = http.request(
-                "GET",
-                f"{API_BASE_URL}/orders/{self.order_id}",
-                headers=headers
+    def _expect(self, response, expected: int, *, operation: str):
+        diagnostic = Diagnostic(
+            test_id=self.id().rsplit(".", 1)[-1],
+            run_id=self.run.run_id,
+            operation=operation,
+            expected_status=expected,
+            actual_status=response.status,
+            error_type=None if response.status == expected else "UnexpectedStatus",
+        )
+        self.run.record_diagnostic(diagnostic)
+        if response.status != expected:
+            self.fail(
+                "unexpected HTTP status: "
+                + json.dumps(diagnostic.as_dict(), separators=(",", ":"))
             )
 
-            self.assertEqual(response.status, 200)
-            order = json.loads(response.data.decode("utf-8"))
+    def _create_order(self):
+        synthetic = self.run.synthetic_order(1)
+        response = self.client.post("/orders", synthetic.payload)
+        self._expect(response, 201, operation="POST /orders")
+        order = response_json(response)
+        self.assertIn("orderId", order)
+        owned = self.run.register_created(order["orderId"], synthetic.marker)
+        return owned, order
 
-            if order["status"] == "CONFIRMED":
-                self.order_status = "CONFIRMED"
-                return
-
-            if order["status"] not in ["PENDING", "CONFIRMED", "PROCESSING"]:
-                self.fail(f"Unexpected status: {order['status']}")
-
-            time.sleep(poll_interval)
-
-        current_response = http.request(
-            "GET",
-            f"{API_BASE_URL}/orders/{self.order_id}",
-            headers=headers
-        )
-        current_order = json.loads(current_response.data.decode("utf-8"))
-
-        self.assertEqual(
-            current_order["status"],
-            "CONFIRMED",
-            f"Order not confirmed after {max_wait}s, current status: {current_order['status']}"
-        )
-
-    def test_03_verify_order_data_integrity(self):
-        """Order data should remain intact after transition."""
-        if not hasattr(self, "order_id"):
-            self.skipTest("No order_id from previous test")
-
-        headers = {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-        }
-
-        response = http.request(
-            "GET",
-            f"{API_BASE_URL}/orders/{self.order_id}",
-            headers=headers
+    def _wait_for_confirmed(self, order_id: str) -> dict:
+        deadline = time.monotonic() + CONFIRM_TIMEOUT_SECONDS
+        last_status = None
+        while time.monotonic() < deadline:
+            response = self.client.get(f"/orders/{order_id}")
+            self._expect(
+                response,
+                200,
+                operation=f"GET /orders/{order_id}",
+            )
+            order = response_json(response)
+            last_status = order.get("status")
+            if last_status == "CONFIRMED":
+                return order
+            if last_status not in ("PENDING", "CONFIRMED", "PROCESSING"):
+                self.fail(f"unexpected order status: {last_status}")
+            time.sleep(POLL_INTERVAL_SECONDS)
+        self.fail(
+            f"order {order_id} not CONFIRMED after {CONFIRM_TIMEOUT_SECONDS}s; "
+            f"last status: {last_status}"
         )
 
-        self.assertEqual(response.status, 200)
-        order = json.loads(response.data.decode("utf-8"))
+    def test_post_order_creates_pending_order(self):
+        """T10C-01: each test creates its own order; no shared self.order_id."""
+        owned, order = self._create_order()
 
-        self.assertEqual(order["status"], "CONFIRMED")
-        self.assertEqual(order["currency"], "EUR")
-        self.assertIn("customer", order)
-        self.assertIn("items", order)
-        self.assertEqual(len(order["items"]), 1)
-        self.assertEqual(order["items"][0]["sku"], "TEST-SKU-001")
+        self.assertEqual(order["status"], "PENDING")
+        self.assertEqual(order["totalAmount"], 100)
+        self.assertEqual(order["items"][0]["sku"], owned.marker)
 
+    def test_order_transitions_to_confirmed_independently(self):
+        """T10C-01: transition test owns its own order."""
+        owned, _order = self._create_order()
 
-class TestWorkerIntegration(unittest.TestCase):
-    """Verify worker processed the SQS message."""
+        confirmed = self._wait_for_confirmed(owned.order_id)
 
-    @classmethod
-    def setUpClass(cls):
-        try:
-            import boto3
-            cls.boto3 = boto3
-        except ImportError:
-            raise unittest.SkipTest("boto3 not available, skipping worker integration tests")
+        self.assertEqual(confirmed["orderId"], owned.order_id)
+        self.assertEqual(confirmed["status"], "CONFIRMED")
 
-    def test_sqs_message_processed(self):
-        """Verify SQS worker was invoked."""
-        client = self.boto3.client("sqs", region_name="eu-central-1")
+    def test_order_data_integrity_independently(self):
+        """T10C-01: integrity test owns its own order."""
+        owned, _order = self._create_order()
 
-        queue_url = SQS_QUEUE_URL
-
-        response = client.get_queue_attributes(
-            QueueUrl=queue_url,
-            AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"]
+        response = self.client.get(f"/orders/{owned.order_id}")
+        self._expect(
+            response,
+            200,
+            operation=f"GET /orders/{owned.order_id}",
         )
+        stored = response_json(response)
 
-        msg_count = int(response["Attributes"].get("ApproximateNumberOfMessages", 0))
+        self.assertEqual(stored["orderId"], owned.order_id)
+        self.assertEqual(stored["currency"], "EUR")
+        self.assertEqual(len(stored["items"]), 1)
+        self.assertEqual(stored["items"][0]["sku"], owned.marker)
 
-        self.assertEqual(msg_count, 0, f"Expected no visible messages, found {msg_count}")
 
+class TestLiveUnauthenticatedEndpoint(unittest.TestCase):
+    """T10C-03: independent 401 test that never needs an access token."""
 
-if __name__ == "__main__":
-    unittest.main()
+    def setUp(self):
+        self.api_base_url = _live_endpoint()
+        if not self.api_base_url:
+            self.skipTest(
+                "BLOCKED: live E2E not enabled or API_BASE_URL missing; "
+                "local 401 coverage uses the fake transport"
+            )
+        self.client = ApiClient(self.api_base_url, transport=Urllib3Transport())
+
+    def test_unauthenticated_get_orders_returns_401(self):
+        response = self.client.get("/orders", authenticated=False)
+        self.assertEqual(response.status, 401, "expected unauthenticated 401")
