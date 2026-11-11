@@ -236,7 +236,12 @@ def resolve_plan_output(
 
     candidate = Path(out_value)
     if candidate.suffix == ".tfplan":
-        parsed = PlanMetadata.parse_filename(candidate.name)
+        parsed = PlanMetadata.parse_filename(
+            candidate.name,
+            expected_deployment_id=(
+                expected_metadata.deployment_id if expected_metadata is not None else None
+            ),
+        )
         if parsed is None:
             raise PlanOutputError(
                 f"--out '{out_value}' ist kein gueltiger Plan-Dateiname. Erwartet wird das "
