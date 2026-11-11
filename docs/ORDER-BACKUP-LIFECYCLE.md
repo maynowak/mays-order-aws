@@ -182,6 +182,17 @@ Legacy-Evidenz ohne `stateFingerprintVersion` bleibt als historisches Dokument
 erhalten, wird vom neuen Gate aber **fail-closed** abgelehnt. Für einen neuen
 Upgrade-Plan ist eine neue, kanonisch gebundene Backup-Evidence erforderlich.
 
+Seit `MO-RC4-P3A-BACKUP-ARN-GATE-FIX-01` gilt zusätzlich:
+
+- `evidenceKind` ist Pflicht und muss `CREATED` oder
+  `EXISTING_BACKUP_REVALIDATION` sein.
+- `backupArn` wird strukturell gegen die Tabellen-ARN geprüft
+  (Partition/Service/Region/Account/Tabelle/`backup/<id>`).
+- Der Upgrade-Plan verlangt eine unabhängig übergebene `--backup-arn`; sie wird
+  als `backupExpectedArn` im Manifest gebunden und muss exakt mit der
+  Evidence-ARN übereinstimmen.
+- Eine reine SHA-256-Bindung der Evidence ersetzt diese Identitätsbindung nicht.
+
 ## 5. CLI
 
 ```bash
@@ -267,10 +278,12 @@ Ressourcen-ARNs enthalten Platzhalter, keine echten Kontonummern.
 
 ## 9. Integration mit P1 (implementiert, lokal)
 
-- `plan --remote --upgrade --backup-evidence <order-backup-evidence.json>`
+- `plan --remote --upgrade --backup-evidence <order-backup-evidence.json> \
+  --backup-arn <arn:aws:dynamodb:...:backup/...>`
   bindet die Evidenz in das Plan-Manifest: `backupRequired`, `backupEvidence`
   mit `fileName`, `sha256`, `status`, `backupArn`, `backupVerifiedAt`,
-  `pitrStatus`, State-Lineage/Serial.
+  `pitrStatus`, `evidenceKind`, State-Lineage/Serial/Fingerprint sowie
+  `backupExpectedArn` als unabhängige Identitätsbindung.
 - `upgrade-readiness.json/.md` enthält `backupRequired` und `backupEvidence`;
   `MISSING`/`PARTIAL`/`FAILED`/`INVALID`/`STALE`/`IDENTITY_MISMATCH` blockieren
   den Readiness-Status mit `UPGRADE_BACKUP_EVIDENCE_*`.
