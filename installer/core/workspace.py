@@ -159,7 +159,7 @@ def validate_workspace_path(path: Path, workspace_root: Path, description: str =
     Raises:
         WorkspaceError: If path is outside workspace
     """
-    integrity = WorkspaceIntegrity(Path(path).parent if path.is_file() else Path(path))
+    integrity = WorkspaceIntegrity(Path(workspace_root))
     return integrity.validate_path(Path(path), description)
 
 

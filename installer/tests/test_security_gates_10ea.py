@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 from installer.core.approval import (
     ApprovalContext,
@@ -18,7 +19,14 @@ from installer.core.approval import (
     create_approval_context,
     verify_approval_context,
 )
-from installer.core.deployment_identity import DeploymentId
+from installer.core.deployment_identity import (
+    DeploymentContext,
+    DeploymentId,
+    DevelopmentPhase,
+    DevelopmentState,
+    PlanOperation,
+    SemanticVersion,
+)
 from installer.core.fail_closed import (
     FailClosedConfig,
     FailClosedError,
@@ -135,10 +143,22 @@ class TestApprovalContext(unittest.TestCase):
         self.assertTrue(valid)
         self.assertEqual(issues, [])
 
-    def test_approval_gate_constructor_is_currently_unusable(self):
-        """Documents the duplicate-class recursion defect; no product fix here."""
-        with self.assertRaises(RecursionError):
-            ApprovalGate(_valid_approval_context())
+    def test_approval_gate_can_be_constructed_and_evaluated(self):
+        context = _valid_approval_context()
+        context.auto_approve = True
+        gate = ApprovalGate(context)
+        proceed, failed = gate.evaluate(SimpleNamespace())
+        self.assertTrue(proceed)
+        self.assertEqual(failed, [])
+
+    def test_approval_gate_denies_interactive_no(self):
+        context = _valid_approval_context()
+        gate = ApprovalGate(context)
+        with mock.patch("builtins.input", return_value="n") as prompt:
+            proceed, failed = gate.evaluate(SimpleNamespace())
+        self.assertFalse(proceed)
+        self.assertEqual(failed, ["User declined approval"])
+        prompt.assert_called_once()
 
 
 class TestWorkspaceIsolation(unittest.TestCase):
@@ -199,16 +219,20 @@ class TestWorkspaceIsolation(unittest.TestCase):
             (Path(self.tempdir.name) / "factory-root").resolve(),
         )
 
-    def test_convenience_helper_ignores_supplied_workspace_root(self):
-        """Characterizes a current helper defect; no product fix is attempted."""
+    def test_convenience_helper_enforces_supplied_workspace_root(self):
         foreign = self.outside / "foreign.json"
-        # The helper derives its root from the target path, so it accepts a path
-        # outside the caller-supplied workspace. This test documents the gap.
-        result = validate_workspace_path(
-            foreign,
-            workspace_root=Path(self.tempdir.name) / "unrelated-root",
+        with self.assertRaises(WorkspaceError):
+            validate_workspace_path(
+                foreign,
+                workspace_root=Path(self.tempdir.name) / "unrelated-root",
+            )
+
+    def test_convenience_helper_accepts_path_inside_supplied_root(self):
+        target = self.root / "allowed.json"
+        self.assertEqual(
+            validate_workspace_path(target, workspace_root=self.root),
+            target.resolve(),
         )
-        self.assertEqual(result, foreign.resolve())
 
 
 class TestFailClosedGuard(unittest.TestCase):
@@ -257,11 +281,48 @@ class TestFailClosedGuard(unittest.TestCase):
         with self.assertRaises(UnknownAWSStateError):
             guard.require_aws_state(None)
 
-    def test_plan_match_check_is_currently_overblocking(self):
-        """Documents that the current check always raises, even on a match."""
+    def test_matching_plan_and_fingerprint_pass(self):
         guard = FailClosedGuard()
+        deployment_id = DeploymentId("123456789012", "mays-orders", "test")
+        plan = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="a" * 64,
+        )
+        expected = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="a" * 64,
+        )
+        guard.require_plan_match(plan, expected)
+
+    def test_plan_mismatch_and_missing_fingerprint_are_denied(self):
+        guard = FailClosedGuard()
+        deployment_id = DeploymentId("123456789012", "mays-orders", "test")
+        plan = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="a" * 64,
+        )
+        mismatched = SimpleNamespace(
+            deployment_id=DeploymentId("123456789012", "mays-orders", "prod"),
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="a" * 64,
+        )
         with self.assertRaises(PlanIntegrityError):
-            guard.require_plan_match(object(), object())
+            guard.require_plan_match(plan, mismatched)
+
+        missing_fingerprint = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+        )
+        with self.assertRaises(PlanIntegrityError):
+            guard.require_plan_match(plan, missing_fingerprint)
 
     def test_lenient_policy_does_not_raise_on_validation(self):
         guard = FailClosedGuard(lenient_fail_closed())
@@ -337,24 +398,74 @@ class TestFailClosedErrors(unittest.TestCase):
         )
         validator.validate_aws_context(context)
 
-    def test_plan_integrity_validator_is_not_executable_due_undefined_names(self):
-        """Documents the current fail-closed defect without inventing a contract."""
+    def test_plan_integrity_validator_accepts_matching_context(self):
         validator = FailClosedValidator()
-        with self.assertRaises(NameError):
-            validator.validate_plan_integrity(
-                SimpleNamespace(
-                    deployment_id="123456789012:mays-orders:test",
-                    operation="deploy",
-                    version="1.0.0",
-                ),
-                object(),
-            )
+        deployment_id = DeploymentId("123456789012", "mays-orders", "test")
+        plan = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="b" * 64,
+        )
+        expected = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="b" * 64,
+        )
+        validator.validate_plan_integrity(plan, expected)
 
-    def test_deployment_context_validator_is_not_executable_due_undefined_helper(self):
-        """Documents the current fail-closed defect without inventing a contract."""
+    def test_plan_integrity_validator_rejects_mismatch_and_missing_data(self):
         validator = FailClosedValidator()
-        with self.assertRaises(AttributeError):
-            validator.validate_deployment_context(object())
+        deployment_id = DeploymentId("123456789012", "mays-orders", "test")
+        plan = SimpleNamespace(
+            deployment_id=deployment_id,
+            operation=PlanOperation.DEPLOY,
+            version=SemanticVersion(0, 2, 0),
+            plan_sha256="b" * 64,
+        )
+        with self.assertRaises(DeploymentMismatchError):
+            validator.validate_plan_integrity(
+                plan,
+                SimpleNamespace(
+                    deployment_id=DeploymentId(
+                        "123456789012", "mays-orders", "prod"
+                    ),
+                    operation=PlanOperation.DEPLOY,
+                    version=SemanticVersion(0, 2, 0),
+                    plan_sha256="b" * 64,
+                ),
+            )
+        with self.assertRaises(ValidationFailedError):
+            validator.validate_plan_integrity(plan, SimpleNamespace())
+
+    def test_deployment_context_validator_accepts_complete_context(self):
+        validator = FailClosedValidator()
+        version = SemanticVersion(0, 2, 0)
+        context = DeploymentContext(
+            deployment_id=DeploymentId("123456789012", "mays-orders", "test"),
+            version=version,
+            development_state=DevelopmentState(
+                version=version,
+                phase=DevelopmentPhase("H2"),
+            ),
+        )
+        validator.validate_deployment_context(context)
+
+    def test_deployment_context_validator_rejects_invalid_identity(self):
+        validator = FailClosedValidator()
+        version = SemanticVersion(0, 2, 0)
+        incomplete = SimpleNamespace(
+            deployment_id=None,
+            version=version,
+            development_state=DevelopmentState(
+                version=version,
+                phase=DevelopmentPhase("H2"),
+            ),
+            allow_aws_operations=False,
+        )
+        with self.assertRaises(DeploymentMismatchError):
+            validator.validate_deployment_context(incomplete)
 
 
 if __name__ == "__main__":

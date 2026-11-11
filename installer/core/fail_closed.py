@@ -162,9 +162,50 @@ class FailClosedGuard:
         return state
     
     def require_plan_match(self, plan_meta, expected_context, message: str = "Plan mismatch") -> None:
-        """Require plan metadata to match expected context."""
-        if self.config.fail_on_plan_mismatch:
-            self._should_fail(True, PlanIntegrityError, message)
+        """Require plan identity, operation, version and fingerprint to match."""
+        if not self.config.fail_on_plan_mismatch:
+            return
+
+        def value(obj, *names):
+            for name in names:
+                entry = getattr(obj, name, None)
+                if entry is not None:
+                    return entry
+            return None
+
+        plan_deployment_id = value(plan_meta, "deployment_id")
+        expected_deployment_id = value(expected_context, "deployment_id")
+        plan_operation = value(plan_meta, "operation")
+        expected_operation = value(expected_context, "operation")
+        plan_version = value(plan_meta, "version")
+        expected_version = value(expected_context, "version")
+        plan_fingerprint = value(plan_meta, "plan_sha256", "plan_fingerprint", "sha256")
+        expected_fingerprint = value(
+            expected_context, "plan_sha256", "plan_fingerprint", "sha256"
+        )
+
+        if any(
+            entry is None
+            for entry in (
+                plan_deployment_id,
+                expected_deployment_id,
+                plan_operation,
+                expected_operation,
+                plan_version,
+                expected_version,
+                plan_fingerprint,
+                expected_fingerprint,
+            )
+        ):
+            raise PlanIntegrityError("Incomplete plan match data or missing fingerprint")
+
+        if (
+            plan_deployment_id != expected_deployment_id
+            or plan_operation != expected_operation
+            or plan_version != expected_version
+            or plan_fingerprint != expected_fingerprint
+        ):
+            raise PlanIntegrityError(message)
     
     def require_deployment_match(self, actual: DeploymentId, expected: DeploymentId, 
                                   message: str = "Deployment ID mismatch") -> None:
@@ -313,6 +354,20 @@ class FailClosedValidator:
     def __init__(self, config: Optional["FailClosedConfig"] = None):
         self.config = config or FailClosedConfig()
     
+    @staticmethod
+    def _has_valid_deployment_id(context) -> bool:
+        """Validate a DeploymentId instance or a parseable canonical ID string."""
+        value = getattr(context, "deployment_id", None)
+        if isinstance(value, DeploymentId):
+            return True
+        if isinstance(value, str) and value:
+            try:
+                DeploymentId.parse(value)
+            except ValueError:
+                return False
+            return True
+        return False
+
     def validate_deployment_context(self, context: "DeploymentContext") -> None:
         """Validate deployment context is complete and valid."""
         # Require deployment ID
@@ -335,25 +390,58 @@ class FailClosedValidator:
                 raise ValidationFailedError("AWS profile required for mutations")
     
     def validate_plan_integrity(self, plan_meta, expected_context) -> None:
-        """Validate plan metadata matches expected context."""
-        # Check deployment ID
-        if plan_meta.deployment_id != expected_deployment_id:
+        """Validate plan identity, operation, version and fingerprint."""
+        def value(obj, *names):
+            for name in names:
+                entry = getattr(obj, name, None)
+                if entry is not None:
+                    return entry
+            return None
+
+        plan_deployment_id = value(plan_meta, "deployment_id")
+        expected_deployment_id = value(expected_context, "deployment_id")
+        plan_operation = value(plan_meta, "operation")
+        expected_operation = value(expected_context, "operation")
+        plan_version = value(plan_meta, "version")
+        expected_version = value(expected_context, "version")
+        plan_fingerprint = value(plan_meta, "plan_sha256", "plan_fingerprint", "sha256")
+        expected_fingerprint = value(
+            expected_context, "plan_sha256", "plan_fingerprint", "sha256"
+        )
+
+        if any(
+            entry is None
+            for entry in (
+                plan_deployment_id,
+                expected_deployment_id,
+                plan_operation,
+                expected_operation,
+                plan_version,
+                expected_version,
+                plan_fingerprint,
+                expected_fingerprint,
+            )
+        ):
+            raise ValidationFailedError("Incomplete plan context or missing fingerprint")
+
+        if plan_deployment_id != expected_deployment_id:
             raise DeploymentMismatchError(
-                f"Plan deployment ID mismatch: expected {expected_deployment_id}, got {plan_meta.deployment_id}"
+                f"Plan deployment ID mismatch: expected {expected_deployment_id}, got {plan_deployment_id}"
             )
-        
-        # Check operation
-        if plan_meta.operation != expected_operation:
+
+        if plan_operation != expected_operation:
             raise ValidationFailedError(
-                f"Plan operation mismatch: expected {expected_operation}, got {plan_meta.operation}"
+                f"Plan operation mismatch: expected {expected_operation}, got {plan_operation}"
             )
-        
-        # Check version (warn only by default)
-        if plan_meta.version != expected_version:
+
+        if plan_version != expected_version:
             if self.config.fail_on_plan_mismatch:
                 raise ValidationFailedError(
-                    f"Plan version mismatch: expected {expected_version}, got {plan_meta.version}"
+                    f"Plan version mismatch: expected {expected_version}, got {plan_version}"
                 )
+
+        if plan_fingerprint != expected_fingerprint:
+            raise ValidationFailedError("Plan fingerprint mismatch")
     
     def validate_aws_context(self, aws_context) -> None:
         """Validate AWS execution context."""
