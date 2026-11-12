@@ -74,14 +74,30 @@ maximal eigener Nachrichten; kein Purge; danach Main/DLQ 0/0.
 
 | ID | Fixture/Aktion | Erwartung |
 |---|---|---|
-| G3X-GSI3-PRE-01 | Identity/Table/GSI3/Queue/Lambda/Schedules read-only | Baselines 0, ACTIVE, CodeSha `vW8n…` |
+| G3X-GSI3-PRE-01 | Identity/Table/GSI3/Queue/Lambda/Schedules read-only | Baselines 0, ACTIVE, CodeSha `FYTu…` (deployed G3-FIX) |
 | G3X-GSI3-SETUP-02 | 10 run-präfixierte Items mit `processingState=running`, gestaffelten Claims | 10 exakte Keys, keine fremden |
-| G3X-GSI3-IDX-03 | GSI3-Query `PROCESSING#RUNNING` | genau 8 Kandidaten |
-| G3X-GSI3-RUN1-04 | `processing/scan limit=20` | Report: 8 candidates, 4 sent, Skips budget/cancelled/anonymized/not_running |
+| G3X-GSI3-IDX-03 | GSI3-Query `PROCESSING#RUNNING` | genau 8 Index-Treffer (`scanned=8`), davon 4 auswählbare Kandidaten |
+| G3X-GSI3-RUN1-04 | `processing/scan limit=20` | Report: `scanned=8`, `checked=8`, `candidates=4`, `sent=4`, Skips budget/cancelled/anonymized/not_running |
 | G3X-GSI3-WRK-05 | Worker-Folgen | A/B/L unverändert, M CONFIRMED/version 3; keine Claim-Writes |
 | G3X-GSI3-RUN2-06 | zweiter Scan | identischer Report; Duplikat NOOP, M version bleibt 3 |
 | G3X-GSI3-ISO-07 | Fremd-/Legacy-IDs | nicht berührt/gesendet |
 | G3X-GSI3-CLN-08 | exakte 10 Keys löschen | GSI3 0, Queue/DLQ 0, keine Reste |
+
+**Zählersemantik (verbindlich, `lambda/src/recovery.py`):**
+
+- `scanned` = Anzahl der aus GSI3 gelesenen Index-Treffer.
+- `checked` = Anzahl der anschließenden `GetItem`-Rechecks.
+- `candidates` = Anzahl der nach allen Skips ausgewählten, gültigen
+  Kandidaten; Skip-Einträge zählen hier nicht mit.
+- `sent` = erfolgreiche SQS-Sendungen.
+- `budgetExhausted` = Anzahl der Kandidaten mit ausgeschöpftem
+  `processingAttempts`-Budget; kein globaler Scan-Abbruch. Ein global
+  begrenzter Scan wird separat als `scan_limit_reached` gezählt.
+
+Damit sind bei den zehn Fixtures `scanned=8`, `checked=8`, `candidates=4`,
+`sent=4` und `budgetExhausted=1` der vertragskonforme Report. Die frühere
+Manifest-Erwartung `candidates=8` verwechselte Index-Treffer mit ausgewählten
+Kandidaten.
 
 **Bekannte Grenzen:** GAP-01/02 Starvation, GAP-03 Status `PROCESSING`/
 `SHIPPED`; nur `generic` produktiv. Der Test darf diese Grenzen nicht als
