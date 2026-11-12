@@ -418,8 +418,7 @@ Keine Privacy-B2-Ausführung. Keine DLQ-/Recovery-Wiederholung.**
 
 | Feld | Wert |
 |---|---|
-| Dokumentations-Commit | wird nach dem Commit eingetragen |
-| Finaler HEAD | wird nach dem Commit eingetragen |
+| Dokumentations-Commit | `ff967a5bd1c678ad0b039e769056f5981bc562a5` |
 | Working Tree nach Commit | CLEAN |
 
 Es wurden nur die drei Dokumentationsdateien geändert: Manifest,
