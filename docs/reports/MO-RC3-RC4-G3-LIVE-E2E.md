@@ -173,7 +173,60 @@ gesperrt.
 
 ---
 
-## 6. Was nicht ausgeführt wurde
+## 6. Gefundenes Testbenutzer-/Gate-Verfahren
+
+Das im Projekt vorhandene Verfahren wurde gefunden; es wurde **nicht ausgeführt**,
+weil es AWS-Mutationen (Cognito-Benutzer, Passwort, Gruppe) erfordert.
+
+### 6.1 Quellen
+
+| Quelle | Inhalt |
+|---|---|
+| `docs/TEST-STRATEGY.md:162-170` | „Test User Setup“ mit `setup_test_user.py` |
+| `scripts/tests/setup_test_user.py` | legt Cognito-Testbenutzer an, setzt Passwort, fügt `staff` hinzu, ist für bestehende Benutzer idempotent |
+| `tests/test-results.md:109-121` | Setup + manueller `ACCESS_TOKEN`-Schritt |
+| `docs/reports/MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01-EXECUTION_LOG.md:34` | historischer E2E-Cleanup entfernte Order, DLQ-Nachricht und Testbenutzer |
+| `/tmp/opencode/MO-RC4-LIFECYCLE-ORCHESTRATION-01.md` §2.1/2.3 | historische E2E- und Cleanup-Evidenz (nicht im Repo) |
+
+### 6.2 Ablauf laut vorhandenem Verfahren
+
+```text
+export AWS_PROFILE=mayaws
+export COGNITO_USER_POOL_ID=eu-central-1_OZ7TK51EK
+export COGNITO_CLIENT_ID=415t3lt2k1umrmoaibn4f302sn
+export TEST_USER_PASSWORD=<approved test password>
+python3 scripts/tests/setup_test_user.py
+# -> TEST_USER_EMAIL (random test-user_<hex>@example.com)
+# -> ACCESS_TOKEN via USER_PASSWORD_AUTH erforderlich
+```
+
+Historischer Cleanup laut Lifecycle-Evidenz:
+
+- Order-Item des eigenen Tests löschen,
+- DLQ-Testnachricht empfangen/löschen (kein Purge),
+- Cognito-Testbenutzer per `AdminDeleteUser` entfernen,
+- Main-Queue unverändert lassen.
+
+### 6.3 Warum das Gate trotzdem blockiert bleibt
+
+1. Das Verfahren erzeugt einen **neuen Cognito-Benutzer und Credentials**; dafür
+   fehlt die ausdrückliche G3-Mutationsfreigabe.
+2. `setup_test_user.py` setzt `COGNITO_USER_POOL_ID` erst **nach** dem
+   `admin_create_user`; ohne explizit gesetzte Pool-ID würde es den
+   Platzhalter `eu-central-1_XXXXXXXX` verwenden.
+3. Das Skript erzeugt keinen Token; `ACCESS_TOKEN` muss separat über
+   `USER_PASSWORD_AUTH` beschafft werden.
+4. Der aktuelle E2E-Harness verlangt zusätzlich `MO_E2E_LIVE=1`,
+   `API_BASE_URL` und `LIVE_CLEANUP_AVAILABLE=True`. Letzteres ist derzeit
+   bewusst `False`, weil keine sichere API-Cleanup-Route existiert.
+5. Der historische Cleanup nutzt direkte DynamoDB-Löschung für das eigene
+   Order-Item. Das ist mit der in 10C/G2 beschlossenen Cleanup-Sicherheit
+   nicht ohne ausdrückliche Freigabe vereinbar.
+
+**Gate 1 bleibt daher BLOCKED.** Das Verfahren ist dokumentiert, aber nicht
+autorisiert und nicht ausgeführt.
+
+## 7. Was nicht ausgeführt wurde
 
 - Kein `POST /orders`.
 - Kein `GET`/`PATCH` gegen die Live-API.
@@ -189,7 +242,7 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ---
 
-## 7. Wiederverwendete Modul-/Builder-Evidence
+## 8. Wiederverwendete Modul-/Builder-Evidence
 
 - Builder: `MO-BUILDER-UPGRADE-P2-01`, 128 PASS.
 - Installer: 10A/11A, 669 PASS; SEC-01…05 behoben; SEC-06 separat.
@@ -199,7 +252,7 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ---
 
-## 8. Offene Release-Blocker
+## 9. Offene Release-Blocker
 
 1. Autorisierte, vorab provisionierte Testidentität.
 2. Sichere, eigentümergebundene Live-Cleanup-Fähigkeit.
@@ -213,7 +266,7 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ---
 
-## 9. Voraussetzungen für G4
+## 10. Voraussetzungen für G4
 
 - G3-Gate 1 erfüllt: autorisierte Testidentität und Ownership-Nachweis.
 - G3-Gate 2 erfüllt: schriftliche Freigabe für konkrete AWS-Mutationen.
@@ -226,7 +279,7 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ---
 
-## 10. Ergebnisstatus
+## 11. Ergebnisstatus
 
 ```text
 G3-A: PASS (read-only Vorbereitung)
@@ -241,7 +294,7 @@ erzeugt. Kein Push, kein Merge.
 
 ---
 
-## 11. Git-Abschluss
+## 12. Git-Abschluss
 
 Vorgesehen:
 
