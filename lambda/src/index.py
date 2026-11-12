@@ -138,13 +138,13 @@ INTERNAL_RECOVERY_ACTION = "recovery/scan"
 INTERNAL_PROCESSING_RECOVERY_ACTION = "processing/scan"
 
 
-def _send_processing_recovery(order_id: str) -> None:
+def _send_processing_recovery(order_id: str, status: str = "CONFIRMED") -> None:
     """Stellt eine Order erneut zu; wirft bei Fehlern (Recovery zaehlt das als Fehler)."""
     if not SQS_QUEUE_URL:
         raise RuntimeError("SQS_QUEUE_URL not configured")
     message = {
         "orderId": order_id,
-        "status": "CONFIRMED",
+        "status": status,
         "metadata": {"reason": "processing_recovery"},
     }
     _get_sqs_client().send_message(

@@ -90,10 +90,12 @@ class FakeTable:
         return {"Item": dict(item)} if item else {}
 
 
-def sender(fail_for=(), calls=None):
-    def _send(order_id):
+def sender(fail_for=(), calls=None, statuses=None):
+    def _send(order_id, status=None):
         if calls is not None:
             calls.append(order_id)
+        if statuses is not None:
+            statuses.append(status)
         if order_id in fail_for:
             raise RuntimeError("SQS down")
     return _send
@@ -156,6 +158,34 @@ class TestProcessingRecoverySelection(unittest.TestCase):
         report = recovery.run_processing_recovery(table, sender(calls=calls), now=NOW)
         self.assertEqual(calls, [])
         self.assertEqual(report["skipped"].get("cancelled"), 1)
+
+    def test_skipped_entries_do_not_starve_valid_candidate(self):
+        items = [
+            make_item("ord_c1", status="CANCELLED", claimed_ago=400),
+            make_item("ord_c2", status="CANCELLED", claimed_ago=401),
+            make_item("ord_b1", attempts=2, claimed_ago=402),
+            make_item("ord_b2", attempts=2, claimed_ago=403),
+            make_item("ord_valid", claimed_ago=500),
+        ]
+        calls = []
+        report = recovery.run_processing_recovery(
+            FakeTable(items), sender(calls=calls), now=NOW, limit=2
+        )
+        self.assertEqual(calls, ["ord_valid"])
+        self.assertEqual(report["candidates"], 1)
+        self.assertEqual(report["skipped"].get("cancelled"), 2)
+        self.assertEqual(report["skipped"].get("budget_exhausted"), 2)
+
+    def test_expired_claim_sends_current_processing_status(self):
+        table = FakeTable([make_item(status="PROCESSING", claimed_ago=400)])
+        calls = []
+        statuses = []
+        report = recovery.run_processing_recovery(
+            table, sender(calls=calls, statuses=statuses), now=NOW
+        )
+        self.assertEqual(report["sent"], 1)
+        self.assertEqual(calls, [ORDER_ID])
+        self.assertEqual(statuses, ["PROCESSING"])
 
     def test_anonymized_is_skipped(self):
         table = FakeTable([make_item(subject=None)])
@@ -253,6 +283,38 @@ class TestInternalAction(unittest.TestCase):
 
 
 class TestGsi3Maintenance(unittest.TestCase):
+    def test_processing_recovery_sender_preserves_target_status(self):
+        sent = []
+
+        class FakeSQS:
+            def send_message(self, **kwargs):
+                sent.append(json.loads(kwargs["MessageBody"]))
+
+        with mock.patch.object(index, "SQS_QUEUE_URL", "https://sqs.test/queue"), \
+             mock.patch.object(index, "_get_sqs_client", return_value=FakeSQS()):
+            index._send_processing_recovery(ORDER_ID, status="PROCESSING")
+
+        self.assertEqual(sent[0]["orderId"], ORDER_ID)
+        self.assertEqual(sent[0]["status"], "PROCESSING")
+        self.assertEqual(sent[0]["metadata"]["reason"], "processing_recovery")
+
+    def test_processing_recovery_current_status_can_be_claimed(self):
+        """GAP-03: current PROCESSING status must not be sent as CONFIRMED."""
+        handler_type = processing_handler()
+        client = FakeDynamo(
+            lifecycle_item(
+                status="PROCESSING",
+                orderType={"S": handler_type},
+                processingState={"S": "running"},
+                processingAttemptId={"S": "old"},
+                processingAttempts={"N": "1"},
+                processingClaimedAt={"S": "2000-01-01T00:00:00.000Z"},
+            )
+        )
+        outcome = run_worker(client, status="PROCESSING")
+        self.assertEqual(outcome, sqs_handler.OUTCOME_PROCESSING_SUCCEEDED)
+        self.assertEqual(client.item["status"]["S"], "PROCESSING")
+
     def test_claim_writes_index_attributes(self):
         handler_type = processing_handler()
         client = FakeDynamo(lifecycle_item(orderType={"S": handler_type}))
@@ -316,7 +378,10 @@ class TestAnonymizeIndexRemoval(unittest.TestCase):
 
         class StubTable:
             def query(self, **kwargs):
-                return {"Items": [dict(item)]}
+                return {"Items": [{"orderId": ORDER_ID}]}
+
+            def get_item(self, **kwargs):
+                return {"Item": dict(item)}
 
             def update_item(self, **kwargs):
                 captured.update(kwargs)
