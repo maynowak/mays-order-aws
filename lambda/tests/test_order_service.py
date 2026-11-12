@@ -1029,6 +1029,45 @@ class TestPrivacyConsumerScopeP02B(unittest.TestCase):
         self.assertEqual(deleted, [{"pk": expected_pk, "sk": "#ORDER"}])
         self.assertTrue(any("outside consumer scope" in note for note in result["limitations"]))
 
+    def test_erase_with_scope_loads_full_item_after_gsi2_projection(self):
+        """GAP F-PRV-01: GSI2 projection has no consumerId; load full item."""
+        items = self._items()
+
+        def on_query(**kwargs):
+            self.assertEqual(kwargs.get("ProjectionExpression"), "orderId")
+            return {"Items": [{"orderId": item["orderId"]} for item in items]}
+
+        def on_get_item(**kwargs):
+            pk = kwargs["Key"]["pk"]
+            item = next((entry for entry in items if entry["pk"] == pk), None)
+            return {"Item": item} if item else {}
+
+        deleted = []
+
+        def on_delete(**kwargs):
+            deleted.append(kwargs["Key"])
+            return {}
+
+        service = create_order_service(
+            "mays-orders",
+            make_client(
+                {
+                    "query": on_query,
+                    "get_item": on_get_item,
+                    "delete_item": on_delete,
+                }
+            ),
+        )
+        result = service.erase_subject(
+            "user-123", context=self._ctx("consumer-a"),
+            options={"mode": "EXECUTE", "policy": "ERASE"},
+        )
+
+        self.assertEqual(result["deletedRecords"], 1)
+        expected_pk = items[0]["pk"]
+        self.assertEqual(deleted, [{"pk": expected_pk, "sk": "#ORDER"}])
+        self.assertIn("outside consumer scope", result["limitations"][0])
+
     def test_erase_without_scope_keeps_previous_behavior(self):
         deleted = []
 

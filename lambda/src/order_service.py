@@ -606,13 +606,23 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,pk,sk,subjectId,version,createdAt",
+                    # consumerId is not projected by GSI2. Only the orderId is
+                    # read from the index; the complete item (including
+                    # consumerId/version) is loaded consistently below before
+                    # the optional consumer-scope filter is applied.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
                 items = result.get("Items", [])
-                for item in items:
+                for entry in items:
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
                     affected.append({
                         "pk": item.get("pk"),
                         "sk": item.get("sk"),
