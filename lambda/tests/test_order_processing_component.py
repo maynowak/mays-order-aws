@@ -474,6 +474,38 @@ class TestOrderProcessingComponent(unittest.TestCase):
             order["orderId"],
         )
 
+    def test_rc3_legacy_payload_without_order_type_keeps_contract(self):
+        """RC3 body without orderType remains valid and maps to generic."""
+        order = self._create(payload=dict(PAYLOAD))
+        item = self._stored(order["orderId"])
+
+        self.assertEqual(item["orderType"], "generic")
+        self.assertEqual(item["status"], "PENDING")
+        self.assertEqual(item["subjectId"], SUBJECT_A)
+        self.assertEqual(order["currency"], "EUR")
+        self.assertEqual(order["totalAmount"], 200)
+        for internal in ("subjectId", "consumerId", "version", "pk", "sk"):
+            self.assertNotIn(internal, order)
+        self.assertEqual(len(self.sqs.messages), 1)
+
+    def test_rc4_namespaced_unknown_type_fails_closed_without_status_write(self):
+        """A valid namespaced orderType without a registered handler stays pending."""
+        order = self._create(
+            payload={**PAYLOAD, "orderType": "ris.document.analyze"}
+        )
+        self.assertEqual(
+            self._stored(order["orderId"])["orderType"], "ris.document.analyze"
+        )
+
+        result = call_worker(self.store, _record(order["orderId"]))
+
+        self.assertEqual(
+            result, {"batchItemFailures": [{"itemIdentifier": "worker-message"}]}
+        )
+        item = self._stored(order["orderId"])
+        self.assertEqual(item["status"], "PENDING")
+        self.assertEqual(item["version"], 1)
+
     # T10B-02 ---------------------------------------------------------------
     def test_t10b_02_worker_transitions_shared_state(self):
         order = self._create()
