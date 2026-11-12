@@ -10,27 +10,32 @@ keine Testdaten, keine SQS-Nachrichten, keine Cognito-Änderungen, keine
 Terraform-Mutation, kein Push/Merge.
 
 ```text
-G3 STATUS: BLOCKED — GATE 1 NICHT ERFÜLLT
-STOP NACH G3-A
+G3 STATUS: PASS für die vorhandene Live-Suite
+Gate 1: nach ausdrücklicher Freigabe erfüllt
+Live-E2E: 4/4 PASS
+Cleanup: VERIFIED (Tabelle 0, Queues 0, Testbenutzer 0)
 ```
 
 ---
 
 ## 1. Executive Summary
 
-Die G3-A-Voraussetzungsprüfung wurde durchgeführt. Der RC4-Teststack ist
-weiterhin vorhanden und konsistent, aber die **Live-Ausführung ist nicht
-freigegeben**:
+Nach der read-only Vorprüfung wurde das vorhandene Testbenutzer-Verfahren
+(`docs/TEST-STRATEGY.md`, `scripts/tests/setup_test_user.py`) mit
+ausdrücklicher Freigabe verwendet. Ein synthetischer Cognito-Testbenutzer
+wurde angelegt, ein Access Token über `USER_PASSWORD_AUTH` beschafft und die
+vier vorhandenen Live-E2E-Tests ausgeführt:
 
-- Keine autorisierte Cognito-Testidentität vorhanden
-  (`list-users` liefert eine leere Liste).
-- Keine `ACCESS_TOKEN`/`TEST_USER_*`-Werte in der Umgebung.
-- Keine sichere, öffentliche, eigentümergebundene Order-Delete-/Cleanup-Route
-  (API hat nur GET/POST/PATCH; kein DELETE).
-- Keine ausdrückliche G3-Live-Freigabe für mutierende AWS-Aufrufe.
+- **4/4 PASS** in 13,776 s,
+- Order-Erstellung, Auth/Owner, Worker-Übergang und Datenintegrität,
+- eigentümergebundener Cleanup über `E2E_SUBJECT`,
+- Testbenutzer wieder gelöscht,
+- Testtabelle 0 Items, Queue/DLQ 0 Nachrichten.
 
-Damit ist **Gate 1** nicht erfüllt. Es wurden keine mutierenden Live-Tests
-ausgeführt. Die vier Live-E2E-Tests bleiben **BLOCKED**.
+Ein durch die Cleanup-Race erzeugter DLQ-Testrest (eigene Test-Order) wurde
+eigentümergebunden empfangen und gelöscht; kein Purge, keine fremde Nachricht.
+Weitere Matrix-Szenarien (DLQ absichtlich, Recovery/GSI3, Privacy-Live) sind
+nicht Teil der vorhandenen vier Live-Tests und bleiben separat offen.
 
 ---
 
@@ -142,34 +147,33 @@ Tabelle, GSIs, Queues, Lambdas, API und Alarme read-only bestätigte.
 
 | Voraussetzung | Status | Nachweis |
 |---|---|---|
-| Autorisierte Testidentität | **FAIL** | Cognito-Pool leer, keine Env-Tokens |
-| Ownership-Nachweis | **BLOCKED** | ohne Identität nicht prüfbar |
-| Sichere Cleanup-Fähigkeit | **FAIL** | keine DELETE-/Cleanup-API; keine direkte DDB-Löschung erlaubt |
-| Betroffene Ressourcen abgegrenzt | **PASS** | Teststack `mays-orders-rc4-test`, Account/Region/Queues/API bestätigt |
-| Explizite G3-Live-Freigabe | **FAIL** | keine separate Freigabe für mutierende AWS-Aufrufe |
-| Keine Produktionsressourcen betroffen | **PASS** | ausschließlich RC4-Teststack read-only geprüft |
+| Autorisierte Testidentität | **PASS (nach Freigabe)** | synthetischer Testbenutzer, danach gelöscht |
+| Ownership-Nachweis | **PASS** | `E2E_SUBJECT` aus Access Token; Cleanup prüft gespeicherte `subjectId` |
+| Sichere Cleanup-Fähigkeit | **PASS (freigegeben)** | exakter, eigentümergebundener Order-Delete; kein Purge, keine fremden Daten |
+| Betroffene Ressourcen abgegrenzt | **PASS** | ausschließlich `mays-orders-rc4-test` |
+| Explizite G3-Live-Freigabe | **PASS** | Nutzerfreigabe für Testbenutzer/Live-Tests/Cleanup |
+| Keine Produktionsressourcen betroffen | **PASS** | Account/Region/Teststack; keine RIS/Produktion |
 
-**Gate 1 = BLOCKED.** Gate 2 (AWS-Mutationsfreigabe) wurde nicht beantragt.
+**Gate 1 = PASS.** Die Live-Suite wurde im freigegebenen RC4-Teststack
+ausgeführt. Gate 2 im Sinne einer separaten Terraform-Mutation entfällt:
+Es gab kein Terraform-Apply/Destroy/Import.
 
 ---
 
 ## 5. G3-B — RC3/RC4-Testmatrix
 
-Alle Zeilen sind vorbereitet; mutierende Live-Ausführung bleibt bis Gate 1/2
-gesperrt.
-
 | Test | Erwartung | Vorbereitung | Live-Ergebnis |
 |---|---|---|---|
-| RC3-Legacy-Order | Body ohne `orderType` funktioniert | G2-Test `test_rc3_legacy_payload_without_order_type_keeps_contract` | **BLOCKED** |
-| RC4-Order | Order mit Modulzuordnung wird verarbeitet | 10B-Komponentenpfad; G2-Unknown-Type-Test | **BLOCKED** |
-| Auth/Owner | Nur berechtigte Identitäten erhalten Zugriff | Identity-/Owner-Tests; Testidentität fehlt | **BLOCKED** |
-| Persistenz | Order/Status korrekt gespeichert | Fake-DDB; Live-DDB leer | **BLOCKED** |
-| Worker | Order erreicht Consumer | Fake-SQS/Worker; Live-Queue 0 | **BLOCKED** |
-| Retry/DLQ | Fehlerbehandlung vertragsgemäß | 10B Batch-Fehler; Terraform-Redrive | **BLOCKED** |
-| Recovery/GSI3 | Wiederherstellung funktioniert | P02I-Tests; GSI3 ACTIVE, keine Daten | **BLOCKED** |
-| Privacy | Inspect/Export/Erase/RETAIN | Service-/RETAIN-Tests; Live-Secret/Identität fehlt | **BLOCKED** |
-| Cleanup | Synthetische Daten sicher bereinigen | E2E-Harness-Ownership; keine Delete-API | **BLOCKED** |
-| RC3→RC4 | Verträge bleiben kompatibel | G2-Legacy/Contract-Tests; kein Live-Flow | **BLOCKED** |
+| RC3-Legacy-Order | Body ohne `orderType` funktioniert | G2-Test; Live-POST ohne `orderType` | **PASS** |
+| RC4-Order | Order mit Modulzuordnung wird verarbeitet | 10B-Komponentenpfad; Live-generic | **PASS** |
+| Auth/Owner | Nur berechtigte Identitäten erhalten Zugriff | 401 unauthenticated; Owner-GET | **PASS** (fremde Identität nicht live getestet) |
+| Persistenz | Order/Status korrekt gespeichert | Live-POST/GET; Cleanup danach | **PASS** |
+| Worker | Order erreicht Consumer | Live-Queue → ESM → Worker → CONFIRMED | **PASS** |
+| Retry/DLQ | Fehlerbehandlung vertragsgemäß | Terraform-Redrive; unbeabsichtigter Cleanup-DLQ-Rest bereinigt | **PARTIAL** — kein absichtlicher DLQ-Test |
+| Recovery/GSI3 | Wiederherstellung funktioniert | GSI3 ACTIVE; Recovery-Scan nicht ausgeführt | **NOT EXECUTED** |
+| Privacy | Inspect/Export/Erase/RETAIN | Service-/RETAIN-Tests; Live-Secret fehlt | **BLOCKED** |
+| Cleanup | Synthetische Daten sicher bereinigen | eigentümergebundener Delete; Tabelle/Queue/User verifiziert | **PASS** |
+| RC3→RC4 | Verträge bleiben kompatibel | Live-Legacy-Body ohne `orderType` | **PASS** (begrenzter Live-Nachweis) |
 
 ---
 
@@ -207,38 +211,63 @@ Historischer Cleanup laut Lifecycle-Evidenz:
 - Cognito-Testbenutzer per `AdminDeleteUser` entfernen,
 - Main-Queue unverändert lassen.
 
-### 6.3 Warum das Gate trotzdem blockiert bleibt
+### 6.3 Ausführung nach Freigabe
 
-1. Das Verfahren erzeugt einen **neuen Cognito-Benutzer und Credentials**; dafür
-   fehlt die ausdrückliche G3-Mutationsfreigabe.
-2. `setup_test_user.py` setzt `COGNITO_USER_POOL_ID` erst **nach** dem
-   `admin_create_user`; ohne explizit gesetzte Pool-ID würde es den
-   Platzhalter `eu-central-1_XXXXXXXX` verwenden.
-3. Das Skript erzeugt keinen Token; `ACCESS_TOKEN` muss separat über
-   `USER_PASSWORD_AUTH` beschafft werden.
-4. Der aktuelle E2E-Harness verlangt zusätzlich `MO_E2E_LIVE=1`,
-   `API_BASE_URL` und `LIVE_CLEANUP_AVAILABLE=True`. Letzteres ist derzeit
-   bewusst `False`, weil keine sichere API-Cleanup-Route existiert.
-5. Der historische Cleanup nutzt direkte DynamoDB-Löschung für das eigene
-   Order-Item. Das ist mit der in 10C/G2 beschlossenen Cleanup-Sicherheit
-   nicht ohne ausdrückliche Freigabe vereinbar.
+1. Synthetischer Testbenutzer `test-user_ebdc0eb2@example.com` im
+   RC4-Pool angelegt; Passwort nur über Umgebung, nicht protokolliert.
+2. Access Token über `USER_PASSWORD_AUTH` beschafft; `sub` als
+   `E2E_SUBJECT` verwendet.
+3. Live-Suite mit `MO_E2E_LIVE=1` und
+   `MO_E2E_LIVE_CLEANUP=1` ausgeführt.
+4. Cleanup: eigene Order-Items per exaktem `pk`/`sk` und geprüfter
+   `subjectId` gelöscht; Testbenutzer per `AdminDeleteUser` entfernt.
 
-**Gate 1 bleibt daher BLOCKED.** Das Verfahren ist dokumentiert, aber nicht
-autorisiert und nicht ausgeführt.
+Live-Ergebnis:
+
+```text
+Ran 4 tests in 13.776s
+OK
+```
+
+Nach dem Lauf:
+
+```text
+Cognito users:       0
+DynamoDB ItemCount:  0
+Main queue visible:  0
+Main queue in-flight:0
+DLQ visible:         0
+DLQ in-flight:       0
+```
+
+Ein durch die Cleanup-Race erzeugter DLQ-Rest der eigenen Test-Order
+(`ord_2e20adfe1318be9947b708aa`, Sender RC4-Testhandler) wurde per
+`ReceiveMessage` + `DeleteMessage` entfernt; kein Purge, keine fremde
+Nachricht. Die Test-Order war danach nicht mehr in der Tabelle.
+
+### 6.4 Aktuelles Cleanup-Verfahren
+
+`tests/e2e_harness.py::LiveCleanupBackend` löscht nur:
+
+- exakten Order-Key `ord_<orderId>` / `#ORDER`,
+- nach `GetItem`-Prüfung der gespeicherten `subjectId == E2E_SUBJECT`,
+- mit Conditional Delete; fremde/fehlende Items werden nicht gelöscht.
+
+`MO_E2E_LIVE_CLEANUP=1` ist ein expliziter Freigabeschalter. Ohne ihn bleiben
+die Live-Tests `BLOCKED`.
 
 ## 7. Was nicht ausgeführt wurde
 
-- Kein `POST /orders`.
-- Kein `GET`/`PATCH` gegen die Live-API.
-- Keine SQS-Nachricht gesendet.
-- Keine Cognito-Anlage/-Authentifizierung.
-- Kein DynamoDB-Write/Delete.
+- Kein absichtlicher DLQ-/Retry-Test (nur Cleanup-Race-Rest bereinigt).
+- Kein Recovery-/GSI3-Scan mit echten Daten.
+- Kein Privacy-Inspect/Export/Erase-Live-Test (Live-Secret nicht
+  provisioniert).
 - Kein Terraform Plan/Apply/Destroy.
 - Keine Backup-/Restore-Operation.
-- Keine Live-E2E-Ausführung.
+- Keine Produktions-/RIS-Ressource verändert.
 
-Die vier Live-Tests wurden lokal ohne Opt-in ausgeführt und blieben
-erwartungsgemäß **4 SKIP/BLOCKED**.
+Die vier vorhandenen Live-Tests wurden ausgeführt; die darüber
+hinausgehenden Matrix-Szenarien bleiben offen.
 
 ---
 
@@ -254,27 +283,24 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ## 9. Offene Release-Blocker
 
-1. Autorisierte, vorab provisionierte Testidentität.
-2. Sichere, eigentümergebundene Live-Cleanup-Fähigkeit.
-3. Explizite AWS-Mutationsfreigabe für einen definierten Testlauf.
-4. Funktionale DLQ-/Retry-Zustellung.
-5. GSI3-/Recovery-Live-Nachweis.
-6. Produktiver Processing-Handler über `generic`.
-7. API-Idempotenz-Vertrag.
-8. P00-Scope KMS/Secrets/Retention.
-9. Aktueller RC3→RC4-Live-Kompatibilitätsnachweis.
+1. Absichtlicher DLQ-/Retry-Test mit definierter Fehlernachricht.
+2. GSI3-/Recovery-Live-Nachweis mit echten Daten.
+3. Privacy-Inspect/Export/Erase/RETAIN live (Secret-Provisionierung).
+4. Produktiver Processing-Handler über `generic`.
+5. API-Idempotenz-Vertrag.
+6. P00-Scope KMS/Secrets/Retention.
+7. Vollständiger RC3→RC4-Live-Flow inkl. Bestandsdaten.
 
 ---
 
 ## 10. Voraussetzungen für G4
 
-- G3-Gate 1 erfüllt: autorisierte Testidentität und Ownership-Nachweis.
-- G3-Gate 2 erfüllt: schriftliche Freigabe für konkrete AWS-Mutationen.
-- Definiertes, getestetes Cleanup-/Ownership-Verfahren.
+- G3-Gate 1 erfüllt: Testidentität und Ownership-Nachweis sind belegt.
+- Cleanup-Verfahren ist implementiert und verifiziert.
+- Separate Freigabe für DLQ-/Recovery-/Privacy-Live-Tests.
 - Testmanifest mit exakten Ressourcen, Reihenfolge, Abbruchkriterien und
   Cleanup.
 - Keine Produktionsressourcen betroffen.
-- Separate Freigabe für DLQ-/Recovery-/Privacy-Live-Tests.
 - Ergebnisdokumentation mit Test-ID, Run-ID, Cleanup-Status und Evidence.
 
 ---
@@ -283,25 +309,26 @@ erwartungsgemäß **4 SKIP/BLOCKED**.
 
 ```text
 G3-A: PASS (read-only Vorbereitung)
-Gate 1: BLOCKED
-Gate 2: NOT REQUESTED
-Live-E2E: NOT EXECUTED
-G3: BLOCKED — STOP nach G3-A
+Gate 1: PASS (nach ausdrücklicher Freigabe)
+Live-E2E: 4/4 PASS
+Cleanup: VERIFIED (Testtabelle 0, Queues 0, Cognito-User 0)
+G3: PASS für die vorhandene Live-Suite; tiefere Matrix-Szenarien offen
 ```
 
-Es wurden keine AWS-Mutationen, keine Testdaten und keine Live-Requests
-erzeugt. Kein Push, kein Merge.
+Es wurden ausschließlich synthetische Testdaten im RC4-Teststack erzeugt
+und vollständig bereinigt. Kein Terraform, kein Push, kein Merge.
 
 ---
 
 ## 12. Git-Abschluss
 
-Vorgesehen:
-
 ```text
-Commit: docs(rc3,rc4): record g3 live e2e gate status
-Dateien: docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md
-         docs/AI_AUDITLOG.md
+G3-Gate-Doku (blocked): fb475c05da335b2cd4d21acd37cd76da3205fd69
+Live-Cleanup-Test:      e422330bb98562a35f5f189a2ee89aa6b82a81bf
+Doku-Abschluss:         (dieser Commit)
+Dateien:                docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md
+                        docs/AI_AUDITLOG.md
 ```
 
-Commit-SHA und CLEAN-Status werden nach dem Commit verifiziert.
+Kein Push, kein Merge. Der finale CLEAN-Status wird nach dem Doku-Commit
+verifiziert.
