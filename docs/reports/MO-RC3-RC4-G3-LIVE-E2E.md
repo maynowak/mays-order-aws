@@ -4,10 +4,9 @@
 
 **Datum:** 2026-11-12
 **Branch:** `test/mo-rc4-testsuite-hardening-10a`
-**HEAD:** `9484d1dc723f44dfef8de04e757aeff3cce7a86a`
-**Modus:** Read-only AWS-/Repository-Prüfung; **keine mutierenden Live-Tests**,
-keine Testdaten, keine SQS-Nachrichten, keine Cognito-Änderungen, keine
-Terraform-Mutation, kein Push/Merge.
+**HEAD:** `8736dc88f571b95ed05e49b026865c4a38e3cf17`
+**Modus:** Read-only Vorprüfung, danach **ausdrücklich freigegebene** Live-Suite
+im RC4-Teststack; keine Produktions-/Terraform-Mutation, kein Push/Merge.
 
 ```text
 G3 STATUS: PASS für die vorhandene Live-Suite
