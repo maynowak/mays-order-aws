@@ -4,7 +4,7 @@
 
 **Status:** PROPOSED — NOT APPROVED
 
-**Datum:** 2026-11-11
+**Datum:** 2026-11-12
 
 **Scope:** Deploy/Apply und Destroy des Mays-Orders-AWS-Installers
 
@@ -112,6 +112,40 @@ Trust-Key-Entscheidung, CI-Migration, zusätzliche Negativtests.
 8. Legacy-Destroy weiterhin zulässig, aber nur mit V2-Approval?
 9. Evidence-Aufbewahrung und Zugriffsrechte?
 10. Key-Owner/Rotation/Revocation, falls signiert?
+
+## Nachtrag 12A-1 — Empfehlungen (weiterhin nicht genehmigt)
+
+Die detaillierte Entscheidungsvorlage steht in
+`docs/reports/MO-RC4-SECURITY-APPROVAL-DECISION-12A-1.md`.
+
+Empfohlen, aber **nicht freigegeben**:
+
+- **Trust:** lokal Modell A mit geschützter Evidence; CI Modell C; bei
+  getrennten Hosts/externer Quelle Modell B (Signatur).
+- **Vertrag:** separates `ApprovalEvidence`-V2-Artefakt, nicht in
+  `ApprovalContext` integriert.
+- **`--yes`:** ausschließlich Prompt-Unterdrückung; ohne gültige V2-Evidence
+  für APPLY/DESTROY **DENY**.
+- **Fingerprint:** SHA-256 über die rohen Bytes der ausgeführten binären
+  Terraform-Plan-Datei; Plan-JSON nur ergänzend.
+- **TOCTOU:** private, unveränderliche Ausführungskopie plus erneuter Hash
+  unmittelbar vor Ausführung.
+- **Ablauf:** 15 Minuten (konfigurierbar), UTC, ±60 s Clock-Skew.
+- **Replay:** lokaler atomarer Verbrauch für lokale Läufe; zentraler Store
+  für mehrere CI-Runner/externe Systeme. Lokaler Store ist kein globaler
+  Schutz.
+- **Legacy:** ungebundene Freigaben für Mutationen **DENY**, keine
+  automatische Aufwertung.
+- **Destroy:** eigene DESTROY-Evidence und eigener Plan-Fingerprint; keine
+  APPLY-Übernahme.
+- **Signatur:** für CI/multi-host/externe Approval-Quelle erforderlich oder
+  durch gleichwertige authentifizierte Übertragung zu ersetzen; lokal nicht
+  zwingend, dann keine Non-Repudiation-Behauptung.
+
+Offene Entscheidungen: Trust-Key/Signatur, `--yes`-Semantik mit Evidence,
+Ablaufdauer, Replay-Speicher, binärer vs. JSON-Fingerprint, persistente vs.
+flüchtige interaktive Evidence, CI-Migration, Legacy-Destroy,
+Evidence-Aufbewahrung und Key-Rotation.
 
 ## Status
 
