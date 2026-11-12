@@ -7,11 +7,12 @@ following are true:
 - ``MO_E2E_LIVE=1``
 - ``API_BASE_URL`` is set
 - a pre-provisioned ``ACCESS_TOKEN`` is present
-- a safe product cleanup capability is available
+- ``MO_E2E_LIVE_CLEANUP=1`` is explicitly approved
+- ``E2E_SUBJECT`` matches the access-token subject and is verified against
+  each stored order before cleanup
 
-The last condition is currently false. The authenticated live tests therefore
-remain **BLOCKED** by design; no order is created. There is no direct DynamoDB
-deletion workaround.
+Without these conditions no order is created. There is no silent fallback to
+direct DynamoDB deletion.
 
 The previous global SQS queue-count assertion was removed: it was not
 run-scoped and could neither prove ownership nor provide safe cleanup.
@@ -28,17 +29,18 @@ from tests.e2e_harness import (
     BLOCKED,
     ApiClient,
     CleanupError,
-    CleanupUnavailable,
     Diagnostic,
     E2ERun,
+    LiveCleanupBackend,
     Urllib3Transport,
     resolve_auth,
     response_json,
 )
 
-# No safe, owner-scoped order-delete operation exists in the RC4 API.
-# Do not add direct DynamoDB deletion as a workaround.
-LIVE_CLEANUP_AVAILABLE = False
+# Live order tests are enabled only for an explicitly approved run with an
+# owner-verified cleanup backend. There is no silent fallback to direct DDB
+# deletion when this opt-in is absent.
+LIVE_CLEANUP_AVAILABLE = os.environ.get("MO_E2E_LIVE_CLEANUP") == "1"
 
 CONFIRM_TIMEOUT_SECONDS = int(os.environ.get("E2E_CONFIRM_TIMEOUT_SECONDS", "60"))
 POLL_INTERVAL_SECONDS = float(os.environ.get("E2E_POLL_INTERVAL_SECONDS", "3"))
@@ -48,12 +50,6 @@ def _live_endpoint():
     if os.environ.get("MO_E2E_LIVE") != "1":
         return None
     return (os.environ.get("API_BASE_URL") or "").strip() or None
-
-
-def _safe_cleanup(_order):
-    raise CleanupUnavailable(
-        "no safe owner-scoped order delete operation; live cleanup is BLOCKED"
-    )
 
 
 class LiveE2EBase(unittest.TestCase):
@@ -68,10 +64,18 @@ class LiveE2EBase(unittest.TestCase):
             self.skipTest(f"BLOCKED: {self.auth.blocked_reason}")
         if not LIVE_CLEANUP_AVAILABLE:
             self.skipTest(
-                "BLOCKED: no safe owner-scoped order cleanup capability; "
-                "live order creation is intentionally disabled"
+                "BLOCKED: no explicit live cleanup approval; set "
+                "MO_E2E_LIVE_CLEANUP=1 only for an approved run"
             )
+        subject_id = (os.environ.get("E2E_SUBJECT") or "").strip()
+        if not subject_id:
+            self.skipTest("BLOCKED: E2E_SUBJECT missing for owner-verified cleanup")
         self.run = E2ERun()
+        self.cleanup_backend = LiveCleanupBackend(
+            table_name=os.environ.get("ORDERS_TABLE", ""),
+            region=os.environ.get("AWS_REGION", "eu-central-1"),
+            subject_id=subject_id,
+        )
         self.client = ApiClient(
             self.auth.api_base_url,
             access_token=self.auth.access_token,
@@ -82,11 +86,8 @@ class LiveE2EBase(unittest.TestCase):
         if not getattr(self, "run", None) or not self.run.orders:
             return
         try:
-            self.run.cleanup_all(_safe_cleanup)
+            self.run.cleanup_all(self.cleanup_backend)
         except CleanupError:
-            # This branch is unreachable while LIVE_CLEANUP_AVAILABLE is false;
-            # it makes a future incomplete cleanup fail visibly rather than
-            # silently dropping test data.
             for order in self.run.orders:
                 order.cleanup_status = BLOCKED
             raise

@@ -198,6 +198,56 @@ class CleanupResult:
     error_type: Optional[str] = None
 
 
+class LiveCleanupBackend:
+    """Owner-verified cleanup for explicitly approved live test runs.
+
+    This class is only constructed when ``MO_E2E_LIVE_CLEANUP=1``. It verifies
+    the stored ``subjectId`` before deleting the exact order item. It is not a
+    general deletion service and never touches foreign orders.
+    """
+
+    def __init__(self, *, table_name: str, region: str, subject_id: str):
+        if not table_name:
+            raise CleanupUnavailable("ORDERS_TABLE missing for live cleanup")
+        if not subject_id:
+            raise CleanupUnavailable("E2E_SUBJECT missing for live cleanup")
+        import boto3
+
+        self.client = boto3.client("dynamodb", region_name=region)
+        self.table_name = table_name
+        self.subject_id = subject_id
+
+    def __call__(self, order: OwnedOrder) -> None:
+        key = {
+            "pk": {"S": f"ord_{order.order_id}"},
+            "sk": {"S": "#ORDER"},
+        }
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key=key,
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        if not item:
+            return
+        stored_subject = (item.get("subjectId") or {}).get("S")
+        if stored_subject != self.subject_id:
+            raise CleanupOwnershipError(
+                "refusing live cleanup: stored subject does not match E2E_SUBJECT"
+            )
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key=key,
+                ConditionExpression="subjectId = :sid",
+                ExpressionAttributeValues={":sid": {"S": self.subject_id}},
+            )
+        except Exception as exc:
+            raise CleanupError(
+                f"live cleanup failed for order {order.order_id}: {type(exc).__name__}"
+            ) from exc
+
+
 class CleanupLedger:
     """Tracks cleanup only for records created by the current test run."""
 
