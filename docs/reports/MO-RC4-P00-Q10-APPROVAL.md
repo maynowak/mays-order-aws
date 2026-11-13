@@ -8,6 +8,11 @@
 **Modus:** Dokumentation und Read-only-Prüfung; keine Produkt-/Terraform-/AWS-
 Änderung, kein Push, kein Merge, kein Tag, kein Deployment.
 
+> **Historischer Stand:** Dieses Dokument dokumentiert die Q-10-Freigabe.
+> P00-B wurde anschließend separat autorisiert und auf
+> `feature/mo-rc4-p00-b-secret-provider` implementiert; siehe
+> `docs/reports/MO-RC4-P00-B-SECRET-PROVIDER-FOUNDATION.md`.
+
 ```text
 MO-RC4-P00-Q10 — ADR-008 APPROVED / P00-B READY FOR AUTHORIZATION
 ```

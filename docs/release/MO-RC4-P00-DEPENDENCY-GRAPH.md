@@ -5,8 +5,8 @@
 **Base:** `/home/dci-student/projects/Mays-Orders-AWS-rc4-integration` @ `release/rc4-integration`
 
 > **Decision status 2026-11-13:** Q-02, Q-08 and Q-10 are DECIDED; ADR-008 is
-> `ACCEPTED`. P00-B is **READY FOR AUTHORIZATION**; no implementation has
-> started. P00-C/D/E/G remain separately gated.
+> `ACCEPTED`. P00-B is **IMPLEMENTED / TESTED ON A FEATURE BRANCH**, not merged.
+> P00-C/D/E/G remain separately gated.
 
 ---
 

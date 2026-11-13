@@ -27,6 +27,7 @@ from identity import (
 )
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
+from secret_provider import SecretProvider, SecretProviderError, create_secret_provider
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
@@ -139,9 +140,34 @@ def is_validation_exception(err: Any) -> bool:
 
 
 class OrderService:
-    def __init__(self, table_name: str, client: Any = None) -> None:
+    def __init__(
+        self,
+        table_name: str,
+        client: Any = None,
+        secret_provider: Optional[SecretProvider] = None,
+    ) -> None:
         self._table_name = table_name
         self._table = client if client is not None else _get_dynamodb_resource().Table(table_name)
+        self._secret_provider = secret_provider
+
+    def _resolve_privacy_secret(self) -> str:
+        """Resolve the internal privacy secret once per service instance.
+
+        Provider selection comes only from configuration, never from request
+        data. Provider errors are mapped to the existing fail-closed 400 path
+        without exposing provider internals, ARNs or secret values.
+        """
+        try:
+            provider = self._secret_provider
+            if provider is None:
+                provider = create_secret_provider()
+                self._secret_provider = provider
+            material = provider.resolve()
+        except SecretProviderError as exc:
+            raise validation_error(exc.public_message) from None
+        if not material.value:
+            raise validation_error("Internal secret not configured")
+        return material.value
 
     def _require_privacy_auth(self, context: Optional[Dict[str, Any]], permission: str) -> None:
         if not context or not context.get("project"):
@@ -155,15 +181,13 @@ class OrderService:
             raise validation_error("Unauthorized privacy operation")
         if not context.get(permission):
             raise validation_error(f"Missing permission {permission}")
-        # Internal trust boundary: secret must be configured and token must match
-        internal_secret = os.environ.get("PRIVACY_INTERNAL_SECRET")
-        if not internal_secret:
-            raise validation_error("Internal secret not configured")
+        # Internal trust boundary: secret must be configured and token must match.
+        # The provider remains ENV by default; no request field can select it.
+        internal_secret = self._resolve_privacy_secret()
         token = context.get("internal_token")
         if not token:
             raise validation_error("Internal token missing")
-        # Use constant-time compare
-        import secrets
+        # Use constant-time compare (existing privacy contract).
         if not secrets.compare_digest(str(token), str(internal_secret)):
             raise validation_error("Internal trust boundary violation")
 
@@ -783,5 +807,9 @@ class OrderService:
         }
 
 
-def create_order_service(table_name: str, client: Any = None) -> OrderService:
-    return OrderService(table_name, client)
+def create_order_service(
+    table_name: str,
+    client: Any = None,
+    secret_provider: Optional[SecretProvider] = None,
+) -> OrderService:
+    return OrderService(table_name, client, secret_provider=secret_provider)

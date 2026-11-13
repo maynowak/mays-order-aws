@@ -76,17 +76,19 @@ These branches remain unchanged; no work was deleted.
 ## 5. P00 Status
 
 ```text
-P00 — OPEN / NOT INCLUDED
-AWS_MANAGED: MISSING / Q-02 + Q-08 + Q-10 APPROVED
-APP_MANAGED: MISSING / Q-10 APPROVED, OTHER GATES OPEN
+P00 — OPEN / FEATURE-BRANCH IMPLEMENTATION ONLY
+AWS_MANAGED: CONFIG FOUNDATION / RESOURCE + IAM + KMS MISSING
+APP_MANAGED: CONFIG CONTRACT / KEY LOADER + HMAC MISSING
 KMS backup stash: UNCHANGED, NOT APPLIED
-P00-B: READY FOR AUTHORIZATION, NOT STARTED
+P00-B: IMPLEMENTED / TESTED ON FEATURE BRANCH / NOT MERGED
 ```
 
-P00 design/ADR documents are integrated; implementation remains a separate
-RC4 work package. Q-02 (Secrets Manager), Q-08 (ARN/name reference + runtime
-fetch) and Q-10 (ADR-008, C-01…C-07) are owner-approved; ADR-008 is `ACCEPTED`.
-No P00 completion is claimed and no package is started.
+P00 design/ADR documents and P00-B source/tests are prepared on
+`feature/mo-rc4-p00-b-secret-provider`; they are **not** integrated into this
+branch. Q-02 (Secrets Manager), Q-08 (ARN/name reference + runtime fetch) and
+Q-10 (ADR-008, C-01…C-07) are owner-approved; ADR-008 is `ACCEPTED`.
+No P00 completion is claimed, no P00-C/D resource exists and no package is
+merged.
 
 ## 6. Release Readiness
 
