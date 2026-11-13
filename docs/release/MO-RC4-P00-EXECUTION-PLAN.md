@@ -1,7 +1,8 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / Q-02 + Q-08 + Q-10 APPROVED / P00-B READY FOR AUTHORIZATION
-**Base:** `release/rc4-integration` @ `dd4879951c19a60400d3b4fb7a01d394600a4a90`
+**Status:** EXECUTION PLAN READY / Q-02 + Q-08 + Q-10 APPROVED / P00-B READY FOR INTEGRATION
+**Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
+**Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 

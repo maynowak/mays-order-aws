@@ -77,6 +77,19 @@ The order may change only with documented dependency justification.
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-08/Q-10 approved; Q-04, Q-09 pending |
 
+### P00-C-M01 — Effective SecretProvider Cache Lifetime
+
+| Field | Content |
+|---|---|
+| Status | **OPEN — mandatory P00-C acceptance criterion** |
+| Source | `MO-RC4-P00-B-INTEGRATION-REVIEW-01` finding M-01 |
+| Problem | P00-B `SecretCache` is owned by a per-invocation `OrderService` (`index.py:252`); effective scope is one invocation, not one Lambda execution environment. |
+| Required scope | Document the actual cache scope and implement either a module-scoped provider/cache or an explicitly documented per-invocation fetch policy. |
+| Identity isolation | Cache key must remain bound to provider, exact reference/identity, key version/fingerprint and KMS reference; no cross-identity reuse. |
+| Rotation | Define cache invalidation/refresh for the approved Q-11 rotation procedure; no silent stale material. |
+| Tests | Add positive/negative tests for cross-invocation reuse and cross-identity isolation; preserve ENV default behavior. |
+| Gate | Must be evidenced before P00-C integration; it is not a retroactive P00-B merge blocker. |
+
 ---
 
 ## P00-D — APP_MANAGED / Versioned HMAC
