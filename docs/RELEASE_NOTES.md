@@ -2,10 +2,11 @@
 
 # RC4 Module Candidate — NOT RELEASED
 
-STATUS: `RC4 MODULE RELEASE CONDITIONALLY READY`
-VERSION: Release-Label offen (Q-12) — `v0.5.0-rc.4` vs. `v0.6.0-rc.1`
+STATUS: `RELEASE CANDIDATE — NOT PUBLISHED`
+OWNER STATUS: `RC4 RELEASE OWNER APPROVAL PENDING`
+VERSION (PROPOSED): `v0.5.0-rc.4` — not approved, not tagged
 DEPLOYMENT VERSION (Teststack): `0.2.0`
-BASE: `614d06a4177bcbfb0ece484cebb8ddc03acac67f`
+BASE: `0aa95484bb237edea8e417cb765b32f76b97b77f`
 
 SCOPE (proposed; owner approval required):
 - Order-API, Owner-/Consumer-Isolation, Statusmodell, SQS-Worker, DLQ,
@@ -35,8 +36,9 @@ KNOWN LIMITATIONS:
   deduplication is not.
 - Only `generic` is the productive handler. Other handlers are not part of the
   verified RC4 scope.
-- P00 KMS/Secrets-Manager/Retention is not implemented; P00 scope is not
-  formally decided.
+- P00 KMS/Secrets-Manager/Retention is **not represented as fulfilled** in this
+  limited module candidate. Production KMS/Secret-Management/Rotation/Retention
+  requirements remain in force and are not waived.
 - SEC-06 ApprovalEvidence V2 is proposed, not implemented.
 - Terraform teststack drift: two `source_code_hash` changes are not applied;
   no structural/data change.
