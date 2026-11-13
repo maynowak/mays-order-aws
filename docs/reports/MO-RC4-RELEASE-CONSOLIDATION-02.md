@@ -236,7 +236,7 @@ historischen Reports übernommen.
 | Feld | Wert |
 |---|---|
 | Merge-Commit | `bb8edce81f67db4767f03528d1214e5b63247992` |
-| Dokumentations-Commit | wird nach Commit eingetragen |
+| Dokumentations-Commit | `312782f897f5c482e12452b8af43c6cd3f7efbdd` |
 | Working Tree nach Commit | CLEAN |
 
 **STOP — kein Push, kein Main-Merge, kein Release-Tag, kein Deployment.**
