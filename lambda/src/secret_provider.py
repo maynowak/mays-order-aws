@@ -11,7 +11,7 @@ import os
 import re
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol
 
 from errors import VALIDATION_ERROR, OrderError
 
@@ -36,8 +36,6 @@ _SECRET_ARN_PATTERN = re.compile(
 _KMS_KEY_ARN_PATTERN = re.compile(
     r"^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]{1,2048}$"
 )
-
-T = TypeVar("T")
 
 
 def validate_secret_reference(reference: str) -> str:

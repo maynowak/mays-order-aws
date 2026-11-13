@@ -11,14 +11,15 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — P00 Security Architecture (owner decisions in progress)
+RC4 Integration — P00 Security Implementation (P00-B on feature branch)
 
 Current Feature:
-MO-RC4 P00 — SecretProvider, AWS_MANAGED, APP_MANAGED, KMS, Retention
+MO-RC4 P00 — SecretProvider Foundation implemented; AWS_MANAGED/APP_MANAGED
+integration contracts prepared
 
 Current Task:
-MO-RC4-P00-Q10 — ADR-008 nach C-01…C-07 freigegeben und ACCEPTED; Q-02/Q-08/Q-10
-approved; P00-B ready for authorization; keine P00-Implementierung gestartet
+MO-RC4-P00-B — SecretProvider Foundation IMPLEMENTATION COMPLETE / INTEGRATION
+REVIEW READY; 1.208 lokale PASS (669/128/379/32) + 28 Seed; nicht gemerged
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -38,11 +39,12 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-release/rc4-integration (zentraler RC4-Integrationsbranch, Basis 086a8be; P00 dokumentiert,
-keine Implementierung)
+feature/mo-rc4-p00-b-secret-provider (P00-B implementiert, getestet; NICHT gemerged)
 → P00-Entscheidungen: Q-02 Secrets Manager APPROVED; Q-08 ARN/Name + Runtime-Fetch
-  APPROVED; Q-10 ADR-008 APPROVED/ACCEPTED (C-01…C-07 eingearbeitet);
-  P00-B READY FOR AUTHORIZATION, Implementierung nicht gestartet
+  APPROVED; Q-10 ADR-008 APPROVED/ACCEPTED (C-01…C-07 eingearbeitet)
+→ P00-B: ENV-Default gekapselt; AWS_MANAGED/APP_MANAGED-Konfigurationsverträge;
+  Runtime-Fetch-Adapter mit injiziertem Fetcher; Cache/Fehler/Redaction; 34 neue Tests
+→ P00-C/P00-D: nicht gestartet (IAM/KMS/Secrets-Ressource bzw. APP-HMAC bleiben offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

@@ -162,7 +162,7 @@ Vollständige Aufträge:
 
 | Paket | Inhalt | Start nach |
 |---|---|---|
-| P00-B | SecretProvider Foundation | Q-08/Q-10 APPROVED; **READY FOR AUTHORIZATION** |
+| P00-B | SecretProvider Foundation | **IMPLEMENTED / TESTED / INTEGRATION REVIEW READY** (feature branch) |
 | P00-C | AWS_MANAGED / Secrets Manager | B, Q-02/Q-08/Q-09/Q-10 |
 | P00-D | APP_MANAGED / HMAC | B, Q-10/Q-11 |
 | P00-E | KMS/Terraform/IAM | Q-04/Q-09/Q-10 |
@@ -209,15 +209,15 @@ Integrationsgate und STOP-Bedingungen.
 ## 9. Status und nächster Schritt
 
 ```text
-MO-RC4-P00-ORCHESTRATION-01 — Q-02 + Q-08 + Q-10 APPROVED / P00-B READY FOR AUTHORIZATION
+MO-RC4-P00-ORCHESTRATION-01 — Q-02 + Q-08 + Q-10 APPROVED / P00-B IMPLEMENTED ON FEATURE BRANCH
 ```
 
 Nächster Schritt:
 
 1. Q-02/Q-08/Q-10 sind entschieden; Q-10 ist nach vollständiger Einarbeitung
    von C-01…C-07 und ADR-008-Status `ACCEPTED` freigegeben.
-2. P00-B ist für eine separate Paketfreigabe bereit; keine Implementierung
-   wurde gestartet.
+2. P00-B ist implementiert/getestet auf `feature/mo-rc4-p00-b-secret-provider`;
+   Integration Review steht aus, kein Merge.
 3. Danach Q-04/Q-09 (KMS/Gate) und Q-05/Q-07/Q-14 (Retention);
    Q-06 mit Legal/Operations.
 4. Q-03/Q-11/Q-13 vor den jeweiligen Paketen; Q-12 vor Release-Gate.

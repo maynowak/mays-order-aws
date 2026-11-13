@@ -1,16 +1,15 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-08 + Q-10 APPROVED / P00-B READY FOR AUTHORIZATION
+**Status:** DRAFTED / Q-02 + Q-08 + Q-10 APPROVED / P00-B IMPLEMENTED ON FEATURE BRANCH
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
 
 > **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
 > reference + runtime fetch) and Q-10 (ADR-008 after C-01…C-07) are approved.
-> ADR-008 is `ACCEPTED`. P00-B is ready for a separate package authorization.
-> No package may begin production implementation until its remaining Owner
-> gates and package authorization are closed. This is a backlog, not an
-> implementation start.
+> ADR-008 is `ACCEPTED`. P00-B is implemented and tested on its feature branch,
+> not merged. No other package may begin production implementation until its
+> remaining Owner gates and package authorization are closed.
 
 ---
 
@@ -56,7 +55,8 @@ The order may change only with documented dependency justification.
 | Security boundary | no secret values in response/log; no request-controlled reference |
 | Commit boundary | provider foundation + tests + docs only |
 | Owner approval | Q-08 approved; Q-10 approved |
-| Package status | **READY FOR AUTHORIZATION** — not started |
+| Package status | **IMPLEMENTED / TESTED / INTEGRATION REVIEW READY** — feature branch not merged |
+| Actual components | `lambda/src/secret_provider.py`, provider wiring in `order_service.py`, 34 provider/security tests, rebuilt ZIP |
 
 **Do not include:** Secrets Manager IAM/IaC, APP HMAC, rotation, retention.
 
