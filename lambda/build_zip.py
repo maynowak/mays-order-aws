@@ -18,15 +18,9 @@ SRC_DIR = pathlib.Path(__file__).resolve().parent / "src"
 DIST_DIR = pathlib.Path(__file__).resolve().parent / "dist"
 ZIP_PATH = DIST_DIR / "lambda.zip"
 
-MODULES = [
-    "index.py",
-    "order_service.py",
-    "state_machine.py",
-    "validation.py",
-    "errors.py",
-    "order_types.py",
-    "sqs_handler.py",
-]
+MODULES = sorted(
+    path.name for path in SRC_DIR.glob("*.py") if not path.name.startswith("_")
+)
 
 
 def build() -> None:

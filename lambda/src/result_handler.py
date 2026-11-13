@@ -43,10 +43,6 @@ def _signature(record: Dict[str, Any]) -> str:
 
 
 def handler(event: Dict[str, Any], context: Any = None) -> Dict[str, Any]:
-    table_name = os.environ.get("ORDERS_TABLE")
-    if not table_name:
-        raise RuntimeError("ORDERS_TABLE is not configured")
-
     secret = os.environ.get("ORDER_RESULT_SERVICE_SECRET")
     if not secret:
         # Fail closed: no verification material means nothing is trusted.
@@ -56,15 +52,31 @@ def handler(event: Dict[str, Any], context: Any = None) -> Dict[str, Any]:
                 "body": json.dumps({"processed": 0,
                                     "rejected": len(event.get("Records", [])),
                                     "reason": "service_secret_missing"})}
+    return process_records(event.get("Records", []), [secret])
 
-    service = create_order_service(table_name=table_name)
+
+def process_records(records: List[Dict[str, Any]],
+                    secrets: List[str],
+                    service: Any = None) -> Dict[str, Any]:
+    """Verify and apply a batch with one or more accepted HMAC keys.
+
+    Multiple keys support rotation: the consumer accepts ``current`` and
+    ``previous`` until the producer rollout is complete.
+    """
+    table_name = os.environ.get("ORDERS_TABLE")
+    if not table_name:
+        raise RuntimeError("ORDERS_TABLE is not configured")
+    service = service or create_order_service(table_name=table_name)
+
     processed = 0
     rejected = 0
 
-    for record in event.get("Records", []):
+    for record in records:
         message_id = record.get("messageId", "")
         body = record.get("body") or ""
-        if not verify_signature(secret, message_id, body, _signature(record)):
+        signature = _signature(record)
+        if not any(verify_signature(secret, message_id, body, signature)
+                   for secret in secrets if secret):
             logger.warning("result rejected: invalid service signature")
             rejected += 1
             continue

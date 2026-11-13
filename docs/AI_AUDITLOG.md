@@ -331,3 +331,13 @@ Date: 2026-11-13
 - The resource policy grants secretsmanager:GetSecretValue only to the explicitly supplied RIS producer role ARNs and is scoped to the secret ARN. An empty list leaves the secret without any cross-role grant.
 - Verified: terraform fmt -check = 0 and terraform validate = Success (1.17.0, -backend=false). No apply, no deployment, no AWS mutation.
 - Account reconciliation is recorded in the RIS report docs/reports/MO-RIS-AWS-INTEGRATION-PLAN-02.md: same account 240571105849 by file evidence, live verification blocked because the available credentials belong to 262370457690.
+
+
+[MO-RIS-AWS-LAMBDA-BRIDGE-01 / RESULT CONSUMER LAMBDA]
+Status: LOCAL VERIFIED - dedicated consumer entrypoint, not deployed.
+Date: 2026-11-13
+- Added lambda/src/result_consumer.py: separate Lambda entrypoint using the existing A06 boundary. HMAC keys come from Secrets Manager via ORDER_RESULT_SECRET_ARN, cached per container; the secret may be a JSON object {current, previous} for rotation or a bare string. Missing reference or unreadable secret fails closed with a reason code and no write.
+- result_handler refactored minimally: process_records(records, secrets, service=None) verifies against one or more accepted keys; the env-based handler delegates to it unchanged.
+- Packaging defect fixed: build_zip.py used a hardcoded module list, so identity/agent_order/result_envelope/result_handler/dispatch/result_consumer would never have been shipped. It now discovers src/*.py; the built zip contains 13 modules including result_consumer.py.
+- Tests: new tests/test_result_consumer_lambda.py 12 passed; full Orders suite 205 OK. Coverage includes valid result, ORDER_FAILED path via the shared boundary, rotation with the previous key, missing ARN, unavailable secret, forged signature, unknown version/type, wrong order, cancelled order and a partial batch.
+- No AWS call, no deployment, no Terraform change; the Lambda resources, roles and event source mappings remain the next gated step.
