@@ -647,6 +647,77 @@ class TestNonAsciiHardening(unittest.TestCase):
         self.assertEqual(raised.exception.http_status, 400)
 
 
+class TestProviderHardeningAdditional(unittest.TestCase):
+    def test_order_service_construction_does_not_eagerly_resolve_provider(self):
+        with patch.dict(
+            os.environ,
+            {"PRIVACY_SECRET_PROVIDER": "unknown", "PRIVACY_INTERNAL_SECRET": "ignored"},
+            clear=False,
+        ):
+            service = create_order_service("mays-orders", client=object())
+            self.assertIsNone(service._secret_provider)
+            with self.assertRaises(OrderError):
+                service._resolve_privacy_secret()
+
+    def test_wrong_token_with_malicious_context_still_fails(self):
+        class Provider:
+            def resolve(self):
+                return SecretMaterial(provider="env", value="expected")
+
+        service = create_order_service(
+            "mays-orders", client=object(), secret_provider=Provider()
+        )
+        context = {
+            "project": "mays-orders",
+            "authorized": True,
+            "privacy_inspect": True,
+            "internal_token": "wrong",
+            "secretProvider": "env",
+            "secretReference": "orders/other",
+            "provider": "env",
+        }
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(context, "privacy_inspect")
+        self.assertEqual(raised.exception.http_status, 400)
+
+    def test_two_services_share_the_process_wide_default_provider(self):
+        material = SecretMaterial(provider="env", value="shared")
+        calls = []
+
+        class Provider:
+            def resolve(self):
+                calls.append(1)
+                return material
+
+        provider = Provider()
+        with patch("order_service.get_default_secret_provider", return_value=provider):
+            first = create_order_service("mays-orders", client=object())
+            second = create_order_service("mays-orders", client=object())
+            self.assertEqual(first._resolve_privacy_secret(), "shared")
+            self.assertEqual(second._resolve_privacy_secret(), "shared")
+        self.assertEqual(calls, [1, 1])
+
+    def test_aws_error_message_is_not_exposed(self):
+        class ErrorWithSecret(_ClientError):
+            def __init__(self):
+                super().__init__("AccessDeniedException")
+                self.response["Error"]["Message"] = "raw-secret-value"
+
+        provider = SecretsManagerProvider(
+            SecretProviderConfig.from_environment(
+                {
+                    "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+                    "PRIVACY_SECRET_ID": "orders/privacy",
+                }
+            ),
+            lambda reference: (_ for _ in ()).throw(ErrorWithSecret()),
+        )
+        with self.assertRaises(SecretAccessDenied) as raised:
+            provider.resolve()
+        self.assertNotIn("raw-secret-value", str(raised.exception))
+
+
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):
     def test_order_service_uses_injected_env_provider(self):
         provider = EnvSecretProvider(
