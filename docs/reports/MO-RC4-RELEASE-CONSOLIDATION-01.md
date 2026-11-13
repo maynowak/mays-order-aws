@@ -227,7 +227,7 @@ Baseline-Kompromiss getroffen.
 | Working Tree | CLEAN |
 | Integrationsbranch | nicht vorhanden |
 | RC3-Tag | nicht vorhanden |
-| Dokumentations-Commit | wird nach Commit eingetragen |
+| Dokumentations-Commit | `ed9467bf2dc9cbbbc138a825c341fdfdb717688e` |
 | Working Tree nach Commit | CLEAN |
 
 ---
