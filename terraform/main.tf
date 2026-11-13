@@ -240,3 +240,13 @@ moved {
   from = module.cognito_backup_automation
   to   = module.cognito_backup_automation[0]
 }
+
+module "agent_transport" {
+  count  = var.enable_agent_transport ? 1 : 0
+  source = "./modules/agent_transport"
+
+  project_name = var.project_name
+  tags         = var.tags
+
+  ris_result_producer_role_arns = var.ris_result_producer_role_arns
+}

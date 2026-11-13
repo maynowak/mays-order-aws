@@ -134,3 +134,18 @@ variable "enable_cognito_backup_automation" {
   type        = bool
   default     = true
 }
+# ---------------------------------------------------------------------------
+# Agent transport boundary (MO-RIS-AWS-INTEGRATION-PLAN-01).
+# Disabled by default: an existing installation plans zero changes.
+# ---------------------------------------------------------------------------
+variable "enable_agent_transport" {
+  description = "Create the agent result queue (Orders side of the boundary)."
+  type        = bool
+  default     = false
+}
+
+variable "ris_result_producer_role_arns" {
+  description = "RIS role ARNs allowed to enqueue agent results."
+  type        = list(string)
+  default     = []
+}
