@@ -1,11 +1,13 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / OWNER APPROVAL PENDING
-**Base:** `release/rc4-integration` @ `96265dfaa53cbd812030c0bafc5f3ca54efb2995`
+**Status:** EXECUTION PLAN READY / Q-02 + Q-08 APPROVED / Q-10 PENDING
+**Base:** `release/rc4-integration` @ `f2c41a077a724a09a67b08b8b442b98b094f86c5`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 
 > This plan prepares implementation orders. It does not start implementation.
+> Q-02 and Q-08 are owner-approved; Q-10 and the package authorizations remain
+> open. P00-B is still blocked by Q-10.
 
 ---
 
@@ -48,7 +50,8 @@ Before any implementation package:
 **Non-goals:** no Secrets Manager IaC, no KMS, no APP HMAC, no rotation, no
 retention.
 
-**Inputs:** Q-08, Q-10; `MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`.
+**Inputs:** Q-08 (approved 2026-11-13), Q-10 (pending);
+`MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`.
 
 **Affected files (proposed):**
 
@@ -75,7 +78,8 @@ provider failure, log redaction.
 
 **Integration gate:** SG-01, SG-02, SG-06, SG-08; full local regression.
 
-**STOP:** any owner decision missing; any fallback required to pass tests.
+**STOP:** Q-10 still open; any owner decision missing; any fallback required to
+pass tests.
 
 ---
 
@@ -83,7 +87,8 @@ provider failure, log redaction.
 
 **Goal:** Optional Secrets Manager provider and reference-only configuration.
 
-**Dependencies:** P00-B; Q-02, Q-04 (optional CMK), Q-08, Q-09, Q-10.
+**Dependencies:** P00-B; Q-02 (approved), Q-04 (optional CMK), Q-08
+(approved), Q-09, Q-10 (pending).
 
 **Affected files (proposed):**
 

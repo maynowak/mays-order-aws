@@ -1,10 +1,16 @@
 # MO-RC4-P00 Decision Register
 
-**Status:** OWNER DECISIONS PENDING
+**Status:** Q-02 + Q-08 DECIDED / Q-10 AND OTHERS PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **RC4 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Integration Branch:** `release/rc4-integration`
 **Prepared:** 2026-11-13
+
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager) and Q-08
+> (ARN/name reference + runtime fetch, no plaintext secret in Env) are
+> approved. Q-10 remains pending after the ADR-008/contract comparison
+> (`docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`). No product
+> implementation is authorized by these decisions.
 
 > Recommendations are not approvals. Only the Release Owner may change an
 > `OPEN`/`PROPOSED` item to `DECIDED`.
@@ -16,15 +22,15 @@
 | ID | Frage | Status | Blockiert |
 |---|---|---|---|
 | Q-01 | RC3-Tag / RC4-Baseline | **ALREADY_DECIDED** (Baseline only) | nichts mehr |
-| Q-02 | Secret-Backend | **READY_FOR_OWNER** | P00-B/C |
+| Q-02 | Secret-Backend | **DECIDED — Secrets Manager** | P00-C (Entscheidung geschlossen) |
 | Q-03 | Modulplatzierung | **READY_FOR_OWNER** | P00-H |
 | Q-04 | CMK erzeugen/extern | **READY_FOR_OWNER** | P00-E |
 | Q-05 | `tenantId` | **READY_FOR_OWNER** | P00-G |
 | Q-06 | Retention-Fristen | **BLOCKED_BY_EXTERNAL_DECISION** | P00-G |
 | Q-07 | Cancel-Anonymisierung | **READY_FOR_OWNER** | P00-G |
-| Q-08 | Secret-Referenz/Fetch | **READY_FOR_OWNER** | P00-B/C |
+| Q-08 | Secret-Referenz/Fetch | **DECIDED — ARN/Name + Runtime-Fetch** | P00-B/C (Entscheidung geschlossen) |
 | Q-09 | Policy-Gate-Erweiterung | **READY_FOR_OWNER** | P00-C/E/H |
-| Q-10 | ADR-008-Freigabe | **READY_FOR_OWNER** | P00-B/C/E |
+| Q-10 | ADR-008-Freigabe | **READY_FOR_OWNER — Abgleich abgeschlossen** | P00-B/C/E |
 | Q-11 | Rotation in RC4 | **READY_FOR_OWNER** | P00-D/F |
 | Q-12 | Release-Label | **READY_FOR_OWNER** | Release-Gate |
 | Q-13 | AWS-Testkonto | **READY_FOR_OWNER** | P00-I |
@@ -44,9 +50,13 @@ not an RC3 release approval and does not create a tag.
 | Security impact | Secrets Manager supports controlled versions/rotation; SSM needs separate policy; ENV is plaintext and not a production secret store |
 | Compatibility | Additive; default `env` remains |
 | Recommendation | **Secrets Manager** (`secretsmanager`) |
+| Owner decision | **APPROVED 2026-11-13 — Secrets Manager** |
 | Packages | P00-C, P00-F |
-| Owner gate | Q-02 |
-| Status | **READY_FOR_OWNER** |
+| Owner gate | Q-02 (closed) |
+| Status | **DECIDED** |
+
+The decision fixes the backend. It does not authorize P00-C implementation,
+Terraform, AWS access or secret creation.
 
 ---
 
@@ -130,8 +140,13 @@ not an RC3 release approval and does not create a tag.
 | Security impact | Runtime fetch avoids plaintext configuration; plaintext Env is not production-safe |
 | Compatibility | Default ENV unchanged; new provider opt-in |
 | Recommendation | **ARN/name reference + runtime fetch**, no plaintext Secret in Env |
+| Owner decision | **APPROVED 2026-11-13 — Option (a)**, no plaintext secret in Env; contract configuration/validation surface applies |
 | Packages | P00-B/C/H |
-| Owner gate | Q-08 |
+| Owner gate | Q-08 (closed) |
+| Status | **DECIDED** |
+
+The decision fixes reference/fetch semantics. It does not authorize P00-B
+implementation; Q-10 remains open.
 
 ---
 
@@ -153,14 +168,19 @@ not an RC3 release approval and does not create a tag.
 
 | Field | Content |
 |---|---|
-| Existing evidence | ADR-008 (PROPOSED), P00/P01 designs |
-| Options | (a) approve ADR-008, (b) revise, (c) reject |
+| Existing evidence | ADR-008 (PROPOSED), P00/P01 designs, `MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` |
+| Options | (a) approve ADR-008 with documented clarifications, (b) revise ADR first, (c) reject |
 | Security impact | KMS/Secrets service adoption needs a governance decision |
 | Compatibility | No runtime change until implementation |
-| Recommendation | **Approve ADR-008 as decision basis**, with P00-A contract clarifications |
+| Recommendation | **Approve ADR-008 with C-01…C-07**, then set ADR-008 to `ACCEPTED` |
 | Packages | P00-B/C/E |
 | Owner gate | Q-10 |
-| Status | **READY_FOR_OWNER** (ADR currently PROPOSED) |
+| Status | **READY_FOR_OWNER** — comparison complete; ADR-008 remains PROPOSED |
+
+The comparison found no hard architecture conflict, but seven clarifications
+(C-01…C-07) and two governance items (legacy question numbering, ADR-006
+status) must be resolved by the Owner. Q-10 is **not** approved by this
+register.
 
 ---
 
@@ -225,6 +245,7 @@ not an RC3 release approval and does not create a tag.
 ### Can be approved together
 
 - **Foundation bundle:** Q-02 + Q-08 + Q-10 (provider/backend/reference/ADR).
+  Q-02 and Q-08 are approved; Q-10 remains open pending the ADR clarifications.
 - **KMS bundle:** Q-04 + Q-09 (CMK ownership + gate rules).
 - **Retention bundle:** Q-05 + Q-06 + Q-07 + Q-14 (data model, legal, semantics).
 - **Later release bundle:** Q-03 + Q-11 + Q-13 (module, rotation scope, test account)
@@ -243,13 +264,13 @@ not an RC3 release approval and does not create a tag.
 
 | Question | Blocks |
 |---|---|
-| Q-02 | P00-C |
+| Q-02 | P00-C (decision closed; remaining Q-04/Q-09/Q-10 still gate implementation) |
 | Q-03 | P00-H |
 | Q-04 | P00-E |
 | Q-05 | P00-G |
 | Q-06 | P00-G |
 | Q-07 | P00-G |
-| Q-08 | P00-B/C |
+| Q-08 | P00-B/C (decision closed; P00-B still gated by Q-10) |
 | Q-09 | P00-C/E/H |
 | Q-10 | P00-B/C/E |
 | Q-11 | P00-D/F |
@@ -264,8 +285,10 @@ No package may start until its listed decisions are closed.
 ## 17. Status
 
 ```text
-OWNER_DECISIONS_PENDING
+Q-02 + Q-08 DECIDED / Q-10 AND REMAINING QUESTIONS PENDING
 ```
 
-Q-01 is baseline-decided; Q-02…Q-14 remain open/proposed. No product
-implementation is authorized by this register.
+Q-01 is baseline-decided. Q-02 and Q-08 are owner-approved. Q-03…Q-07 and
+Q-09…Q-14 remain open/proposed; Q-10 is ready for an owner decision after the
+ADR-008 comparison, but is not approved. No product implementation is
+authorized by this register.

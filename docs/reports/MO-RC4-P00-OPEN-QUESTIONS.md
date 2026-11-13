@@ -24,9 +24,17 @@ Frage entschieden ist. Empfehlungen sind Vorschläge, keine Beschlüsse.
 | **Q-13** | AWS-Testkonto für RC4-E2E (KMS/Secrets sind konto-/policy-abhängig) | (a) RIS-Testkonto `262370457690` erneut, (b) neues, isoliertes Testkonto, (c) kein AWS-Test in RC4 | **(a)** mit frischem Workspace; KMS/Secrets brauchen zusätzliche IAM-Rechte im Testkonto | P-13, E2E | E2E-Gate |
 | **Q-14** | Umgang mit Bestandsdaten ohne `retentionUntil` | (a) unbefristet belassen + Doku, (b) Backfill-Skript (separat, nicht RC4-Code), (c) Frist beim ersten Zugriff setzen | **(b)** als separater Auftrag; RC4-Code ändert Bestandsdaten nicht | P-08 | Datenmigration |
 
+> **Owner-Update 2026-11-13:** Q-02 (Secrets Manager) und Q-08 (ARN/Name-
+> Referenz + Laufzeit-Fetch) sind freigegeben. Q-10 bleibt nach dem
+> ADR-008/Contract-Abgleich offen. Die Tabelle bleibt als historische
+> Entscheidungsgrundlage erhalten; maßgeblich ist der aktuelle
+> `docs/release/MO-RC4-P00-DECISION-REGISTER.md`.
+
 ## Entscheidungsbedarf vor Implementierungsstart
 
-**Blockierend (P0):** Q-01, Q-02, Q-04, Q-08, Q-09, Q-10
+**Blockierend (P0), historischer Stand:** Q-01, Q-02, Q-04, Q-08, Q-09, Q-10.
+Davon sind Q-02 und Q-08 am 2026-11-13 freigegeben; Q-04/Q-09/Q-10 bleiben
+offen.
 **Wichtig, aber nicht blockierend für P-01/P-15:** Q-03, Q-05, Q-06, Q-07, Q-11, Q-13, Q-14
 **Spätestens vor Release:** Q-12
 

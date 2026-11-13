@@ -1,12 +1,14 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / OWNER DECISIONS PENDING
+**Status:** DRAFTED / Q-02 + Q-08 APPROVED / Q-10 PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
 
-> No package may begin production implementation until its Owner gates are
-> closed. This is a backlog, not an implementation start.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager) and Q-08 (ARN/name
+> reference + runtime fetch) are approved. No package may begin production
+> implementation until its remaining Owner gates are closed. P00-B remains
+> blocked by Q-10. This is a backlog, not an implementation start.
 
 ---
 
@@ -51,7 +53,7 @@ The order may change only with documented dependency justification.
 | Migration risk | accidental behavior change; mitigate with default-off and regression tests |
 | Security boundary | no secret values in response/log; no request-controlled reference |
 | Commit boundary | provider foundation + tests + docs only |
-| Owner approval | Q-08, Q-10 |
+| Owner approval | Q-08 approved; **Q-10 pending** |
 
 **Do not include:** Secrets Manager IAM/IaC, APP HMAC, rotation, retention.
 
@@ -70,7 +72,7 @@ The order may change only with documented dependency justification.
 | Migration risk | secret in state/plan if ephemeral misuse; DDB/SQS not touched |
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
-| Owner approval | Q-02, Q-04, Q-08, Q-09, Q-10 |
+| Owner approval | Q-02/Q-08 approved; Q-04, Q-09, Q-10 pending |
 
 ---
 

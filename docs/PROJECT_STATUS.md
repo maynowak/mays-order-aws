@@ -4,21 +4,22 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-02)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-13)
 
 ```text
 May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Release Candidate — v0.5.0-rc.3 (MO-Modul-Integration + RIS) — GO fuer RC
+RC4 Integration — P00 Security Architecture (owner decisions in progress)
 
 Current Feature:
-MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
+MO-RC4 P00 — SecretProvider, AWS_MANAGED, APP_MANAGED, KMS, Retention
 
 Current Task:
-MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 — abgeschlossen: Verify PASS, E2E 9/9 PASS, Destroy 58/58,
-RC4-State (inkl. Versionen) entfernt; Main-Integration BLOCKED (Auto-Apply-Pipeline `directAWSGit`)
+MO-RC4-P00-ORCHESTRATION-01 — Q-02 (Secrets Manager) und Q-08 (ARN/Name-Referenz +
+Laufzeit-Fetch) owner-approved; Q-10 (ADR-008) pending nach konkretem Abgleich;
+keine P00-Implementierung gestartet
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -38,7 +39,10 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00 dokumentiert, keine Implementierung)
+release/rc4-integration (zentraler RC4-Integrationsbranch, Basis 086a8be; P00 dokumentiert,
+keine Implementierung)
+→ P00-Entscheidungen: Q-02 Secrets Manager APPROVED; Q-08 ARN/Name + Runtime-Fetch
+  APPROVED; Q-10 ADR-008 PENDING (Abgleich: keine harten Konflikte, C-01…C-07 offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

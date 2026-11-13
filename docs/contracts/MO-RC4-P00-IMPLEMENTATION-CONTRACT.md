@@ -1,11 +1,16 @@
 # MO-RC4-P00 Implementation Contract
 
-**Status:** DRAFTED / OWNER DECISIONS PENDING
+**Status:** DRAFTED / Q-02 + Q-08 OWNER-APPROVED / Q-10 AND OTHERS PENDING
 **Scope:** P00 SecretProvider, AWS_MANAGED, APP_MANAGED, KMS/encryption,
 rotation and retention integration
 **Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Branch:** `release/rc4-integration`
 **Reference:** `docs/reports/MO-RC4-P00-A-SECURITY-ARCHITECTURE-DECISION.md`
+
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager) and Q-08 (ARN/name
+> reference + runtime fetch, no plaintext secret in Env) are approved. This is
+> a contract decision only; no implementation is authorized. Q-10 remains
+> pending after `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`.
 
 > This is an implementation contract, not code. No field below is approved for
 > implementation until the corresponding Owner Decision is closed.
@@ -105,8 +110,10 @@ PRIVACY_KMS_KEY_ARN     = <key ARN>     # optional for AWS_MANAGED/KMS paths
 | unset | `env` default | — |
 | unknown | — | fail-closed |
 
-**Note:** Rejecting conflicting configuration is a proposed safety rule; Q-08
-must confirm the exact configuration surface.
+**Note:** Q-08 is owner-approved for the ARN/name-reference plus runtime-fetch
+direction. Rejecting conflicting configuration remains the safety rule in this
+contract to prevent silent mode confusion; any deviation requires an explicit
+contract change.
 
 ---
 
@@ -316,18 +323,20 @@ No fallback or automatic migration between ENV/AWS_MANAGED/APP_MANAGED.
 
 Implementation must not start on:
 
-- Q-02 (backend),
+- ~~Q-02 (backend)~~ — **owner-approved 2026-11-13: Secrets Manager**;
 - Q-03 (module placement),
 - Q-04 (CMK ownership),
 - Q-05 (`tenantId`),
 - Q-06 (retention duration),
 - Q-07 (cancel semantics),
-- Q-08 (reference/fetch shape),
+- ~~Q-08 (reference/fetch shape)~~ — **owner-approved 2026-11-13:
+  ARN/name reference + runtime fetch**;
 - Q-09 (policy gate),
-- Q-10 (ADR approval),
+- Q-10 (ADR approval — comparison complete, decision pending),
 - Q-11 (rotation scope),
 - Q-12 (release label),
 - Q-13 (test account),
 - Q-14 (legacy backfill).
 
-P00-A itself is documentation only.
+Q-02/Q-08 approval does not start P00-B or P00-C; Q-10 and the package
+authorization still gate implementation. P00-A itself is documentation only.

@@ -11,8 +11,14 @@
 kein Merge/Cherry-Pick, kein Push, kein Release-Tag.
 
 ```text
-MO-RC4-P00-A — CONTRACT DRAFTED / OWNER DECISIONS PENDING
+MO-RC4-P00-A — CONTRACT DRAFTED / Q-02 + Q-08 APPROVED / Q-10 PENDING
 ```
+
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager) und Q-08 (ARN/Name-
+> Referenz + Laufzeit-Fetch, kein Klartext-Secret in Env) sind freigegeben.
+> Q-10 bleibt nach dem ADR-008-Abgleich offen
+> (`docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`). Die Freigaben
+> autorisieren keine Implementierung.
 
 Der technische Vertrag ist konsistent ableitbar, aber mehrere
 sicherheitsrelevante Entscheidungen sind weiterhin **PROPOSED** bzw. **OPEN**.
@@ -35,6 +41,7 @@ entschieden.
 | `architecture/architecture-decisions.md` ADR-008 | PROPOSED, nicht freigegeben |
 | `docs/release/RC4-INTEGRATION-MANIFEST.md` | Integrationsbasis |
 | `docs/reports/MO-RC4-RELEASE-CONSOLIDATION-02.md` | Integrationsnachweis |
+| `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` | Owner-Update 2026-11-13; Q-10-Abgleich |
 
 ### 1.1 Bestätigte Baseline
 
@@ -50,22 +57,23 @@ entschieden.
 | ID | Architekturfrage | Bisherige Entscheidung | Evidenz | Status | Handlungsbedarf |
 |---|---|---|---|---|---|
 | Q-01 | RC3-Tag nachziehen? | Kein Tag; `086a8be` nur als RC4-Baseline autorisiert | Release-Owner-Autorisierung; `PROJECT_STATUS` | **DECIDED (nur Baseline)** | Keine RC3-Releasefreigabe; kein Tag |
-| Q-02 | Secret-Backend | Secrets Manager empfohlen | P00 P-02; ADR-008 D-5 | **PROPOSED** | Owner-Freigabe |
+| Q-02 | Secret-Backend | Secrets Manager | P00 P-02; ADR-008 D-5; Owner-Freigabe 2026-11-13 | **DECIDED** | Backend festgelegt; P00-C bleibt durch Q-04/Q-09/Q-10 gated |
 | Q-03 | Wo neue Module anbieten? | Eigenes `orders-service-hardened`-Preset empfohlen | P00 P-11; Q-03 | **OPEN** | Owner/Builder-Entscheidung |
 | Q-04 | KMS-Key erzeugen oder extern? | Beides: Default erzeugen, externer ARN override | P00 P-04; Q-04 | **PROPOSED** | Owner-Freigabe |
 | Q-05 | `tenantId`? | Optional, Default null | P00 P-08; Q-05 | **PROPOSED** | Owner/API-Entscheidung |
 | Q-06 | Retention-Fristen | 365/30 Tage vorgeschlagen, rechtlich zu bestätigen | P00 P-08/P-09; Q-06 | **OPEN** | Rechtlich/fachlich |
 | Q-07 | Cancel-Anonymisierung | Opt-in, Default Frist abwarten | P00 P-09; Q-07 | **PROPOSED** | Owner-Freigabe |
-| Q-08 | Secret-Zustellung | ARN/Referenz in Env, Laufzeit-Fetch | P00 P-01/P-02; Q-08 | **PROPOSED** | Owner-Freigabe |
+| Q-08 | Secret-Zustellung | ARN/Referenz in Env, Laufzeit-Fetch | P00 P-01/P-02; Q-08; Owner-Freigabe 2026-11-13 | **DECIDED** | Referenz/Fetch festgelegt; P00-B bleibt durch Q-10 gated |
 | Q-09 | Policy-Gate-Allowlist | Erweitern mit Regeln | P00 P-15; Q-09 | **PROPOSED** | Governance-Freigabe |
-| Q-10 | ADR/Services | ADR-008 für KMS/Secrets | ADR-008 | **PROPOSED** | ADR-Freigabe |
+| Q-10 | ADR/Services | ADR-008 für KMS/Secrets | ADR-008; ADR-008/Contract-Abgleich | **READY_FOR_OWNER** | ADR-008 bleibt PROPOSED; C-01…C-07 klären |
 | Q-11 | Rotation in RC4? | Native Rotation später; manuelle Rotation dokumentieren | P00 P-03; Q-11 | **PROPOSED** | Owner-Freigabe |
 | Q-12 | Release-Label | `v0.6.0-rc.1` bei P00-Feature-Generation, sonst `v0.5.0-rc.4` | Q-12; RC4-Dossier | **OPEN** | Release-Owner |
 | Q-13 | AWS-Testkonto | RIS-Testkonto erneut vorgeschlagen | Q-13 | **OPEN** | Owner/Testfreigabe |
 | Q-14 | Bestand ohne Retention | Separater Backfill, nicht RC4-Code | Q-14 | **OPEN** | Owner/Migration |
 
-**Statuslegende:** `DECIDED` nur für die ausdrücklich autorisierte Baseline;
-`PROPOSED` ist keine Freigabe; `OPEN` blockiert nur die abhängigen Pakete.
+**Statuslegende:** `DECIDED` = ausdrücklich autorisierte Entscheidung
+(Q-01 nur Baseline; Q-02/Q-08 am 2026-11-13 freigegeben); `PROPOSED` ist keine
+Freigabe; `OPEN`/`READY_FOR_OWNER` blockiert die abhängigen Pakete.
 
 ---
 
@@ -92,7 +100,8 @@ gesetzter Provider-Konfiguration aktiv werden.
 
 ### 3.2 AWS_MANAGED
 
-**Designstatus:** PROPOSED; Q-02/Q-08/Q-10 offen.
+**Designstatus:** Q-02/Q-08 entschieden (2026-11-13); Q-10 offen; P00-C nicht
+implementiert.
 
 - **Secret-Herkunft:** AWS Secrets Manager; `PRIVACY_SECRET_ID` referenziert den
   exakten ARN/Name.

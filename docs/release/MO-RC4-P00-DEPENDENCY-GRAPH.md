@@ -4,6 +4,10 @@
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 **Base:** `/home/dci-student/projects/Mays-Orders-AWS-rc4-integration` @ `release/rc4-integration`
 
+> **Decision status 2026-11-13:** Q-02 and Q-08 are DECIDED. Q-10 remains
+> pending after the ADR-008 comparison. P00-B is still blocked by Q-10; no
+> implementation has started.
+
 ---
 
 ## 1. Directed Graph

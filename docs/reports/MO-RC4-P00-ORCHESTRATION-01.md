@@ -29,7 +29,7 @@ nicht freigegeben.
 | RC3-Baseline | `086a8be` (autorisiert; kein Tag) |
 | P00-A | CONTRACT DRAFTED |
 | P00-Implementierung | PENDING |
-| Owner-Entscheidungen | PENDING |
+| Owner-Entscheidungen | Q-02 + Q-08 APPROVED; Q-10 und weitere PENDING |
 | Produktänderung in diesem Auftrag | keine |
 
 Der Branch ist der zentrale RC4-Integrationsstand. Es wurde keine Arbeit unter
@@ -68,15 +68,15 @@ keine separaten Schreibagenten auf dem Branch zugelassen.
 
 | ID | Empfehlung | Sicherheitsrisiko | Blockiert | Owner-Entscheidung |
 |---|---|---|---|---|
-| Q-02 | Secrets Manager | Plaintext/Umgehung bei ENV; Rotation nötig | P00-C | **OFFEN** |
+| Q-02 | Secrets Manager | Plaintext/Umgehung bei ENV; Rotation nötig | P00-C | **APPROVED 2026-11-13** |
 | Q-03 | separates `orders-service-hardened` | Modul-Defaults könnten RIS/Consumer beeinflussen | P00-H | **OFFEN** |
 | Q-04 | externer CMK-ARN + optional erzeugen | automatische CMK-Erzeugung/Kosten/Löschrisiko | P00-E | **OFFEN** |
 | Q-05 | `tenantId` optional/null | Pflichtfeld wäre API-Breaking-Change | P00-G | **OFFEN** |
 | Q-06 | Fristen konfigurierbar; Werte durch Legal | falsche Frist = Compliance/Datenverlust | P00-G | **BLOCKED_BY_EXTERNAL_DECISION** |
 | Q-07 | Opt-in-Anonymisierung, Default warten | vorzeitige Löschung von Nachweisen | P00-G | **OFFEN** |
-| Q-08 | ARN/Referenz + Laufzeit-Fetch | Klartext in Env | P00-B/C | **OFFEN** |
+| Q-08 | ARN/Referenz + Laufzeit-Fetch | Klartext in Env | P00-B/C | **APPROVED 2026-11-13** |
 | Q-09 | Gate-Allowlist mit Regeln | Wildcards/zu breite Rechte | P00-C/E/H | **OFFEN** |
-| Q-10 | ADR-008 freigeben | ungenehmigte neue Dienste | P00-B/C/E | **OFFEN** |
+| Q-10 | ADR-008 freigeben | ungenehmigte neue Dienste | P00-B/C/E | **OFFEN — ADR-Abgleich abgeschlossen** |
 | Q-11 | manuelle Rotation, native später | Cache-/Auth-Ausfall | P00-D/F | **OFFEN** |
 | Q-12 | Label abhängig vom P00-Scope | Release-Identität | Release-Gate | **OFFEN** (kann warten) |
 | Q-13 | isoliertes Testkonto | Cross-Projekt-/Testdatenrisiko | P00-I | **OFFEN** (kann warten) |
@@ -86,7 +86,8 @@ Q-01 ist als **RC4-Baseline** entschieden; es ist keine RC3-Releasefreigabe.
 
 ### Gemeinsame Freigaben
 
-- **Foundation:** Q-02 + Q-08 + Q-10.
+- **Foundation:** Q-02 + Q-08 + Q-10. Q-02/Q-08 sind freigegeben; Q-10 bleibt
+  nach dem ADR-Abgleich offen.
 - **KMS/Gate:** Q-04 + Q-09.
 - **Retention:** Q-05 + Q-07 + Q-14; Q-06 benötigt zusätzlich Legal/Operations.
 - **Später:** Q-03 + Q-11 + Q-13; Q-12 kann bis zum Release-Gate warten.
@@ -197,6 +198,8 @@ Integrationsgate und STOP-Bedingungen.
 - `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 - `docs/release/MO-RC4-P00-DEPENDENCY-GRAPH.md`
 - `docs/release/MO-RC4-P00-EXECUTION-PLAN.md`
+- `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`
+- `docs/reports/MO-RC4-P00-OWNER-DECISION-02.md`
 - `docs/release/RC4-INTEGRATION-MANIFEST.md`
 - `architecture/architecture-decisions.md` (ADR-008, PROPOSED)
 
@@ -205,12 +208,13 @@ Integrationsgate und STOP-Bedingungen.
 ## 9. Status und nächster Schritt
 
 ```text
-MO-RC4-P00-ORCHESTRATION-01 — EXECUTION PLAN READY / OWNER APPROVAL PENDING
+MO-RC4-P00-ORCHESTRATION-01 — Q-02 + Q-08 APPROVED / Q-10 PENDING / IMPLEMENTATION NOT STARTED
 ```
 
 Nächster Schritt:
 
-1. Release Owner entscheidet Q-02, Q-08, Q-10 (Foundation).
+1. Q-02/Q-08 sind entschieden; Q-10 nach Klärung C-01…C-07 aus
+   `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` entscheiden.
 2. Danach Q-04/Q-09 (KMS/Gate) und Q-05/Q-07/Q-14 (Retention);
    Q-06 mit Legal/Operations.
 3. Erst dann Feature-Branches und Implementierung starten.
@@ -218,6 +222,26 @@ Nächster Schritt:
 
 Keine pauschale Freigabe durch den Commander. Keine Produktimplementierung in
 diesem Auftrag.
+
+---
+
+## 9.1 Owner-Entscheidung 2026-11-13
+
+Der Release Owner hat die Foundation-Architektur teilweise freigegeben:
+
+| ID | Entscheidung | Status |
+|---|---|---|
+| Q-02 | Secrets Manager als AWS_MANAGED-Backend | **APPROVED** |
+| Q-08 | ARN/Name-Referenz + Laufzeit-Fetch; kein Klartext in Env | **APPROVED** |
+| Q-10 | ADR-008-Freigabe | **PENDING** — Abgleich abgeschlossen, Klärungen C-01…C-07 offen |
+
+Der konkrete ADR-008/Contract-Abgleich liegt in
+`docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`. Ergebnis: keine harten
+Architekturkonflikte, aber sieben Klarstellungen und zwei Governance-Punkte.
+ADR-008 bleibt bis zur Owner-Entscheidung `PROPOSED`.
+
+Q-02/Q-08 autorisieren **keine** Implementierung. P00-B bleibt durch Q-10
+blockiert; P00-C zusätzlich durch Q-04/Q-09/Q-10.
 
 ---
 
