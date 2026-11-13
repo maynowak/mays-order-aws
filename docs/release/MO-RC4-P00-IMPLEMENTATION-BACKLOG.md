@@ -1,0 +1,206 @@
+# MO-RC4-P00 Implementation Backlog
+
+**Status:** DRAFTED / OWNER DECISIONS PENDING
+**Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
+**Baseline:** `086a8be`
+**Branch:** `release/rc4-integration`
+
+> No package may begin production implementation until its Owner gates are
+> closed. This is a backlog, not an implementation start.
+
+---
+
+## Dependency Graph
+
+```text
+P00-A (this contract)
+  ├─ P00-B SecretProvider Foundation
+  │    ├─ P00-C AWS_MANAGED / Secrets Manager
+  │    │    └─ P00-F Rotation (after Q-11)
+  │    └─ P00-D APP_MANAGED / Versioned HMAC
+  ├─ P00-E KMS / Terraform / IAM
+  │    └─ depends on Q-04, Q-09, Q-10, P-15
+  ├─ P00-G Retention / TTL
+  │    └─ depends on Q-06, Q-07, Q-14
+  └─ P00-H Installer / Builder
+       └─ depends on P00-B/C/E and Q-03
+P00-I Security / Regression / Release Gates
+  └─ depends on all implemented packages
+```
+
+Recommended implementation order:
+
+```text
+P00-B → P00-C → P00-E → P00-H → P00-D → P00-F → P00-G → P00-I
+```
+
+The order may change only with documented dependency justification.
+
+---
+
+## P00-B — SecretProvider Foundation
+
+| Field | Content |
+|---|---|
+| Goal | Provider abstraction with `env` default and fail-closed resolution |
+| Dependencies | P00-A; Q-08 (configuration shape), Q-10 (ADR approval) |
+| Components | `lambda/src/secret_provider.py` (proposed), privacy auth adapter |
+| Config contract | `PRIVACY_SECRET_PROVIDER`, references, no fallback |
+| Acceptance | ENV bit-compatible; provider selection tested; no secrets in logs/errors |
+| Negative tests | unknown provider, missing ref, conflicting refs, provider failure |
+| Migration risk | accidental behavior change; mitigate with default-off and regression tests |
+| Security boundary | no secret values in response/log; no request-controlled reference |
+| Commit boundary | provider foundation + tests + docs only |
+| Owner approval | Q-08, Q-10 |
+
+**Do not include:** Secrets Manager IAM/IaC, APP HMAC, rotation, retention.
+
+---
+
+## P00-C — AWS_MANAGED / Secrets Manager
+
+| Field | Content |
+|---|---|
+| Goal | Secrets Manager-backed provider with optional CMK reference |
+| Dependencies | P00-B; Q-02, Q-04, Q-08, Q-09, Q-10 |
+| Components | `terraform/modules/privacy_secret`, handler env references, IAM |
+| Config contract | `PRIVACY_SECRET_ID`, no plaintext env secret |
+| Acceptance | exact-ARN access; default-off; no secret in state/output; fail-closed |
+| Negative tests | ResourceNotFound, AccessDenied, timeout, wrong ARN/project |
+| Migration risk | secret in state/plan if ephemeral misuse; DDB/SQS not touched |
+| Security boundary | least privilege, exact ARN, no fallback to ENV |
+| Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
+| Owner approval | Q-02, Q-04, Q-08, Q-09, Q-10 |
+
+---
+
+## P00-D — APP_MANAGED / Versioned HMAC
+
+| Field | Content |
+|---|---|
+| Goal | External key material with HMAC-SHA256 and explicit key version |
+| Dependencies | P00-B; Q-10; Q-11 if rotation/versions included |
+| Components | APP key adapter, canonical HMAC payload, keyId/keyVersion |
+| Config contract | external key reference; key ID/version; no AWS KMS implied |
+| Acceptance | valid/invalid HMAC fail-closed; old version only in approved window |
+| Negative tests | wrong key, bad Base64/length, missing version, rollback |
+| Migration risk | key loss or version mismatch; require dual-version transition |
+| Security boundary | no custom cipher; no key in data/items/logs |
+| Commit boundary | APP adapter + tests + docs |
+| Owner approval | Q-10, Q-11; APP_MANAGED is Phase 2, not automatically RC4 |
+
+---
+
+## P00-E — KMS / Terraform / IAM
+
+| Field | Content |
+|---|---|
+| Goal | Optional customer-managed KMS for secrets/DB/SQS with least privilege |
+| Dependencies | Q-04, Q-09, Q-10; P00-C for secret option |
+| Components | `terraform/modules/kms`, DDB/SQS optional wiring, IAM/key policy |
+| Config contract | `kms_enabled`, optional existing key ARN; default off |
+| Acceptance | no CMK by default; new CMK rotation on; no wildcard; plan valid |
+| Negative tests | missing key policy, wrong ARN, wildcard IAM, deletion window |
+| Migration risk | DDB/SQS in-place updates; no automatic replacement; plan review |
+| Security boundary | exact key ARN; no CMK for unrelated services; no CloudFront/Cognito/RIS |
+| Commit boundary | module + wiring + policy tests; no rotation execution |
+| Owner approval | Q-04, Q-09, Q-10 |
+
+---
+
+## P00-F — Rotation
+
+| Field | Content |
+|---|---|
+| Goal | Documented, owner-controlled rotation and cache invalidation |
+| Dependencies | P00-C/D/E; Q-11 |
+| Components | Secrets Manager rotation or manual runbook; cache invalidation |
+| Config contract | rotation flag/default off; transition window decision |
+| Acceptance | old/new version semantics documented; failed rotation fail-closed |
+| Negative tests | missing pending version, stale cache, concurrent read |
+| Migration risk | breaking active Lambda sessions if cache not invalidated |
+| Security boundary | no automatic old-key deletion; audit without secret values |
+| Commit boundary | rotation adapter/runbook + tests |
+| Owner approval | Q-11; transition window and responsibility |
+
+---
+
+## P00-G — Retention / TTL
+
+| Field | Content |
+|---|---|
+| Goal | Define and implement retention mechanics without inventing legal periods |
+| Dependencies | P00-A; Q-05, Q-06, Q-07, Q-14 |
+| Components | `retentionUntil`, optional TTL, cancel semantics, docs |
+| Config contract | retention fields/flags; default decision required |
+| Acceptance | fachliche Frist and TTL clearly separated; no synchronous-delete claim |
+| Negative tests | missing field, expired item, cancel, RETAIN, backup restore scenario |
+| Migration risk | legacy items have no field; no implicit default deletion |
+| Security boundary | PII minimization; ERASE/ANONYMIZE/RETAIN unchanged |
+| Commit boundary | model/validation/tests/docs; no backfill unless separately approved |
+| Owner approval | Q-05, Q-06, Q-07, Q-14 |
+
+---
+
+## P00-H — Installer / Builder
+
+| Field | Content |
+|---|---|
+| Goal | Safe configuration of provider/KMS/retention modules for new and existing installs |
+| Dependencies | P00-B/C/E/G; Q-03, Q-08, Q-09 |
+| Components | installer flags/validation, builder catalog/preset, manifest |
+| Config contract | defaults off; no secrets in CLI/manifest/state |
+| Acceptance | existing installs unchanged; no forced replacement; errors redacted |
+| Negative tests | incompatible flags, missing key/secret, bad upgrade plan |
+| Migration risk | flag combinations; module stripping; state drift |
+| Security boundary | no secret values in argv/state/plan; no implicit CMK |
+| Commit boundary | installer/builder code + tests + docs |
+| Owner approval | Q-03, Q-08, Q-09 |
+
+---
+
+## P00-I — Security / Regression / Release Gates
+
+| Field | Content |
+|---|---|
+| Goal | Verify full P00 implementation and release boundaries |
+| Dependencies | all implemented packages |
+| Components | secret/HMAC/KMS tests, log/state audits, installer/builder gates |
+| Acceptance | no secret leakage; default-off compatibility; full local regression |
+| Negative tests | every fail-closed path, cross-provider fallback, state leak |
+| Migration risk | residual migration/drift; must be explicit in release notes |
+| Security boundary | no AWS mutation during local verification |
+| Commit boundary | test/evidence/docs only |
+| Owner approval | Q-12, release gate |
+
+---
+
+## Cross-Package Acceptance
+
+- `env` default unchanged.
+- No provider fallback.
+- No secret in Git, logs, reports, Terraform outputs/state.
+- No automatic CMK creation.
+- No automatic rotation.
+- No legal retention periods invented.
+- No DDB/SQS resource replacement.
+- No RIS/Jobfront/Jobsearch changes.
+- Existing 1.174 local regression remains green at every package boundary.
+
+---
+
+## Commit / Review Boundaries
+
+Each package must be a separate commit (or small, logically bounded series)
+with:
+
+1. contract diff,
+2. implementation diff,
+3. focused tests,
+4. negative tests,
+5. auditlog update,
+6. `git diff --check`,
+7. no AWS/Terraform mutation,
+8. working tree clean.
+
+No package may bundle unrelated RC4 changes or a release tag.
