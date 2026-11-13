@@ -5,14 +5,20 @@ from unittest.mock import patch
 from errors import OrderError
 from order_service import create_order_service
 from secret_provider import (
+    APP_MANAGED_PROVIDER,
+    ENV_PROVIDER,
+    SECRETS_MANAGER_PROVIDER,
     EnvSecretProvider,
     ProviderConfigurationError,
     SecretAccessDenied,
     SecretCache,
+    SecretInvalid,
     SecretMaterial,
     SecretNotConfigured,
+    SecretNotFound,
     SecretProviderConfig,
     SecretReference,
+    SecretUnavailable,
     create_secret_provider,
 )
 
@@ -131,6 +137,131 @@ class TestProviderContract(unittest.TestCase):
         material = cache.get_or_load("key", load)
         self.assertEqual(material.value, "after-retry")
         self.assertEqual(calls, [1, 1])
+
+
+class _ClientError(Exception):
+    def __init__(self, code):
+        super().__init__("provider failure")
+        self.response = {"Error": {"Code": code, "Message": "provider failure"}}
+
+
+class TestSecretsManagerProvider(unittest.TestCase):
+    ARN = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:orders/privacy-AbCdEf"
+    KMS_ARN = "arn:aws:kms:eu-central-1:123456789012:key/11111111-2222-3333-4444-555555555555"
+
+    def _env(self, **overrides):
+        return {
+            "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+            "PRIVACY_SECRET_ID": self.ARN,
+            **overrides,
+        }
+
+    def test_accepts_arn_and_valid_name(self):
+        for reference in (self.ARN, "orders/privacy", "orders+privacy@v1"):
+            with self.subTest(reference=reference):
+                config = SecretProviderConfig.from_environment(
+                    self._env(PRIVACY_SECRET_ID=reference)
+                )
+                self.assertEqual(config.provider, SECRETS_MANAGER_PROVIDER)
+                self.assertEqual(config.reference, reference)
+
+    def test_accepts_valid_optional_kms_arn(self):
+        config = SecretProviderConfig.from_environment(
+            self._env(PRIVACY_KMS_KEY_ARN=self.KMS_ARN)
+        )
+        self.assertEqual(config.kms_key_arn, self.KMS_ARN)
+
+    def test_rejects_missing_reference(self):
+        with self.assertRaises(ProviderConfigurationError):
+            create_secret_provider({"PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER})
+
+    def test_rejects_plaintext_env_secret(self):
+        with self.assertRaises(ProviderConfigurationError):
+            create_secret_provider(
+                self._env(PRIVACY_INTERNAL_SECRET="must-not-be-used")
+            )
+
+    def test_rejects_app_configuration(self):
+        for extra in (
+            {"PRIVACY_APP_KEY_REF": "ref"},
+            {"PRIVACY_APP_KEY_ID": "id"},
+            {"PRIVACY_APP_KEY_VERSION": "1"},
+        ):
+            with self.subTest(extra=extra):
+                with self.assertRaises(ProviderConfigurationError):
+                    create_secret_provider(self._env(**extra))
+
+    def test_rejects_invalid_reference_and_kms_arn(self):
+        invalid = (
+            {"PRIVACY_SECRET_ID": "*"},
+            {"PRIVACY_SECRET_ID": "contains space"},
+            {"PRIVACY_SECRET_ID": "arn:aws:secretsmanager:eu-central-1:123:secret:x"},
+            {"PRIVACY_KMS_KEY_ARN": "not-a-key-arn"},
+        )
+        for extra in invalid:
+            with self.subTest(extra=extra):
+                with self.assertRaises(ProviderConfigurationError):
+                    create_secret_provider(self._env(**extra))
+
+    def test_runtime_fetch_success_and_cache(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": "resolved-secret"}
+
+        provider = create_secret_provider(self._env(), fetcher)
+        first = provider.resolve()
+        second = provider.resolve()
+        self.assertEqual(first.value, "resolved-secret")
+        self.assertIs(first, second)
+        self.assertEqual(calls, [self.ARN])
+
+    def test_missing_runtime_adapter_fails_closed(self):
+        provider = create_secret_provider(self._env())
+        with self.assertRaises(SecretUnavailable):
+            provider.resolve()
+
+    def test_provider_errors_are_classified_without_raw_details(self):
+        cases = (
+            ("ResourceNotFoundException", SecretNotFound),
+            ("AccessDeniedException", SecretAccessDenied),
+            ("AccessDenied", SecretAccessDenied),
+            ("KMSAccessDeniedException", SecretAccessDenied),
+            ("InternalServiceError", SecretUnavailable),
+        )
+        for code, expected in cases:
+            with self.subTest(code=code):
+                provider = create_secret_provider(
+                    self._env(),
+                    lambda reference, code=code: (_ for _ in ()).throw(_ClientError(code)),
+                )
+                with self.assertRaises(expected) as raised:
+                    provider.resolve()
+                self.assertNotIn(self.ARN, str(raised.exception))
+                self.assertNotIn("raw-secret", str(raised.exception))
+
+    def test_generic_provider_exception_is_redacted(self):
+        def fetcher(reference):
+            raise RuntimeError("raw-secret-value from provider")
+
+        provider = create_secret_provider(self._env(), fetcher)
+        with self.assertRaises(SecretUnavailable) as raised:
+            provider.resolve()
+        self.assertNotIn("raw-secret-value", str(raised.exception))
+        self.assertNotIn(self.ARN, str(raised.exception))
+
+    def test_invalid_or_binary_secret_is_rejected(self):
+        for response in (
+            {},
+            {"SecretString": ""},
+            {"SecretBinary": b"binary"},
+            "not-a-mapping",
+        ):
+            with self.subTest(response=response):
+                provider = create_secret_provider(self._env(), lambda reference, response=response: response)
+                with self.assertRaises(SecretInvalid):
+                    provider.resolve()
 
 
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):

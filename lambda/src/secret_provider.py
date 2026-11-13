@@ -8,9 +8,10 @@ APP_MANAGED key material/HMAC integration (P00-D) are separate packages.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from errors import VALIDATION_ERROR, OrderError
 
@@ -21,8 +22,56 @@ SUPPORTED_PROVIDERS = (ENV_PROVIDER, SECRETS_MANAGER_PROVIDER, APP_MANAGED_PROVI
 
 ENV_SECRET_NAME = "PRIVACY_INTERNAL_SECRET"
 PROVIDER_ENV = "PRIVACY_SECRET_PROVIDER"
+SECRET_ID_ENV = "PRIVACY_SECRET_ID"
+KMS_KEY_ARN_ENV = "PRIVACY_KMS_KEY_ARN"
+APP_KEY_REF_ENV = "PRIVACY_APP_KEY_REF"
+APP_KEY_ID_ENV = "PRIVACY_APP_KEY_ID"
+APP_KEY_VERSION_ENV = "PRIVACY_APP_KEY_VERSION"
+
+_SECRET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9/_+=.@-]{1,512}$")
+_SECRET_ARN_PATTERN = re.compile(
+    r"^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]{1,512}$"
+)
+_KMS_KEY_ARN_PATTERN = re.compile(
+    r"^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]{1,2048}$"
+)
 
 T = TypeVar("T")
+
+
+def validate_secret_reference(reference: str) -> str:
+    """Validate an exact Secrets Manager ARN or a project-scoped name.
+
+    Error messages never contain the supplied reference.
+    """
+    candidate = (reference or "").strip()
+    if not candidate or any(char.isspace() for char in candidate):
+        raise ProviderConfigurationError()
+    if candidate.startswith("arn:"):
+        if not _SECRET_ARN_PATTERN.fullmatch(candidate):
+            raise ProviderConfigurationError()
+    elif not _SECRET_NAME_PATTERN.fullmatch(candidate):
+        raise ProviderConfigurationError()
+    return candidate
+
+
+def validate_kms_key_arn(key_arn: str) -> str:
+    candidate = (key_arn or "").strip()
+    if not candidate or not _KMS_KEY_ARN_PATTERN.fullmatch(candidate):
+        raise ProviderConfigurationError()
+    return candidate
+
+
+def _non_empty(env: Mapping[str, str], name: str) -> str:
+    value = (env.get(name) or "").strip()
+    if not value:
+        raise ProviderConfigurationError()
+    return value
+
+
+def _reject_non_empty(env: Mapping[str, str], name: str) -> None:
+    if (env.get(name) or "").strip():
+        raise ProviderConfigurationError()
 
 
 class SecretProviderError(OrderError):
@@ -125,22 +174,40 @@ class SecretProviderConfig:
         env = os.environ if environ is None else environ
         provider = (env.get(PROVIDER_ENV) or ENV_PROVIDER).strip().lower()
 
-        if provider != ENV_PROVIDER:
+        if provider not in SUPPORTED_PROVIDERS:
             raise ProviderConfigurationError()
 
-        # Avoid a silent mode confusion if a deployment carries a reference for
-        # a different provider while still running the ENV default.
-        conflicting = (
-            "PRIVACY_SECRET_ID",
-            "PRIVACY_APP_KEY_ID",
-            "PRIVACY_APP_KEY_VERSION",
-            "PRIVACY_APP_KEY_REF",
-            "PRIVACY_KMS_KEY_ARN",
-        )
-        if any((env.get(name) or "").strip() for name in conflicting):
-            raise ProviderConfigurationError()
+        if provider == ENV_PROVIDER:
+            # Avoid a silent mode confusion if a deployment carries a reference
+            # for a different provider while still running the ENV default.
+            for name in (
+                SECRET_ID_ENV,
+                APP_KEY_ID_ENV,
+                APP_KEY_VERSION_ENV,
+                APP_KEY_REF_ENV,
+                KMS_KEY_ARN_ENV,
+            ):
+                _reject_non_empty(env, name)
+            return cls(provider=ENV_PROVIDER, reference=ENV_SECRET_NAME)
 
-        return cls(provider=ENV_PROVIDER, reference=ENV_SECRET_NAME)
+        if provider == SECRETS_MANAGER_PROVIDER:
+            _reject_non_empty(env, ENV_SECRET_NAME)
+            _reject_non_empty(env, APP_KEY_ID_ENV)
+            _reject_non_empty(env, APP_KEY_VERSION_ENV)
+            _reject_non_empty(env, APP_KEY_REF_ENV)
+            reference = validate_secret_reference(_non_empty(env, SECRET_ID_ENV))
+            kms_key_arn = (env.get(KMS_KEY_ARN_ENV) or "").strip() or None
+            if kms_key_arn is not None:
+                kms_key_arn = validate_kms_key_arn(kms_key_arn)
+            return cls(
+                provider=SECRETS_MANAGER_PROVIDER,
+                reference=reference,
+                kms_key_arn=kms_key_arn,
+            )
+
+        # APP_MANAGED configuration is added in P00-B/B4. Until then the mode
+        # must fail closed rather than being silently treated as ENV.
+        raise ProviderConfigurationError()
 
 
 class SecretCache:
@@ -183,16 +250,88 @@ class EnvSecretProvider:
         return SecretMaterial(provider=ENV_PROVIDER, value=value)
 
 
+SecretsManagerFetcher = Callable[[str], Mapping[str, Any]]
+
+
+def _aws_error_code(exc: Exception) -> str:
+    response = getattr(exc, "response", None)
+    if not isinstance(response, Mapping):
+        return ""
+    error = response.get("Error")
+    if not isinstance(error, Mapping):
+        return ""
+    return str(error.get("Code") or "")
+
+
+class SecretsManagerProvider:
+    """Testable runtime-fetch adapter for the P00-C Secrets Manager wiring.
+
+    P00-B deliberately does not create a boto3 client, IAM policy or secret
+    resource. P00-C injects the real fetcher; unit tests inject a fake.
+    """
+
+    def __init__(
+        self,
+        config: SecretProviderConfig,
+        fetcher: SecretsManagerFetcher | None = None,
+    ) -> None:
+        self._config = config
+        self._fetcher = fetcher
+        self._cache = SecretCache()
+
+    def resolve(self) -> SecretMaterial:
+        if self._fetcher is None:
+            raise SecretUnavailable()
+        key = (
+            self._config.provider,
+            self._config.reference,
+            self._config.key_version or "",
+            self._config.kms_key_arn or "",
+        )
+        return self._cache.get_or_load(key, self._load)
+
+    def _load(self) -> SecretMaterial:
+        try:
+            response = self._fetcher(self._config.reference)  # type: ignore[misc]
+        except SecretProviderError:
+            raise
+        except Exception as exc:
+            code = _aws_error_code(exc)
+            if code in ("ResourceNotFoundException", "ResourceNotFound"):
+                raise SecretNotFound() from None
+            if code in ("AccessDeniedException", "AccessDenied", "KMSAccessDeniedException"):
+                raise SecretAccessDenied() from None
+            raise SecretUnavailable() from None
+
+        if not isinstance(response, Mapping):
+            raise SecretInvalid()
+        value = response.get("SecretString")
+        if not isinstance(value, str) or not value:
+            raise SecretInvalid()
+        return SecretMaterial(
+            provider=SECRETS_MANAGER_PROVIDER,
+            value=value,
+            key_id=self._config.key_id,
+            key_version=self._config.key_version,
+        )
+
+
 def create_secret_provider(
     environ: Mapping[str, str] | None = None,
+    secretsmanager_fetcher: SecretsManagerFetcher | None = None,
 ) -> SecretProvider:
-    """Build the configured provider.
+    """Build the configured provider without any implicit fallback.
 
-    P00-B only enables the ENV provider. Other providers are introduced by
-    their separately approved packages; until then their configuration must
-    fail closed rather than silently falling back to ENV.
+    ENV is the backwards-compatible default. Secrets Manager runtime fetching
+    is available through the injected P00-C adapter; without an adapter the
+    selected provider fails closed. APP_MANAGED remains a P00-D implementation.
     """
 
     env = os.environ if environ is None else environ
     config = SecretProviderConfig.from_environment(env)
-    return EnvSecretProvider(config, env)
+    if config.provider == ENV_PROVIDER:
+        return EnvSecretProvider(config, env)
+    if config.provider == SECRETS_MANAGER_PROVIDER:
+        return SecretsManagerProvider(config, secretsmanager_fetcher)
+    # APP_MANAGED is intentionally not implemented in P00-B.
+    raise ProviderConfigurationError()
