@@ -7,8 +7,10 @@ APP_MANAGED key material/HMAC integration (P00-D) are separate packages.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import sys
 import threading
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
@@ -519,3 +521,20 @@ def reset_default_secret_provider() -> None:
     with _default_provider_lock:
         _default_provider = None
         _default_provider_key = None
+
+
+def configured_provider_name(environ: Mapping[str, str] | None = None) -> str:
+    """Return a safe provider label for diagnostics; never a secret/reference."""
+    env = os.environ if environ is None else environ
+    provider = (env.get(PROVIDER_ENV) or ENV_PROVIDER).strip().lower()
+    return provider if provider in SUPPORTED_PROVIDERS else "invalid"
+
+
+def log_secret_provider_failure(error: SecretProviderError, provider: str) -> None:
+    """Emit one structured, secret-safe failure event to stderr/CloudWatch."""
+    payload = {
+        "event": "secret_provider_failure",
+        "provider": provider,
+        "errorClass": type(error).__name__,
+    }
+    print(json.dumps(payload, sort_keys=True, separators=(",", ":")), file=sys.stderr)

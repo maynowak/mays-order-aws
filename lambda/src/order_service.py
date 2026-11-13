@@ -27,7 +27,13 @@ from identity import (
 )
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
-from secret_provider import SecretProvider, SecretProviderError, get_default_secret_provider
+from secret_provider import (
+    SecretProvider,
+    SecretProviderError,
+    configured_provider_name,
+    get_default_secret_provider,
+    log_secret_provider_failure,
+)
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
@@ -194,6 +200,7 @@ class OrderService:
                 self._secret_provider = provider
             material = provider.resolve()
         except SecretProviderError as exc:
+            log_secret_provider_failure(exc, configured_provider_name())
             raise validation_error(exc.public_message) from None
         if not material.value:
             raise validation_error("Internal secret not configured")

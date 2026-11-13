@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import os
 import unittest
 from unittest.mock import patch
@@ -27,6 +28,7 @@ from secret_provider import (
     SecretsManagerProvider,
     create_secret_provider,
     get_default_secret_provider,
+    log_secret_provider_failure,
     reset_default_secret_provider,
 )
 
@@ -526,7 +528,7 @@ class TestSecurityHardening(unittest.TestCase):
         with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
             service._require_privacy_auth(context, "privacy_inspect")
 
-    def test_provider_error_does_not_log_secret(self):
+    def test_provider_error_logs_only_safe_structured_fields(self):
         class FailingProvider:
             def resolve(self):
                 raise SecretAccessDenied()
@@ -538,11 +540,31 @@ class TestSecurityHardening(unittest.TestCase):
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            with self.assertRaises(OrderError):
-                service._resolve_privacy_secret()
-        self.assertNotIn("secret", stdout.getvalue().lower())
-        self.assertNotIn("secret", stderr.getvalue().lower())
+        with patch.dict(
+            os.environ,
+            {"PRIVACY_SECRET_PROVIDER": "secretsmanager", "ORDERS_PROJECT_NAME": "mays-orders"},
+            clear=False,
+        ):
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                with self.assertRaises(OrderError):
+                    service._resolve_privacy_secret()
+        self.assertEqual(stdout.getvalue(), "")
+        line = stderr.getvalue().strip()
+        payload = json.loads(line)
+        self.assertEqual(payload["event"], "secret_provider_failure")
+        self.assertEqual(payload["provider"], "secretsmanager")
+        self.assertEqual(payload["errorClass"], "SecretAccessDenied")
+        self.assertNotIn("arn:", line.lower())
+        self.assertNotIn("raw-secret", line)
+        self.assertNotIn("super-secret", line)
+
+    def test_log_helper_does_not_include_secret_message(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            log_secret_provider_failure(SecretAccessDenied("raw-secret-value"), "secretsmanager")
+        line = stderr.getvalue().strip()
+        self.assertNotIn("raw-secret-value", line)
+        self.assertIn("SecretAccessDenied", line)
 
     def test_backend_exception_cause_is_not_exposed(self):
         def fetcher(reference):
