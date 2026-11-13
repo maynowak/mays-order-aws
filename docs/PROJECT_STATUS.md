@@ -17,8 +17,8 @@ Current Feature:
 MO-RC4 P00 — SecretProvider Foundation integrated; P00-C/P00-D remain gated
 
 Current Task:
-MO-RC4-P00-C-AUTHORIZATION-01 — Q-04/Q-09 APPROVED under contract; P00-C
-READY FOR IMPLEMENTATION AUTHORIZATION; P00-C-M01 and L-findings OPEN
+MO-RC4-P00-C-IMPLEMENTATION-02 — P00-C IMPLEMENTED / TESTED / SECURITY REVIEW
+READY; 1.229 lokale PASS (669/128/400/32) + 28 Seed; nicht gemerged
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -38,15 +38,14 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-release/rc4-integration @ P00-B merge e71f3edcb146fb7b3943b4c23fa65e771cf4611e
+feature/mo-rc4-p00-c-aws-managed (P00-C implementiert, getestet; NICHT gemerged)
 → P00-Entscheidungen: Q-02 Secrets Manager, Q-04 CMK-Optionen, Q-08 ARN/Name +
   Runtime-Fetch, Q-09 Policy-Gate und Q-10 ADR-008 APPROVED; ADR-008 ACCEPTED
-→ P00-C: READY FOR IMPLEMENTATION AUTHORIZATION; Q-04/Q-09 geschlossen,
-  P00-C-M01 + L-01/L-02/L-03/L-04/L-06 bleiben offene Akzeptanzkriterien
-→ P00-B: integriert und post-merge verifiziert; 1.208 lokale PASS + 28 Seed;
-  Lambda-ZIP c35e6c8b… reproduzierbar
-→ Review-Findings: M-01 OPEN als P00-C-M01; L-01…L-04/L-06 open; L-05 FIXED
-→ P00-C/P00-D: nicht gestartet (IAM/KMS/Secrets-Ressource bzw. APP-HMAC bleiben offen)
+→ P00-C: boto3-Fetcher, modulweiter Cache, KMS-Binding, Non-ASCII-Guard,
+  strukturierte Observability, Rollout-Doku; 1.229 PASS + 28 Seed
+→ P00-C-M01/L-01…L-04/L-06: implementiert/getestet, Security Review pending;
+  L-05 FIXED
+→ P00-D/P00-E: nicht gestartet (APP-HMAC bzw. DDB/SQS-CMK/Infrastruktur offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

@@ -1,6 +1,6 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C READY FOR IMPLEMENTATION AUTHORIZATION
+**Status:** EXECUTION PLAN READY / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C IMPLEMENTED ON FEATURE BRANCH
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
@@ -8,8 +8,9 @@
 
 > Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved. P00-B is integrated on
 > `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.
-> P00-C is ready for a separate implementation authorization; P00-C-M01 and
-> L-01…L-06 acceptance criteria remain open. P00-D/E/G remain separately gated.
+> P00-C is implemented/tested on its feature branch and ready for security
+> review; P00-C-M01 and L-01…L-06 are implemented/tested but not yet
+> independently reviewed. P00-D/E/G remain separately gated.
 
 ---
 
@@ -92,7 +93,8 @@ fallback required to pass tests.
 
 **Goal:** Optional Secrets Manager provider and reference-only configuration.
 
-**Status:** **READY FOR IMPLEMENTATION AUTHORIZATION** — not started.
+**Status:** **IMPLEMENTED / TESTED / SECURITY REVIEW READY** — feature branch,
+not merged. 1.229 local PASS + 28 Seed.
 
 **Dependencies:** P00-B; Q-02 (approved), Q-04 (approved: AWS default/existing
 ARN/opt-in CMK), Q-08 (approved), Q-09 (approved: explicit allowlist/default
