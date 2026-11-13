@@ -260,3 +260,16 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - recovery-checkpoint-strategy → docs/reports/recovery-checkpoint-strategy.md (retroaktiv indexiert)
 - test-strategy → docs/reports/test-strategy.md (retroaktiv indexiert)
 - MAYS-ORDERS-MODULE-DOC-INTEGRATION-01 → docs/reports/MAYS-ORDERS-MODULE-DOC-INTEGRATION-01.md (VERIFIED: Nutzer-Doku für den Modulbau integriert — Week-1..4 byte-identisch nach docs/initialweekcontest/ verschoben, Modul-Testleitfaden gegengeprüft [34 Dateien, MANAGED/EXTERNAL, Negativtest] und 12 Evidenz-Stellen auf Repo-Reports umgestellt, AGENTS.md/README-Referenzen konsistent; keine Funktionsänderung)
+
+[MO-AGENT-ORDER-OWNERSHIP-01 / PHASE 1 DISCOVERY]
+Status: COMPLETE (read-only) — no auth/authz code changed.
+Date: 2026-11-13
+- Baseline: feature/mo-agent-order-body-01 @ 6369eb4 (target base 9627eb2).
+- Verified: API Gateway HTTP API uses a JWT authorizer with issuer = own Cognito pool and audience = the single public app client; all four routes are authorization_type JWT. The Lambda reads NO claims (no requestContext/authorizer/claims access in lambda/src/index.py).
+- Therefore authentication is complete and authorization against the order owner does not exist: create ignores the caller, get_order checks no owner, list_orders queries gsi1pk="LIST" (all orders), update_order_status checks only the status transition. The documented intent in security/authentication-decision.md ("Lambda nutzt Claims sub/cognito:username/groups für Authorization") is not implemented.
+- subjectId: create_order(..., subject_id=None) is the only call path and no caller ever passes it, so every existing order has no owner binding. subjectId/GSI2 serve the privacy path only and are stripped from responses.
+- Agent orders from A04 are protected solely by INTERNAL_FIELDS (not returned publicly); with no ownership check that is the only protection.
+- Deliverables: identity/ownership contract (owner = iss+sub, actor and service kept separate, RIS key is not an order identity), fail-closed legacy strategy (404 for orders without ownerKey, no email-based backfill), API access matrix, 19-point security/regression matrix, minimal S1-S6 plan.
+- Open decisions recorded: legacy enforcement vs shadow mode vs backfill (O1), list index GSI3 vs GSI2 (O2), staff/admin read (O3), internal result boundary for A06 (O4).
+- No AWS mutation, no deployment, no code change.
+Report: docs/reports/MO-AGENT-ORDER-OWNERSHIP-01-PHASE1.md
