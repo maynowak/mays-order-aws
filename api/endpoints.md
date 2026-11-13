@@ -83,6 +83,13 @@ Nicht enthalten: `processing`, `metadata.partnerApplicationRef`,
 Identitäts- und Indexfelder. Listen-, Create- und Patch-Antworten enthalten
 `agentOrder` nicht.
 
+**Ergebnisprojektion (A06):** Liegt ein übernommenes Agentenergebnis vor, enthält
+die Eigentümer-Detailantwort zusätzlich `processing` mit `status`
+(`COMPLETED`/`FAILED`), `attempt`, `completedAt` und entweder `result` oder
+`error.message`. Interne Korrelationstokens (`workId`, `messageId`,
+`idempotencyKey`, `executionId`) werden nicht ausgegeben. Der fachliche
+Order-`status` bleibt unverändert; das Ergebnis ist ein eigenes Feld.
+
 **Fehler:**
 - 404 `ORDER_NOT_FOUND` — Order existiert nicht
 - 400 `VALIDATION_ERROR` — ungültiges `orderId`-Format

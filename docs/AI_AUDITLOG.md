@@ -299,3 +299,15 @@ Date: 2026-11-13
 - Tests: cd lambda, PYTHONPATH=src, unittest discover -> 144 tests OK (128 + 16 new in tests/test_agent_order_projection.py), compileall clean. Retail detail key set asserted unchanged.
 - No AWS call, no apply, no deployment, no merge, no change to the RIS transport contract.
 Report: docs/reports/MO-AGENT-ORDER-PROJECTION-01.md
+
+[MO-RIS-AGENT-RESULT-BOUNDARY-01 / A06 RESULT HANDOFF]
+Status: COMPLETE (local) — synthetic ORDER_RESULT 42 assigned once to the correct order and readable by the owner.
+Date: 2026-11-13
+- Baseline: Orders feature/mo-agent-order-body-01 @ 72634a9; RIS feature/ris-mo-addition-agent-e2e-01 @ f44cea2; transport V1 checked, unchanged.
+- Trust boundary: the consumer requires the SQS attribute serviceSignature = HMAC-SHA256(ORDER_RESULT_SERVICE_SECRET, messageId + "\n" + body), compared in constant time. Missing secret or signature drops the message before any order is touched; a tampered body invalidates the signature. A sender name inside the JSON is treated as informational only.
+- Ingestion: OrderService.apply_result accepts only agent orders, requires the stored correlation reference to match, honours expectedWorkId when dispatch recorded one, rejects cancelled orders, treats a duplicate idempotency key as a no-op, rejects a different execution under the same key, rejects a second terminal result and stale attempts, and writes with attribute_not_exists(processing) so the first writer wins. The fachliche order status is never reinterpreted; the result lives in its own processing field.
+- Projection: owner detail additionally exposes processing with status, attempt, completedAt and result or a truncated error message; workId, executionId, messageId and idempotencyKey stay internal.
+- Tests: cd lambda, PYTHONPATH=src, unittest discover -> 175 tests OK (144 pre-existing + 31 new in tests/test_result_handoff.py), compileall clean. All 20 required evidence points covered.
+- Infra deliberately NOT created: result queue with DLQ, IAM send/receive restriction, shared secret, dedicated consumer Lambda. The AWS path is therefore not live-verified; no public result-write route exists.
+- No RC upgrade, no apply, no deployment, no Cognito/CloudFront/DNS change, no cross-database access.
+Report: docs/reports/MO-RIS-AGENT-RESULT-BOUNDARY-01-A06.md

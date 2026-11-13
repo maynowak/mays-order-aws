@@ -14,6 +14,7 @@ from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORD
 from validation import validate_create_order
 from agent_order import ORDER_TYPE_AGENT, fingerprint as agent_order_fingerprint
 from identity import OwnerIdentity
+from result_envelope import ORDER_RESULT, ResultRejected
 
 #: Dedicated ownership index. Deliberately separate from gsi1 (global list) and
 #: gsi2 (privacy subject): ownership and privacy are different concerns.
@@ -126,6 +127,27 @@ def to_public_agent_order(agent_order: Any) -> Dict[str, Any]:
             "delivery": contract.get("delivery"),
         },
     }
+    return projected
+
+
+def to_public_processing(processing: Any) -> Dict[str, Any]:
+    """Owner-facing view of the technical result.
+
+    Released: status, attempt, completion time, the fachliche result or a
+    sanitised error message. Withheld: work/message ids and the idempotency key
+    (internal correlation tokens).
+    """
+    if not isinstance(processing, dict):
+        return {}
+    projected: Dict[str, Any] = {}
+    for key in ("status", "attempt", "completedAt"):
+        if processing.get(key) is not None:
+            projected[key] = processing[key]
+    if isinstance(processing.get("result"), dict):
+        projected["result"] = processing["result"]
+    error = processing.get("error")
+    if isinstance(error, dict) and isinstance(error.get("message"), str):
+        projected["error"] = {"message": error["message"][:500]}
     return projected
 
 
@@ -283,6 +305,111 @@ class OrderService:
         self._table.put_item(Item=item)
         return to_public_order(item)
 
+    def _get_raw_item(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Stored item as-is (ownership and result matching need internals)."""
+        result = self._table.get_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK}
+        )
+        return result.get("Item")
+
+    def apply_result(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
+        """Store one RIS result on the matching agent order (idempotent).
+
+        The stored order is the authoritative source: the order id, the
+        correlation reference and (when dispatch recorded one) the work id must
+        all match. The fachliche order status is never reinterpreted; the result
+        lives in its own ``processing`` field.
+        """
+        order_id = envelope["orderId"]
+        item = self._get_raw_item(order_id)
+        if item is None:
+            raise order_not_found(order_id)
+        if item.get("orderType") != ORDER_TYPE_AGENT:
+            raise ResultRejected("not_agent_order",
+                                 "Order is not an agent execution order")
+        if item.get("status") == "CANCELLED":
+            raise ResultRejected("order_cancelled",
+                                 "Order was cancelled; result is not accepted")
+
+        agent_order = item.get("agentOrder") or {}
+        expected_correlation = (agent_order.get("metadata") or {}).get(
+            "requestId")
+        if not expected_correlation:
+            raise ResultRejected(
+                "missing_correlation",
+                "Order carries no correlation reference")
+        if expected_correlation != envelope["correlationId"]:
+            raise ResultRejected("correlation_mismatch",
+                                 "Result does not belong to this order")
+
+        execution = envelope["execution"]
+        expected_work = item.get("expectedWorkId")
+        if expected_work and expected_work != execution["workId"]:
+            raise ResultRejected("work_mismatch",
+                                 "Result does not belong to this execution")
+
+        existing = item.get("processing")
+        if isinstance(existing, dict):
+            if existing.get("status") in ("COMPLETED", "FAILED"):
+                if existing.get("idempotencyKey") == envelope["idempotencyKey"]:
+                    stored_execution = existing.get("executionId")
+                    incoming_execution = execution.get("executionId")
+                    if (stored_execution and incoming_execution
+                            and stored_execution != incoming_execution):
+                        raise ResultRejected(
+                            "execution_mismatch",
+                            "Result execution does not match the stored one")
+                    return dict(existing)  # duplicate delivery: no-op
+                raise ResultRejected(
+                    "already_finalised",
+                    "Order already carries a terminal result")
+            if int(existing.get("attempt") or 0) > int(execution["attempt"]):
+                raise ResultRejected("stale_attempt",
+                                     "A newer attempt was already recorded")
+
+        record: Dict[str, Any] = {
+            "schemaVersion": "1.0",
+            "status": ("COMPLETED" if envelope["messageType"] == ORDER_RESULT
+                       else "FAILED"),
+            "attempt": execution["attempt"],
+            "workId": execution["workId"],
+            "idempotencyKey": envelope["idempotencyKey"],
+            "messageId": envelope["messageId"],
+            "completedAt": now_iso(),
+        }
+        if execution.get("executionId"):
+            record["executionId"] = execution["executionId"]
+        if envelope["messageType"] == ORDER_RESULT:
+            record["result"] = envelope["payload"]
+        else:
+            error = envelope["payload"].get("error")
+            record["error"] = error if isinstance(error, dict) else {
+                "message": "Agent execution failed"}
+
+        try:
+            self._table.update_item(
+                Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+                UpdateExpression=(
+                    "SET #p = :p, updatedAt = :u, #v = #v + :one"),
+                ConditionExpression="attribute_exists(pk) AND "
+                                    "attribute_not_exists(#p)",
+                ExpressionAttributeNames={"#p": "processing", "#v": "version"},
+                ExpressionAttributeValues={
+                    ":p": record, ":u": now_iso(), ":one": 1},
+                ReturnValues="ALL_NEW",
+            )
+        except Exception as err:
+            if is_conditional_check_failed(err):
+                refreshed = self._get_raw_item(order_id) or {}
+                current = refreshed.get("processing") or {}
+                if current.get("idempotencyKey") == envelope["idempotencyKey"]:
+                    return dict(current)
+                raise ResultRejected(
+                    "concurrent_result",
+                    "A result was stored concurrently") from err
+            raise
+        return record
+
     def get_order(self, order_id: str,
                   identity: OwnerIdentity) -> Dict[str, Any]:
         """Return the order only to its verified owner.
@@ -308,6 +435,8 @@ class OrderService:
         # patch responses keep it internal.
         if item.get("orderType") == ORDER_TYPE_AGENT and item.get("agentOrder"):
             public["agentOrder"] = to_public_agent_order(item["agentOrder"])
+        if isinstance(item.get("processing"), dict):
+            public["processing"] = to_public_processing(item["processing"])
         return public
 
     def list_orders(self, identity: OwnerIdentity, limit: int,
