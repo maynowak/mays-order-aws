@@ -416,7 +416,13 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - 34 new provider tests plus full local suites verified: Lambda 379, Installer
   669, Builder 128, E2E 32 = 1,208 PASS; Seed 28 separately. Lambda ZIP
   `c35e6c8b…` contains `secret_provider.py` and rebuilds deterministically.
-- Security/compatibility PASS; no CRITICAL/HIGH/MEDIUM finding. LOW/operational
-  note: process cache has no hot invalidation; rotation requires new
-  process/environment per contract. P00-C/D and AWS live remain separate.
+- Security/compatibility PASS; no CRITICAL/HIGH finding. **Correction after
+  multi-agent review:** M-01 MEDIUM — effective cache scope is one invocation,
+  not one execution environment (`index.py:252` creates a new `OrderService`);
+  P00-C must-fix, not a P00-B merge blocker. LOW findings: non-ASCII compare
+  can return 500, missing provider observability, decorative KMS ARN until
+  P00-C, weak test assertions, stale execution-plan base, undocumented rollout
+  sequence. See report for all evidence and INFO observations.
 - Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-REVIEW-01.md`.
+- Review branch: `review/mo-rc4-p00-b-integration-01`; report update committed
+  separately; no feature/integration branch changed.
