@@ -1,17 +1,19 @@
 # MO-RC4-P00 Implementation Contract
 
-**Status:** DRAFTED / Q-02 + Q-08 + Q-10 OWNER-APPROVED / OTHER DECISIONS PENDING
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 OWNER-APPROVED / OTHER DECISIONS PENDING
 **Scope:** P00 SecretProvider, AWS_MANAGED, APP_MANAGED, KMS/encryption,
 rotation and retention integration
 **Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Branch:** `release/rc4-integration`
 **Reference:** `docs/reports/MO-RC4-P00-A-SECURITY-ARCHITECTURE-DECISION.md`
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
-> reference + runtime fetch, no plaintext secret in Env) and Q-10 (ADR-008,
-> after C-01…C-07) are approved. This is a contract/architecture decision only;
-> no implementation is authorized. P00-B is ready for a separate package
-> authorization. Remaining questions (Q-03…Q-07, Q-09, Q-11…Q-14) remain open.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-04 (CMK
+> default/external/opt-in), Q-08 (ARN/name reference + runtime fetch, no
+> plaintext secret in Env), Q-09 (explicit Policy-Gate allowlist) and Q-10
+> (ADR-008 after C-01…C-07) are approved. This is a
+> contract/architecture decision only; no implementation is authorized.
+> P00-B is integrated; P00-C still requires a separate package authorization.
+> Remaining questions (Q-03, Q-05, Q-06, Q-07, Q-11…Q-14) remain open.
 
 > This is an implementation contract, not code. No field below is approved for
 > implementation until the corresponding Owner Decision is closed.
@@ -222,6 +224,12 @@ APP_MANAGED is not an AWS KMS key and not a variant of AWS_MANAGED.
 - DDB/SQS CMK activation is an explicit, separately approved change.
 - AWS-owned encryption is not re-labelled as P00 CMK.
 - T011-14 backup KMS is not part of P00.
+- **Q-04 approved:** AWS-managed Secrets Manager encryption is the default;
+  existing customer CMKs require an explicit ARN; a new CMK only by explicit
+  opt-in and never implicitly. Provider activation does not alter existing
+  encryption resources.
+- **Q-09 approved:** Policy-Gate extension is allowlist-based, default-deny and
+  least-privilege; no wildcard without a separate Owner decision.
 
 ---
 
@@ -241,7 +249,8 @@ PRIVACY_SECRET_ID      = output of privacy_secret module (no value)
 - `privacy_secret` and `kms` are separately selectable.
 - No secret value in state/plan/output.
 - Key policy/IAM count-gated.
-- Policy-Gate allowlist change requires Q-09.
+- Policy-Gate allowlist is Q-09-approved: explicit allowlist, default deny,
+  exact Secret references and no wildcard without separate Owner approval.
 
 ### Module Builder
 
@@ -334,19 +343,21 @@ Implementation must not start on:
 
 - ~~Q-02 (backend)~~ — **owner-approved 2026-11-13: Secrets Manager**;
 - Q-03 (module placement),
-- Q-04 (CMK ownership),
+- ~~Q-04 (CMK ownership)~~ — **owner-approved 2026-11-13: AWS default /
+  existing ARN / opt-in only**;
 - Q-05 (`tenantId`),
 - Q-06 (retention duration),
 - Q-07 (cancel semantics),
 - ~~Q-08 (reference/fetch shape)~~ — **owner-approved 2026-11-13:
   ARN/name reference + runtime fetch**;
-- Q-09 (policy gate),
+- ~~Q-09 (policy gate)~~ — **owner-approved 2026-11-13: explicit allowlist /
+  default deny**;
 - ~~Q-10 (ADR approval)~~ — **owner-approved 2026-11-13 after C-01…C-07**;
 - Q-11 (rotation scope),
 - Q-12 (release label),
 - Q-13 (test account),
 - Q-14 (legacy backfill).
 
-Q-02/Q-08/Q-10 approval does not start P00-B or P00-C. P00-B is **ready for a
-separate package authorization**; P00-C remains gated by Q-04/Q-09 and package
-authorization. P00-A itself is documentation only.
+Q-02/Q-04/Q-08/Q-09/Q-10 approval does not start P00-C. P00-B is integrated;
+P00-C remains at **implementation authorization pending** and must satisfy
+P00-C-M01 and the P00-C acceptance criteria. P00-A itself is documentation only.

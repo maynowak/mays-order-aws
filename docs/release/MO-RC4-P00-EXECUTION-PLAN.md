@@ -1,15 +1,15 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / Q-02 + Q-08 + Q-10 APPROVED / P00-B INTEGRATED / POST-MERGE VERIFIED
+**Status:** EXECUTION PLAN READY / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C READY FOR IMPLEMENTATION AUTHORIZATION
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 
-> Q-02, Q-08 and Q-10 are owner-approved. P00-B is integrated on
+> Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved. P00-B is integrated on
 > `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.
-> P00-C/D/E/G remain separately gated; P00-C-M01 is an open mandatory
-> cache-lifetime criterion.
+> P00-C is ready for a separate implementation authorization; P00-C-M01 and
+> L-01…L-06 acceptance criteria remain open. P00-D/E/G remain separately gated.
 
 ---
 
@@ -92,10 +92,15 @@ fallback required to pass tests.
 
 **Goal:** Optional Secrets Manager provider and reference-only configuration.
 
-**Dependencies:** P00-B; Q-02 (approved), Q-04 (optional CMK), Q-08
-(approved), Q-09, Q-10 (approved; C-01…C-07 incorporated).
-**Mandatory condition:** `P00-C-M01` effective cache lifetime is open and must be
-evidenced before P00-C integration.
+**Status:** **READY FOR IMPLEMENTATION AUTHORIZATION** — not started.
+
+**Dependencies:** P00-B; Q-02 (approved), Q-04 (approved: AWS default/existing
+ARN/opt-in CMK), Q-08 (approved), Q-09 (approved: explicit allowlist/default
+deny), Q-10 (approved; C-01…C-07 incorporated).
+
+**Mandatory acceptance conditions:** `P00-C-M01` effective cache lifetime,
+L-01 non-ASCII material handling, L-02 provider observability, L-03 KMS-ARN
+runtime effect, L-04 test hardening, L-06 atomic provider rollout.
 
 **Affected files (proposed):**
 
@@ -115,8 +120,12 @@ lambda/tests/test_secret_provider.py
 - explicit provider uses exact Secret ARN;
 - no plaintext in env/state/output;
 - IAM `GetSecretValue` exact ARN;
+- `kms:Decrypt` only for an actual customer CMK;
+- explicit default-deny Policy-Gate allowlist;
+- no implicit CMK creation; no change to existing encryption by activation;
 - `AccessDenied`/not-found fail-closed;
-- no ENV fallback.
+- no ENV fallback;
+- M-01/L-01…L-04/L-06 acceptance conditions evidenced.
 
 **Negative tests:** wrong ARN, missing secret, wrong IAM, missing provider,
 secret value absent from plan/state/output/logs.

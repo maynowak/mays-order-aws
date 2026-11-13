@@ -1,16 +1,17 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-08 + Q-10 APPROVED / P00-B INTEGRATED / P00-C-M01 OPEN
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C AUTHORIZATION PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
-> reference + runtime fetch) and Q-10 (ADR-008 after C-01…C-07) are approved.
-> ADR-008 is `ACCEPTED`. P00-B is integrated via merge `e71f3ed` and post-merge
-> verified. No other package may begin production implementation until its
-> remaining Owner gates and package authorization are closed; P00-C-M01 is
-> mandatory for P00-C.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-04 (CMK
+> default/external/opt-in), Q-08 (ARN/name reference + runtime fetch), Q-09
+> (explicit Policy-Gate allowlist) and Q-10 (ADR-008 after C-01…C-07) are
+> approved. ADR-008 is `ACCEPTED`. P00-B is integrated via merge `e71f3ed` and
+> post-merge verified. P00-C is ready for a separate implementation
+> authorization; P00-C-M01 and the L-findings remain mandatory acceptance
+> criteria. No other package may begin production implementation.
 
 ---
 
@@ -76,7 +77,8 @@ The order may change only with documented dependency justification.
 | Migration risk | secret in state/plan if ephemeral misuse; DDB/SQS not touched |
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
-| Owner approval | Q-02/Q-08/Q-10 approved; Q-04, Q-09 pending |
+| Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
+| Package status | **READY FOR IMPLEMENTATION AUTHORIZATION** — not started |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
@@ -90,6 +92,19 @@ The order may change only with documented dependency justification.
 | Rotation | Define cache invalidation/refresh for the approved Q-11 rotation procedure; no silent stale material. |
 | Tests | Add positive/negative tests for cross-invocation reuse and cross-identity isolation; preserve ENV default behavior. |
 | Gate | Must be evidenced before P00-C integration; it is not a retroactive P00-B merge blocker. |
+
+### P00-C review acceptance criteria
+
+| ID | Criterion | Status |
+|---|---|---|
+| L-01 | Non-ASCII resolved material/token must not produce an unhandled `TypeError`/500; validate or map fail-closed. | **OPEN** |
+| L-02 | Provider failures need sanitized observability without ARN/reference/secret values. | **OPEN** |
+| L-03 | `PRIVACY_KMS_KEY_ARN` must have a tested runtime effect when CMK is selected, or be rejected until implemented. | **OPEN** |
+| L-04 | Add negative tests for lazy provider initialization, request-context isolation and actual redaction. | **OPEN** |
+| L-06 | Document/test the atomic provider switch (set provider + remove plaintext env/reference). | **OPEN** |
+
+These criteria are not P00-B merge blockers, but must be evidenced before
+P00-C integration.
 
 ---
 

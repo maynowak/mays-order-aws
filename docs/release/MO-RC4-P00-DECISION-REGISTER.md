@@ -1,16 +1,17 @@
 # MO-RC4-P00 Decision Register
 
-**Status:** Q-02 + Q-08 + Q-10 DECIDED / OTHER QUESTIONS PENDING
+**Status:** Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / OTHER QUESTIONS PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **RC4 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Integration Branch:** `release/rc4-integration`
 **Prepared:** 2026-11-13
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
-> reference + runtime fetch, no plaintext secret in Env) and Q-10 (ADR-008,
-> after C-01…C-07) are approved. ADR-008 is `ACCEPTED`. No product
-> implementation is authorized by these decisions; P00-B is ready for a
-> separate package authorization.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-04 (CMK
+> default/external/opt-in), Q-08 (ARN/name reference + runtime fetch, no
+> plaintext secret in Env), Q-09 (explicit Policy-Gate allowlist) and Q-10
+> (ADR-008 after C-01…C-07) are approved. ADR-008 is `ACCEPTED`. No product
+> implementation is authorized by these decisions; P00-C requires a separate
+> package authorization.
 
 > Recommendations are not approvals. Only the Release Owner may change an
 > `OPEN`/`PROPOSED` item to `DECIDED`.
@@ -24,12 +25,12 @@
 | Q-01 | RC3-Tag / RC4-Baseline | **ALREADY_DECIDED** (Baseline only) | nichts mehr |
 | Q-02 | Secret-Backend | **DECIDED — Secrets Manager** | P00-C (Entscheidung geschlossen) |
 | Q-03 | Modulplatzierung | **READY_FOR_OWNER** | P00-H |
-| Q-04 | CMK erzeugen/extern | **READY_FOR_OWNER** | P00-E |
+| Q-04 | CMK erzeugen/extern | **DECIDED — AWS default / existing ARN / opt-in CMK** | P00-C/E (Entscheidung geschlossen) |
 | Q-05 | `tenantId` | **READY_FOR_OWNER** | P00-G |
 | Q-06 | Retention-Fristen | **BLOCKED_BY_EXTERNAL_DECISION** | P00-G |
 | Q-07 | Cancel-Anonymisierung | **READY_FOR_OWNER** | P00-G |
 | Q-08 | Secret-Referenz/Fetch | **DECIDED — ARN/Name + Runtime-Fetch** | P00-B/C (Entscheidung geschlossen) |
-| Q-09 | Policy-Gate-Erweiterung | **READY_FOR_OWNER** | P00-C/E/H |
+| Q-09 | Policy-Gate-Erweiterung | **DECIDED — explicit allowlist / default deny** | P00-C/E/H (Entscheidung geschlossen) |
 | Q-10 | ADR-008-Freigabe | **DECIDED — ADR-008 ACCEPTED** | P00-B/C/E (Entscheidung geschlossen) |
 | Q-11 | Rotation in RC4 | **READY_FOR_OWNER** | P00-D/F |
 | Q-12 | Release-Label | **READY_FOR_OWNER** | Release-Gate |
@@ -83,8 +84,13 @@ Terraform, AWS access or secret creation.
 | Security impact | External ARN preserves BYOK/portability; creating a CMK increases control and lifecycle responsibility |
 | Compatibility | Optional; default off; no automatic CMK |
 | Recommendation | **both**: explicit external ARN supported; optional create only when enabled |
-| Packages | P00-E |
-| Owner gate | Q-04 |
+| Owner decision | **APPROVED 2026-11-13:** AWS-managed default; existing CMK via explicit ARN; new CMK only explicit opt-in; never implicit; no change to existing encryption by provider activation |
+| Packages | P00-C/E |
+| Owner gate | Q-04 (closed) |
+| Status | **DECIDED** |
+
+The DDB/SQS CMK activation remains a separate P00-E decision. Q-04 authorizes
+only the AWS_MANAGED Secrets Manager CMK options.
 
 ---
 
@@ -159,8 +165,10 @@ implementation; Q-10 was approved separately on 2026-11-13.
 | Security impact | Gate extension can weaken controls if not exact; no extension blocks P00 IaC |
 | Compatibility | Existing resource types/rules must remain |
 | Recommendation | Extend with explicit KMS/Secrets types and rotation/least-privilege rules |
+| Owner decision | **APPROVED 2026-11-13:** explicit allowlist, default deny, least privilege, exact Secret references, `GetSecretValue` only for approved secrets, `kms:Decrypt` only for actual customer CMK, no wildcard without separate decision |
 | Packages | P00-C/E/H |
-| Owner gate | Q-09 |
+| Owner gate | Q-09 (closed) |
+| Status | **DECIDED** |
 
 ---
 
@@ -246,7 +254,8 @@ separately gated.
 
 - **Foundation bundle:** Q-02 + Q-08 + Q-10 (provider/backend/reference/ADR).
   All three are approved; P00-B is ready for separate authorization.
-- **KMS bundle:** Q-04 + Q-09 (CMK ownership + gate rules).
+- **KMS bundle:** Q-04 + Q-09 (CMK ownership + gate rules). Both are approved;
+  DDB/SQS CMK activation remains P00-E scope.
 - **Retention bundle:** Q-05 + Q-06 + Q-07 + Q-14 (data model, legal, semantics).
 - **Later release bundle:** Q-03 + Q-11 + Q-13 (module, rotation scope, test account)
   may be approved later, before the corresponding packages.
@@ -266,13 +275,13 @@ separately gated.
 |---|---|
 | Q-02 | P00-C (decision closed; remaining Q-04/Q-09/Q-10 still gate implementation) |
 | Q-03 | P00-H |
-| Q-04 | P00-E |
+| Q-04 | P00-C/E (decision closed; DDB/SQS CMK still separate P00-E) |
 | Q-05 | P00-G |
 | Q-06 | P00-G |
 | Q-07 | P00-G |
 | Q-08 | P00-B/C (decision closed; P00-B still gated by Q-10) |
-| Q-09 | P00-C/E/H |
-| Q-10 | P00-B/C/E (decision closed; P00-B ready for authorization, C/E still gated) |
+| Q-09 | P00-C/E/H (decision closed; implementation still needs package authorization) |
+| Q-10 | P00-B/C/E (decision closed; P00-B integrated, C/E still gated) |
 | Q-11 | P00-D/F |
 | Q-12 | Release-Gate only |
 | Q-13 | P00-I only |
@@ -285,10 +294,10 @@ No package may start until its listed decisions are closed.
 ## 17. Status
 
 ```text
-Q-02 + Q-08 + Q-10 DECIDED / REMAINING QUESTIONS PENDING
+Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / REMAINING QUESTIONS PENDING
 ```
 
-Q-01 is baseline-decided. Q-02, Q-08 and Q-10 are owner-approved; ADR-008 is
-`ACCEPTED`. Q-03…Q-07 and Q-09…Q-14 remain open/proposed. No product
-implementation is authorized by this register; P00-B is ready for a separate
-package authorization.
+Q-01 is baseline-decided. Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved;
+ADR-008 is `ACCEPTED`. Q-03, Q-05, Q-06, Q-07, Q-11, Q-12, Q-13 and Q-14
+remain open/proposed. P00-B is integrated; P00-C requires a separate package
+authorization. No product implementation is authorized by this register.

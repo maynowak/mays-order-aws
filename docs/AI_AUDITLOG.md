@@ -443,3 +443,22 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - M-01 remains OPEN; L-01…L-04/L-06 OPEN; L-05 FIXED. No P00-C/D, Terraform,
   AWS, RIS, Jobsearch, push, main merge, tag or deployment action.
 - Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-02.md`.
+
+## 2026-11-13 — MO-RC4-P00-C-AUTHORIZATION-01
+
+**Status:** `MO-RC4-P00-C — Q-04/Q-09 APPROVED / IMPLEMENTATION AUTHORIZATION PENDING`
+
+- Owner approved Q-04: AWS-managed default, existing CMK only by explicit ARN,
+  new CMK only by explicit opt-in, never implicit; no change to existing
+  encryption by provider activation. DDB/SQS CMK remains P00-E.
+- Owner approved Q-09: explicit Policy-Gate allowlist, default deny, least
+  privilege, exact Secret references, `kms:Decrypt` only for actual customer
+  CMK, no wildcard without separate Owner decision.
+- Contract/ADR/register/backlog/manifest checked: no contract conflict.
+  P00-C is ready for implementation authorization, not started.
+- P00-C acceptance criteria remain open: M-01 cache lifetime, L-01 non-ASCII,
+  L-02 observability, L-03 KMS-ARN effect, L-04 test hardening, L-06 atomic
+  provider switch. L-05 remains fixed.
+- Report: `docs/reports/MO-RC4-P00-C-AUTHORIZATION-01.md`.
+- No product implementation, Terraform/AWS mutation, RIS/Jobsearch change,
+  push, main merge, tag or deployment.

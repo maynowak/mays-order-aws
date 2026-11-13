@@ -4,9 +4,10 @@
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 **Base:** `/home/dci-student/projects/Mays-Orders-AWS-rc4-integration` @ `release/rc4-integration`
 
-> **Decision status 2026-11-13:** Q-02, Q-08 and Q-10 are DECIDED; ADR-008 is
-> `ACCEPTED`. P00-B is **INTEGRATED / POST-MERGE VERIFIED** (merge `e71f3ed`).
-> P00-C/D/E/G remain separately gated; P00-C-M01 is open.
+> **Decision status 2026-11-13:** Q-02, Q-04, Q-08, Q-09 and Q-10 are DECIDED;
+> ADR-008 is `ACCEPTED`. P00-B is **INTEGRATED / POST-MERGE VERIFIED** (merge
+> `e71f3ed`). P00-C is ready for implementation authorization; P00-C-M01 is open.
+> P00-D/E/G remain separately gated.
 
 ---
 
