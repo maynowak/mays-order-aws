@@ -404,3 +404,19 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-P00-OWNER-DECISION-02 → docs/reports/MO-RC4-P00-OWNER-DECISION-02.md + docs/release/MO-RC4-P00-DECISION-REGISTER.md + docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md + Contract/P00-A/Orchestrierung/Backlog/Execution-Plan/Project-Status (Owner-Entscheidungen Q-02 Secrets Manager und Q-08 ARN/Name-Referenz + Laufzeit-Fetch APPROVED; Q-10 ADR-008 PENDING; konkreter ADR/Contract-Abgleich: keine harten Konflikte, 7 Klarstellungen C-01…C-07 und 2 Governance-Punkte; ADR-008 bleibt PROPOSED; keine P00-Implementierung, keine AWS-/Terraform-/RIS-Änderung, kein Push)
 - MO-RC4-P00-Q10 → docs/reports/MO-RC4-P00-Q10-APPROVAL.md + architecture/architecture-decisions.md + Decision-Register/Contract/P00-A/Orchestrierung/Comparison/Backlog/Execution-Plan/Manifest/Project-Status (C-01…C-07 vollständig in ADR-008 eingearbeitet: P01→P00-Mapping, optionale PRIVACY_KMS_KEY_ARN-Referenz, Least-Privilege-IAM, manuelle Rotation ohne Auto-Rotator, unveränderter orders-service-Vertrag, ADR-006 bleibt ACCEPTED, Orphan-Detection P00-G; ADR-008 ACCEPTED; Q-10 APPROVED; P00-B READY FOR AUTHORIZATION, nicht gestartet; keine Produkt-/AWS-/Terraform-/RIS-Änderung, kein Push)
 - MO-RC4-P00-B → docs/reports/MO-RC4-P00-B-SECRET-PROVIDER-FOUNDATION.md + lambda/src/secret_provider.py + lambda/src/order_service.py + lambda/tests/test_secret_provider.py + lambda/dist/lambda.zip (P00-B SecretProvider Foundation: ENV-Default gekapselt, AWS_MANAGED-/APP_MANAGED-Konfigurationsverträge, Runtime-Fetch-Adapter mit injiziertem Fetcher, Cache, Fail-closed-Fehlerklassen, Redaction, keine Request-Provider-Auswahl; Lambda 379, Installer 669, Builder 128, E2E lokal 32 = 1.208 PASS + 28 Seed; Gate-Commits c2708ba/cb93cc2/c2bdab7/2f405be/c53f7f7; Feature-Branch nicht gemerged; keine AWS-/Terraform-/RIS-Änderung, kein Push/Tag/Deploy)
+
+
+## 2026-11-13 — MO-RC4-P00-B-INTEGRATION-REVIEW-01
+
+**Status:** `MO-RC4-P00-B — REVIEW PASS / MERGE AUTHORIZATION PENDING`
+
+- Read-only review of feature `f0ea3b8` against integration `8ddc050`;
+  ancestry and conflict-free merge-tree verified. No product code, merge,
+  push, AWS/Terraform or deployment action.
+- 34 new provider tests plus full local suites verified: Lambda 379, Installer
+  669, Builder 128, E2E 32 = 1,208 PASS; Seed 28 separately. Lambda ZIP
+  `c35e6c8b…` contains `secret_provider.py` and rebuilds deterministically.
+- Security/compatibility PASS; no CRITICAL/HIGH/MEDIUM finding. LOW/operational
+  note: process cache has no hot invalidation; rotation requires new
+  process/environment per contract. P00-C/D and AWS live remain separate.
+- Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-REVIEW-01.md`.
