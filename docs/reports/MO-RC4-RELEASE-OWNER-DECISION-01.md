@@ -158,8 +158,8 @@ Keine Produkt-, Test-, Terraform-, AWS- oder RIS-Änderung.
 
 | Feld | Wert |
 |---|---|
-| Dossier-/Notes-Commit | wird nach dem Commit eingetragen |
-| Entscheidungsbericht-Commit | wird nach dem Commit eingetragen |
+| Dossier-/Notes-Commit | `6d45b4a1f7c94e447b2e10e481800550459cfea7` |
+| Entscheidungsbericht-Commit | `1557c09a574c20152c61014a25dd22cdc438548b` |
 | Working Tree nach Commit | CLEAN |
 
 ---
