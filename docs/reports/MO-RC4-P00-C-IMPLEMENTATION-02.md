@@ -106,6 +106,19 @@ Die Sequenz ist **nicht live ausgeführt**.
 
 Keine Terraform-, IAM-, KMS-, RIS-, Jobsearch-, API- oder Order-Statusänderung.
 
+### Commit-Gates
+
+| Gate | Commit |
+|---|---|
+| C1 Secrets Manager Fetcher | `c39fce6b4aa0b09a0a85b1249e6a594becbd7920` |
+| C2 Cache Lifetime / M-01 | `cefadb1ee2e0d3674fc670428c817b9891f830a5` |
+| C3 KMS-Referenz / L-03 | `80785ff8529457dc1f953fa576eb264f0954cbfc` |
+| C4 Non-ASCII / L-01 | `364b5cae6444facc5075adb46b7ac372e082b983` |
+| C5 Observability / L-02 | `fb460908a08a50a3c5bc23d99c7dd60e82580240` |
+| C6 Test-Hardening / L-04 | `70b73aa9f47a3c9734c98ccbd202590b37f17ceb` |
+| C7 Rollout / L-06 | `6428776a2adf4d704b66f756f60e9100b8610fed` |
+| C8 Regression/Report | `8103572d2d8b51c61389d81dc55e97ee782f3dd9` |
+
 ---
 
 ## 3. Testresultate
