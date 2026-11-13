@@ -225,7 +225,7 @@ diesem Auftrag.
 
 | Feld | Wert |
 |---|---|
-| Dokumentations-Commit | wird nach Commit eingetragen |
+| Dokumentations-Commit | `0e337bb602adbde60cc1f8ca0abb7c32704da5b3` |
 | Working Tree nach Commit | CLEAN |
 
 **STOP — Implementierung erst nach gezielter Owner-Freigabe.**
