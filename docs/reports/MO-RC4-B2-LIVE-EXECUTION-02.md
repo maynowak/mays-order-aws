@@ -230,7 +230,7 @@ Der Auditlog-Eintrag wird nach dem Commit ergänzt.
 | Feld | Wert |
 |---|---|
 | Test-Fix-Commit | `71e1ae70ec285d1611d8c309f9bdb1fe8ce44ed6` |
-| Dokumentations-Commit | wird nach dem Commit eingetragen |
+| Dokumentations-Commit | `e69b350fa11cd26acff273b7c3f56ea812d56482` |
 | Working Tree nach Commit | CLEAN |
 
 **STOP — keine automatische G4-/RC4-Freigabe, kein Terraform Apply, kein Push/Merge.**
