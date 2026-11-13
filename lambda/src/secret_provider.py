@@ -8,18 +8,21 @@ APP_MANAGED key material/HMAC integration (P00-D) are separate packages.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from errors import VALIDATION_ERROR, OrderError
 
 ENV_PROVIDER = "env"
 SECRETS_MANAGER_PROVIDER = "secretsmanager"
 APP_MANAGED_PROVIDER = "app_managed"
+SUPPORTED_PROVIDERS = (ENV_PROVIDER, SECRETS_MANAGER_PROVIDER, APP_MANAGED_PROVIDER)
 
 ENV_SECRET_NAME = "PRIVACY_INTERNAL_SECRET"
 PROVIDER_ENV = "PRIVACY_SECRET_PROVIDER"
+
+T = TypeVar("T")
 
 
 class SecretProviderError(OrderError):
@@ -71,6 +74,16 @@ class SecretProvider(Protocol):
 
 
 @dataclass(frozen=True)
+class SecretReference:
+    """Non-secret provider reference. Never contains secret material."""
+
+    provider: str
+    reference: str
+    key_id: str | None = None
+    key_version: str | None = None
+
+
+@dataclass(frozen=True)
 class SecretMaterial:
     """Resolved secret material. ``value`` is never exposed by repr/logging."""
 
@@ -95,6 +108,17 @@ class SecretProviderConfig:
 
     provider: str
     reference: str
+    key_id: str | None = None
+    key_version: str | None = None
+    kms_key_arn: str | None = None
+
+    def to_reference(self) -> SecretReference:
+        return SecretReference(
+            provider=self.provider,
+            reference=self.reference,
+            key_id=self.key_id,
+            key_version=self.key_version,
+        )
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> "SecretProviderConfig":
@@ -117,6 +141,28 @@ class SecretProviderConfig:
             raise ProviderConfigurationError()
 
         return cls(provider=ENV_PROVIDER, reference=ENV_SECRET_NAME)
+
+
+class SecretCache:
+    """Process-local, non-persistent cache keyed by provider/reference/version.
+
+    Errors are never cached: a failed load must be retried and fail closed,
+    never silently resolved from an older value.
+    """
+
+    def __init__(self) -> None:
+        self._values: dict[Hashable, SecretMaterial] = {}
+
+    def get_or_load(
+        self,
+        key: Hashable,
+        loader: Callable[[], SecretMaterial],
+    ) -> SecretMaterial:
+        if key in self._values:
+            return self._values[key]
+        material = loader()
+        self._values[key] = material
+        return material
 
 
 class EnvSecretProvider:

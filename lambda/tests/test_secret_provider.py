@@ -8,9 +8,11 @@ from secret_provider import (
     EnvSecretProvider,
     ProviderConfigurationError,
     SecretAccessDenied,
+    SecretCache,
     SecretMaterial,
     SecretNotConfigured,
     SecretProviderConfig,
+    SecretReference,
     create_secret_provider,
 )
 
@@ -79,6 +81,56 @@ class TestEnvSecretProvider(unittest.TestCase):
         self.assertEqual(config.provider, "env")
         self.assertEqual(config.reference, "PRIVACY_INTERNAL_SECRET")
         self.assertNotIn("do-not-store", repr(config))
+
+
+class TestProviderContract(unittest.TestCase):
+    def test_config_maps_to_non_secret_reference(self):
+        config = SecretProviderConfig(
+            provider="app_managed",
+            reference="external-ref",
+            key_id="key-1",
+            key_version="v1",
+        )
+        reference = config.to_reference()
+        self.assertEqual(
+            reference,
+            SecretReference(
+                provider="app_managed",
+                reference="external-ref",
+                key_id="key-1",
+                key_version="v1",
+            ),
+        )
+        self.assertNotIn("value", repr(reference).lower())
+
+    def test_cache_returns_material_without_second_load(self):
+        cache = SecretCache()
+        calls = []
+        expected = SecretMaterial(provider="env", value="cached")
+
+        def load():
+            calls.append(1)
+            return expected
+
+        self.assertIs(cache.get_or_load(("env", "PRIVACY_INTERNAL_SECRET"), load), expected)
+        self.assertIs(cache.get_or_load(("env", "PRIVACY_INTERNAL_SECRET"), load), expected)
+        self.assertEqual(calls, [1])
+
+    def test_cache_does_not_cache_failed_loads(self):
+        cache = SecretCache()
+        calls = []
+
+        def load():
+            calls.append(1)
+            if len(calls) == 1:
+                raise SecretAccessDenied()
+            return SecretMaterial(provider="env", value="after-retry")
+
+        with self.assertRaises(SecretAccessDenied):
+            cache.get_or_load("key", load)
+        material = cache.get_or_load("key", load)
+        self.assertEqual(material.value, "after-retry")
+        self.assertEqual(calls, [1, 1])
 
 
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):
