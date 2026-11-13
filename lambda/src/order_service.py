@@ -27,7 +27,7 @@ from identity import (
 )
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
-from secret_provider import SecretProvider, SecretProviderError, create_secret_provider
+from secret_provider import SecretProvider, SecretProviderError, get_default_secret_provider
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
@@ -151,16 +151,17 @@ class OrderService:
         self._secret_provider = secret_provider
 
     def _resolve_privacy_secret(self) -> str:
-        """Resolve the internal privacy secret once per service instance.
+        """Resolve the internal privacy secret through the process-wide provider.
 
         Provider selection comes only from configuration, never from request
-        data. Provider errors are mapped to the existing fail-closed 400 path
-        without exposing provider internals, ARNs or secret values.
+        data. The default provider/cache survives multiple invocations in the
+        same Lambda execution environment; injected providers remain scoped to
+        their service instance. Provider errors map to the fail-closed 400 path.
         """
         try:
             provider = self._secret_provider
             if provider is None:
-                provider = create_secret_provider()
+                provider = get_default_secret_provider()
                 self._secret_provider = provider
             material = provider.resolve()
         except SecretProviderError as exc:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -251,6 +252,10 @@ class SecretCache:
         self._values[key] = material
         return material
 
+    def invalidate(self) -> None:
+        """Drop cached material; the next resolve performs a fresh load."""
+        self._values.clear()
+
 
 class EnvSecretProvider:
     """Backwards-compatible implementation of the existing ENV trust boundary."""
@@ -363,6 +368,10 @@ class SecretsManagerProvider:
             key_version=self._config.key_version,
         )
 
+    def invalidate(self) -> None:
+        """Invalidate this provider's cache for a controlled rotation/deploy."""
+        self._cache.invalidate()
+
 
 class AppManagedProvider:
     """P00-D boundary: validates key metadata, but does not resolve/HMAC keys.
@@ -380,20 +389,11 @@ class AppManagedProvider:
         raise AppKeyInvalid()
 
 
-def create_secret_provider(
-    environ: Mapping[str, str] | None = None,
-    secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+def _build_provider(
+    config: SecretProviderConfig,
+    env: Mapping[str, str],
+    secretsmanager_fetcher: SecretsManagerFetcher | None,
 ) -> SecretProvider:
-    """Build the configured provider without any implicit fallback.
-
-    ENV is the backwards-compatible default. Secrets Manager runtime fetching
-    is available through the injected P00-C adapter; without an adapter the
-    selected provider fails closed. APP_MANAGED validates key metadata but
-    remains a P00-D implementation and currently fails closed on resolution.
-    """
-
-    env = os.environ if environ is None else environ
-    config = SecretProviderConfig.from_environment(env)
     if config.provider == ENV_PROVIDER:
         return EnvSecretProvider(config, env)
     if config.provider == SECRETS_MANAGER_PROVIDER:
@@ -404,3 +404,63 @@ def create_secret_provider(
     if config.provider == APP_MANAGED_PROVIDER:
         return AppManagedProvider(config)
     raise ProviderConfigurationError()
+
+
+def create_secret_provider(
+    environ: Mapping[str, str] | None = None,
+    secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+) -> SecretProvider:
+    """Build the configured provider without any implicit fallback.
+
+    ENV is the backwards-compatible default. Secrets Manager runtime fetching
+    uses the lazy boto3 adapter unless a test injects a fetcher. APP_MANAGED
+    validates key metadata but remains a P00-D implementation and fails closed.
+    """
+
+    env = os.environ if environ is None else environ
+    config = SecretProviderConfig.from_environment(env)
+    return _build_provider(config, env, secretsmanager_fetcher)
+
+
+_default_provider: SecretProvider | None = None
+_default_provider_key: tuple[Any, ...] | None = None
+_default_provider_lock = threading.Lock()
+
+
+def get_default_secret_provider(
+    environ: Mapping[str, str] | None = None,
+    secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+) -> SecretProvider:
+    """Return the process-wide provider for one Lambda execution environment.
+
+    The cache is keyed by provider, exact reference, key metadata, KMS reference
+    and an injected-fetcher identity. A changed configuration replaces the
+    provider; errors are never cached. ``reset_default_secret_provider`` is a
+    controlled invalidation hook for rotation/deployment or tests.
+    """
+
+    env = os.environ if environ is None else environ
+    config = SecretProviderConfig.from_environment(env)
+    fetcher_identity = id(secretsmanager_fetcher) if secretsmanager_fetcher is not None else None
+    key = (
+        config.provider,
+        config.reference,
+        config.key_id,
+        config.key_version,
+        config.kms_key_arn,
+        fetcher_identity,
+    )
+    global _default_provider, _default_provider_key
+    with _default_provider_lock:
+        if _default_provider is None or _default_provider_key != key:
+            _default_provider = _build_provider(config, env, secretsmanager_fetcher)
+            _default_provider_key = key
+        return _default_provider
+
+
+def reset_default_secret_provider() -> None:
+    """Drop the module-level provider/cache (controlled rotation/tests only)."""
+    global _default_provider, _default_provider_key
+    with _default_provider_lock:
+        _default_provider = None
+        _default_provider_key = None

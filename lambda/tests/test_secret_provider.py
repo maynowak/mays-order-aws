@@ -26,6 +26,8 @@ from secret_provider import (
     SecretUnavailable,
     SecretsManagerProvider,
     create_secret_provider,
+    get_default_secret_provider,
+    reset_default_secret_provider,
 )
 
 
@@ -143,6 +145,18 @@ class TestProviderContract(unittest.TestCase):
         material = cache.get_or_load("key", load)
         self.assertEqual(material.value, "after-retry")
         self.assertEqual(calls, [1, 1])
+
+    def test_cache_isolates_different_identity_keys(self):
+        cache = SecretCache()
+        calls = []
+
+        def load(value):
+            calls.append(value)
+            return SecretMaterial(provider="env", value=value)
+
+        self.assertEqual(cache.get_or_load(("sm", "a"), lambda: load("a")).value, "a")
+        self.assertEqual(cache.get_or_load(("sm", "b"), lambda: load("b")).value, "b")
+        self.assertEqual(calls, ["a", "b"])
 
 
 class _ClientError(Exception):
@@ -291,6 +305,79 @@ class TestSecretsManagerProvider(unittest.TestCase):
                 provider = create_secret_provider(self._env(), lambda reference, response=response: response)
                 with self.assertRaises(SecretInvalid):
                     provider.resolve()
+
+
+class TestModuleCacheLifetime(unittest.TestCase):
+    ARN_A = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:orders/a-AbCdEf"
+    ARN_B = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:orders/b-AbCdEf"
+
+    def setUp(self):
+        reset_default_secret_provider()
+
+    def tearDown(self):
+        reset_default_secret_provider()
+
+    def _env(self, reference):
+        return {
+            "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+            "PRIVACY_SECRET_ID": reference,
+        }
+
+    def test_default_provider_is_shared_across_invocations(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": "cached-secret"}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        second = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertIs(first, second)
+        self.assertEqual(first.resolve().value, "cached-secret")
+        self.assertEqual(second.resolve().value, "cached-secret")
+        self.assertEqual(calls, [self.ARN_A])
+
+    def test_config_change_replaces_provider_and_isolates_identity(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": reference}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        second = get_default_secret_provider(self._env(self.ARN_B), fetcher)
+        self.assertIsNot(first, second)
+        self.assertEqual(first.resolve().value, self.ARN_A)
+        self.assertEqual(second.resolve().value, self.ARN_B)
+        self.assertEqual(calls, [self.ARN_A, self.ARN_B])
+
+    def test_cache_invalidate_forces_fresh_fetch(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": f"value-{len(calls)}"}
+
+        provider = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertEqual(provider.resolve().value, "value-1")
+        provider.invalidate()
+        self.assertEqual(provider.resolve().value, "value-2")
+        self.assertEqual(calls, [self.ARN_A, self.ARN_A])
+
+    def test_reset_drops_module_provider(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": "value"}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        reset_default_secret_provider()
+        second = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertIsNot(first, second)
+        first.resolve()
+        second.resolve()
+        self.assertEqual(calls, [self.ARN_A, self.ARN_A])
 
 
 class TestAppManagedProviderContract(unittest.TestCase):
