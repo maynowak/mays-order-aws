@@ -180,7 +180,7 @@ deterministischen Rebuild war die Installer-Suite **669/669 PASS**.
 | B3 | `c2bdab752ad76e2561020d28f633cbabe0fe6fb9` | AWS_MANAGED-Konfiguration und Runtime-Fetch-Adapter |
 | B4 | `2f405bea53bdf630364c8c9e66c22988b6e41d2e` | APP_MANAGED-Konfigurationsvertrag, fail-closed Boundary |
 | B5 | `c53f7f76ae5fb4ff9c7d2324403e9a632b68e05e` | Security-/Negativtests und Redaction-Nachweise |
-| B6 | `[nach Commit eintragen]` | Artefakt-Rebuild, Regression, Abschlussbericht |
+| B6 | `5025b46b3813b143edab3eda1f6d425210b2c8a7` | Artefakt-Rebuild, Regression, Abschlussbericht |
 
 ---
 
