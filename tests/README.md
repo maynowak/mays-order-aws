@@ -10,6 +10,9 @@ bewusst **lokal** und **live** getrennt.
 | `tests/e2e_harness.py` | Fake-HTTP, Run-/Order-Fixtures, Ownership-Cleanup, Diagnostik | Nein |
 | `tests/test_e2e_harness.py` | 16 lokale Tests für Harness, Auth, 401, Cleanup, Redaktion | Nein |
 | `tests/test_e2e_async_order.py` | 4 echte Live-E2E-Tests; ohne Opt-in BLOCKED | Ja, nur mit Freigabe |
+| `tests/privacy_e2e_harness.py` | B2-Gates, Lambda-Invoke-Adapter, Privacy-Kontext, exakte Fixtures | Nein |
+| `tests/test_privacy_e2e_harness.py` | 15 lokale Privacy-Harness-Tests | Nein |
+| `tests/test_privacy_e2e.py` | G3X-PRV-X01…X13 Live-Tests; standardmäßig BLOCKED | Ja, nur mit B2-Freigabe |
 
 ## Lokale Tests
 
@@ -25,8 +28,17 @@ Ran 16 tests
 OK
 ```
 
-Die lokalen Tests verwenden `FakeTransport`; sie benötigen weder Credentials
-noch Netzwerk.
+Die lokalen Tests verwenden `FakeTransport` bzw. Fake-Dynamo-Clients; sie
+benötigen weder Credentials noch Netzwerk.
+
+Privacy-Harness separat:
+
+```bash
+cd /tmp/opencode/rc4-upgrade-plan
+python3 -m unittest tests.test_e2e_harness tests.test_privacy_e2e_harness -v
+```
+
+Erwartung: 31 Tests PASS, keine AWS-Verbindung.
 
 ## Live-E2E — Voraussetzungen
 
@@ -53,6 +65,66 @@ entspricht. Fremde Orders werden mit `CleanupOwnershipError` abgelehnt.
 `MO_E2E_LIVE_CLEANUP` darf nur in einem ausdrücklich freigegebenen Testlauf
 gesetzt werden. Ohne diese Variable werden die Live-Tests als `BLOCKED`
 übersprungen.
+
+## Privacy B2 — Live-Gates und Testbenutzer
+
+Die Privacy-Livetests (`G3X-PRV-X01`…`X13`) verwenden **vorab bereitgestellte**
+Testidentitäten A/B. Das Testmodul legt **keine** Cognito-Benutzer, IAM-Rollen,
+Secrets oder Lambda-Konfiguration an.
+
+Benötigte Umgebung (alle Werte erforderlich; fehlende Werte ergeben `BLOCKED`):
+
+```bash
+export MO_PRIVACY_LIVE=1
+export MO_E2E_LIVE_CLEANUP=1
+export PRIVACY_E2E_INVOKER_APPROVED=1
+export AWS_PROFILE=mayaws
+export AWS_REGION=eu-central-1
+export PRIVACY_E2E_ACCOUNT_ID=240571105849
+export PRIVACY_E2E_TABLE=mays-orders-rc4-test
+export PRIVACY_E2E_HANDLER=mays-orders-rc4-test-handler
+export PRIVACY_E2E_CODE_SHA256=FYTuDczNCwQid4JxhFdaGHbBWcdaeg6VzNKbT+WjfkQ=
+export PRIVACY_E2E_PROJECT=mays-orders-rc4-test
+export PRIVACY_E2E_CONSUMER_ID='cognito:cognito-idp.eu-central-1.amazonaws.com/eu-central-1_OZ7TK51EK#415t3lt2k1umrmoaibn4f302sn'
+export PRIVACY_E2E_QUEUE_URL='https://sqs.eu-central-1.amazonaws.com/240571105849/mays-orders-rc4-test-orders-queue'
+export PRIVACY_E2E_DLQ_URL='https://sqs.eu-central-1.amazonaws.com/240571105849/mays-orders-rc4-test-orders-queue-dlq'
+export API_BASE_URL='https://37fldhw7fi.execute-api.eu-central-1.amazonaws.com'
+export PRIVACY_E2E_SUBJECT_A=<sub of test identity A>
+export PRIVACY_E2E_SUBJECT_B=<sub of test identity B>
+export PRIVACY_E2E_ACCESS_TOKEN_A=<pre-provisioned token A>
+export PRIVACY_E2E_ACCESS_TOKEN_B=<pre-provisioned token B>
+export PRIVACY_E2E_INTERNAL_TOKEN=<must equal the handler's PRIVACY_INTERNAL_SECRET>
+```
+
+`PRIVACY_E2E_INVOKER_APPROVED=1` bestätigt den separat freigegebenen,
+least-privilege Lambda-Invoker. `MO_E2E_LIVE_CLEANUP=1` bestätigt den
+run-scoped Cleanup. Ohne alle Gates importiert das Live-Modul kein boto3 und
+führt keine AWS-Verbindung aus.
+
+```bash
+cd /tmp/opencode/rc4-upgrade-plan
+python3 -m unittest tests.test_privacy_e2e -v
+```
+
+Erwartung ohne Freigabe:
+
+```text
+skipped: BLOCKED: missing privacy live prerequisite(s): ...
+```
+
+Der Cleanup verwendet:
+
+- `LiveCleanupBackend` für normale A/B-Orders (subject-/owner-verifiziert).
+- `ExactKeyCleanupBackend` für ANONYMIZE und Consumer-Fixtures mit exaktem
+  `pk`/`sk` und run-scoped Marker; kein Scan, kein Purge, keine fremden Keys.
+
+`G3X-PRV-X13` (fehlendes Lambda-Secret) ist in einem secret-fähigen B2-Lauf
+nicht reproduzierbar, weil dafür eine zweite Lambda-Konfigurationsänderung
+nötig wäre. Der lokale Test `test_privacy_requires_internal_secret` deckt den
+fail-closed Branch ab; der Live-Test bleibt explizit `BLOCKED`.
+
+Die Testidentitäten werden **nicht** automatisch gelöscht. Der Operator muss
+sie nach dem Lauf über den freigegebenen Cognito-Cleanup entfernen.
 
 ## Testbenutzer-Verfahren (historisch, AWS-Mutation)
 

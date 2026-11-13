@@ -33,6 +33,11 @@ _SENSITIVE_KEYS = {
     "aws_session_token",
     "secret",
     "token",
+    "internal_token",
+    "privacy_internal_secret",
+    "privacy_e2e_internal_token",
+    "access_token_a",
+    "access_token_b",
 }
 
 
@@ -245,6 +250,85 @@ class LiveCleanupBackend:
         except Exception as exc:
             raise CleanupError(
                 f"live cleanup failed for order {order.order_id}: {type(exc).__name__}"
+            ) from exc
+
+
+class ExactKeyCleanupBackend:
+    """Run-scoped exact-key cleanup for ANONYMIZE and consumer fixtures.
+
+    Unlike ``LiveCleanupBackend`` this backend does not rely on ``subjectId``:
+    ANONYMIZE removes that attribute. It still refuses foreign data by checking
+    the run marker in the stored item's ``items[].sku`` and by deleting only the
+    exact tracked order key.
+    """
+
+    def __init__(
+        self,
+        *,
+        table_name: str,
+        region: str,
+        run_id: str,
+        client: Any = None,
+    ):
+        if not table_name:
+            raise CleanupUnavailable("ORDERS_TABLE missing for exact-key cleanup")
+        if not run_id:
+            raise CleanupUnavailable("run_id missing for exact-key cleanup")
+        if client is None:
+            import boto3
+
+            client = boto3.client("dynamodb", region_name=region)
+        self.client = client
+        self.table_name = table_name
+        self.run_id = run_id
+
+    def __call__(self, order: OwnedOrder) -> None:
+        if order.run_id != self.run_id or order.owner_run_id != self.run_id:
+            raise CleanupOwnershipError(
+                "refusing exact-key cleanup: order is not owned by the current run"
+            )
+        expected_prefix = f"E2E-{self.run_id}-"
+        if not order.marker.startswith(expected_prefix):
+            raise CleanupOwnershipError(
+                "refusing exact-key cleanup: marker is not run-scoped"
+            )
+
+        key = {
+            "pk": {"S": f"ord_{order.order_id}"},
+            "sk": {"S": "#ORDER"},
+        }
+        item = self.client.get_item(
+            TableName=self.table_name,
+            Key=key,
+            ConsistentRead=True,
+        ).get("Item")
+        if not item:
+            return
+
+        items = item.get("items")
+        has_marker = any(
+            isinstance(entry, Mapping) and entry.get("sku") == order.marker
+            for entry in (items or [])
+        )
+        if not has_marker:
+            raise CleanupOwnershipError(
+                "refusing exact-key cleanup: stored run marker does not match"
+            )
+
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key=key,
+                ConditionExpression="attribute_exists(pk)",
+            )
+        except Exception as exc:
+            response = getattr(exc, "response", {})
+            code = (response.get("Error") or {}).get("Code")
+            if code == "ConditionalCheckFailedException":
+                return
+            raise CleanupError(
+                f"exact-key cleanup failed for order {order.order_id}: "
+                f"{type(exc).__name__}"
             ) from exc
 
 
