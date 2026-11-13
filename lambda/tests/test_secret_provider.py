@@ -1,3 +1,5 @@
+import contextlib
+import io
 import os
 import unittest
 from unittest.mock import patch
@@ -317,6 +319,74 @@ class TestAppManagedProviderContract(unittest.TestCase):
         self.assertEqual(provider.auth_method, APP_MANAGED_AUTH_METHOD)  # type: ignore[attr-defined]
         with self.assertRaises(AppKeyInvalid):
             provider.resolve()
+
+
+class TestSecurityHardening(unittest.TestCase):
+    def test_request_context_cannot_select_provider_or_reference(self):
+        class Provider:
+            def resolve(self):
+                return SecretMaterial(provider="env", value="expected-secret")
+
+        service = create_order_service(
+            "mays-orders",
+            client=object(),
+            secret_provider=Provider(),
+        )
+        context = {
+            "project": "mays-orders",
+            "authorized": True,
+            "privacy_inspect": True,
+            "internal_token": "expected-secret",
+            "secretProvider": "secretsmanager",
+            "secretReference": "arn:aws:secretsmanager:eu-central-1:123456789012:secret:evil",
+        }
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            service._require_privacy_auth(context, "privacy_inspect")
+
+    def test_provider_error_does_not_log_secret(self):
+        class FailingProvider:
+            def resolve(self):
+                raise SecretAccessDenied()
+
+        service = create_order_service(
+            "mays-orders",
+            client=object(),
+            secret_provider=FailingProvider(),
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            with self.assertRaises(OrderError):
+                service._resolve_privacy_secret()
+        self.assertNotIn("secret", stdout.getvalue().lower())
+        self.assertNotIn("secret", stderr.getvalue().lower())
+
+    def test_backend_exception_cause_is_not_exposed(self):
+        def fetcher(reference):
+            raise RuntimeError("raw-secret-value")
+
+        provider = create_secret_provider(
+            {
+                "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+                "PRIVACY_SECRET_ID": "orders/privacy",
+            },
+            fetcher,
+        )
+        with self.assertRaises(SecretUnavailable) as raised:
+            provider.resolve()
+        self.assertIsNone(raised.exception.__cause__)
+        self.assertNotIn("raw-secret-value", str(raised.exception))
+
+    def test_invalid_reference_error_does_not_echo_reference(self):
+        bad_reference = "bad reference with secret-value"
+        with self.assertRaises(ProviderConfigurationError) as raised:
+            create_secret_provider(
+                {
+                    "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+                    "PRIVACY_SECRET_ID": bad_reference,
+                }
+            )
+        self.assertNotIn(bad_reference, str(raised.exception))
 
 
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):
