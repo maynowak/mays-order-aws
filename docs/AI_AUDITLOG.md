@@ -341,3 +341,14 @@ Date: 2026-11-13
 - Packaging defect fixed: build_zip.py used a hardcoded module list, so identity/agent_order/result_envelope/result_handler/dispatch/result_consumer would never have been shipped. It now discovers src/*.py; the built zip contains 13 modules including result_consumer.py.
 - Tests: new tests/test_result_consumer_lambda.py 12 passed; full Orders suite 205 OK. Coverage includes valid result, ORDER_FAILED path via the shared boundary, rotation with the previous key, missing ARN, unavailable secret, forged signature, unknown version/type, wrong order, cancelled order and a partial batch.
 - No AWS call, no deployment, no Terraform change; the Lambda resources, roles and event source mappings remain the next gated step.
+
+
+[MO-RIS-AWS-TERRAFORM-WIRING-01 / RESULT CONSUMER LAMBDA WIRING]
+Status: CODE COMPLETE - consumer wired to the result queue, default-off.
+Date: 2026-11-13
+- modules/agent_transport gained lambda.tf: dedicated consumer role with logs scoped to its own log group, dynamodb:GetItem/UpdateItem on the existing orders table only (no PutItem/DeleteItem), secretsmanager:GetSecretValue scoped to the module's secret ARN, and consume rights on the results queue.
+- kms:Decrypt is a separate policy with count = var.result_secret_kms_key_arn != "" ? 1 : 0, so no KMS key or permission exists unless explicitly configured.
+- Lambda result_consumer.handler on python3.14 using the existing bundle; env carries only ORDERS_TABLE and ORDER_RESULT_SECRET_ARN. SQS ESM batch 10 with ReportBatchItemFailures. No API route was added.
+- Default-off preserved: module count = var.enable_agent_transport (default false); with the flag on the Orders module contributes 10 active resources plus one optional KMS policy.
+- Validation: terraform fmt -check = 0, terraform validate = Success, static wiring tests 12 passed, full Orders suite 217 OK.
+- No AWS call, no plan, no apply, no deployment; the account and secret remain unverified/provisioned outside this gate.
