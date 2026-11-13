@@ -60,7 +60,7 @@ class PrivacyLiveE2E(unittest.TestCase):
         cls.sqs = cls.session.client("sqs")
 
         cls._verify_preflight()
-        cls.run = E2ERun()
+        cls.e2e_run = E2ERun()
         cls.normal_a = []
         cls.normal_b = []
         cls.exact = []
@@ -84,11 +84,11 @@ class PrivacyLiveE2E(unittest.TestCase):
             cls.foreign = cls._create_direct_fixture(
                 cls.config.subject_a, "foreign", cls.config.consumer_id + "-foreign"
             )
-            cls.anon_subject = f"privacy-anon-{cls.run.run_id}"
+            cls.anon_subject = f"privacy-anon-{cls.e2e_run.run_id}"
             cls.anon = cls._create_direct_fixture(
                 cls.anon_subject, "anon", cls.config.consumer_id
             )
-            cls.scope_subject = f"privacy-scope-{cls.run.run_id}"
+            cls.scope_subject = f"privacy-scope-{cls.e2e_run.run_id}"
             cls.scope_match = cls._create_direct_fixture(
                 cls.scope_subject, "scope-match", cls.config.consumer_id
             )
@@ -139,13 +139,13 @@ class PrivacyLiveE2E(unittest.TestCase):
 
     @classmethod
     def _create_order(cls, client, sequence, bucket):
-        synthetic = cls.run.synthetic_order(sequence)
+        synthetic = cls.e2e_run.synthetic_order(sequence)
         response = client.post("/orders", synthetic.payload)
         if response.status != 201:
             raise RuntimeError(f"privacy live order creation failed: {response.status}")
         order = response_json(response)
         order_id = order["orderId"]
-        owned = cls.run.register_created(order_id, synthetic.marker)
+        owned = cls.e2e_run.register_created(order_id, synthetic.marker)
         bucket.append(owned)
         deadline = time.monotonic() + CONFIRM_TIMEOUT_SECONDS
         last_status = None
@@ -162,8 +162,8 @@ class PrivacyLiveE2E(unittest.TestCase):
     @classmethod
     def _create_direct_fixture(cls, subject_id, marker_suffix, consumer_id):
         order_id = "ord_" + uuid.uuid4().hex[:24]
-        marker = run_marker(cls.run.run_id, marker_suffix)
-        owned = cls.run.register_created(order_id, marker)
+        marker = run_marker(cls.e2e_run.run_id, marker_suffix)
+        owned = cls.e2e_run.register_created(order_id, marker)
         now = _now()
         item = {
             "pk": {"S": f"ord_{order_id}"},
@@ -217,11 +217,11 @@ class PrivacyLiveE2E(unittest.TestCase):
             backend_exact = ExactKeyCleanupBackend(
                 table_name=cls.config.table_name,
                 region=cls.config.region,
-                run_id=cls.run.run_id,
+                run_id=cls.e2e_run.run_id,
             )
             for order in exact:
                 backend_exact(order)
-        for order in getattr(cls.run, "orders", []) if hasattr(cls, "run") else []:
+        for order in getattr(cls.e2e_run, "orders", []) if hasattr(cls, "e2e_run") else []:
             item = cls.ddb.get_item(
                 TableName=cls.config.table_name,
                 Key={"pk": {"S": f"ord_{order.order_id}"}, "sk": {"S": "#ORDER"}},
@@ -260,9 +260,9 @@ class PrivacyLiveE2E(unittest.TestCase):
     def _context(self, permission, **overrides):
         return make_privacy_context(self.config, permission, **overrides)
 
-    def _invoke(self, action, subject_id, permission, **overrides):
+    def _invoke(self, action, subject_id, permission, *, options=None, **overrides):
         context = self._context(permission, **overrides)
-        return self.invoker.invoke(action, subject_id, context)
+        return self.invoker.invoke(action, subject_id, context, options=options)
 
     def _get_item(self, order_id):
         return self.ddb.get_item(

@@ -190,6 +190,32 @@ class TestExactKeyCleanup(unittest.TestCase):
 
         self.assertEqual(client.deleted, [("ord_ord_a", "#ORDER")])
 
+    def test_deletes_typed_low_level_item(self):
+        order = OwnedOrder("run-a", "run-a", "ord_a", "E2E-run-a-1")
+        typed_item = {
+            "pk": {"S": "ord_ord_a"},
+            "sk": {"S": "#ORDER"},
+            "items": {
+                "L": [{
+                    "M": {
+                        "sku": {"S": order.marker},
+                        "quantity": {"N": "1"},
+                    }
+                }]
+            },
+        }
+        client = FakeDynamoClient({("ord_ord_a", "#ORDER"): typed_item})
+        cleanup = ExactKeyCleanupBackend(
+            table_name="mays-orders-rc4-test",
+            region="eu-central-1",
+            run_id="run-a",
+            client=client,
+        )
+
+        cleanup(order)
+
+        self.assertEqual(client.deleted, [("ord_ord_a", "#ORDER")])
+
     def test_refuses_marker_mismatch(self):
         order = OwnedOrder("run-a", "run-a", "ord_a", "E2E-run-a-1")
         client = FakeDynamoClient({("ord_ord_a", "#ORDER"): _item("ord_a", "E2E-run-b-1")})

@@ -306,13 +306,39 @@ class ExactKeyCleanupBackend:
             return
 
         items = item.get("items")
-        has_marker = any(
-            isinstance(entry, Mapping) and entry.get("sku") == order.marker
-            for entry in (items or [])
-        )
+        entries = []
+        if isinstance(items, Mapping):
+            # Low-level boto3 DynamoDB client returns typed AttributeValues.
+            typed = items.get("L")
+            if isinstance(typed, list):
+                entries = typed
+        elif isinstance(items, list):
+            # Permissive path for injected plain-item clients.
+            entries = items
+
+        stored_markers = []
+        has_marker = False
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            # Low-level: {"M": {"sku": {"S": marker}}}
+            typed_map = entry.get("M")
+            if isinstance(typed_map, Mapping):
+                sku = typed_map.get("sku")
+                if isinstance(sku, Mapping):
+                    stored_markers.append(sku.get("S"))
+                    if sku.get("S") == order.marker:
+                        has_marker = True
+                continue
+            # Plain-item path: {"sku": marker}
+            if entry.get("sku") == order.marker:
+                has_marker = True
+                stored_markers.append(entry.get("sku"))
         if not has_marker:
             raise CleanupOwnershipError(
-                "refusing exact-key cleanup: stored run marker does not match"
+                "refusing exact-key cleanup: stored run marker does not match "
+                f"(order={order.order_id}, marker={order.marker!r}, "
+                f"stored={stored_markers!r})"
             )
 
         try:
