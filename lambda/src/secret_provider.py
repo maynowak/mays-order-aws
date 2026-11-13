@@ -273,6 +273,34 @@ class EnvSecretProvider:
 SecretsManagerFetcher = Callable[[str], Mapping[str, Any]]
 
 
+class Boto3SecretsManagerFetcher:
+    """Lazy boto3 adapter for AWS_MANAGED runtime fetching.
+
+    No boto3 import or AWS call happens at module import. The client is created
+    on first use and kept for the lifetime of this adapter (module-scoped in
+    the production path); unit tests inject a fake client.
+    """
+
+    def __init__(self, client: Any = None) -> None:
+        self._client = client
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            import boto3  # type: ignore[reportMissingImports]  # provided by the Lambda runtime
+
+            self._client = boto3.client(
+                "secretsmanager",
+                region_name=os.environ.get("AWS_REGION", "eu-central-1"),
+            )
+        return self._client
+
+    def get_secret_value(self, secret_id: str) -> Mapping[str, Any]:
+        return self._get_client().get_secret_value(SecretId=secret_id)
+
+    def __call__(self, secret_id: str) -> Mapping[str, Any]:
+        return self.get_secret_value(secret_id)
+
+
 def _aws_error_code(exc: Exception) -> str:
     response = getattr(exc, "response", None)
     if not isinstance(response, Mapping):
@@ -369,7 +397,10 @@ def create_secret_provider(
     if config.provider == ENV_PROVIDER:
         return EnvSecretProvider(config, env)
     if config.provider == SECRETS_MANAGER_PROVIDER:
-        return SecretsManagerProvider(config, secretsmanager_fetcher)
+        fetcher = secretsmanager_fetcher
+        if fetcher is None:
+            fetcher = Boto3SecretsManagerFetcher().get_secret_value
+        return SecretsManagerProvider(config, fetcher)
     if config.provider == APP_MANAGED_PROVIDER:
         return AppManagedProvider(config)
     raise ProviderConfigurationError()

@@ -12,6 +12,7 @@ from secret_provider import (
     ENV_PROVIDER,
     SECRETS_MANAGER_PROVIDER,
     AppKeyInvalid,
+    Boto3SecretsManagerFetcher,
     EnvSecretProvider,
     ProviderConfigurationError,
     SecretAccessDenied,
@@ -23,6 +24,7 @@ from secret_provider import (
     SecretProviderConfig,
     SecretReference,
     SecretUnavailable,
+    SecretsManagerProvider,
     create_secret_provider,
 )
 
@@ -222,9 +224,32 @@ class TestSecretsManagerProvider(unittest.TestCase):
         self.assertEqual(calls, [self.ARN])
 
     def test_missing_runtime_adapter_fails_closed(self):
-        provider = create_secret_provider(self._env())
+        config = SecretProviderConfig.from_environment(self._env())
+        provider = SecretsManagerProvider(config, fetcher=None)
         with self.assertRaises(SecretUnavailable):
             provider.resolve()
+
+    def test_default_secretsmanager_provider_uses_boto3_adapter(self):
+        provider = create_secret_provider(self._env())
+        self.assertIsInstance(provider, SecretsManagerProvider)
+        self.assertIsNotNone(provider._fetcher)
+
+    def test_boto3_fetcher_uses_injected_client_without_aws(self):
+        calls = []
+
+        class FakeClient:
+            def get_secret_value(self, **kwargs):
+                calls.append(kwargs)
+                return {"SecretString": "from-fake-client"}
+
+        fetcher = Boto3SecretsManagerFetcher(FakeClient())
+        provider = SecretsManagerProvider(self._config(), fetcher.get_secret_value)
+        material = provider.resolve()
+        self.assertEqual(material.value, "from-fake-client")
+        self.assertEqual(calls, [{"SecretId": self.ARN}])
+
+    def _config(self):
+        return SecretProviderConfig.from_environment(self._env())
 
     def test_provider_errors_are_classified_without_raw_details(self):
         cases = (
