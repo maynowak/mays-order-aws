@@ -130,6 +130,15 @@ class TestPrivacyInvokeAdapter(unittest.TestCase):
         self.assertNotIn("secret-value", rendered)
         self.assertIn("COMPLETED", rendered)
 
+        diagnostic = client.diagnostic(
+            test_id="G3X-PRV-X01",
+            run_id="run-a",
+            action="privacy/inspect",
+            response=response,
+        )
+        self.assertEqual(diagnostic["test_id"], "G3X-PRV-X01")
+        self.assertEqual(diagnostic["actual_status"], 200)
+
     def test_redact_handles_internal_token_key(self):
         rendered = json.dumps(redact({"internal_token": "secret-value"}))
         self.assertNotIn("secret-value", rendered)

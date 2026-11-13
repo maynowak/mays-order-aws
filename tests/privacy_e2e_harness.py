@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Mapping, Optional
 
-from tests.e2e_harness import BLOCKED, PASS, redact
+from tests.e2e_harness import BLOCKED, PASS, Diagnostic, redact
 
 PRIVACY_LIVE_ENV = "MO_PRIVACY_LIVE"
 PRIVACY_INVOKER_ENV = "PRIVACY_E2E_INVOKER_APPROVED"
@@ -202,6 +202,22 @@ class PrivacyInvokeClient:
 
     def redacted_diagnostic(self, response: PrivacyResponse) -> Dict[str, Any]:
         return redact(response.body)
+
+    def diagnostic(
+        self,
+        *,
+        test_id: str,
+        run_id: str,
+        action: str,
+        response: PrivacyResponse,
+    ) -> Dict[str, Any]:
+        return Diagnostic(
+            test_id=test_id,
+            run_id=run_id,
+            operation=action,
+            expected_status=None,
+            actual_status=response.status_code,
+        ).as_dict()
 
 
 def boto3_invoker(function_name: str, lambda_client: Any = None):
