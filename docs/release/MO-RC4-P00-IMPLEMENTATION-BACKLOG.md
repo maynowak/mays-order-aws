@@ -1,14 +1,16 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-08 APPROVED / Q-10 PENDING
+**Status:** DRAFTED / Q-02 + Q-08 + Q-10 APPROVED / P00-B READY FOR AUTHORIZATION
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager) and Q-08 (ARN/name
-> reference + runtime fetch) are approved. No package may begin production
-> implementation until its remaining Owner gates are closed. P00-B remains
-> blocked by Q-10. This is a backlog, not an implementation start.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
+> reference + runtime fetch) and Q-10 (ADR-008 after C-01…C-07) are approved.
+> ADR-008 is `ACCEPTED`. P00-B is ready for a separate package authorization.
+> No package may begin production implementation until its remaining Owner
+> gates and package authorization are closed. This is a backlog, not an
+> implementation start.
 
 ---
 
@@ -53,7 +55,8 @@ The order may change only with documented dependency justification.
 | Migration risk | accidental behavior change; mitigate with default-off and regression tests |
 | Security boundary | no secret values in response/log; no request-controlled reference |
 | Commit boundary | provider foundation + tests + docs only |
-| Owner approval | Q-08 approved; **Q-10 pending** |
+| Owner approval | Q-08 approved; Q-10 approved |
+| Package status | **READY FOR AUTHORIZATION** — not started |
 
 **Do not include:** Secrets Manager IAM/IaC, APP HMAC, rotation, retention.
 
@@ -72,7 +75,7 @@ The order may change only with documented dependency justification.
 | Migration risk | secret in state/plan if ephemeral misuse; DDB/SQS not touched |
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
-| Owner approval | Q-02/Q-08 approved; Q-04, Q-09, Q-10 pending |
+| Owner approval | Q-02/Q-08/Q-10 approved; Q-04, Q-09 pending |
 
 ---
 
@@ -89,7 +92,7 @@ The order may change only with documented dependency justification.
 | Migration risk | key loss or version mismatch; require dual-version transition |
 | Security boundary | no custom cipher; no key in data/items/logs |
 | Commit boundary | APP adapter + tests + docs |
-| Owner approval | Q-10, Q-11; APP_MANAGED is Phase 2, not automatically RC4 |
+| Owner approval | Q-10 approved; Q-11 open; APP_MANAGED is Phase 2, not automatically RC4 |
 
 ---
 
@@ -106,7 +109,7 @@ The order may change only with documented dependency justification.
 | Migration risk | DDB/SQS in-place updates; no automatic replacement; plan review |
 | Security boundary | exact key ARN; no CMK for unrelated services; no CloudFront/Cognito/RIS |
 | Commit boundary | module + wiring + policy tests; no rotation execution |
-| Owner approval | Q-04, Q-09, Q-10 |
+| Owner approval | Q-04, Q-09; Q-10 approved |
 
 ---
 

@@ -1,16 +1,17 @@
 # MO-RC4-P00 Implementation Contract
 
-**Status:** DRAFTED / Q-02 + Q-08 OWNER-APPROVED / Q-10 AND OTHERS PENDING
+**Status:** DRAFTED / Q-02 + Q-08 + Q-10 OWNER-APPROVED / OTHER DECISIONS PENDING
 **Scope:** P00 SecretProvider, AWS_MANAGED, APP_MANAGED, KMS/encryption,
 rotation and retention integration
 **Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Branch:** `release/rc4-integration`
 **Reference:** `docs/reports/MO-RC4-P00-A-SECURITY-ARCHITECTURE-DECISION.md`
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager) and Q-08 (ARN/name
-> reference + runtime fetch, no plaintext secret in Env) are approved. This is
-> a contract decision only; no implementation is authorized. Q-10 remains
-> pending after `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/name
+> reference + runtime fetch, no plaintext secret in Env) and Q-10 (ADR-008,
+> after C-01…C-07) are approved. This is a contract/architecture decision only;
+> no implementation is authorized. P00-B is ready for a separate package
+> authorization. Remaining questions (Q-03…Q-07, Q-09, Q-11…Q-14) remain open.
 
 > This is an implementation contract, not code. No field below is approved for
 > implementation until the corresponding Owner Decision is closed.
@@ -157,6 +158,9 @@ reference suffix only.
 - Secrets Manager rotation is a separate capability (Q-11).
 - KMS key rotation is independent of secret-value rotation.
 - APP_MANAGED uses explicit `keyId`/`keyVersion`.
+- RC4 has **no automatic rotator and no automatic rotation**. A documented
+  manual rotation procedure is permitted; scope, transition window and
+  responsibility remain Q-11.
 - Old material may remain valid only during an Owner-approved transition window.
 - Cache invalidation requires a new Lambda environment/deployment or an
   explicitly designed refresh signal; no silent hot reload.
@@ -172,8 +176,8 @@ reference suffix only.
 | Reference | Exact ARN/name, project-scoped |
 | Provider IAM | `secretsmanager:GetSecretValue` on exact ARN |
 | Secret encryption | AWS-managed default; optional CMK via separate decision |
-| KMS IAM | `kms:Decrypt` only if CMK selected; exact key ARN |
-| Value in Env | **No** plaintext; only provider/reference fields |
+| KMS IAM | `kms:Decrypt` only if CMK selected; exact key ARN; no wildcard |
+| Value in Env | **No** plaintext; only provider/reference fields, including optional non-secret `PRIVACY_KMS_KEY_ARN` |
 | Value in Terraform | **No** value in outputs/state |
 | Cache | Process-local |
 | Rotation | Manual/native later; not automatically enabled |
@@ -241,9 +245,10 @@ PRIVACY_SECRET_ID      = output of privacy_secret module (no value)
 
 ### Module Builder
 
-- `orders-service` contract remains unchanged.
+- Existing `orders-service` inputs and outputs remain unchanged.
 - P00 modules offered only via explicit hardened preset/module selection
-  (Q-03).
+  (Q-03); the exact placement remains open.
+- New optional variables must leave the default plan resource-identical.
 - No secret values in builder manifest.
 - Validation fail-closed; no silent stripping of security wiring.
 
@@ -264,6 +269,10 @@ PRIVACY_SECRET_ID      = output of privacy_secret module (no value)
 - ERASE/ANONYMIZE/RETAIN remain separate operations.
 - Backups/PITR are separate retention/erasure concerns.
 - No legal period, TTL duration or automatic deletion is invented.
+- **Orphan detection (ADR-008 D-2) is assigned to P00-G** for specification and
+  fail-closed behavior. P00-G does not include automatic deletion, backfill or a
+  RIS write path; execution remains separately Owner-gated. Q-14 governs legacy
+  data, RIS coordination remains outside P00.
 - Q-06/Q-14 remain Owner decisions.
 - Existing Privacy auth and fail-closed behavior must not regress.
 
@@ -332,11 +341,12 @@ Implementation must not start on:
 - ~~Q-08 (reference/fetch shape)~~ — **owner-approved 2026-11-13:
   ARN/name reference + runtime fetch**;
 - Q-09 (policy gate),
-- Q-10 (ADR approval — comparison complete, decision pending),
+- ~~Q-10 (ADR approval)~~ — **owner-approved 2026-11-13 after C-01…C-07**;
 - Q-11 (rotation scope),
 - Q-12 (release label),
 - Q-13 (test account),
 - Q-14 (legacy backfill).
 
-Q-02/Q-08 approval does not start P00-B or P00-C; Q-10 and the package
-authorization still gate implementation. P00-A itself is documentation only.
+Q-02/Q-08/Q-10 approval does not start P00-B or P00-C. P00-B is **ready for a
+separate package authorization**; P00-C remains gated by Q-04/Q-09 and package
+authorization. P00-A itself is documentation only.

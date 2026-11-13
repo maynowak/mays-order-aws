@@ -77,15 +77,16 @@ These branches remain unchanged; no work was deleted.
 
 ```text
 P00 — OPEN / NOT INCLUDED
-AWS_MANAGED: MISSING / Q-02 + Q-08 DECIDED
-APP_MANAGED: MISSING / Q-10 PENDING
+AWS_MANAGED: MISSING / Q-02 + Q-08 + Q-10 APPROVED
+APP_MANAGED: MISSING / Q-10 APPROVED, OTHER GATES OPEN
 KMS backup stash: UNCHANGED, NOT APPLIED
+P00-B: READY FOR AUTHORIZATION, NOT STARTED
 ```
 
 P00 design/ADR documents are integrated; implementation remains a separate
-RC4 work package. Q-02 (Secrets Manager) and Q-08 (ARN/name reference + runtime
-fetch) are owner-approved; Q-10 (ADR-008) remains pending after the documented
-comparison. No P00 completion is claimed.
+RC4 work package. Q-02 (Secrets Manager), Q-08 (ARN/name reference + runtime
+fetch) and Q-10 (ADR-008, C-01…C-07) are owner-approved; ADR-008 is `ACCEPTED`.
+No P00 completion is claimed and no package is started.
 
 ## 6. Release Readiness
 

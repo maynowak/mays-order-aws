@@ -18,8 +18,8 @@ gesetzlichen Fristen erfunden und keine TTL konfiguriert.
 | CloudWatch Logs | Retention über `log_retention_days` konfigurierbar | Terraform |
 | CloudTrail | Management-Events, kein Lifecycle definiert | `docs/reports/BACKUP-01...` |
 
-ADR-008 (Retention/Privacy) ist **PROPOSED**, nicht umgesetzt. Es gibt keine
-Löschfristen, keine TTL und kein Ledger.
+ADR-008 (Retention/Privacy) ist **ACCEPTED** (Q-10, 2026-11-13), aber nicht
+umgesetzt. Es gibt keine Löschfristen, keine TTL und kein Ledger.
 
 ---
 

@@ -1,19 +1,22 @@
 # MO-RC4-P00 — ADR-008 / Implementation Contract Comparison
 
-**Status:** COMPARISON COMPLETE / Q-10 OWNER DECISION PENDING
+**Status:** RESOLVED / Q-10 APPROVED 2026-11-13
 **Datum:** 2026-11-13
 **Branch:** `release/rc4-integration`
-**ADR:** `architecture/architecture-decisions.md` → ADR-008 (PROPOSED)
+**ADR:** `architecture/architecture-decisions.md` → ADR-008 (**ACCEPTED**)
 **Contract:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Scope:** Read-only Abgleich der Architekturentscheidung mit dem
-P00-Implementierungsvertrag. Keine ADR-Freigabe, keine Produktimplementierung.
+P00-Implementierungsvertrag; C-01…C-07 wurden anschließend in ADR-008
+eingearbeitet. Keine Produktimplementierung.
 
 ---
 
 ## 1. Ergebnis
 
 **Kein harter Architekturkonflikt.** Die Zielrichtung von ADR-008 und dem
-Implementierungsvertrag ist konsistent:
+Implementierungsvertrag ist konsistent. Der Abgleich war die Grundlage für die
+Q-10-Freigabe; die sieben Klarstellungen wurden am 2026-11-13 in ADR-008
+eingearbeitet und die Auflösung ist unten dokumentiert.
 
 - `ENV` bleibt Default.
 - `AWS_MANAGED` verwendet Secrets Manager.
@@ -25,8 +28,9 @@ Implementierungsvertrag ist konsistent:
 - Retention/TTL ist kein synchroner Löschbeweis.
 - Erweiterungen sind additiv und default-off.
 
-Der Abgleich zeigt jedoch **Klarstellungsbedarf**, bevor Q-10 freigegeben werden
-sollte. Q-10 bleibt deshalb **OFFEN**.
+Der Abgleich zeigte **Klarstellungsbedarf** vor der Q-10-Freigabe. Dieser Bedarf
+ist mit der Einarbeitung von C-01…C-07 in ADR-008 geschlossen; Q-10 ist
+**APPROVED**.
 
 ---
 
@@ -36,13 +40,17 @@ sollte. Q-10 bleibt deshalb **OFFEN**.
 |---|---|---|---|
 | Q-02 | Secrets Manager als AWS-MANAGED-Backend | 2026-11-13 | P00-C-Backend festgelegt |
 | Q-08 | ARN/Name-Referenz + Laufzeit-Fetch; kein Klartext-Secret in Env | 2026-11-13 | P00-B/C-Konfigurationsrichtung festgelegt |
+| Q-10 | ADR-008 nach Einarbeitung C-01…C-07 | 2026-11-13 | ADR-008 `ACCEPTED`; P00-B ready for authorization |
 
-Diese Freigaben autorisieren **keine Implementierung**. P00-B bleibt wegen
-Q-10 und der noch offenen Paketfreigabe blockiert.
+Diese Freigaben autorisieren **keine Implementierung**. P00-B ist für eine
+separate Paketfreigabe bereit; P00-C/D/E/G bleiben separat gated.
 
 ---
 
 ## 3. Entscheidungsabgleich
+
+> Bewertung zum Zeitpunkt des Abgleichs. Die Auflösung der offenen Punkte ist
+> in Abschnitt 5 dokumentiert.
 
 | ADR-008 | Vertrag | Bewertung | Klärungsbedarf |
 |---|---|---|---|
@@ -71,24 +79,30 @@ sind nicht deckungsgleich mit dem P00-Decision-Register:
 | Q-19 | Freigabe der Dienste | Q-10 = ADR-008-Freigabe |
 | Q-06 | RIS-Abstimmung | Q-06 = Retention-Fristen |
 
-**Folge:** Q-10 sollte erst freigegeben werden, wenn die ADR-Nummern auf das
-P00-Register abgebildet oder als historische P01-Nummern gekennzeichnet sind.
-Sonst ist die Entscheidungsgrundlage nicht eindeutig auditierbar.
+**Folge (historisch):** Q-10 sollte erst freigegeben werden, wenn die ADR-Nummern
+auf das P00-Register abgebildet oder als historische P01-Nummern gekennzeichnet
+sind. Sonst ist die Entscheidungsgrundlage nicht eindeutig auditierbar.
+
+**Auflösung:** ADR-008 enthält jetzt die Tabelle „Historische P01-Fragen →
+P00-Zuordnung“; die historischen Nummern werden nicht als offene P00-Fragen
+verwendet.
 
 ### G-02 — ADR-006-Status
 
-ADR-008 erklärt, dass ADR-006 („keine zusätzlichen Services“) für
-Sicherheitsdienste ergänzt wird und separat als überholt markiert werden sollte.
-Eine tatsächliche Statusänderung von ADR-006 ist nicht dokumentiert.
+ADR-006 („keine zusätzlichen Services“) ist **ACCEPTED** und bleibt für alle
+übrigen Services gültig. ADR-008 ist die neue Architecture Decision für Secrets
+Manager und KMS; ADR-006 wird **nicht** als überholt markiert und es gibt keine
+pauschale Freigabe weiterer Services.
 
-**Folge:** Q-10 sollte die Governance-Behandlung von ADR-006 ausdrücklich
-bestätigen. Der Commander ändert den ADR-Status nicht eigenmächtig.
+**Auflösung:** Q-10 bestätigt diese explizite, eng begrenzte Behandlung. Der
+ADR-006-Status wurde nicht eigenmächtig verändert.
 
 ### G-03 — ADR-Status
 
-ADR-008 ist **PROPOSED**. Der Implementierungsvertrag ist **DRAFTED**. Keines
-der beiden Dokumente ist durch Q-02/Q-08 automatisch freigegeben. Q-02/Q-08
-legen nur Backend und Referenz-/Fetch-Richtung fest.
+ADR-008 ist seit der Q-10-Freigabe **ACCEPTED**. Der Implementierungsvertrag
+bleibt **DRAFTED**; Q-02/Q-08/Q-10 autorisieren keine Implementierung. Die
+Freigaben legen Backend, Referenz-/Fetch-Richtung und die Architekturgrundlage
+fest; die übrigen P00-Fragen bleiben offen.
 
 ---
 
@@ -105,7 +119,20 @@ legen nur Backend und Referenz-/Fetch-Richtung fest.
 | C-07 | Orphan-Detection aus D-2 in P00-G aufnehmen oder ausdrücklich als separaten Auftrag abgrenzen | ADR-008 D-2; Contract §10 | Q-10/Q-14 |
 
 `C-04` und `C-05` berühren auch Q-11 bzw. Q-03. Sie sind keine stillen
-Vorentscheidungen; die jeweiligen Fragen bleiben separat.
+Vorentscheidungen; die jeweiligen Fragen bleiben separat. `C-04` bestätigt
+ausdrücklich nur „kein automatischer Rotator“, nicht den Q-11-Umfang.
+
+### Auflösung C-01…C-07
+
+| ID | Status | Nachweis in ADR-008 |
+|---|---|---|
+| C-01 | **EINGEARBEITET** | Tabelle „Historische P01-Fragen → P00-Zuordnung“; keine alten IDs als offene P00-Fragen |
+| C-02 | **EINGEARBEITET** | D-5: optionale `PRIVACY_KMS_KEY_ARN`-Referenz, kein Secret-Wert |
+| C-03 | **EINGEARBEITET** | D-5: exakte ARNs, kein Wildcard, `kms:Decrypt` nur bei CMK |
+| C-04 | **EINGEARBEITET** | D-7: kein Auto-Rotator, dokumentierte manuelle Rotation, Q-11 offen |
+| C-05 | **EINGEARBEITET** | D-8: `orders-service` unverändert, gehärtete Module separat, Q-03 offen |
+| C-06 | **EINGEARBEITET** | ADR-006 bleibt `ACCEPTED`; ADR-008 ist die neue ADR nur für Secrets Manager/KMS |
+| C-07 | **EINGEARBEITET** | D-2: P00-G spezifiziert Detection/Fail-closed; keine automatische Löschung/Backfill/RIS |
 
 ---
 
@@ -116,22 +143,23 @@ ADR-008 vs. P00 Implementation Contract
 ────────────────────────────────────────
 Architekturrichtung:       KONSISTENT
 Harte Konflikte:           KEINE
-Klarstellungen:            7 (C-01…C-07)
-Governance-Offenpunkte:    2 (G-01, G-02)
-Q-10-Status:               READY FOR OWNER DECISION (nach Klarstellung)
+Klarstellungen:            7 (C-01…C-07) — EINGEARBEITET
+Governance-Offenpunkte:    GESCHLOSSEN (G-01/G-02)
+ADR-008-Status:            ACCEPTED
+Q-10-Status:               APPROVED 2026-11-13
+P00-B:                     READY FOR AUTHORIZATION
 Implementierungsstart:     NICHT AUTORISIERT
 ```
 
-**Empfehlung:** Q-10 mit den Klarstellungen C-01…C-07 freigeben und ADR-008
-anschließend durch den Release Owner auf `ACCEPTED` setzen. Bis dahin bleibt
-ADR-008 `PROPOSED`, P00-B bleibt blockiert.
+Q-10 ist auf Basis der vollständigen Einarbeitung freigegeben. P00-B ist für
+eine separate Paketfreigabe bereit; die Implementierung selbst ist nicht
+autorisiert.
 
 ---
 
 ## 7. Nicht Teil dieses Abgleichs
 
-- Keine Änderung von ADR-008 oder ADR-006.
 - Keine Produkt-/Terraform-/AWS-Änderung.
 - Keine Implementierung von P00-B bis P00-I.
-- Keine Freigabe von Q-03/Q-04/Q-05/Q-06/Q-07/Q-09/Q-10/Q-11/Q-12/Q-13/Q-14.
+- Keine Freigabe von Q-03/Q-04/Q-05/Q-06/Q-07/Q-09/Q-11/Q-12/Q-13/Q-14.
 - Kein Push, Merge, Tag oder Deployment.

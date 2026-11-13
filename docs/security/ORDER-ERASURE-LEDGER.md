@@ -98,7 +98,7 @@ pseudonyme Subject-Referenz, Order-IDs und Zähler/Zeitpunkte.
 - **Keyed HMAC-SHA256** über `subjectId`, Schlüssel ≥ 32 Byte, `keyId` im Klartext.
 - Kein ungesalzener Hash niedrig-entropischer IDs (z. B. E-Mail) als „anonym“.
 - Der Schlüssel wird **nie** im Ledger gespeichert; Produktion über
-  Secrets Manager/KMS (noch nicht implementiert; ADR-008 D-5/D-6 PROPOSED).
+  Secrets Manager/KMS (noch nicht implementiert; ADR-008 D-5/D-6 ACCEPTED).
 - Rotation: neuer `keyId`, alter Schlüssel bleibt nur zur Verifikation alter
   Referenzen erhalten; Rotation ist ein eigener, freigegebener Vorgang.
 - Eine pseudonymisierte Referenz ist **weiterhin personenbezogen**, solange eine

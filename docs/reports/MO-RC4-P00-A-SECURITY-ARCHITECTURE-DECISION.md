@@ -11,14 +11,14 @@
 kein Merge/Cherry-Pick, kein Push, kein Release-Tag.
 
 ```text
-MO-RC4-P00-A — CONTRACT DRAFTED / Q-02 + Q-08 APPROVED / Q-10 PENDING
+MO-RC4-P00-A — CONTRACT DRAFTED / Q-02 + Q-08 + Q-10 APPROVED
 ```
 
-> **Owner update 2026-11-13:** Q-02 (Secrets Manager) und Q-08 (ARN/Name-
-> Referenz + Laufzeit-Fetch, kein Klartext-Secret in Env) sind freigegeben.
-> Q-10 bleibt nach dem ADR-008-Abgleich offen
-> (`docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md`). Die Freigaben
-> autorisieren keine Implementierung.
+> **Owner update 2026-11-13:** Q-02 (Secrets Manager), Q-08 (ARN/Name-
+> Referenz + Laufzeit-Fetch, kein Klartext-Secret in Env) und Q-10 (ADR-008
+> nach C-01…C-07) sind freigegeben; ADR-008 ist `ACCEPTED`. Die Freigaben
+> autorisieren keine Implementierung; P00-B ist für eine separate
+> Paketfreigabe bereit.
 
 Der technische Vertrag ist konsistent ableitbar, aber mehrere
 sicherheitsrelevante Entscheidungen sind weiterhin **PROPOSED** bzw. **OPEN**.
@@ -38,7 +38,7 @@ entschieden.
 | `docs/reports/MO-RC4-P00-OPEN-QUESTIONS.md` | Q-01…Q-14 |
 | `docs/reports/MO-RC4-P01-SECRET-PROVIDER-DESIGN.md` | AWS_MANAGED/APP_MANAGED Design |
 | `docs/reports/MO-RC4-P01-CONTRACT-INVENTORY.md` | Ist-Verträge |
-| `architecture/architecture-decisions.md` ADR-008 | PROPOSED, nicht freigegeben |
+| `architecture/architecture-decisions.md` ADR-008 | ACCEPTED (Q-10, 2026-11-13) |
 | `docs/release/RC4-INTEGRATION-MANIFEST.md` | Integrationsbasis |
 | `docs/reports/MO-RC4-RELEASE-CONSOLIDATION-02.md` | Integrationsnachweis |
 | `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` | Owner-Update 2026-11-13; Q-10-Abgleich |
@@ -65,15 +65,15 @@ entschieden.
 | Q-07 | Cancel-Anonymisierung | Opt-in, Default Frist abwarten | P00 P-09; Q-07 | **PROPOSED** | Owner-Freigabe |
 | Q-08 | Secret-Zustellung | ARN/Referenz in Env, Laufzeit-Fetch | P00 P-01/P-02; Q-08; Owner-Freigabe 2026-11-13 | **DECIDED** | Referenz/Fetch festgelegt; P00-B bleibt durch Q-10 gated |
 | Q-09 | Policy-Gate-Allowlist | Erweitern mit Regeln | P00 P-15; Q-09 | **PROPOSED** | Governance-Freigabe |
-| Q-10 | ADR/Services | ADR-008 für KMS/Secrets | ADR-008; ADR-008/Contract-Abgleich | **READY_FOR_OWNER** | ADR-008 bleibt PROPOSED; C-01…C-07 klären |
+| Q-10 | ADR/Services | ADR-008 für KMS/Secrets | ADR-008; Owner-Freigabe 2026-11-13 | **DECIDED** | ADR-008 ACCEPTED; C-01…C-07 eingearbeitet |
 | Q-11 | Rotation in RC4? | Native Rotation später; manuelle Rotation dokumentieren | P00 P-03; Q-11 | **PROPOSED** | Owner-Freigabe |
 | Q-12 | Release-Label | `v0.6.0-rc.1` bei P00-Feature-Generation, sonst `v0.5.0-rc.4` | Q-12; RC4-Dossier | **OPEN** | Release-Owner |
 | Q-13 | AWS-Testkonto | RIS-Testkonto erneut vorgeschlagen | Q-13 | **OPEN** | Owner/Testfreigabe |
 | Q-14 | Bestand ohne Retention | Separater Backfill, nicht RC4-Code | Q-14 | **OPEN** | Owner/Migration |
 
 **Statuslegende:** `DECIDED` = ausdrücklich autorisierte Entscheidung
-(Q-01 nur Baseline; Q-02/Q-08 am 2026-11-13 freigegeben); `PROPOSED` ist keine
-Freigabe; `OPEN`/`READY_FOR_OWNER` blockiert die abhängigen Pakete.
+(Q-01 nur Baseline; Q-02/Q-08/Q-10 am 2026-11-13 freigegeben); `PROPOSED` ist
+keine Freigabe; `OPEN`/`READY_FOR_OWNER` blockiert die abhängigen Pakete.
 
 ---
 
@@ -100,8 +100,8 @@ gesetzter Provider-Konfiguration aktiv werden.
 
 ### 3.2 AWS_MANAGED
 
-**Designstatus:** Q-02/Q-08 entschieden (2026-11-13); Q-10 offen; P00-C nicht
-implementiert.
+**Designstatus:** Q-02/Q-08/Q-10 entschieden (2026-11-13); ADR-008 ACCEPTED;
+P00-C nicht implementiert und weiterhin durch Q-04/Q-09 gated.
 
 - **Secret-Herkunft:** AWS Secrets Manager; `PRIVACY_SECRET_ID` referenziert den
   exakten ARN/Name.
@@ -357,19 +357,19 @@ Löschung. Q-06/Q-14 bleiben offen. TTL ist **kein** DSGVO-Löschnachweis.
 
 ## 9. Owner Decision Register
 
-**Status: OWNER_DECISIONS_PENDING**
+**Status: Q-02 + Q-08 + Q-10 APPROVED / OTHER DECISIONS OPEN**
 
 | ID | Entscheidung | Bestehende Evidenz | Empfehlung | Auswirkung | Status |
 |---|---|---|---|---|---|
-| Q-02 | Secrets Manager vs. SSM vs. ENV | P00/P01 | Secrets Manager | P00-C/P00-E | OPEN |
+| Q-02 | Secrets Manager vs. SSM vs. ENV | P00/P01 | Secrets Manager | P00-C/P00-E | APPROVED |
 | Q-03 | Modulangebot | P00 Q-03 | separates hardened Preset | P00-H | OPEN |
 | Q-04 | CMK erzeugen/extern | P00 Q-04 | beides, Default extern | P00-E | OPEN |
 | Q-05 | `tenantId` | P00 Q-05 | optional/null | P00-G | OPEN |
 | Q-06 | Retention-Fristen | P00 Q-06 | 365/30 nur Vorschlag, rechtlich bestätigen | P00-G | OPEN |
 | Q-07 | Cancel-Anonymisierung | P00 Q-07 | Opt-in | P00-G | OPEN |
-| Q-08 | Secret-Referenz/Fetch | P00 Q-08 | ARN + Laufzeit-Fetch | P00-B/C | OPEN |
+| Q-08 | Secret-Referenz/Fetch | P00 Q-08 | ARN + Laufzeit-Fetch | P00-B/C | APPROVED |
 | Q-09 | Policy-Gate-Erweiterung | P00 Q-09 | mit Regeln | P00-E | OPEN |
-| Q-10 | ADR-008-Freigabe | ADR-008 | PROPOSED freigeben/ändern | P00-A | OPEN |
+| Q-10 | ADR-008-Freigabe | ADR-008 | ACCEPTED | P00-A/B/C/E | APPROVED |
 | Q-11 | Rotation in RC4? | P00 Q-11 | nur manuell, native später | P00-F | OPEN |
 | Q-12 | Release-Label | Q-12 | abhängig vom P00-Scope | Release | OPEN |
 | Q-13 | AWS-Testkonto | Q-13 | isoliertes Testkonto/Freigabe | P00-I | OPEN |
@@ -378,8 +378,8 @@ Löschung. Q-06/Q-14 bleiben offen. TTL ist **kein** DSGVO-Löschnachweis.
 Q-01 ist für die RC4-Baseline entschieden (kein RC3-Tag; `086a8be` autorisiert);
 das ist **keine** RC3-Releasefreigabe.
 
-**Nicht entschieden:** Q-02, Q-03, Q-04, Q-05, Q-06, Q-07, Q-08, Q-09, Q-10,
-Q-11, Q-12, Q-13, Q-14.
+**Nicht entschieden:** Q-03, Q-04, Q-05, Q-06, Q-07, Q-09, Q-11, Q-12, Q-13,
+Q-14. Q-02/Q-08/Q-10 sind am 2026-11-13 freigegeben.
 
 ---
 
@@ -397,14 +397,15 @@ insbesondere:
 - Rotation, Retention und TTL sind getrennte Mechanismen.
 - Retention-Fristen und TTL-Semantik bleiben offen.
 
-**Nächster Schritt:** Owner-Entscheidungen gemäß Register; danach P00-B
-(SecretProvider Foundation) als separates Implementierungspaket.
+**Nächster Schritt:** P00-B (SecretProvider Foundation) ist nach Q-08/Q-10 für
+eine separate Paketautorisierung bereit; P00-C/D/E/G bleiben offen.
 
 Verwandte Dokumente:
 
 - `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 - `docs/release/MO-RC4-P00-IMPLEMENTATION-BACKLOG.md`
-- `architecture/architecture-decisions.md` (ADR-008, PROPOSED)
+- `docs/reports/MO-RC4-P00-Q10-APPROVAL.md`
+- `architecture/architecture-decisions.md` (ADR-008, ACCEPTED)
 
 ---
 

@@ -9,6 +9,10 @@
 **Modus:** Dokumentation und Read-only-Abgleich; keine Produkt-/Terraform-/AWS-
 Änderung, kein Push, kein Merge, kein Tag, kein Deployment.
 
+> **Historischer Stand:** Dieses Dokument dokumentiert Q-02/Q-08 und den damals
+> offenen Q-10-Stand. Q-10 wurde am 2026-11-13 nach Einarbeitung von C-01…C-07
+> freigegeben; maßgeblich ist `docs/reports/MO-RC4-P00-Q10-APPROVAL.md`.
+
 ---
 
 ## 1. Entscheidung
