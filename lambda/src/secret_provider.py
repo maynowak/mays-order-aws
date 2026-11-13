@@ -276,6 +276,7 @@ class EnvSecretProvider:
 
 
 SecretsManagerFetcher = Callable[[str], Mapping[str, Any]]
+SecretsManagerDescriptor = Callable[[str], Mapping[str, Any]]
 
 
 class Boto3SecretsManagerFetcher:
@@ -302,6 +303,9 @@ class Boto3SecretsManagerFetcher:
     def get_secret_value(self, secret_id: str) -> Mapping[str, Any]:
         return self._get_client().get_secret_value(SecretId=secret_id)
 
+    def describe_secret(self, secret_id: str) -> Mapping[str, Any]:
+        return self._get_client().describe_secret(SecretId=secret_id)
+
     def __call__(self, secret_id: str) -> Mapping[str, Any]:
         return self.get_secret_value(secret_id)
 
@@ -327,9 +331,11 @@ class SecretsManagerProvider:
         self,
         config: SecretProviderConfig,
         fetcher: SecretsManagerFetcher | None = None,
+        descriptor: SecretsManagerDescriptor | None = None,
     ) -> None:
         self._config = config
         self._fetcher = fetcher
+        self._descriptor = descriptor
         self._cache = SecretCache()
 
     def resolve(self) -> SecretMaterial:
@@ -344,17 +350,15 @@ class SecretsManagerProvider:
         return self._cache.get_or_load(key, self._load)
 
     def _load(self) -> SecretMaterial:
+        if self._config.kms_key_arn:
+            self._verify_kms_key()
+
         try:
             response = self._fetcher(self._config.reference)  # type: ignore[misc]
         except SecretProviderError:
             raise
         except Exception as exc:
-            code = _aws_error_code(exc)
-            if code in ("ResourceNotFoundException", "ResourceNotFound"):
-                raise SecretNotFound() from None
-            if code in ("AccessDeniedException", "AccessDenied", "KMSAccessDeniedException"):
-                raise SecretAccessDenied() from None
-            raise SecretUnavailable() from None
+            self._raise_mapped_error(exc)
 
         if not isinstance(response, Mapping):
             raise SecretInvalid()
@@ -367,6 +371,42 @@ class SecretsManagerProvider:
             key_id=self._config.key_id,
             key_version=self._config.key_version,
         )
+
+    def _verify_kms_key(self) -> None:
+        """Verify the configured CMK binding through DescribeSecret.
+
+        Secrets Manager decrypts with the secret's own KMS key; the request
+        cannot select a different CMK. This check makes PRIVACY_KMS_KEY_ARN
+        behaviorally effective and fails closed on a mismatch. It requires
+        secretsmanager:DescribeSecret in addition to GetSecretValue.
+        """
+        if self._descriptor is None:
+            raise SecretUnavailable()
+        try:
+            response = self._descriptor(self._config.reference)
+        except SecretProviderError:
+            raise
+        except Exception as exc:
+            self._raise_mapped_error(exc)
+
+        if not isinstance(response, Mapping):
+            raise SecretInvalid()
+        actual_key = response.get("KmsKeyId")
+        if not isinstance(actual_key, str) or not actual_key:
+            raise SecretInvalid()
+        if actual_key != self._config.kms_key_arn:
+            raise SecretInvalid()
+
+    @staticmethod
+    def _raise_mapped_error(exc: Exception) -> None:
+        code = _aws_error_code(exc)
+        if code in ("ResourceNotFoundException", "ResourceNotFound"):
+            raise SecretNotFound() from None
+        if code in ("AccessDeniedException", "AccessDenied", "KMSAccessDeniedException"):
+            raise SecretAccessDenied() from None
+        if type(exc).__name__ in ("ParamValidationError", "InvalidParameterException"):
+            raise ProviderConfigurationError() from None
+        raise SecretUnavailable() from None
 
     def invalidate(self) -> None:
         """Invalidate this provider's cache for a controlled rotation/deploy."""
@@ -393,14 +433,19 @@ def _build_provider(
     config: SecretProviderConfig,
     env: Mapping[str, str],
     secretsmanager_fetcher: SecretsManagerFetcher | None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None,
 ) -> SecretProvider:
     if config.provider == ENV_PROVIDER:
         return EnvSecretProvider(config, env)
     if config.provider == SECRETS_MANAGER_PROVIDER:
         fetcher = secretsmanager_fetcher
+        descriptor = secretsmanager_descriptor
         if fetcher is None:
-            fetcher = Boto3SecretsManagerFetcher().get_secret_value
-        return SecretsManagerProvider(config, fetcher)
+            adapter = Boto3SecretsManagerFetcher()
+            fetcher = adapter.get_secret_value
+            if descriptor is None:
+                descriptor = adapter.describe_secret
+        return SecretsManagerProvider(config, fetcher, descriptor)
     if config.provider == APP_MANAGED_PROVIDER:
         return AppManagedProvider(config)
     raise ProviderConfigurationError()
@@ -409,6 +454,7 @@ def _build_provider(
 def create_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
 ) -> SecretProvider:
     """Build the configured provider without any implicit fallback.
 
@@ -419,7 +465,9 @@ def create_secret_provider(
 
     env = os.environ if environ is None else environ
     config = SecretProviderConfig.from_environment(env)
-    return _build_provider(config, env, secretsmanager_fetcher)
+    return _build_provider(
+        config, env, secretsmanager_fetcher, secretsmanager_descriptor
+    )
 
 
 _default_provider: SecretProvider | None = None
@@ -430,6 +478,7 @@ _default_provider_lock = threading.Lock()
 def get_default_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
 ) -> SecretProvider:
     """Return the process-wide provider for one Lambda execution environment.
 
@@ -442,6 +491,9 @@ def get_default_secret_provider(
     env = os.environ if environ is None else environ
     config = SecretProviderConfig.from_environment(env)
     fetcher_identity = id(secretsmanager_fetcher) if secretsmanager_fetcher is not None else None
+    descriptor_identity = (
+        id(secretsmanager_descriptor) if secretsmanager_descriptor is not None else None
+    )
     key = (
         config.provider,
         config.reference,
@@ -449,11 +501,14 @@ def get_default_secret_provider(
         config.key_version,
         config.kms_key_arn,
         fetcher_identity,
+        descriptor_identity,
     )
     global _default_provider, _default_provider_key
     with _default_provider_lock:
         if _default_provider is None or _default_provider_key != key:
-            _default_provider = _build_provider(config, env, secretsmanager_fetcher)
+            _default_provider = _build_provider(
+                config, env, secretsmanager_fetcher, secretsmanager_descriptor
+            )
             _default_provider_key = key
         return _default_provider
 

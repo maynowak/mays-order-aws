@@ -250,20 +250,91 @@ class TestSecretsManagerProvider(unittest.TestCase):
 
     def test_boto3_fetcher_uses_injected_client_without_aws(self):
         calls = []
+        kms_arn = self.KMS_ARN
 
         class FakeClient:
             def get_secret_value(self, **kwargs):
-                calls.append(kwargs)
+                calls.append(("get", kwargs))
                 return {"SecretString": "from-fake-client"}
+
+            def describe_secret(self, **kwargs):
+                calls.append(("describe", kwargs))
+                return {"KmsKeyId": kms_arn}
 
         fetcher = Boto3SecretsManagerFetcher(FakeClient())
         provider = SecretsManagerProvider(self._config(), fetcher.get_secret_value)
         material = provider.resolve()
         self.assertEqual(material.value, "from-fake-client")
-        self.assertEqual(calls, [{"SecretId": self.ARN}])
+        self.assertEqual(calls, [("get", {"SecretId": self.ARN})])
+
+    def test_kms_binding_is_verified_through_describe_secret(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(("get", reference))
+            return {"SecretString": "with-cmk"}
+
+        def descriptor(reference):
+            calls.append(("describe", reference))
+            return {"KmsKeyId": self.KMS_ARN}
+
+        provider = SecretsManagerProvider(
+            self._config_with_kms(), fetcher, descriptor
+        )
+        self.assertEqual(provider.resolve().value, "with-cmk")
+        self.assertEqual(
+            calls,
+            [("describe", self.ARN), ("get", self.ARN)],
+        )
+
+    def test_kms_binding_mismatch_fails_closed_without_fetch(self):
+        def fetcher(reference):
+            raise AssertionError("GetSecretValue must not run after mismatch")
+
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            fetcher,
+            lambda reference: {"KmsKeyId": self.KMS_ARN + "-other"},
+        )
+        with self.assertRaises(SecretInvalid):
+            provider.resolve()
+
+    def test_kms_binding_requires_descriptor(self):
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            lambda reference: {"SecretString": "never"},
+        )
+        with self.assertRaises(SecretUnavailable):
+            provider.resolve()
+
+    def test_kms_descriptor_access_denied_is_redacted(self):
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            lambda reference: {"SecretString": "never"},
+            lambda reference: (_ for _ in ()).throw(_ClientError("AccessDeniedException")),
+        )
+        with self.assertRaises(SecretAccessDenied) as raised:
+            provider.resolve()
+        self.assertNotIn(self.ARN, str(raised.exception))
+
+    def test_no_kms_config_does_not_call_descriptor(self):
+        calls = []
+
+        provider = SecretsManagerProvider(
+            self._config(),
+            lambda reference: {"SecretString": "without-cmk"},
+            lambda reference: calls.append(reference) or {"KmsKeyId": self.KMS_ARN},
+        )
+        self.assertEqual(provider.resolve().value, "without-cmk")
+        self.assertEqual(calls, [])
 
     def _config(self):
         return SecretProviderConfig.from_environment(self._env())
+
+    def _config_with_kms(self):
+        return SecretProviderConfig.from_environment(
+            self._env(PRIVACY_KMS_KEY_ARN=self.KMS_ARN)
+        )
 
     def test_provider_errors_are_classified_without_raw_details(self):
         cases = (
