@@ -273,3 +273,17 @@ Date: 2026-11-13
 - Open decisions recorded: legacy enforcement vs shadow mode vs backfill (O1), list index GSI3 vs GSI2 (O2), staff/admin read (O3), internal result boundary for A06 (O4).
 - No AWS mutation, no deployment, no code change.
 Report: docs/reports/MO-AGENT-ORDER-OWNERSHIP-01-PHASE1.md
+
+[MO-AGENT-ORDER-OWNERSHIP-02 / PHASE 2 OWNER ENFORCEMENT]
+Status: COMPLETE (local) — create, get, list and patch enforce the verified owner.
+Date: 2026-11-13
+- Decisions implemented: O1 fail-closed (legacy inaccessible), O2 dedicated ownership index, O3 no staff/admin bypass, O4 internal result boundary deferred to A06.
+- S1 identity.py: reads only requestContext.authorizer.jwt.claims; requires iss AND sub; checks configured issuer and audience/client; allows only token_use id/access; ownerKey = sha256(iss \0 sub). Missing ORDERS_COGNITO_ISSUER/CLIENT_ID yields 503 instead of an unchecked path.
+- S2 create: ownerIssuer/ownerSubject/ownerKey/actorType/actorId/ownerClientId stored server-side for retail and agent orders alike; the strict body allowlist rejects injected owner fields with 400.
+- S3 get/patch require identity before any read or write; foreign and unowned orders return 404 ORDER_NOT_FOUND, indistinguishable from a missing order; legacy rows without ownerKey are denied.
+- S4 list queries only gsi3 (gsi1/gsi2 were already taken by global list and privacy). If the index is unavailable the service returns 503 and never falls back to the global list.
+- S5 privacy untouched: subjectId/gsi2 are still only set when explicitly passed (never on the API path); privacy functions keep their own authContext+secret boundary. No email/customer-based backfill.
+- Tests: cd lambda, PYTHONPATH=src, unittest discover -> 128 tests OK (96 pre-existing + 32 new in tests/test_ownership.py covering all 14 required evidence points). compileall clean.
+- Infra as code only (no apply): gsi3 in modules/dynamodb, cognito_issuer/cognito_client_id variables and ORDERS_COGNITO_ISSUER/CLIENT_ID env in modules/lambda, wired from module.cognito in the root. Terraform fmt/validate run locally.
+- Behaviour change by design: all legacy orders become invisible to end users (404). No migration in this gate.
+Report: docs/reports/MO-AGENT-ORDER-OWNERSHIP-02-PHASE2.md

@@ -11,6 +11,14 @@
 
 ## 2. Endpoint-Spezifikation
 
+> **Eigentümerbindung (MO-AGENT-ORDER-OWNERSHIP-02):** Jede Route liest `iss` und
+> `sub` aus den vom Gateway verifizierten JWT-Claims. Der Eigentümer wird beim
+> Anlegen serverseitig gespeichert. `GET`, `PATCH` und `GET` (Liste) sind auf den
+> Eigentümer begrenzt; fremde und nicht zuordenbare Orders liefern `404`
+> `ORDER_NOT_FOUND` (keine Unterscheidung zu „existiert nicht").
+> Orders ohne Eigentümerbindung (Bestand) bleiben für normale Aufrufer gesperrt.
+> Es gibt keinen `staff`/`admin`-Pauschalzugriff.
+
 ### 2.1 `POST /orders`
 
 **Auth:** erforderlich (Cognito JWT).
@@ -131,10 +139,11 @@
 | 400 | `VALIDATION_ERROR` | Request validiert nicht |
 | 401 | `UNAUTHORIZED` | Fehlendes/ungültiges Token |
 | 403 | `FORBIDDEN` | Authentifiziert, aber nicht berechtigt |
-| 404 | `ORDER_NOT_FOUND` | Order existiert nicht |
+| 404 | `ORDER_NOT_FOUND` | Order existiert nicht **oder** gehört einem anderen Aufrufer |
 | 409 | `INVALID_TRANSITION` | Statusübergang ungültig |
 | 409 | `CONFLICTED_UPDATE` | Konkurrierendes Update (Conditional Check verloren) |
 | 500 | `INTERNAL_ERROR` | Unerwarteter Fehler (nur generisch nach außen) |
+| 503 | `SERVICE_UNAVAILABLE` | Eigentümer-Index oder Identitätskonfiguration fehlt (fail-closed) |
 
 ## 4. Offene API-Entscheidungen (Woche 1/2)
 
