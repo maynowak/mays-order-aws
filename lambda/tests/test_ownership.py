@@ -324,13 +324,18 @@ class TestRouteLevelEnforcement(unittest.TestCase):
         self.assertEqual(400, code)
         self.assertEqual("VALIDATION_ERROR", body["error"]["code"])
 
-    def test_agent_order_body_is_not_exposed(self):
+    def test_agent_order_detail_is_sanitised(self):
+        """P01: the owner sees the fachliche body, but never internals."""
         agent_id = self.service.create_order(AGENT_BODY, ALICE)["orderId"]
         code, body = self._call(event_for(
             ALICE, path_params={"orderId": agent_id}))
         self.assertEqual(200, code)
-        self.assertNotIn("agentOrder", body)
+        self.assertIn("agentOrder", body)
         self.assertNotIn("agentOrderFingerprint", body)
+        self.assertNotIn("processing", body["agentOrder"])
+        self.assertNotIn("partnerApplicationRef", body["agentOrder"]["metadata"])
+        self.assertNotIn("apiProfileRef", body["agentOrder"]["metadata"])
+        self.assertNotIn("ownerKey", body)
 
     def test_foreign_user_cannot_see_agent_order(self):
         agent_id = self.service.create_order(AGENT_BODY, ALICE)["orderId"]

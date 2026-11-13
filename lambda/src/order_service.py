@@ -26,7 +26,11 @@ OWNER_INDEX_RANGE_KEY = "gsi3sk"
 # agentOrder/agentOrderFingerprint sind fachlicher Bestandteil der Order, werden
 # aber NICHT über öffentliche Read-/List-Antworten ausgegeben (A04.5: die
 # Zielbasis hat noch keine verlässliche Eigentümerprüfung).
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId", "agentOrder", "agentOrderFingerprint"}
+INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId", "agentOrder", "agentOrderFingerprint",
+                   # Ownership internals (MO-AGENT-ORDER-OWNERSHIP-02): identity
+                   # bindings and index keys must never reach a client.
+                   "ownerIssuer", "ownerSubject", "ownerKey", "ownerClientId",
+                   "actorType", "actorId", "gsi3pk", "gsi3sk"}
 
 _dynamodb_resource = None
 
@@ -58,6 +62,71 @@ def now_iso() -> str:
 
 def to_public_order(item: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in item.items() if key not in INTERNAL_FIELDS}
+
+
+#: Fields of ``agentOrder`` that may be shown to the verified owner.
+#: Everything else stays internal by omission, not by blacklist: a new field in
+#: the stored body is simply not projected until it is explicitly released here.
+PUBLIC_AGENT_ORDER_METADATA = ("source", "requestId")
+
+
+def to_public_agent_order(agent_order: Any) -> Dict[str, Any]:
+    """Owner-facing projection of one agent order.
+
+    Released: target, fachliche input, the two non-identifying metadata
+    references, and the result contract.
+
+    Withheld: ``processing`` (technical execution state), ``metadata``
+    identity references (``partnerApplicationRef``, ``apiProfileRef``) and
+    ``idempotencyKey``. Reading an order does not grant access to identity or
+    processing internals.
+    """
+    if not isinstance(agent_order, dict):
+        return {}
+
+    # Only a body that still satisfies the V1 contract is projected. A tampered
+    # or drifted stored body is withheld entirely instead of being forwarded
+    # unvalidated (no unknown fields, no credential-shaped content).
+    from agent_order import AgentOrderValidationError, validate_agent_order
+
+    try:
+        agent_order = validate_agent_order(agent_order)
+    except AgentOrderValidationError:
+        return {}
+
+    target = agent_order.get("target") if isinstance(
+        agent_order.get("target"), dict) else {}
+    raw_input = agent_order.get("input") if isinstance(
+        agent_order.get("input"), dict) else {}
+    metadata = agent_order.get("metadata") if isinstance(
+        agent_order.get("metadata"), dict) else {}
+    contract = agent_order.get("resultContract") if isinstance(
+        agent_order.get("resultContract"), dict) else {}
+
+    projected = {
+        "schemaVersion": agent_order.get("schemaVersion"),
+        "target": {
+            "agentId": target.get("agentId"),
+            "capability": target.get("capability"),
+            "agentVersion": target.get("agentVersion"),
+        },
+        "input": {
+            "schemaVersion": raw_input.get("schemaVersion"),
+            "data": raw_input.get("data") if isinstance(
+                raw_input.get("data"), dict) else {},
+        },
+        "metadata": {
+            key: metadata[key] for key in PUBLIC_AGENT_ORDER_METADATA
+            if metadata.get(key) is not None
+        },
+        "resultContract": {
+            "schemaVersion": contract.get("schemaVersion"),
+            "format": contract.get("format"),
+            "expectedCapability": contract.get("expectedCapability"),
+            "delivery": contract.get("delivery"),
+        },
+    }
+    return projected
 
 
 def to_list_item(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -232,7 +301,14 @@ class OrderService:
             raise order_not_found(order_id)
         if not identity.can_read(item):
             raise order_not_found(order_id)
-        return to_public_order(item)
+
+        public = to_public_order(item)
+        # Owner-only detail projection: the fachliche agentOrder is released
+        # here and only here, after the ownership check. Lists, create and
+        # patch responses keep it internal.
+        if item.get("orderType") == ORDER_TYPE_AGENT and item.get("agentOrder"):
+            public["agentOrder"] = to_public_agent_order(item["agentOrder"])
+        return public
 
     def list_orders(self, identity: OwnerIdentity, limit: int,
                     next_token: Optional[str] = None) -> Dict[str, Any]:

@@ -287,3 +287,15 @@ Date: 2026-11-13
 - Infra as code only (no apply): gsi3 in modules/dynamodb, cognito_issuer/cognito_client_id variables and ORDERS_COGNITO_ISSUER/CLIENT_ID env in modules/lambda, wired from module.cognito in the root. Terraform fmt/validate run locally.
 - Behaviour change by design: all legacy orders become invisible to end users (404). No migration in this gate.
 Report: docs/reports/MO-AGENT-ORDER-OWNERSHIP-02-PHASE2.md
+
+[MO-AGENT-ORDER-PROJECTION-01 / OWNER-ONLY DETAIL]
+Status: COMPLETE (local) — the verified owner sees the released agentOrder on detail only.
+Date: 2026-11-13
+- Baseline: feature/mo-agent-order-body-01 @ 10f1aaa, 128 tests green before the change.
+- Defect found and fixed (introduced in Phase 2): ownerIssuer/ownerSubject/ownerKey/ownerClientId/actorType/actorId/gsi3pk/gsi3sk were NOT in INTERNAL_FIELDS, so every detail and list response leaked the ownership binding, including the raw subject. All eight fields are now internal.
+- New to_public_agent_order applies only in get_order, after the ownership check. Released: schemaVersion, target (agentId/capability/agentVersion), input (schemaVersion/data), metadata.source and metadata.requestId, resultContract. Withheld: metadata.partnerApplicationRef, metadata.apiProfileRef, metadata.idempotencyKey, processing (incl. parentWorkId) and agentOrderFingerprint.
+- The projection re-validates the stored body against the V1 contract first; a tampered or drifted body (unknown fields, secret-shaped content) is withheld entirely instead of being forwarded. Whitelist-by-omission, not blacklist.
+- Routes: detail for the owner only; list, create and patch responses keep agentOrder internal; foreign owner and legacy rows stay 404.
+- Tests: cd lambda, PYTHONPATH=src, unittest discover -> 144 tests OK (128 + 16 new in tests/test_agent_order_projection.py), compileall clean. Retail detail key set asserted unchanged.
+- No AWS call, no apply, no deployment, no merge, no change to the RIS transport contract.
+Report: docs/reports/MO-AGENT-ORDER-PROJECTION-01.md

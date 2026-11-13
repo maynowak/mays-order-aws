@@ -74,6 +74,15 @@
 
 **Antwort 200:** Order-Objekt wie oben.
 
+**Eigentümer-Detail (MO-AGENT-ORDER-PROJECTION-01):** Bei
+`orderType = "agent.execution"` enthält die Antwort für den **verifizierten
+Eigentümer** zusätzlich ein freigegebenes `agentOrder`-Objekt mit `schemaVersion`,
+`target`, `input`, `metadata` (`source`, `requestId`) und `resultContract`.
+Nicht enthalten: `processing`, `metadata.partnerApplicationRef`,
+`metadata.apiProfileRef`, `metadata.idempotencyKey` sowie alle internen
+Identitäts- und Indexfelder. Listen-, Create- und Patch-Antworten enthalten
+`agentOrder` nicht.
+
 **Fehler:**
 - 404 `ORDER_NOT_FOUND` — Order existiert nicht
 - 400 `VALIDATION_ERROR` — ungültiges `orderId`-Format
