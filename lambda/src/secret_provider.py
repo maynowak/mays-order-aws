@@ -27,6 +27,7 @@ KMS_KEY_ARN_ENV = "PRIVACY_KMS_KEY_ARN"
 APP_KEY_REF_ENV = "PRIVACY_APP_KEY_REF"
 APP_KEY_ID_ENV = "PRIVACY_APP_KEY_ID"
 APP_KEY_VERSION_ENV = "PRIVACY_APP_KEY_VERSION"
+APP_MANAGED_AUTH_METHOD = "HMAC-SHA256"
 
 _SECRET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9/_+=.@-]{1,512}$")
 _SECRET_ARN_PATTERN = re.compile(
@@ -72,6 +73,15 @@ def _non_empty(env: Mapping[str, str], name: str) -> str:
 def _reject_non_empty(env: Mapping[str, str], name: str) -> None:
     if (env.get(name) or "").strip():
         raise ProviderConfigurationError()
+
+
+def _validate_identifier(value: str, max_length: int = 256) -> str:
+    candidate = (value or "").strip()
+    if not candidate or len(candidate) > max_length:
+        raise ProviderConfigurationError()
+    if any(char.isspace() or ord(char) < 0x20 or ord(char) == 0x7F for char in candidate):
+        raise ProviderConfigurationError()
+    return candidate
 
 
 class SecretProviderError(OrderError):
@@ -205,8 +215,20 @@ class SecretProviderConfig:
                 kms_key_arn=kms_key_arn,
             )
 
-        # APP_MANAGED configuration is added in P00-B/B4. Until then the mode
-        # must fail closed rather than being silently treated as ENV.
+        if provider == APP_MANAGED_PROVIDER:
+            _reject_non_empty(env, ENV_SECRET_NAME)
+            _reject_non_empty(env, SECRET_ID_ENV)
+            _reject_non_empty(env, KMS_KEY_ARN_ENV)
+            reference = _validate_identifier(_non_empty(env, APP_KEY_REF_ENV))
+            key_id = _validate_identifier(_non_empty(env, APP_KEY_ID_ENV))
+            key_version = _validate_identifier(_non_empty(env, APP_KEY_VERSION_ENV))
+            return cls(
+                provider=APP_MANAGED_PROVIDER,
+                reference=reference,
+                key_id=key_id,
+                key_version=key_version,
+            )
+
         raise ProviderConfigurationError()
 
 
@@ -316,6 +338,22 @@ class SecretsManagerProvider:
         )
 
 
+class AppManagedProvider:
+    """P00-D boundary: validates key metadata, but does not resolve/HMAC keys.
+
+    The external key loader and HMAC verification are intentionally absent in
+    P00-B. Selecting APP_MANAGED before P00-D therefore fails closed.
+    """
+
+    auth_method = APP_MANAGED_AUTH_METHOD
+
+    def __init__(self, config: SecretProviderConfig) -> None:
+        self._config = config
+
+    def resolve(self) -> SecretMaterial:
+        raise AppKeyInvalid()
+
+
 def create_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
@@ -324,7 +362,8 @@ def create_secret_provider(
 
     ENV is the backwards-compatible default. Secrets Manager runtime fetching
     is available through the injected P00-C adapter; without an adapter the
-    selected provider fails closed. APP_MANAGED remains a P00-D implementation.
+    selected provider fails closed. APP_MANAGED validates key metadata but
+    remains a P00-D implementation and currently fails closed on resolution.
     """
 
     env = os.environ if environ is None else environ
@@ -333,5 +372,6 @@ def create_secret_provider(
         return EnvSecretProvider(config, env)
     if config.provider == SECRETS_MANAGER_PROVIDER:
         return SecretsManagerProvider(config, secretsmanager_fetcher)
-    # APP_MANAGED is intentionally not implemented in P00-B.
+    if config.provider == APP_MANAGED_PROVIDER:
+        return AppManagedProvider(config)
     raise ProviderConfigurationError()

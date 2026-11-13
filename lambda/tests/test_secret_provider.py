@@ -5,9 +5,11 @@ from unittest.mock import patch
 from errors import OrderError
 from order_service import create_order_service
 from secret_provider import (
+    APP_MANAGED_AUTH_METHOD,
     APP_MANAGED_PROVIDER,
     ENV_PROVIDER,
     SECRETS_MANAGER_PROVIDER,
+    AppKeyInvalid,
     EnvSecretProvider,
     ProviderConfigurationError,
     SecretAccessDenied,
@@ -262,6 +264,59 @@ class TestSecretsManagerProvider(unittest.TestCase):
                 provider = create_secret_provider(self._env(), lambda reference, response=response: response)
                 with self.assertRaises(SecretInvalid):
                     provider.resolve()
+
+
+class TestAppManagedProviderContract(unittest.TestCase):
+    def _env(self, **overrides):
+        return {
+            "PRIVACY_SECRET_PROVIDER": APP_MANAGED_PROVIDER,
+            "PRIVACY_APP_KEY_REF": "external/key-ref",
+            "PRIVACY_APP_KEY_ID": "key-1",
+            "PRIVACY_APP_KEY_VERSION": "v1",
+            **overrides,
+        }
+
+    def test_valid_key_metadata_is_accepted(self):
+        config = SecretProviderConfig.from_environment(self._env())
+        self.assertEqual(config.provider, APP_MANAGED_PROVIDER)
+        self.assertEqual(config.reference, "external/key-ref")
+        self.assertEqual(config.key_id, "key-1")
+        self.assertEqual(config.key_version, "v1")
+        self.assertEqual(config.to_reference().key_version, "v1")
+
+    def test_missing_key_metadata_is_rejected(self):
+        for name in (
+            "PRIVACY_APP_KEY_REF",
+            "PRIVACY_APP_KEY_ID",
+            "PRIVACY_APP_KEY_VERSION",
+        ):
+            with self.subTest(name=name):
+                env = self._env()
+                env.pop(name)
+                with self.assertRaises(ProviderConfigurationError):
+                    create_secret_provider(env)
+
+    def test_conflicting_provider_values_are_rejected(self):
+        for extra in (
+            {"PRIVACY_INTERNAL_SECRET": "plaintext"},
+            {"PRIVACY_SECRET_ID": "orders/privacy"},
+            {"PRIVACY_KMS_KEY_ARN": "arn:aws:kms:eu-central-1:123456789012:key/x"},
+        ):
+            with self.subTest(extra=extra):
+                with self.assertRaises(ProviderConfigurationError):
+                    create_secret_provider(self._env(**extra))
+
+    def test_invalid_key_identifiers_are_rejected(self):
+        for field in ("PRIVACY_APP_KEY_REF", "PRIVACY_APP_KEY_ID", "PRIVACY_APP_KEY_VERSION"):
+            with self.subTest(field=field):
+                with self.assertRaises(ProviderConfigurationError):
+                    create_secret_provider(self._env(**{field: "has whitespace"}))
+
+    def test_app_managed_resolution_is_fail_closed_in_p00_b(self):
+        provider = create_secret_provider(self._env())
+        self.assertEqual(provider.auth_method, APP_MANAGED_AUTH_METHOD)  # type: ignore[attr-defined]
+        with self.assertRaises(AppKeyInvalid):
+            provider.resolve()
 
 
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):
