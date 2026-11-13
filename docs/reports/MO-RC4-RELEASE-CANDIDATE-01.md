@@ -339,3 +339,15 @@ RC4 MODULE RELEASE CONDITIONALLY READY
 
 **STOP — keine automatische Hochstufung, kein Release-Tag, keine
 Veröffentlichung, keine RIS-Integration, kein Push/Merge.**
+
+---
+
+## 15. Commits / Working Tree
+
+| Feld | Wert |
+|---|---|
+| Dossier-/Release-Notes-Commit | `21638bc43793937bda49ba85ec939cc406c26837` |
+| Entscheidungsbericht-Commit | `48948a80f91a436cf2e75a34326c4d3868f1aa5b` |
+| Working Tree nach Commit | CLEAN |
+
+Keine Produkt-, Test-, Terraform-, AWS- oder RIS-Änderung.
