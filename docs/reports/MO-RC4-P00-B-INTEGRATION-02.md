@@ -86,7 +86,7 @@ Damit ist L-05 **FIXED** (Dokumentationskorrektur, Pre-Merge-Commit
 | Feature-Merge (`--no-ff`) | `e71f3edcb146fb7b3943b4c23fa65e771cf4611e` | P00-B Produktcode, Tests, ZIP, Feature-Docs |
 | Review-Dokumentation | `6c7d294` | Review-Bericht und Auditlog-Abschnitt |
 | Review-Korrektur | `b4b6b1a` | M-01/L-01…L-06 und Multi-Agent-Evidenz |
-| Integration-Abschluss | `[nach Commit eintragen]` | Manifest/Plan/Backlog/Status/Auditlog/Report |
+| Integration-Abschluss | `415c64de48ab7471a32f46922dc83bd3555c3bf0` | Manifest/Plan/Backlog/Status/Auditlog/Report |
 
 Review-Dokumente wurden per Cherry-Pick der docs-only Commits übernommen; es
 wurden **keine doppelten Produktcommits** aus dem Review-Branch eingebracht.
