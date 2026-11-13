@@ -7,25 +7,37 @@ from unittest import mock
 
 import index
 from errors import order_not_found
+from identity import OwnerIdentity
+
+IDENTITY = OwnerIdentity(
+    issuer="https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TEST",
+    subject="user-1", client_id="client-test")
 
 
 class FakeService:
     def __init__(self, create=None, get=None, list_orders=None, update=None):
-        self.create_order = create or (lambda raw: {"orderId": "ord_1", "status": "PENDING"})
-        self.get_order = get or (lambda order_id: {"orderId": order_id, "status": "PENDING"})
+        self.create_order = create or (
+            lambda raw, identity=None: {"orderId": "ord_1", "status": "PENDING"})
+        self.get_order = get or (
+            lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING"})
         self.list_orders = list_orders or (
-            lambda limit, next_token=None: {"orders": [], "count": 0}
+            lambda identity, limit, next_token=None: {"orders": [], "count": 0}
         )
         self.update_order_status = update or (
-            lambda order_id, status: {"orderId": order_id, "status": status}
+            lambda order_id, status, identity=None: {"orderId": order_id, "status": status}
         )
 
 
 @contextmanager
 def patch_service(fake):
-    with mock.patch("index.create_order_service", return_value=fake), mock.patch.dict(
-        "index.os.environ", {"ORDERS_TABLE": "mays-orders"}
-    ):
+    with mock.patch("index.create_order_service", return_value=fake), \
+         mock.patch("index.extract_identity", return_value=IDENTITY), \
+         mock.patch.dict("index.os.environ", {
+             "ORDERS_TABLE": "mays-orders",
+             "ORDERS_COGNITO_ISSUER":
+                 "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TEST",
+             "ORDERS_COGNITO_CLIENT_ID": "client-test",
+         }):
         yield
 
 
@@ -42,7 +54,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_returns_201_and_parses_body(self):
         captured = {}
 
-        def create(raw):
+        def create(raw, identity=None):
             captured["raw"] = raw
             return {"orderId": "ord_1", "status": "PENDING", "totalAmount": 2000}
 
@@ -67,7 +79,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_post_orders_decodes_base64_body(self):
         captured = {}
 
-        def create(raw):
+        def create(raw, identity=None):
             captured["raw"] = raw
             return {"orderId": "ord_1", "status": "PENDING"}
 
@@ -96,7 +108,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_get_orders_returns_200_with_list(self):
         captured = {}
 
-        def list_orders(limit, next_token=None):
+        def list_orders(identity, limit, next_token=None):
             captured["limit"] = limit
             captured["next_token"] = next_token
             return {"orders": [], "count": 0}
@@ -121,7 +133,7 @@ class TestHandlerRoutes(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
 
     def test_get_order_returns_200(self):
-        fake = FakeService(get=lambda order_id: {"orderId": order_id, "status": "PENDING"})
+        fake = FakeService(get=lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING"})
         with patch_service(fake):
             response = index.handler(
                 {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_abc"}},
@@ -142,7 +154,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_patch_status_returns_200(self):
         captured = {}
 
-        def update(order_id, status):
+        def update(order_id, status, identity=None):
             captured["status"] = status
             return {"orderId": order_id, "status": status}
 
@@ -175,7 +187,7 @@ class TestHandlerRoutes(unittest.TestCase):
     def test_route_key_fallback_http_method_and_path(self):
         captured = {}
 
-        def list_orders(limit, next_token=None):
+        def list_orders(identity, limit, next_token=None):
             captured["called"] = True
             return {"orders": [], "count": 0}
 
@@ -211,7 +223,7 @@ class TestDecimalSerialization(unittest.TestCase):
 
 class TestHandlerErrors(unittest.TestCase):
     def test_order_error_mapped_to_status_code(self):
-        def get_missing(order_id):
+        def get_missing(order_id, identity=None):
             raise order_not_found(order_id)
 
         fake = FakeService(get=get_missing)
@@ -225,7 +237,7 @@ class TestHandlerErrors(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "ORDER_NOT_FOUND")
 
     def test_unexpected_error_maps_to_500(self):
-        def create_boom(raw):
+        def create_boom(raw, identity=None):
             raise RuntimeError("boom")
 
         fake = FakeService(create=create_boom)
@@ -245,7 +257,7 @@ class TestHandlerDecimalRegression(unittest.TestCase):
     """MAYS-ORDERS-PRIVACY-RUNTIME-FIX-01: GET/LIST mit DynamoDB-Decimal."""
 
     def test_get_order_with_decimal_returns_200(self):
-        fake = FakeService(get=lambda order_id: {"orderId": order_id, "status": "PENDING", "totalAmount": Decimal("39.98")})
+        fake = FakeService(get=lambda order_id, identity=None: {"orderId": order_id, "status": "PENDING", "totalAmount": Decimal("39.98")})
         with patch_service(fake):
             response = index.handler(
                 {"routeKey": "GET /orders/{orderId}", "pathParameters": {"orderId": "ord_1"}},
@@ -255,7 +267,7 @@ class TestHandlerDecimalRegression(unittest.TestCase):
         self.assertEqual(json.loads(response["body"])["totalAmount"], 39.98)
 
     def test_list_orders_with_decimal_returns_200(self):
-        fake = FakeService(list_orders=lambda limit, next_token=None: {"orders": [{"orderId": "ord_1", "totalAmount": Decimal("10")}], "count": 1})
+        fake = FakeService(list_orders=lambda identity, limit, next_token=None: {"orders": [{"orderId": "ord_1", "totalAmount": Decimal("10")}], "count": 1})
         with patch_service(fake):
             response = index.handler({"routeKey": "GET /orders", "queryStringParameters": {}}, None)
         self.assertEqual(response["statusCode"], 200)

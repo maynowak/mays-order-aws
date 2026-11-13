@@ -11,6 +11,14 @@ from errors import OrderError, json_default
 from order_service import create_order_service, decode_next_token
 from order_types import GSI1_PK, ORDER_ID_PREFIX
 
+from identity import OwnerIdentity
+
+IDENTITY = OwnerIdentity(
+    issuer="https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TEST",
+    subject="user-1", client_id="client-test")
+
+
+
 
 class FakeTable:
     """Stub für boto3 dynamodb.Table — registriert Handler je Operation."""
@@ -69,6 +77,13 @@ def make_order(**overrides):
         "version": 1,
         "gsi1pk": GSI1_PK,
         "gsi1sk": "2026-08-17T12:00:00.000Z",
+        "ownerIssuer": IDENTITY.issuer,
+        "ownerSubject": IDENTITY.subject,
+        "ownerKey": IDENTITY.owner_key,
+        "actorType": "user",
+        "actorId": IDENTITY.subject,
+        "gsi3pk": IDENTITY.owner_key,
+        "gsi3sk": "2026-08-17T12:00:00.000Z#ord_2f4b1c9e0000000000000000",
     }
     item.update(overrides)
     return item
@@ -100,7 +115,7 @@ class TestCreateOrder(unittest.TestCase):
                 ],
                 "currency": "EUR",
             }
-        )
+        , IDENTITY)
 
         self.assertEqual(order["status"], "PENDING")
         self.assertEqual(order["totalAmount"], 4497)
@@ -129,7 +144,7 @@ class TestCreateOrder(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.create_order({"customer": {}, "items": [], "currency": ""})
+            service.create_order({"customer": {}, "items": [], "currency": ""}, IDENTITY)
         self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
         self.assertEqual(called, [])
 
@@ -152,7 +167,7 @@ class TestCreateOrder(unittest.TestCase):
                 "items": [{"sku": "SKU-1001", "quantity": 1, "unitPrice": 1999}],
                 "currency": "EUR",
             }
-        )
+        , IDENTITY)
 
         self.assertNotIn("isTestData", put_item["item"])
         self.assertNotIn("isTestData", put_item["item"]["items"][0])
@@ -166,7 +181,7 @@ class TestGetOrder(unittest.TestCase):
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
 
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, IDENTITY)
         self.assertEqual(order["orderId"], item["orderId"])
         self.assertEqual(order["status"], "PENDING")
         self.assertNotIn("pk", order)
@@ -180,7 +195,7 @@ class TestGetOrder(unittest.TestCase):
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
 
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, IDENTITY)
         self.assertNotIn("isTestData", order)
 
     def test_raises_order_not_found(self):
@@ -190,13 +205,13 @@ class TestGetOrder(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.get_order(ORDER_ID)
+            service.get_order(ORDER_ID, IDENTITY)
         self.assertEqual(ctx.exception.code, "ORDER_NOT_FOUND")
         self.assertEqual(ctx.exception.http_status, 404)
 
 
 class TestListOrders(unittest.TestCase):
-    def test_queries_gsi1_descending_and_returns_compact_items(self):
+    def test_queries_owner_index_descending_and_returns_compact_items(self):
         query_input = {}
 
         def on_query(**kwargs):
@@ -208,8 +223,8 @@ class TestListOrders(unittest.TestCase):
             client=make_client({"query": on_query}),
         )
 
-        result = service.list_orders(20)
-        self.assertEqual(query_input["IndexName"], "gsi1")
+        result = service.list_orders(IDENTITY, 20)
+        self.assertEqual(query_input["IndexName"], "gsi3")
         self.assertFalse(query_input["ScanIndexForward"])
         self.assertEqual(query_input["Limit"], 20)
         self.assertEqual(result["count"], 1)
@@ -235,7 +250,7 @@ class TestListOrders(unittest.TestCase):
             ),
         )
 
-        result = service.list_orders(5)
+        result = service.list_orders(IDENTITY, 5)
         self.assertEqual(result["nextToken"], encode_token(lek))
 
     def test_sets_exclusive_start_key_from_next_token(self):
@@ -252,7 +267,7 @@ class TestListOrders(unittest.TestCase):
             client=make_client({"query": on_query}),
         )
 
-        service.list_orders(20, token)
+        service.list_orders(IDENTITY, 20, token)
         self.assertEqual(query_input["ExclusiveStartKey"], lek)
 
     def test_rejects_invalid_next_token(self):
@@ -262,7 +277,7 @@ class TestListOrders(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.list_orders(20, "!!!not-base64-json!!!")
+            service.list_orders(IDENTITY, 20, "!!!not-base64-json!!!")
         self.assertEqual(ctx.exception.code, "VALIDATION_ERROR")
 
 
@@ -283,7 +298,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
             ),
         )
 
-        order = service.update_order_status(ORDER_ID, "CONFIRMED")
+        order = service.update_order_status(ORDER_ID, "CONFIRMED", IDENTITY)
         self.assertEqual(order["status"], "CONFIRMED")
         self.assertIn("#status = :currentStatus", update_input["ConditionExpression"])
         self.assertEqual(update_input["ExpressionAttributeValues"][":currentStatus"], "PENDING")
@@ -302,7 +317,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CANCELLED")
+            service.update_order_status(ORDER_ID, "CANCELLED", IDENTITY)
         error = ctx.exception
         self.assertEqual(error.code, "INVALID_TRANSITION")
         self.assertEqual(error.details, {"currentStatus": "PROCESSING", "requestedStatus": "CANCELLED"})
@@ -314,7 +329,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CONFIRMED")
+            service.update_order_status(ORDER_ID, "CONFIRMED", IDENTITY)
         self.assertEqual(ctx.exception.code, "ORDER_NOT_FOUND")
         self.assertEqual(ctx.exception.http_status, 404)
 
@@ -330,7 +345,7 @@ class TestUpdateOrderStatus(unittest.TestCase):
         )
 
         with self.assertRaises(OrderError) as ctx:
-            service.update_order_status(ORDER_ID, "CONFIRMED")
+            service.update_order_status(ORDER_ID, "CONFIRMED", IDENTITY)
         self.assertEqual(ctx.exception.code, "CONFLICTED_UPDATE")
         self.assertEqual(ctx.exception.http_status, 409)
 
@@ -510,7 +525,7 @@ class TestRuntimeFixRegression(unittest.TestCase):
             table_name="mays-orders",
             client=make_client({"get_item": lambda **kw: {"Item": item}}),
         )
-        order = service.get_order(ORDER_ID)
+        order = service.get_order(ORDER_ID, IDENTITY)
         body = json.loads(json.dumps(order, default=json_default))
         self.assertEqual(body["totalAmount"], 39.98)
 
@@ -524,7 +539,7 @@ class TestRuntimeFixRegression(unittest.TestCase):
             table_name="mays-orders",
             client=make_client({"query": on_query}),
         )
-        result = service.list_orders(20)
+        result = service.list_orders(IDENTITY, 20)
         self.assertIn("nextToken", result)
         # Token muss dekodierbar sein (Decimal im LEK darf nicht scheitern)
         decoded = decode_next_token(result["nextToken"])

@@ -20,6 +20,14 @@ from errors import OrderError  # noqa: E402
 from order_service import OrderService, to_list_item, to_public_order  # noqa: E402
 from validation import validate_create_order  # noqa: E402
 
+from identity import OwnerIdentity
+
+IDENTITY = OwnerIdentity(
+    issuer="https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_TEST",
+    subject="user-1", client_id="client-test")
+
+
+
 
 class FakeTable:
     def __init__(self):
@@ -167,7 +175,7 @@ class TestAgentOrderPersistence(unittest.TestCase):
         self.service = OrderService("orders-table", client=self.table)
 
     def test_agent_order_is_persisted_as_own_component(self):
-        order = self.service.create_order(agent_body())
+        order = self.service.create_order(agent_body(), IDENTITY)
         item = self.table.items[0]
         self.assertEqual("agent.execution", item["orderType"])
         self.assertEqual("math.add", item["agentOrder"]["target"]["capability"])
@@ -176,19 +184,19 @@ class TestAgentOrderPersistence(unittest.TestCase):
         self.assertTrue(item["orderId"].startswith("ord_"))
 
     def test_no_retail_fields_are_invented(self):
-        self.service.create_order(agent_body())
+        self.service.create_order(agent_body(), IDENTITY)
         item = self.table.items[0]
         for forbidden in ("customer", "items", "currency", "totalAmount"):
             self.assertNotIn(forbidden, item)
 
     def test_agent_order_is_not_in_the_public_projection(self):
-        order = self.service.create_order(agent_body())
+        order = self.service.create_order(agent_body(), IDENTITY)
         self.assertNotIn("agentOrder", order)
         self.assertNotIn("agentOrderFingerprint", order)
         self.assertEqual("PENDING", order["status"])
 
     def test_list_projection_is_minimal_for_agent_orders(self):
-        self.service.create_order(agent_body())
+        self.service.create_order(agent_body(), IDENTITY)
         listed = to_list_item(self.table.items[0])
         self.assertEqual("agent.execution", listed["orderType"])
         self.assertNotIn("customer", listed)
@@ -196,7 +204,7 @@ class TestAgentOrderPersistence(unittest.TestCase):
         self.assertNotIn("agentOrder", listed)
 
     def test_retail_order_persistence_is_unchanged(self):
-        order = self.service.create_order(RETAIL)
+        order = self.service.create_order(RETAIL, IDENTITY)
         item = self.table.items[0]
         self.assertNotIn("orderType", item)
         self.assertNotIn("agentOrder", item)
@@ -210,6 +218,8 @@ class TestCreateRouteDispatch(unittest.TestCase):
         import index
         self.index = index
         os.environ["ORDERS_TABLE"] = "orders-table"
+        os.environ["ORDERS_COGNITO_ISSUER"] = IDENTITY.issuer
+        os.environ["ORDERS_COGNITO_CLIENT_ID"] = IDENTITY.client_id
         self._queue = index.SQS_QUEUE_URL
         index.SQS_QUEUE_URL = "https://sqs.local/queue"
 
@@ -218,10 +228,12 @@ class TestCreateRouteDispatch(unittest.TestCase):
 
     def _post(self, order, service_order):
         service = type("S", (), {"create_order": lambda self, body,
-                                 subject_id=None: service_order})()
+                                 identity=None: service_order})()
         event = {"routeKey": "POST /orders", "body": json.dumps(order)}
         with patch.object(self.index, "create_order_service",
                           return_value=service), \
+             patch.object(self.index, "extract_identity",
+                          return_value=IDENTITY), \
              patch.object(self.index, "_send_to_sqs") as send:
             response = self.index.handler(event, None)
         return response, send

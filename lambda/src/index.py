@@ -7,7 +7,8 @@ import sys
 import uuid
 from typing import Any, Dict, Optional
 
-from errors import OrderError, error_body, internal_error, json_default, validation_error
+from errors import OrderError, error_body, internal_error, json_default, service_unavailable, unauthorized, validation_error
+from identity import IdentityError, extract_identity
 from order_service import create_order_service
 from validation import validate_list_params, validate_order_id, validate_status_update_body
 
@@ -136,11 +137,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if isinstance(event, dict) and isinstance(event.get("internalAction"), str):
         return _handle_internal(service, event)
 
+    # Public routes require a verified caller identity. Missing configuration is
+    # a deployment error (503), never a reason to skip the check.
+    expected_issuer = os.environ.get("ORDERS_COGNITO_ISSUER")
+    expected_client_id = os.environ.get("ORDERS_COGNITO_CLIENT_ID")
+    if not expected_issuer or not expected_client_id:
+        print("Identity configuration missing (ORDERS_COGNITO_ISSUER/CLIENT_ID)")
+        return fail(service_unavailable("Service is not configured"))
+
+    try:
+        identity = extract_identity(
+            event,
+            expected_issuer=expected_issuer,
+            expected_client_id=expected_client_id,
+        )
+    except IdentityError as exc:
+        print(f"Identity rejected: {exc.code}")
+        return fail(unauthorized())
+
     try:
         route = route_key(event)
 
         if route == "POST /orders":
-            order = service.create_order(parse_body(event))
+            order = service.create_order(parse_body(event), identity)
             order_id = order.get("orderId")
             # Agent orders are persisted only; dispatch is a separate gate
             # (A05). Sending them to the status-only retail worker would corrupt
@@ -152,20 +171,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if route == "GET /orders":
             params = validate_list_params(event.get("queryStringParameters"))
-            result = service.list_orders(params["limit"], params.get("nextToken"))
+            result = service.list_orders(
+                identity, params["limit"], params.get("nextToken"))
             return ok(200, result)
 
         if route == "GET /orders/{orderId}":
             path_params = event.get("pathParameters") or {}
             order_id = validate_order_id(path_params.get("orderId"))
-            order = service.get_order(order_id)
+            order = service.get_order(order_id, identity)
             return ok(200, order)
 
         if route == "PATCH /orders/{orderId}/status":
             path_params = event.get("pathParameters") or {}
             order_id = validate_order_id(path_params.get("orderId"))
             status = validate_status_update_body(parse_body(event))
-            order = service.update_order_status(order_id, status)
+            order = service.update_order_status(order_id, status, identity)
             return ok(200, order)
 
         return fail(validation_error(f"Unsupported route: {route}"))

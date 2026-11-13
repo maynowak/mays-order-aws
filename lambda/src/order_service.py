@@ -8,11 +8,18 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
+from errors import conflicted_update, invalid_transition, json_default, order_not_found, service_unavailable, validation_error
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
 from agent_order import ORDER_TYPE_AGENT, fingerprint as agent_order_fingerprint
+from identity import OwnerIdentity
+
+#: Dedicated ownership index. Deliberately separate from gsi1 (global list) and
+#: gsi2 (privacy subject): ownership and privacy are different concerns.
+OWNER_INDEX_NAME = "gsi3"
+OWNER_INDEX_HASH_KEY = "gsi3pk"
+OWNER_INDEX_RANGE_KEY = "gsi3sk"
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
@@ -136,13 +143,15 @@ class OrderService:
         if not secrets.compare_digest(str(token), str(internal_secret)):
             raise validation_error("Internal trust boundary violation")
 
-    def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
+    def create_order(self, raw_body: Any, identity: OwnerIdentity) -> Dict[str, Any]:
+        if not isinstance(identity, OwnerIdentity):
+            raise validation_error("Verified identity is required")
         input_data = validate_create_order(raw_body)
         now = now_iso()
         order_id = generate_order_id()
 
         if input_data.get("orderType") == ORDER_TYPE_AGENT:
-            return self._create_agent_order(input_data, order_id, now, subject_id)
+            return self._create_agent_order(input_data, order_id, now, identity)
 
         items = [
             {**item, "lineTotal": item["quantity"] * item["unitPrice"]}
@@ -164,21 +173,17 @@ class OrderService:
             "version": 1,
             "gsi1pk": GSI1_PK,
             "gsi1sk": now,
+            **identity.item_fields(),
+            "gsi3pk": identity.owner_key,
+            "gsi3sk": f"{now}#{order_id}",
         }
-
-        if subject_id:
-            item["subjectId"] = subject_id
-            from order_types import GSI2_PK_PREFIX, GSI2_NAME
-            # GSI2 not required for public API, but prepared for privacy capability
-            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
-            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
 
         self._table.put_item(Item=item)
 
         return to_public_order(item)
 
     def _create_agent_order(self, input_data: Dict[str, Any], order_id: str,
-                            now: str, subject_id: Optional[str]) -> Dict[str, Any]:
+                            now: str, identity: OwnerIdentity) -> Dict[str, Any]:
         """Persist an agent order: no retail fields, no invented line items.
 
         The validated ``agentOrder`` is stored as its own component. It is never
@@ -201,30 +206,49 @@ class OrderService:
             "version": 1,
             "gsi1pk": GSI1_PK,
             "gsi1sk": now,
+            **identity.item_fields(),
+            "gsi3pk": identity.owner_key,
+            "gsi3sk": f"{now}#{order_id}",
         }
-
-        if subject_id:
-            item["subjectId"] = subject_id
-            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
-            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
 
         self._table.put_item(Item=item)
         return to_public_order(item)
 
-    def get_order(self, order_id: str) -> Dict[str, Any]:
+    def get_order(self, order_id: str,
+                  identity: OwnerIdentity) -> Dict[str, Any]:
+        """Return the order only to its verified owner.
+
+        A missing order and an order owned by someone else are indistinguishable
+        (both ``404``), and an order without an owner binding (legacy) is never
+        returned to a normal caller.
+        """
+        if not isinstance(identity, OwnerIdentity):
+            raise order_not_found(order_id)
         result = self._table.get_item(
             Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK}
         )
         item = result.get("Item")
         if item is None:
             raise order_not_found(order_id)
+        if not identity.can_read(item):
+            raise order_not_found(order_id)
         return to_public_order(item)
 
-    def list_orders(self, limit: int, next_token: Optional[str] = None) -> Dict[str, Any]:
+    def list_orders(self, identity: OwnerIdentity, limit: int,
+                    next_token: Optional[str] = None) -> Dict[str, Any]:
+        """List only the caller's own orders.
+
+        There is deliberately **no** fallback to the global list: if the
+        ownership index is unavailable, the request fails closed with ``503``
+        instead of exposing every order in the system.
+        """
+        if not isinstance(identity, OwnerIdentity):
+            raise service_unavailable("Ownership index is not available")
+
         query_kwargs: Dict[str, Any] = {
-            "IndexName": TABLE_INDEX_NAME,
-            "KeyConditionExpression": "gsi1pk = :pk",
-            "ExpressionAttributeValues": {":pk": GSI1_PK},
+            "IndexName": OWNER_INDEX_NAME,
+            "KeyConditionExpression": f"{OWNER_INDEX_HASH_KEY} = :owner",
+            "ExpressionAttributeValues": {":owner": identity.owner_key},
             "ScanIndexForward": False,
             "Limit": limit,
         }
@@ -235,10 +259,10 @@ class OrderService:
             result = self._table.query(**query_kwargs)
         except Exception as err:
             if is_validation_exception(err):
-                raise validation_error(
-                    "Invalid pagination token or query",
-                    {"path": "nextToken"},
-                ) from err
+                # Missing index or unusable key: never fall back to the global
+                # list, because that would expose foreign orders.
+                raise service_unavailable(
+                    "Ownership index is not available") from err
             raise
 
         orders = [to_list_item(item) for item in result.get("Items", [])]
@@ -249,8 +273,9 @@ class OrderService:
             response["nextToken"] = encoded
         return response
 
-    def update_order_status(self, order_id: str, status: str) -> Dict[str, Any]:
-        current = self.get_order(order_id)
+    def update_order_status(self, order_id: str, status: str,
+                            identity: OwnerIdentity) -> Dict[str, Any]:
+        current = self.get_order(order_id, identity)
 
         if not can_transition(current["status"], status):
             raise invalid_transition(current["status"], status)

@@ -20,6 +20,8 @@ ORDER_NOT_FOUND = "ORDER_NOT_FOUND"
 INVALID_TRANSITION = "INVALID_TRANSITION"
 CONFLICTED_UPDATE = "CONFLICTED_UPDATE"
 INTERNAL_ERROR = "INTERNAL_ERROR"
+UNAUTHORIZED = "UNAUTHORIZED"
+SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
 
 
 class OrderError(Exception):
@@ -66,6 +68,14 @@ def conflicted_update() -> OrderError:
 
 def internal_error(message: str = "Internal error") -> OrderError:
     return OrderError(INTERNAL_ERROR, message, 500)
+
+
+def unauthorized(message: str = "Unauthorized") -> OrderError:
+    return OrderError(UNAUTHORIZED, message, 401)
+
+
+def service_unavailable(message: str = "Service unavailable") -> OrderError:
+    return OrderError(SERVICE_UNAVAILABLE, message, 503)
 
 
 def error_body(error: OrderError) -> Dict[str, Any]:
