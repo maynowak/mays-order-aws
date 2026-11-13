@@ -122,7 +122,7 @@ kein `lambda:InvokeFunction`-Testprinzipal, F-PRV-01 bestätigt.
 | G3X-PRV-X09 | Erase B | 1 gelöscht, Wiederholung idempotent |
 | G3X-PRV-X10 | RETAIN A | PARTIALLY_COMPLETED, 2 retained, keine Mutation |
 | G3X-PRV-X11 | ANONYMIZE eine Order | 1 anonymisiert, Owner-GET 404 |
-| G3X-PRV-X12 | Consumer-Scope-Erase | **expected defect F-PRV-01**: 0 affected/limitation; als DEFECT dokumentieren |
+| G3X-PRV-X12 | Consumer-Scope-Erase | **F-PRV-01-Fix**: 1 eigener Consumer-Record gelöscht; fremder Consumer/legacy unberührt; `limitations` nennt ausgeschlossene Records |
 | G3X-PRV-X13 | Secret fehlt | 400, kein Datenzugriff |
 
 Cleanup: ERASE bereits gelöscht; RETAIN/ANONYMIZE eigene Keys mit SKU-/Run-
