@@ -322,3 +322,12 @@ Date: 2026-11-13
 - Tests: Orders 193 OK (175 + 18 new in tests/test_dispatch.py); RIS 149 OK including 10 cross-repo tests in tests/test_mo_dispatch_handoff.py (skipped without MO_ORDERS_SRC) proving the full loop Orders -> dispatch -> RIS parse -> addition agent 42 -> ORDER_RESULT -> apply_result -> owner sees 42, plus duplicate result, wrong workId, stale attempt and unsigned-message rejection.
 - Infra (queues, IAM, secret, consumer) documented only, not created. No apply, no deployment; AWS handoff remains NOT DEPLOYED / NOT LIVE VERIFIED.
 Report: docs/reports/MO-RIS-AGENT-DISPATCH-01-A05.md
+
+
+[MO-RIS-AWS-INTEGRATION-PLAN-02 / RESULT SECRET CONTAINER]
+Status: PLAN (code only) - Secrets Manager container added, disabled by default.
+Date: 2026-11-13
+- Added aws_secretsmanager_secret and aws_secretsmanager_secret_policy to modules/agent_transport, both inside the enable_agent_transport gate (default false). The secret holds no value in Terraform; it is set out-of-band, so no secret material can reach state, Git, reports, logs or tests.
+- The resource policy grants secretsmanager:GetSecretValue only to the explicitly supplied RIS producer role ARNs and is scoped to the secret ARN. An empty list leaves the secret without any cross-role grant.
+- Verified: terraform fmt -check = 0 and terraform validate = Success (1.17.0, -backend=false). No apply, no deployment, no AWS mutation.
+- Account reconciliation is recorded in the RIS report docs/reports/MO-RIS-AWS-INTEGRATION-PLAN-02.md: same account 240571105849 by file evidence, live verification blocked because the available credentials belong to 262370457690.
