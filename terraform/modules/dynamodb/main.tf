@@ -44,6 +44,16 @@ resource "aws_dynamodb_table" "orders" {
     type = "S"
   }
 
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+
   global_secondary_index {
     name               = "gsi1"
     projection_type    = "INCLUDE"
@@ -72,6 +82,25 @@ resource "aws_dynamodb_table" "orders" {
 
     key_schema {
       attribute_name = "gsi2sk"
+      key_type       = "RANGE"
+    }
+  }
+
+  # Dedicated ownership index (MO-AGENT-ORDER-OWNERSHIP-02, O2).
+  # Deliberately separate from gsi1 (global list) and gsi2 (privacy subject):
+  # owner-scoped listing must never reuse the privacy or the global key space.
+  global_secondary_index {
+    name               = "gsi3"
+    projection_type    = "INCLUDE"
+    non_key_attributes = ["orderId", "orderType", "status", "createdAt", "updatedAt", "customer", "totalAmount", "currency"]
+
+    key_schema {
+      attribute_name = "gsi3pk"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "gsi3sk"
       key_type       = "RANGE"
     }
   }

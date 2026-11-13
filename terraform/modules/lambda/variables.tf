@@ -59,3 +59,15 @@ variable "queue_url" {
   type        = string
   default     = ""
 }
+
+variable "cognito_issuer" {
+  description = "Verified JWT issuer of the API authorizer (identity binding)."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_client_id" {
+  description = "Verified JWT audience/client of the API authorizer."
+  type        = string
+  default     = ""
+}

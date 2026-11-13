@@ -86,6 +86,8 @@ module "lambda" {
   iam_role_arn        = module.iam.role_arn
   dynamodb_table_name = module.dynamodb.table_name
   queue_url           = module.sqs.queue_url
+  cognito_issuer      = "https://${module.cognito.user_pool_endpoint}"
+  cognito_client_id   = module.cognito.user_pool_client_id
   monitoring_enabled  = var.monitoring_enabled
   log_retention_days  = var.log_retention_days
   filename            = "${path.root}/../lambda/dist/lambda.zip"
