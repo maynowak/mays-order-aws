@@ -311,3 +311,14 @@ Date: 2026-11-13
 - Infra deliberately NOT created: result queue with DLQ, IAM send/receive restriction, shared secret, dedicated consumer Lambda. The AWS path is therefore not live-verified; no public result-write route exists.
 - No RC upgrade, no apply, no deployment, no Cognito/CloudFront/DNS change, no cross-database access.
 Report: docs/reports/MO-RIS-AGENT-RESULT-BOUNDARY-01-A06.md
+
+[MO-RIS-AGENT-DISPATCH-01 / A05 DISPATCH & WORK-ID BINDING]
+Status: LOCAL COMPLETE — stored agent order dispatched over the frozen V1 with one server-bound workId; A06 accepts the result.
+Date: 2026-11-13
+- Conflict found and resolved without a schema change: the V1 validator already accepted execution.workId on ORDER_DISPATCH, but the RIS mapping ignored it and generated a new id. Fixed in RIS as an additive, backward-compatible rule (use the pre-bound id when present, otherwise generate). No new field, no version bump; 96 RIS transport/agent-order tests stayed green.
+- Order side: prepare_dispatch loads the stored order, enforces ownership, rejects cancelled/retail orders, re-checks agentOrderFingerprint (missing or mismatching), reuses an existing expectedWorkId and otherwise binds a new one atomically with attribute_not_exists(expectedWorkId). dispatch = PENDING records the bind.
+- Envelope is built from the stored order only: orderId, messageId, correlationId (metadata.requestId, required), idempotencyKey, recipient.agentId/capability, payload, identity.contextRef (metadata.apiProfileRef, required, resolved by RIS not trusted) and execution.workId.
+- Delivery state: PENDING = bound but not confirmed (retry allowed with the same id); SENT = confirmed (same messageId idempotent, a different one is a dispatch_conflict). A crash between bind and send therefore neither loses the order nor creates a second execution. No exactly-once claim.
+- Tests: Orders 193 OK (175 + 18 new in tests/test_dispatch.py); RIS 149 OK including 10 cross-repo tests in tests/test_mo_dispatch_handoff.py (skipped without MO_ORDERS_SRC) proving the full loop Orders -> dispatch -> RIS parse -> addition agent 42 -> ORDER_RESULT -> apply_result -> owner sees 42, plus duplicate result, wrong workId, stale attempt and unsigned-message rejection.
+- Infra (queues, IAM, secret, consumer) documented only, not created. No apply, no deployment; AWS handoff remains NOT DEPLOYED / NOT LIVE VERIFIED.
+Report: docs/reports/MO-RIS-AGENT-DISPATCH-01-A05.md

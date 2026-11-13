@@ -15,6 +15,11 @@ from validation import validate_create_order
 from agent_order import ORDER_TYPE_AGENT, fingerprint as agent_order_fingerprint
 from identity import OwnerIdentity
 from result_envelope import ORDER_RESULT, ResultRejected
+from dispatch import (
+    DispatchRejected,
+    build_dispatch_envelope,
+    new_work_id,
+)
 
 #: Dedicated ownership index. Deliberately separate from gsi1 (global list) and
 #: gsi2 (privacy subject): ownership and privacy are different concerns.
@@ -31,7 +36,10 @@ INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version"
                    # Ownership internals (MO-AGENT-ORDER-OWNERSHIP-02): identity
                    # bindings and index keys must never reach a client.
                    "ownerIssuer", "ownerSubject", "ownerKey", "ownerClientId",
-                   "actorType", "actorId", "gsi3pk", "gsi3sk"}
+                   "actorType", "actorId", "gsi3pk", "gsi3sk",
+                   # Dispatch internals (A05): work binding and send state are
+                   # correlation data, never part of a client response.
+                   "expectedWorkId", "dispatch"}
 
 _dynamodb_resource = None
 
@@ -311,6 +319,125 @@ class OrderService:
             Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK}
         )
         return result.get("Item")
+
+    def prepare_dispatch(self, order_id: str,
+                         identity: OwnerIdentity) -> Dict[str, Any]:
+        """Bind exactly one work id to an authorised agent order.
+
+        Idempotent: a second call returns the already bound id instead of
+        creating a new execution. A completed order is never re-bound.
+        """
+        item = self._get_raw_item(order_id)
+        if item is None:
+            raise order_not_found(order_id)
+        if not identity.can_read(item):
+            raise order_not_found(order_id)
+        if item.get("orderType") != ORDER_TYPE_AGENT:
+            raise DispatchRejected("not_agent_order",
+                                   "Order is not an agent execution order")
+        if item.get("status") == "CANCELLED":
+            raise DispatchRejected("order_cancelled",
+                                   "Cancelled orders are not dispatched")
+
+        agent_order = item.get("agentOrder") or {}
+
+        stored_fingerprint = item.get("agentOrderFingerprint")
+        if not stored_fingerprint:
+            raise DispatchRejected(
+                "fingerprint_missing",
+                "Order carries no execution-definition fingerprint")
+        if stored_fingerprint != agent_order_fingerprint(agent_order):
+            raise DispatchRejected(
+                "fingerprint_mismatch",
+                "Stored execution definition changed since acceptance")
+
+        existing_work_id = item.get("expectedWorkId")
+        if existing_work_id:
+            return {
+                "orderId": order_id,
+                "workId": existing_work_id,
+                "reused": True,
+                "dispatchStatus": (item.get("dispatch") or {}).get("status"),
+            }
+
+        work_id = new_work_id()
+        now = now_iso()
+        try:
+            self._table.update_item(
+                Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+                UpdateExpression=(
+                    "SET expectedWorkId = :w, #d = :d, updatedAt = :u"),
+                ConditionExpression=("attribute_exists(pk) AND "
+                                     "attribute_not_exists(expectedWorkId)"),
+                ExpressionAttributeNames={"#d": "dispatch"},
+                ExpressionAttributeValues={
+                    ":w": work_id,
+                    ":d": {"status": "PENDING", "boundAt": now},
+                    ":u": now,
+                },
+            )
+        except Exception as err:
+            if is_conditional_check_failed(err):
+                refreshed = self._get_raw_item(order_id) or {}
+                bound = refreshed.get("expectedWorkId")
+                if bound:
+                    return {
+                        "orderId": order_id,
+                        "workId": bound,
+                        "reused": True,
+                        "dispatchStatus": (refreshed.get("dispatch") or {}).get(
+                            "status"),
+                    }
+                raise DispatchRejected("dispatch_bind_failed",
+                                       "Work id could not be bound") from err
+            raise
+        return {"orderId": order_id, "workId": work_id, "reused": False,
+                "dispatchStatus": "PENDING"}
+
+    def dispatch_envelope(self, order_id: str, work_id: str) -> Dict[str, Any]:
+        """Build ORDER_DISPATCH from the stored order (not from the request)."""
+        item = self._get_raw_item(order_id)
+        if item is None:
+            raise order_not_found(order_id)
+        if item.get("expectedWorkId") != work_id:
+            raise DispatchRejected("work_mismatch",
+                                   "Work id is not bound to this order")
+        return build_dispatch_envelope(item, work_id)
+
+    def mark_dispatch_sent(self, order_id: str, work_id: str,
+                           message_id: str) -> Dict[str, Any]:
+        """Record a successful send. Safe to repeat for the same message."""
+        item = self._get_raw_item(order_id)
+        if item is None:
+            raise order_not_found(order_id)
+        if item.get("expectedWorkId") != work_id:
+            raise DispatchRejected("work_mismatch",
+                                   "Work id is not bound to this order")
+        current = item.get("dispatch") or {}
+        if current.get("status") == "SENT":
+            if current.get("messageId") == message_id:
+                return dict(current)
+            raise DispatchRejected("dispatch_conflict",
+                                   "Order was already dispatched")
+
+        record = {"status": "SENT", "messageId": message_id,
+                  "sentAt": now_iso(), "boundAt": current.get("boundAt")}
+        try:
+            self._table.update_item(
+                Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+                UpdateExpression="SET #d = :d, updatedAt = :u",
+                ConditionExpression=("attribute_exists(pk) AND "
+                                     "expectedWorkId = :w"),
+                ExpressionAttributeNames={"#d": "dispatch"},
+                ExpressionAttributeValues={
+                    ":d": record, ":u": now_iso(), ":w": work_id},
+            )
+        except Exception as err:
+            if is_conditional_check_failed(err):
+                raise DispatchRejected("work_mismatch",
+                                       "Work id changed concurrently") from err
+            raise
+        return record
 
     def apply_result(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
         """Store one RIS result on the matching agent order (idempotent).
