@@ -142,7 +142,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if route == "POST /orders":
             order = service.create_order(parse_body(event))
             order_id = order.get("orderId")
-            if order_id and SQS_QUEUE_URL:
+            # Agent orders are persisted only; dispatch is a separate gate
+            # (A05). Sending them to the status-only retail worker would corrupt
+            # their lifecycle, so the retail SQS path stays retail-only.
+            if (order_id and SQS_QUEUE_URL
+                    and order.get("orderType") != "agent.execution"):
                 _send_to_sqs(order_id)
             return ok(201, order)
 

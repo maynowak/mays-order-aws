@@ -12,10 +12,14 @@ from errors import conflicted_update, invalid_transition, json_default, order_no
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
+from agent_order import ORDER_TYPE_AGENT, fingerprint as agent_order_fingerprint
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId"}
+# agentOrder/agentOrderFingerprint sind fachlicher Bestandteil der Order, werden
+# aber NICHT über öffentliche Read-/List-Antworten ausgegeben (A04.5: die
+# Zielbasis hat noch keine verlässliche Eigentümerprüfung).
+INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId", "agentOrder", "agentOrderFingerprint"}
 
 _dynamodb_resource = None
 
@@ -50,6 +54,16 @@ def to_public_order(item: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def to_list_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    if item.get("orderType") == ORDER_TYPE_AGENT:
+        # Agent orders carry no retail fields; the list projection stays
+        # minimal and never exposes the agentOrder component.
+        return {
+            "orderId": item["orderId"],
+            "orderType": item["orderType"],
+            "status": item["status"],
+            "createdAt": item["createdAt"],
+            "updatedAt": item["updatedAt"],
+        }
     return {
         "orderId": item["orderId"],
         "status": item["status"],
@@ -127,6 +141,9 @@ class OrderService:
         now = now_iso()
         order_id = generate_order_id()
 
+        if input_data.get("orderType") == ORDER_TYPE_AGENT:
+            return self._create_agent_order(input_data, order_id, now, subject_id)
+
         items = [
             {**item, "lineTotal": item["quantity"] * item["unitPrice"]}
             for item in input_data["items"]
@@ -158,6 +175,40 @@ class OrderService:
 
         self._table.put_item(Item=item)
 
+        return to_public_order(item)
+
+    def _create_agent_order(self, input_data: Dict[str, Any], order_id: str,
+                            now: str, subject_id: Optional[str]) -> Dict[str, Any]:
+        """Persist an agent order: no retail fields, no invented line items.
+
+        The validated ``agentOrder`` is stored as its own component. It is never
+        placed inside ``customer``/``items``/``currency`` and never returned by
+        the public projection (see ``INTERNAL_FIELDS``).
+        """
+        agent_order = input_data["agentOrder"]
+        item: Dict[str, Any] = {
+            "pk": f"{ORDER_ID_PREFIX}{order_id}",
+            "sk": ORDER_SK,
+            "orderId": order_id,
+            "orderType": ORDER_TYPE_AGENT,
+            "status": "PENDING",
+            "agentOrder": agent_order,
+            # Immutability marker: proves the accepted execution parameters did
+            # not change silently on a later write/retry.
+            "agentOrderFingerprint": agent_order_fingerprint(agent_order),
+            "createdAt": now,
+            "updatedAt": now,
+            "version": 1,
+            "gsi1pk": GSI1_PK,
+            "gsi1sk": now,
+        }
+
+        if subject_id:
+            item["subjectId"] = subject_id
+            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
+            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
+
+        self._table.put_item(Item=item)
         return to_public_order(item)
 
     def get_order(self, order_id: str) -> Dict[str, Any]:

@@ -5,6 +5,12 @@ from typing import Any, Dict, List, Optional
 
 from errors import validation_error
 from order_types import ORDER_STATUSES
+from agent_order import (
+    AgentOrderValidationError,
+    SUPPORTED_AGENT_ORDER_TYPES,
+    validate_agent_order,
+    validate_order_type,
+)
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ORDER_ID_RE = re.compile(r"^ord_[A-Za-z0-9]+$")
@@ -37,11 +43,67 @@ def assert_integer(value: Any, path: str, minimum: int) -> int:
     return value
 
 
+def _validate_agent_branch(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Validate the optional agent-order variant, or return None for retail.
+
+    The two variants are mutually exclusive on purpose: an agent order must not
+    be disguised as retail items, and a retail order must not carry an agent
+    order. Anything ambiguous is rejected instead of guessed.
+    """
+    has_agent_order = "agentOrder" in body
+    has_order_type = "orderType" in body
+    if not has_agent_order and not has_order_type:
+        return None
+
+    if not has_order_type:
+        raise validation_error(
+            "Field 'orderType' is required when 'agentOrder' is present",
+            {"path": "orderType"},
+        )
+
+    order_type = validate_order_type(body.get("orderType"))
+    if order_type not in SUPPORTED_AGENT_ORDER_TYPES:
+        raise validation_error(
+            f"Field 'orderType' value {order_type!r} is not supported",
+            {"path": "orderType"},
+        )
+
+    if not has_agent_order:
+        raise validation_error(
+            "Field 'agentOrder' is required for orderType 'agent.execution'",
+            {"path": "agentOrder"},
+        )
+
+    for forbidden in ("customer", "items", "currency"):
+        if forbidden in body:
+            raise validation_error(
+                f"Field '{forbidden}' must not be combined with 'agentOrder'",
+                {"path": forbidden},
+            )
+
+    try:
+        normalized = validate_agent_order(body.get("agentOrder"))
+    except AgentOrderValidationError as exc:
+        raise validation_error(
+            exc.message, {"path": "agentOrder", "code": exc.code}
+        ) from exc
+
+    return {"orderType": order_type, "agentOrder": normalized}
+
+
 def validate_create_order(body: Any) -> Dict[str, Any]:
     if not is_plain_object(body):
         raise validation_error("Request body must be a JSON object")
 
-    reject_unknown_keys(body, ["customer", "items", "currency"], "body")
+    reject_unknown_keys(
+        body,
+        ["customer", "items", "currency", "orderType", "agentOrder"],
+        "body",
+    )
+
+    agent_order_input = _validate_agent_branch(body)
+    if agent_order_input is not None:
+        return agent_order_input
 
     customer = body.get("customer")
     if not is_plain_object(customer):
