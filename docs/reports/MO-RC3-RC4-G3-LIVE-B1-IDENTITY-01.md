@@ -312,7 +312,7 @@ Originale B1-Live-Evidence in
 
 | Feld | Wert |
 |---|---|
-| Dokumentations-Commit | wird nach dem Commit eingetragen |
+| Dokumentations-Commit | `deb005d027791372682d924a036ccd76022dc7b5` |
 | Working Tree nach Commit | CLEAN |
 
 Es wurden ausschließlich Dokumentationsdateien geändert. Kein Produktcode,
