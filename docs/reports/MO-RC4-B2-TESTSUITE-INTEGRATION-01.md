@@ -282,7 +282,8 @@ Test-/Doku-Dateien geändert; keine AWS-/Produkt-/Terraform-Änderung.
 | Feld | Wert |
 |---|---|
 | Test-Integrations-Commit | `59c275db4a3ca6bde0e225bd4e21061c1654b79d` |
-| Dokumentations-Commit | wird nach dem Commit eingetragen |
+| Test-Nachtrag (Diagnostic) | `f0f96b3ff046d06df2fc40a125273063d93dbb3e` |
+| Dokumentations-Commit | `f5f6392781e7cbb8eea9713daf1a131d95da5f60` |
 | Working Tree nach Commit | CLEAN |
 
 **STOP — keine automatische AWS-Live-Ausführung, keine Secret-/IAM-Änderung,
