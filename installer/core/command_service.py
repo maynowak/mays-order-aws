@@ -17,6 +17,7 @@ class CommandService:
             context.terraform_dir,
             context.aws_execution_context,
             workspace=context.terraform_workspace,
+            require_explicit_workspace=True,
         )
 
     def init(self, backend: bool = True) -> CommandResult:

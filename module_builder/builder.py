@@ -40,6 +40,28 @@ def _fail(message: str) -> None:
     raise SystemExit(f"module-builder: FEHLER: {message}")
 
 
+def _verify_lambda_artifact(source_root: Path) -> None:
+    """Fail-closed artifact gate (MO-RC4-P02I-C1).
+
+    Verwendet die kanonische Prüfung des Installers (eine Quelle der Wahrheit,
+    keine zweite Modul-Whitelist): das ZIP muss JEDES `src/*.py` byte-identisch
+    enthalten. Ein veraltetes/unvollstaendiges Artefakt bricht den Build ab.
+    """
+    try:
+        from installer.core.artifact_integrity import verify_lambda_zip
+    except Exception as exc:  # pragma: no cover - defensive
+        _fail(
+            "Lambda-Artefaktpruefung nicht verfuegbar (fail-closed): "
+            f"{exc}. Installer-Paket muss importierbar sein."
+        )
+    ok, message = verify_lambda_zip(source_root / "lambda")
+    if not ok:
+        _fail(
+            "Lambda-Artefakt ungueltig (fail-closed) - nichts wurde geschrieben: "
+            f"{message}"
+        )
+
+
 def validate_project_name(name: str) -> None:
     if not name or len(name) < 3 or not PROJECT_NAME_RE.match(name):
         _fail(
@@ -497,6 +519,9 @@ def build(
             f"geschrieben):\n  - " + "\n  - ".join(missing) + hint
         )
 
+    if "lambda/dist/lambda.zip" in artifacts:
+        _verify_lambda_artifact(source_root)
+
     if target_dir.exists() and any(target_dir.iterdir()) and not force:
         _fail(
             f"Zielordner ist nicht leer: {target_dir}\n"
@@ -627,7 +652,13 @@ def build(
         ).stdout.strip()
     except Exception:
         commit = "unknown"
+    file_hashes = {
+        str(Path(path).relative_to(target_dir)): _sha256(Path(path))
+        for path in written
+        if Path(path).is_file()
+    }
     manifest = {
+        "manifest_version": 2,
         "builder_version": __version__,
         "preset": preset_name if selection is None else "custom",
         "modules": sorted(selection) if selection is not None else sorted_module_catalog(),
@@ -636,6 +667,7 @@ def build(
         "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
         "artifacts_sha256": artifact_hashes,
         "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
+        "files": dict(sorted(file_hashes.items())),
         "notes": {
             "backend": "not included — configure your own remote backend",
             "privacy_production_activation": "BLOCKED (secret management missing)",
@@ -859,6 +891,8 @@ def build_module(
             "Erforderliche Quell-Bestandteile fehlen (fail-closed, nichts wurde "
             f"geschrieben):\n  - " + "\n  - ".join(missing)
         )
+    _verify_lambda_artifact(source_root)
+
     if target_dir.exists() and any(target_dir.iterdir()) and not force:
         _fail(
             f"Zielordner ist nicht leer: {target_dir}\n"

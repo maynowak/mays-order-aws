@@ -1,5 +1,11 @@
 locals {
   name = "${var.project_name}-cognito-backup"
+
+  # MO-RC4-P02I-E1B: Ressourcenidentitaet vor Namensrekonstruktion.
+  # Der Bucket-ARN kommt als Modul-Output; nur fuer Aufrufer, die weiterhin
+  # ausschliesslich den Bucket-Namen uebergeben, bleibt der ARN-Fallback
+  # (abwaertskompatibler Modulvertrag).
+  bucket_arn = var.bucket_arn != null ? var.bucket_arn : "arn:aws:s3:::${var.bucket_name}"
 }
 
 data "aws_iam_policy_document" "assume_role" {
@@ -48,8 +54,8 @@ data "aws_iam_policy_document" "backup_policy" {
       "s3:ListBucket"
     ]
     resources = [
-      "arn:aws:s3:::${var.bucket_name}",
-      "arn:aws:s3:::${var.bucket_name}/*"
+      local.bucket_arn,
+      "${local.bucket_arn}/*"
     ]
   }
 }

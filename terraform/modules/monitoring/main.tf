@@ -192,3 +192,24 @@ resource "aws_cloudwatch_metric_alarm" "dynamodb_throttled" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
 }
+
+# MO-RC4-P02I-B2: DLQ-Alarm — Nachrichten in der Dead-Letter-Queue sichtbar machen.
+# Kein SNS-/Benachrichtigungskanal vorhanden (bewusst, T011-11): Alarm ohne Aktionen;
+# fehlender Kanal ist OPEN dokumentiert.
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  count = var.monitoring_enabled && var.dlq_name != null ? 1 : 0
+
+  alarm_name          = "${var.project_name}-dlq-messages"
+  alarm_description   = "Nachrichten in der Order-Dead-Letter-Queue (manuelle Pruefung noetig)."
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  dimensions          = { QueueName = var.dlq_name }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  tags = merge({ "Project" = var.project_name }, var.tags)
+}

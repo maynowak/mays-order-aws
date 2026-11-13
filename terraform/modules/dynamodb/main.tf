@@ -44,6 +44,17 @@ resource "aws_dynamodb_table" "orders" {
     type = "S"
   }
 
+  # MO-RC4-P02I-B2: Index fuer aktive Processing-Claims (KEYS_ONLY, keine PII).
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+
   global_secondary_index {
     name               = "gsi1"
     projection_type    = "INCLUDE"
@@ -72,6 +83,24 @@ resource "aws_dynamodb_table" "orders" {
 
     key_schema {
       attribute_name = "gsi2sk"
+      key_type       = "RANGE"
+    }
+  }
+
+  # Nur aktive Claims: Attribute werden beim Claim gesetzt und bei
+  # Completion/Release entfernt (siehe sqs_handler). KEYS_ONLY -> keine
+  # personenbezogenen Daten im Index; Details per GetItem.
+  global_secondary_index {
+    name            = "gsi3"
+    projection_type = "KEYS_ONLY"
+
+    key_schema {
+      attribute_name = "gsi3pk"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "gsi3sk"
       key_type       = "RANGE"
     }
   }

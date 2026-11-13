@@ -48,6 +48,7 @@ data "aws_iam_policy_document" "handler" {
     resources = [
       var.dynamodb_gsi1_arn,
       var.dynamodb_gsi2_arn,
+      var.dynamodb_gsi3_arn,
     ]
   }
 

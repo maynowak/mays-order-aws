@@ -9,13 +9,58 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from errors import conflicted_update, invalid_transition, json_default, order_not_found, validation_error
+from processing_result import (
+    FIELD_PROCESSING_ATTEMPT_ID,
+    FIELD_PROCESSING_ERROR,
+    FIELD_PROCESSING_STATE,
+    FIELD_RESULT,
+    PROCESSING_FIELDS,
+    processing_summary,
+)
+from identity import (
+    IDENTITY_ITEM_FIELDS,
+    OrderIdentity,
+    OWNER_TYPE_USER,
+    authorize_order_access,
+    item_in_privacy_scope,
+    privacy_scope_consumer,
+)
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
 # darf in API-Antworten niemals auftauchen (nur Demo-Seed setzt es).
-INTERNAL_FIELDS = {"pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId"}
+INTERNAL_FIELDS = {
+    "pk", "sk", "gsi1pk", "gsi1sk", "gsi2pk", "gsi2sk", "version", "isTestData", "subjectId",
+} | set(IDENTITY_ITEM_FIELDS) | set(PROCESSING_FIELDS)
+
+# MO-RC4-P02: Eigentuemer-Identitaet ist Pflicht. Der Wert stammt aus dem
+# verifizierten JWT-Kontext (index.extract_subject_id) und wird hier erneut
+# geprueft (Defense in Depth, damit kein interner Aufruf ohne Eigentuemer
+# durchkommt).
+MAX_SUBJECT_ID_LENGTH = 256
+
+# Schutz vor unbegrenzten Query-Schleifen bei starker Filterung (P02H-A).
+MAX_LIST_PAGES = 10
+
+# MO-RC4-P02F: Zustellzustand (additiv, KEIN fachlicher Order-Status).
+DELIVERY_PENDING = "pending"
+DELIVERY_SENDING = "sending"
+DELIVERY_SENT = "sent"
+DELIVERY_FAILED = "failed"
+DELIVERY_STATES = (DELIVERY_PENDING, DELIVERY_SENDING, DELIVERY_SENT, DELIVERY_FAILED)
+
+
+def _require_valid_subject_id(subject_id: Any) -> str:
+    if not isinstance(subject_id, str):
+        raise validation_error("Missing order owner identity")
+    candidate = subject_id.strip()
+    if not candidate or len(candidate) > MAX_SUBJECT_ID_LENGTH:
+        raise validation_error("Invalid order owner identity")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in candidate):
+        raise validation_error("Invalid order owner identity")
+    return candidate
 
 _dynamodb_resource = None
 
@@ -122,7 +167,28 @@ class OrderService:
         if not secrets.compare_digest(str(token), str(internal_secret)):
             raise validation_error("Internal trust boundary violation")
 
-    def create_order(self, raw_body: Any, subject_id: Optional[str] = None) -> Dict[str, Any]:
+    def create_order(
+        self,
+        raw_body: Any,
+        subject_id: Optional[str] = None,
+        identity: Optional[OrderIdentity] = None,
+    ) -> Dict[str, Any]:
+        # MO-RC4-P02: Jede Bestellung gehoert genau einem verifizierten Benutzer.
+        # Der Body kann die Zuordnung nicht setzen (validate_create_order lehnt
+        # Fremdfelder wie "subjectId" mit 400 ab).
+        # MO-RC4-P02A: Aufgeloeste Identitaet (Consumer/Owner/Actor) ist optional
+        # additiv; ohne sie bleibt der P02-Vertrag (nur subjectId) gueltig.
+        identity_fields: Dict[str, Any] = {}
+        if identity is not None:
+            if identity.owner_type != OWNER_TYPE_USER:
+                raise validation_error(
+                    f"Unsupported order owner type '{identity.owner_type}'"
+                )
+            if subject_id is not None and subject_id != identity.owner_id:
+                raise validation_error("Order owner identity mismatch")
+            subject_id = identity.owner_id
+            identity_fields = identity.to_item_fields()
+        subject_id = _require_valid_subject_id(subject_id)
         input_data = validate_create_order(raw_body)
         now = now_iso()
         order_id = generate_order_id()
@@ -138,6 +204,8 @@ class OrderService:
             "sk": ORDER_SK,
             "orderId": order_id,
             "status": "PENDING",
+            # MO-RC4-P02E: fachlicher Verarbeitungstyp (Default "generic").
+            "orderType": input_data["orderType"],
             "customer": input_data["customer"],
             "items": items,
             "currency": input_data["currency"],
@@ -147,73 +215,170 @@ class OrderService:
             "version": 1,
             "gsi1pk": GSI1_PK,
             "gsi1sk": now,
+            # Zustellung ist von der fachlichen Verarbeitung getrennt.
+            "deliveryState": DELIVERY_PENDING,
         }
 
-        if subject_id:
-            item["subjectId"] = subject_id
-            from order_types import GSI2_PK_PREFIX, GSI2_NAME
-            # GSI2 not required for public API, but prepared for privacy capability
-            item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
-            item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
+        # Ownership ist ab MO-RC4-P02 garantiert (siehe oben) und wird dauerhaft
+        # gespeichert; GSI2 macht die Bestellung fuer Privacy-Lookups auffindbar.
+        item["subjectId"] = subject_id
+        item["gsi2pk"] = f"{GSI2_PK_PREFIX}{subject_id}"
+        item["gsi2sk"] = f"{ORDER_ID_PREFIX}{order_id}#{now}"
+        # P02A: Consumer-/Owner-/Actor-Trennung (nur bei aufgeloester Identitaet).
+        # subjectId und GSI2 bleiben unveraendert -> Privacy-Abfragen bleiben gueltig.
+        if identity_fields:
+            item.update(identity_fields)
 
         self._table.put_item(Item=item)
 
         return to_public_order(item)
 
-    def get_order(self, order_id: str) -> Dict[str, Any]:
-        result = self._table.get_item(
-            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK}
+    def mark_delivery_state(self, order_id: str, state: str) -> None:
+        """Setzt den Zustellzustand nach einem Sendeversuch (MO-RC4-P02F).
+
+        Bewusst OHNE Bedingung: Der Aufrufer besitzt in diesem Moment keinen
+        Lease-Anspruch (POST-Pfad). Der Recovery-Pfad nutzt eigene Claims.
+        Ein Fehler hier darf die API-Antwort nicht veraendern (Aufrufer faengt).
+        """
+        if state not in DELIVERY_STATES:
+            raise validation_error(f"Invalid delivery state '{state}'")
+        self._table.update_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            UpdateExpression=(
+                "SET deliveryState = :state, lastDeliveryAt = :now, "
+                "deliveryAttempts = if_not_exists(deliveryAttempts, :zero) + :one"
+            ),
+            ExpressionAttributeValues={":state": state, ":now": now_iso(), ":zero": 0, ":one": 1},
         )
-        item = result.get("Item")
-        if item is None:
+
+    def _get_raw_order(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Vollstaendiges Order-Item (ConsistentRead), ohne Autorisierung."""
+        result = self._table.get_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            ConsistentRead=True,
+        )
+        return result.get("Item")
+
+    def get_order(self, order_id: str, *, identity: OrderIdentity) -> Dict[str, Any]:
+        """Liest eine Order nur bei passender Owner- UND Consumer-Identitaet.
+
+        Fremde und Legacy-Orders ohne vollstaendige Identitaet liefern 404
+        (keine Existenzoffenlegung).
+        """
+        item = self._get_raw_order(order_id)
+        if item is None or not authorize_order_access(item, identity):
             raise order_not_found(order_id)
         return to_public_order(item)
 
-    def list_orders(self, limit: int, next_token: Optional[str] = None) -> Dict[str, Any]:
-        query_kwargs: Dict[str, Any] = {
-            "IndexName": TABLE_INDEX_NAME,
-            "KeyConditionExpression": "gsi1pk = :pk",
-            "ExpressionAttributeValues": {":pk": GSI1_PK},
-            "ScanIndexForward": False,
-            "Limit": limit,
-        }
-        if next_token:
-            query_kwargs["ExclusiveStartKey"] = decode_next_token(next_token)
+    def list_orders(
+        self,
+        limit: int,
+        next_token: Optional[str] = None,
+        *,
+        identity: OrderIdentity,
+    ) -> Dict[str, Any]:
+        """Listet ausschliesslich Orders des verifizierten Owners+Consumers.
+
+        GSI2 partitioniert nach `SUBJECT#<subjectId>`; da der Index `consumerId`
+        nicht projiziert, wird jedes Item vollstaendig geladen und gefiltert
+        (P02G-A-Muster). Der Cursor ist ein GSI2-`LastEvaluatedKey`.
+        """
+        last_key = decode_next_token(next_token) if next_token else None
+        collected: List[Dict[str, Any]] = []
+        seen = set()
+        pages = 0
 
         try:
-            result = self._table.query(**query_kwargs)
+            while len(collected) < limit and pages < MAX_LIST_PAGES:
+                pages += 1
+                query_kwargs: Dict[str, Any] = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"{GSI2_PK_PREFIX}{identity.owner_id}"
+                    },
+                    # Nur projizierte Attribute anfragen (P02G-A-Befund).
+                    "ProjectionExpression": "orderId",
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+                if last_key:
+                    query_kwargs["ExclusiveStartKey"] = last_key
+                result = self._table.query(**query_kwargs)
+
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id or order_id in seen:
+                        continue
+                    seen.add(order_id)
+                    item = self._load_order_item(order_id)
+                    if item is None or not authorize_order_access(item, identity):
+                        continue
+                    collected.append(item)
+                    if len(collected) >= limit:
+                        break
+
+                last_key = result.get("LastEvaluatedKey")
+                if not last_key:
+                    break
         except Exception as err:
             if is_validation_exception(err):
+                # z. B. alter GSI1-Cursor, der zu GSI2 nicht passt
                 raise validation_error(
                     "Invalid pagination token or query",
                     {"path": "nextToken"},
                 ) from err
             raise
 
-        orders = [to_list_item(item) for item in result.get("Items", [])]
+        collected.sort(key=lambda entry: entry.get("createdAt", ""), reverse=True)
+        orders = [to_list_item(item) for item in collected]
 
         response: Dict[str, Any] = {"orders": orders, "count": len(orders)}
-        encoded = encode_next_token(result.get("LastEvaluatedKey"))
+        encoded = encode_next_token(last_key)
         if encoded:
             response["nextToken"] = encoded
         return response
 
-    def update_order_status(self, order_id: str, status: str) -> Dict[str, Any]:
-        current = self.get_order(order_id)
+    def update_order_status(
+        self, order_id: str, status: str, *, identity: OrderIdentity
+    ) -> Dict[str, Any]:
+        """Aendert den Status nur bei passender Owner- UND Consumer-Identitaet.
 
-        if not can_transition(current["status"], status):
-            raise invalid_transition(current["status"], status)
+        Die Autorisierung ist Teil DERSELBEN Conditional-Expression wie Status
+        und Version (kein TOCTOU, kein ungeschuetzter Fallback-Write).
+        """
+        item = self._get_raw_order(order_id)
+        if item is None or not authorize_order_access(item, identity):
+            raise order_not_found(order_id)
+
+        current_status = item.get("status")
+        if not can_transition(current_status, status):
+            raise invalid_transition(current_status, status)
 
         try:
             result = self._table.update_item(
                 Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
-                UpdateExpression="SET #status = :newStatus, updatedAt = :now, #version = #version + :one",
-                ConditionExpression="attribute_exists(pk) AND #status = :currentStatus",
-                ExpressionAttributeNames={"#status": "status", "#version": "version"},
+                UpdateExpression=(
+                    "SET #status = :newStatus, updatedAt = :now, "
+                    "#version = if_not_exists(#version, :zero) + :one"
+                ),
+                ConditionExpression=(
+                    "attribute_exists(pk) AND #status = :currentStatus "
+                    "AND #subjectId = :owner AND #consumerId = :consumer"
+                ),
+                ExpressionAttributeNames={
+                    "#status": "status",
+                    "#version": "version",
+                    "#subjectId": "subjectId",
+                    "#consumerId": "consumerId",
+                },
                 ExpressionAttributeValues={
                     ":newStatus": status,
-                    ":currentStatus": current["status"],
+                    ":currentStatus": current_status,
+                    ":owner": identity.owner_id,
+                    ":consumer": identity.consumer_id,
                     ":now": now_iso(),
+                    ":zero": 0,
                     ":one": 1,
                 },
                 ReturnValues="ALL_NEW",
@@ -221,8 +386,25 @@ class OrderService:
             return to_public_order(result["Attributes"])
         except Exception as err:
             if is_conditional_check_failed(err):
+                fresh = self._get_raw_order(order_id)
+                # Kein Fallback-Write: fremd/verschwunden -> 404, sonst 409.
+                if fresh is None or not authorize_order_access(fresh, identity):
+                    raise order_not_found(order_id) from err
                 raise conflicted_update() from err
             raise
+
+    def _load_order_item(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Laedt das vollstaendige Order-Item (ConsistentRead).
+
+        GSI2 projiziert nur einen Teil der Attribute (kein `consumerId`, keine
+        Verarbeitungsfelder). Eine Query mit nicht projizierten Feldern wuerde
+        in DynamoDB fehlschlagen; deshalb wird nach der Query je Order geladen.
+        """
+        result = self._table.get_item(
+            Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+            ConsistentRead=True,
+        )
+        return result.get("Item")
 
     def inspect_subject(self, subject_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         self._require_privacy_auth(context, "privacy_inspect")
@@ -230,15 +412,38 @@ class OrderService:
         if not subject_id or not isinstance(subject_id, str):
             raise validation_error("Invalid subjectId")
 
-        # Query GSI2 for orders linked to subject
+        # Query GSI2 for orders linked to subject (vollstaendig paginiert:
+        # MO-RC4-P02 — ein Benutzer kann mehr Bestellungen haben als eine
+        # DynamoDB-Seite (1 MB) zurueckgibt).
+        scope = privacy_scope_consumer(context)
+        items = []
+        last_evaluated_key = None
         try:
-            result = self._table.query(
-                IndexName=GSI2_NAME,
-                KeyConditionExpression="gsi2pk = :pk",
-                ExpressionAttributeValues={":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                ProjectionExpression="orderId,#status,createdAt,updatedAt,customer",
-                ExpressionAttributeNames={"#status": "status"},
-            )
+            while True:
+                query_kwargs: Dict[str, Any] = {
+                    "IndexName": GSI2_NAME,
+                    "KeyConditionExpression": "gsi2pk = :pk",
+                    "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
+                    # Nur projizierte Attribute anfragen (GSI2 kennt die
+                    # Verarbeitungsfelder nicht) und je Order vollstaendig laden.
+                    "ProjectionExpression": "orderId",
+                }
+                if last_evaluated_key:
+                    query_kwargs["ExclusiveStartKey"] = last_evaluated_key
+                result = self._table.query(**query_kwargs)
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
+                    if not item_in_privacy_scope(item, scope):
+                        continue
+                    items.append(item)
+                last_evaluated_key = result.get("LastEvaluatedKey")
+                if not last_evaluated_key:
+                    break
         except Exception:
             # Technical failure must not be reported as successful empty result
             return {
@@ -249,8 +454,6 @@ class OrderService:
                 "dataCategories": [],
                 "limitations": ["GSI2 query failed"],
             }
-
-        items = result.get("Items", [])
         order_refs = []
         for item in items:
             oid = item.get("orderId")
@@ -267,12 +470,22 @@ class OrderService:
                 if "email" in cust:
                     data_categories.append("customer.email")
 
+        # MO-RC4-P02G-A: datensparsame Kennzeichnung, KEINE Ergebnisinhalte.
+        summary = processing_summary(items)
+        if summary["hasProcessingResult"]:
+            data_categories.append("processing.result")
+        if summary["hasProcessingError"]:
+            data_categories.append("processing.error")
+
         return {
             "subjectId": subject_id,
             "status": "COMPLETED",
             "affectedRecords": len(order_refs),
             "orderReferences": order_refs,
             "dataCategories": data_categories,
+            "hasProcessingResult": summary["hasProcessingResult"],
+            "hasProcessingError": summary["hasProcessingError"],
+            "processingStates": summary["processingStates"],
             "limitations": [],
         }
 
@@ -283,6 +496,7 @@ class OrderService:
             raise validation_error("Invalid subjectId")
 
         operation_id = str(uuid.uuid4())
+        scope = privacy_scope_consumer(context)
         orders = []
         last_evaluated_key = None
         limitations = []
@@ -293,14 +507,21 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency",
-                    "ExpressionAttributeNames": {"#status": "status"},
+                    # Nur projizierte Attribute anfragen; Details je Order laden.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
-                items = result.get("Items", [])
-                for item in items:
+                for entry in result.get("Items", []):
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
+                    if not item_in_privacy_scope(item, scope):
+                        continue
                     # Build minimal export view, exclude internal fields
                     export_item = {
                         "orderId": item.get("orderId"),
@@ -316,6 +537,17 @@ class OrderService:
                         export_item["totalAmount"] = item["totalAmount"]
                     if "currency" in item:
                         export_item["currency"] = item["currency"]
+                    # MO-RC4-P02G-A: Ergebnis-/Verarbeitungsfelder vollstaendig
+                    # in die Auskunft aufnehmen (nur vorhandene Felder).
+                    for field in (
+                        FIELD_PROCESSING_STATE,
+                        FIELD_PROCESSING_ATTEMPT_ID,
+                        FIELD_RESULT,
+                        "completedAt",
+                        FIELD_PROCESSING_ERROR,
+                    ):
+                        if field in item:
+                            export_item[field] = item[field]
                     orders.append(export_item)
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -374,19 +606,31 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,pk,sk,subjectId,version,createdAt",
+                    # consumerId is not projected by GSI2. Only the orderId is
+                    # read from the index; the complete item (including
+                    # consumerId/version) is loaded consistently below before
+                    # the optional consumer-scope filter is applied.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
                 items = result.get("Items", [])
-                for item in items:
+                for entry in items:
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
                     affected.append({
                         "pk": item.get("pk"),
                         "sk": item.get("sk"),
                         "orderId": item.get("orderId"),
                         "subjectId": item.get("subjectId"),
                         "version": item.get("version"),
+                        # P02B: fuer den optionalen Consumer-Scope-Filter
+                        "consumerId": item.get("consumerId"),
                     })
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -405,6 +649,19 @@ class OrderService:
                 "completedAt": now_iso(),
             }
 
+        scope = privacy_scope_consumer(context)
+        if scope is not None:
+            in_scope = [entry for entry in affected if item_in_privacy_scope(entry, scope)]
+            excluded = len(affected) - len(in_scope)
+            affected = in_scope
+        else:
+            excluded = 0
+        scope_limitations = (
+            [f"{excluded} record(s) outside consumer scope were not touched"]
+            if excluded
+            else []
+        )
+
         if mode == "PREVIEW":
             planned_deletes = 0
             planned_retentions = 0
@@ -422,7 +679,7 @@ class OrderService:
                 "plannedDeletes": planned_deletes if policy == "ERASE" else 0,
                 "plannedAnonymizations": len(affected) if policy == "ANONYMIZE" else 0,
                 "plannedRetentions": planned_retentions,
-                "limitations": [],
+                "limitations": list(scope_limitations),
                 "completedAt": now_iso(),
             }
 
@@ -436,6 +693,7 @@ class OrderService:
                 "deletedRecords": 0,
                 "anonymizedRecords": 0,
                 "retainedRecords": 0,
+                "skippedRecords": 0,
                 "failedRecords": 0,
                 "limitations": ["Missing explicit retention policy"],
                 "completedAt": now_iso(),
@@ -445,6 +703,7 @@ class OrderService:
         anonymized = 0
         retained = 0
         failed = 0
+        skipped = 0
         for item in affected:
             pk = item.get("pk")
             sk = item.get("sk")
@@ -477,14 +736,32 @@ class OrderService:
                         cond_expr += " AND version = :ver"
                     self._table.update_item(
                         Key={"pk": pk, "sk": sk},
-                        UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk",
+                        UpdateExpression=(
+                            "SET #c.#n = :anon, #c.#e = :anon_email "
+                            "REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt, "
+                            "gsi3pk, gsi3sk"
+                        ),
                         ConditionExpression=cond_expr,
-                        ExpressionAttributeNames={"#c": "customer", "#n": "name", "#e": "email"},
+                        ExpressionAttributeNames={
+                            "#c": "customer", "#n": "name", "#e": "email",
+                            # MO-RC4-P02G-A: Ergebnisse werden NICHT selektiv
+                            # bereinigt, sondern vollstaendig entfernt.
+                            "#result": "result",
+                            "#perr": "processingError",
+                            "#patt": "processingAttemptId",
+                        },
                         ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", **cond_values},
                     )
                     anonymized += 1
-            except Exception:
-                failed += 1
+            except Exception as err:
+                # MO-RC4-P02: Idempotenz. Wurde der Datensatz zwischen Query und
+                # Schreiboperation bereits geloescht oder parallel geaendert,
+                # ist das KEIN Fehler — es wurde nichts Fremdes veraendert.
+                # Der Aufruf bleibt gefahrlos wiederholbar.
+                if is_conditional_check_failed(err):
+                    skipped += 1
+                else:
+                    failed += 1
 
         status = "COMPLETED"
         if failed > 0 or retained > 0:
@@ -499,8 +776,9 @@ class OrderService:
             "deletedRecords": deleted,
             "anonymizedRecords": anonymized,
             "retainedRecords": retained,
+            "skippedRecords": skipped,
             "failedRecords": failed,
-            "limitations": [],
+            "limitations": list(scope_limitations),
             "completedAt": now_iso(),
         }
 

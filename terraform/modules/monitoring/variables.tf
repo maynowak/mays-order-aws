@@ -95,3 +95,10 @@ variable "dynamodb_table_name" {
   description = "Name der DynamoDB-Tabelle (fuer DynamoDB-Metriken)."
   type        = string
 }
+
+# MO-RC4-P02I-B2: DLQ-Alarm (unabhaengig von der Processing-Recovery).
+variable "dlq_name" {
+  description = "Name der SQS Dead-Letter-Queue. Wenn null, wird kein DLQ-Alarm erstellt."
+  type        = string
+  default     = null
+}

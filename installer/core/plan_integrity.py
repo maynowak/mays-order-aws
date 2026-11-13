@@ -233,7 +233,9 @@ class PlanIntegrityVerifier:
         plan_path = Path(plan_path)
         meta = None
         from installer.core.deployment_identity import PlanMetadata
-        meta = PlanMetadata.parse_filename(plan_path.name)
+        meta = PlanMetadata.parse_filename(
+            plan_path.name, expected_deployment_id=deployment_id
+        )
         
         if not meta:
             results["valid"] = False

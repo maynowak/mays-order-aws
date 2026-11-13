@@ -14,6 +14,38 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import shlex
 
+# MO-RC4-TERRAFORM-TIMEOUT-FIX-01: operation-specific process timeouts.
+# Short/read-only Terraform commands keep 180s; apply and destroy need a
+# realistic budget (58+ resources incl. CloudTrail wait) and use 900s by
+# default, overridable via MAYS_TERRAFORM_APPLY_TIMEOUT.
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 180
+DEFAULT_APPLY_TIMEOUT_SECONDS = 900
+APPLY_TIMEOUT_ENV_VAR = "MAYS_TERRAFORM_APPLY_TIMEOUT"
+
+
+def resolve_apply_timeout() -> int:
+    """Resolve the apply/destroy timeout in seconds (fail-closed).
+
+    An invalid override (non-numeric, zero, negative) raises TerraformError
+    instead of silently falling back to a longer/shorter value.
+    """
+    raw = os.environ.get(APPLY_TIMEOUT_ENV_VAR)
+    if raw is None or not raw.strip():
+        return DEFAULT_APPLY_TIMEOUT_SECONDS
+    try:
+        value = int(raw.strip())
+    except ValueError as exc:
+        raise TerraformError(
+            f"{APPLY_TIMEOUT_ENV_VAR} must be a positive integer number of "
+            f"seconds, got {raw!r}."
+        ) from exc
+    if value <= 0:
+        raise TerraformError(
+            f"{APPLY_TIMEOUT_ENV_VAR} must be a positive integer number of "
+            f"seconds, got {raw!r}."
+        )
+    return value
+
 
 @dataclass
 class TerraformCommandAudit:
@@ -91,6 +123,18 @@ class TerraformResult:
         return json.dumps(self.to_dict(), indent=2, default=str)
 
 
+def _failed_result(command: List[str], message: str) -> "TerraformResult":
+    """Deterministic failure result (configuration errors, no execution)."""
+    return TerraformResult(
+        command=command,
+        exit_code=-1,
+        stdout="",
+        stderr=message,
+        duration=0.0,
+        success=False,
+    )
+
+
 class TerraformRunner:
     """
     Central Terraform Runner.
@@ -106,7 +150,8 @@ class TerraformRunner:
         aws_context: "AWSExecutionContext",
         terraform_bin: str = "terraform",
         env: Optional[dict] = None,
-        workspace: str = "default"
+        workspace: str = "default",
+        require_explicit_workspace: bool = False
     ):
         """
         Initialize TerraformRunner.
@@ -117,15 +162,32 @@ class TerraformRunner:
             terraform_bin: Path to terraform binary
             env: Additional environment variables
             workspace: Terraform workspace name for parallel deployments
+            require_explicit_workspace: Fail-closed guard for project-isolated
+                deployments (MO-RC4-P02I-E1B). When True, an empty workspace or
+                the Terraform "default" workspace is rejected at construction
+                time. Project-isolated callers must pass workspace=project_name.
         """
         if not aws_context.validated:
             raise ValueError("AWSExecutionContext must be validated")
+
+        workspace = (workspace or "").strip()
+        if not workspace:
+            raise ValueError(
+                "workspace must not be empty; project-isolated deployments "
+                "must use workspace=project_name"
+            )
+        if require_explicit_workspace and workspace == "default":
+            raise ValueError(
+                "workspace 'default' is not allowed for project-isolated "
+                "deployments (silent fallback); expected workspace=project_name"
+            )
         
         self.working_dir = Path(working_dir).resolve()
         self.terraform_bin = "terraform"
         self.aws_context = aws_context
         self.env = {}
         self.workspace = workspace
+        self.require_explicit_workspace = require_explicit_workspace
     
     def _get_terraform_env(self) -> dict:
         """Build explicit subprocess env from validated context.
@@ -184,8 +246,13 @@ class TerraformRunner:
             backend: Whether to configure backend (False for local validation only)
             upgrade: Upgrade modules and providers
             reconfigure: Reconfigure backend
+
+        MO-RC4-P02I-E2B: `-input=false` ist immer gesetzt. Terraform darf im
+        Installer nie interaktiv nachfragen (insbesondere nicht "copy existing
+        state to the new backend?"); ein solcher Prompt bricht den Lauf ab,
+        statt still eine State-Migration durchzufuehren.
         """
-        args = ["init"]
+        args = ["init", "-input=false"]
         if not backend:
             args.append("-backend=false")
         if upgrade:
@@ -214,7 +281,8 @@ class TerraformRunner:
             var_file: Path to .tfvars file
             var: Variables to pass
         """
-        args = ["plan"]
+        # MO-RC4-P02I-E2B: Plaene laufen nie interaktiv (keine Variablen-Prompts).
+        args = ["plan", "-input=false"]
         if destroy:
             args.append("-destroy")
         if out_file:
@@ -231,9 +299,16 @@ class TerraformRunner:
         """Show plan in JSON format."""
         return self.run_and_get_result(["show", "-json", plan_file])
     
-    def plan_destroy(self, out_file: Optional[str] = None) -> "TerraformResult":
-        """Generate destroy plan."""
-        return self.plan(out_file=out_file, destroy=True)
+    def plan_destroy(self, out_file: Optional[str] = None, var: Optional[dict] = None,
+                     var_file: Optional[str] = None) -> "TerraformResult":
+        """Generate destroy plan.
+
+        MO-RC4-P02I-E1B: destroy plans must carry the same project context as
+        deploy plans. Without `var` the Terraform default of `project_name`
+        ("mays-orders") would be used, silently targeting the default project
+        namespace instead of the selected one.
+        """
+        return self.plan(out_file=out_file, destroy=True, var=var, var_file=var_file)
     
     def show(self, plan_file: str) -> "TerraformResult":
         """Show plan (human readable)."""
@@ -249,7 +324,12 @@ class TerraformRunner:
         """
         if not os.path.exists(plan_file):
             raise TerraformError(f"Plan file not found: {plan_file}")
-        
+
+        try:
+            timeout = resolve_apply_timeout()
+        except TerraformError as exc:
+            return _failed_result(["terraform", "apply", plan_file], str(exc))
+
         # Use provided AWS context or fall back to runner's context
         if aws_context is not None:
             if not aws_context.validated:
@@ -258,11 +338,11 @@ class TerraformRunner:
             original_context = self.aws_context
             self.aws_context = aws_context
             try:
-                return self.run_and_get_result(["apply", plan_file])
+                return self.run_and_get_result(["apply", plan_file], timeout=timeout)
             finally:
                 self.aws_context = original_context
-        
-        return self.run_and_get_result(["apply", plan_file])
+
+        return self.run_and_get_result(["apply", plan_file], timeout=timeout)
     
     def destroy(self, plan_file: str) -> "TerraformResult":
         """
@@ -273,7 +353,14 @@ class TerraformRunner:
         """
         if not os.path.exists(plan_file):
             raise TerraformError(f"Destroy plan file not found: {plan_file}")
-        return self.run_and_get_result(["apply", plan_file])
+
+        try:
+            timeout = resolve_apply_timeout()
+        except TerraformError as exc:
+            return _failed_result(["terraform", "apply", plan_file], str(exc))
+
+        # A destroy plan is applied like any other saved plan.
+        return self.run_and_get_result(["apply", plan_file], timeout=timeout)
     
     # State commands
     
@@ -411,7 +498,12 @@ class TerraformRunner:
         return True, ""
 
     def _ensure_workspace(self) -> None:
-        """Select workspace, create if missing, verify selection."""
+        """Select workspace, create if missing, verify selection.
+
+        The "default" workspace is only reachable for callers that explicitly
+        opt out of project isolation; project-isolated runners reject it at
+        construction time (require_explicit_workspace=True, MO-RC4-P02I-E1B).
+        """
         if self.workspace == "default":
             return
         # Select workspace
@@ -470,8 +562,23 @@ class TerraformRunner:
         if current != self.workspace:
             raise TerraformError(f"workspace mismatch after create: expected {self.workspace}, got {current}")
 
-    def run_and_get_result(self, args: List[str]) -> "TerraformResult":
-        """Run command and return structured result with workspace safety."""
+    def run_and_get_result(
+        self, args: List[str], timeout: int = DEFAULT_COMMAND_TIMEOUT_SECONDS
+    ) -> "TerraformResult":
+        """Run command and return structured result with workspace safety.
+
+        `timeout` is the wall-clock limit for the Terraform process. Apply and
+        destroy pass an operation-specific limit (900s default, override via
+        MAYS_TERRAFORM_APPLY_TIMEOUT); plan/state/read-only commands keep the
+        180s default.
+
+        Process handling: `subprocess.run(timeout=...)` kills and reaps the
+        direct Terraform child process when the limit is exceeded. Provider
+        plugin processes are children of Terraform and terminate with their
+        parent; the runner cannot reap them explicitly. A timeout is always
+        reported as failure (success=False, exit_code=-1) and is never retried
+        automatically.
+        """
         start_time = time.time()
         # Workspace safety for non-init commands
         if not (len(args) > 0 and args[0] == "init"):
@@ -482,7 +589,7 @@ class TerraformRunner:
                 cwd=self.working_dir,
                 capture_output=True,
                 text=True,
-                timeout=180,
+                timeout=timeout,
                 env=self._get_terraform_env()
             )
             return TerraformResult.from_completed_process(
@@ -498,7 +605,7 @@ class TerraformRunner:
                 command=[self.terraform_bin] + args,
                 exit_code=-1,
                 stdout="",
-                stderr=f"Command timed out: {e}",
+                stderr=f"Command timed out after {timeout}s: {e}",
                 duration=time.time() - start_time,
                 success=False
             )

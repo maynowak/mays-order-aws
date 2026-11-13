@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import zipfile
+
+# Entry points that must exist in BOTH source and archive (MO-RC4-P02I-C1).
+REQUIRED_MODULES = ("index.py", "sqs_handler.py")
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -42,6 +45,10 @@ def verify_lambda_zip(lambda_dir: str | Path) -> Tuple[bool, str]:
     }
     if not expected:
         return False, f"No Python modules found in {src_dir}"
+
+    missing_handlers = [name for name in REQUIRED_MODULES if name not in expected]
+    if missing_handlers:
+        return False, f"Missing handler module(s) in source: {missing_handlers}"
 
     try:
         with zipfile.ZipFile(zip_path) as archive:

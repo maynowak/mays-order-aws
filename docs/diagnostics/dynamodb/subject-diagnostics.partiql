@@ -1,0 +1,22 @@
+-- Subject-/Owner-Diagnose (read-only). <SUBJECT_ID> ist der JWT-sub,
+-- kein Klartextname und keine E-Mail-Adresse.
+SELECT "orderId", "status", "createdAt", "updatedAt"
+FROM "<TABLE_NAME>"."gsi2"
+WHERE "gsi2pk" = 'SUBJECT#<SUBJECT_ID>';
+
+-- Einzelne Order auf Anonymisierungsmerkmale pruefen.
+-- Nach ANONYMIZE sind subjectId/gsi2pk/gsi2sk entfernt; 'customer' wird
+-- dann als ANONYMIZED gefuehrt. Keine PII-Ausgabe.
+SELECT "pk", "sk", "orderId", "status",
+       "subjectId", "gsi2pk", "gsi2sk"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Wichtig:
+-- * Ein leeres GSI2-Ergebnis bedeutet nicht zwingend "Order existiert nicht":
+--   nach ANONYMIZE ist die Order ueber GSI2 nicht mehr auffindbar.
+-- * Es gibt kein Erasure-Ledger; ein Restore kann geloeschte PII
+--   zurueckbringen (P3E). Diese Abfrage beweist keine Loeschung.
+-- * Consumer-Isolation ist fachlich (Owner + consumerId), nicht per IAM
+--   oder SQL-Filter garantiert. Siehe security-and-iam.md.

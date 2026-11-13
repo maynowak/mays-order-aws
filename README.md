@@ -76,6 +76,33 @@ python -m module_builder build --target ./generated/custom   --project-name cust
 python -m module_builder presets    # verfügbare Presets listen
 ```
 
+### Bestehende Builder-Projekte aktualisieren
+
+```bash
+# Nur analysieren (keine Projektdateien ändern), Bericht schreiben:
+python -m module_builder upgrade --project ./generated/my-orders --dry-run
+
+# Sichere Änderungen anwenden (ADD/UPDATE_SAFE) und Manifest aktualisieren:
+python -m module_builder upgrade --project ./generated/my-orders --apply
+```
+
+- Das Builder-Manifest `module-builder.manifest.json` (Schema 2) enthält je Datei
+  einen SHA-256-Fingerprint. Nur so lässt sich Builder-Eigentum von
+  Benutzeränderungen unterscheiden; der Verzeichnisname allein zählt nicht.
+- Klassifikation: `UNCHANGED`, `ADD`, `UPDATE_SAFE`, `USER_MODIFIED`, `USER_OWNED`,
+  `REMOVE_CANDIDATE`, `CONFLICT`.
+- **Nie automatisch:** Benutzerdateien überschreiben, `*.tfvars`/`*.auto.tfvars`/`.env*`
+  ändern, veraltete Dateien löschen, Konflikte auflösen, `--force` als Upgrade nutzen.
+- Pfade werden normalisiert; absolute Pfade, `..`, Symlinks und Ziele außerhalb des
+  Projekts werden abgelehnt. Geschrieben wird über ein Staging-Verzeichnis; das
+  Manifest wird erst nach erfolgreichen Schreibvorgängen ersetzt.
+- Status: `READY`, `REVIEW_REQUIRED`, `BLOCKED` (`BUILDER_UPGRADE_CONFLICT`,
+  `BUILDER_PROJECT_UNVERIFIED`, `BUILDER_LEGACY_REVIEW_REQUIRED`), `NO_CHANGES`.
+  Berichte: `<projekt>/.mays-builder/runs/<ts>/builder-upgrade-report.{json,md}`.
+- Legacy-Manifeste ohne Fingerprints werden nicht automatisch übernommen.
+- Der Builder führt **kein** Terraform aus. Nach dem Builder-Upgrade folgt der
+  Installer: `plan --remote --upgrade` → P0A/P0B/P0C/P1 → `upgrade-readiness`.
+
 Details: [Modul-Integrations- & Testleitfaden](docs/MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md) · [Orders-Service-Modul-Vertrag](docs/reports/MAYS-ORDERS-MODULE-CONTRACT-01.md) · `python -m module_builder --help`
 
 ## Projektabgrenzung

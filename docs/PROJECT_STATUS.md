@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-10-31)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-02)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -17,7 +17,8 @@ Current Feature:
 MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
 
 Current Task:
-MO-RC3-P07-P08 — Release-Packaging v0.5.0-rc.3 abgeschlossen; P09 (Tag/Release) wartet auf Freigabe
+MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 — abgeschlossen: Verify PASS, E2E 9/9 PASS, Destroy 58/58,
+RC4-State (inkl. Versionen) entfernt; Main-Integration BLOCKED (Auto-Apply-Pipeline `directAWSGit`)
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -37,8 +38,14 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-feature/t011-11-cloudwatch-monitoring (T011-11 — CloudWatch Monitoring as Code; kein apply)
+feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00 dokumentiert, keine Implementierung)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
+→ P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
+  Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion
+→ P02I-E2B: Installer `plan --remote` (S3-Backend, explizite Identität, `-input=false`), Plan-Manifest
+  (sha256 + Account/Projekt/Region/Workspace/Backend), Recovery-Flags explizit false, Cleanup-Vertrag
+→ RC4-Lifecycle-Test (2026-11-02): Apply 58 Ressourcen, E2E 9/9 PASS, Policy-Gate- und Timeout-Fix,
+  Destroy 58/58, RC4-State entfernt; Main-Integration offen (Pipeline-Sicherheitsgate)
 
 AWS Resources:
 NONE

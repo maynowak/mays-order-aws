@@ -195,7 +195,7 @@ class ApprovalGate:
         Returns True if approved, False if denied.
         If auto_approve is True, returns True without prompting.
         """
-        if self.auto_approve:
+        if self.context.auto_approve:
             return True
         
         try:
@@ -219,39 +219,20 @@ class ApprovalGate:
         """Get set of checks that were bypassed (should be empty for non-bypassable)."""
         return self._bypassed_checks.copy()
 
-
-class ApprovalGate:
-    """
-    High-level approval gate for mutating operations.
-    
-    Coordinates all safety checks and user approval.
-    """
-    
-    def __init__(self, context: "ApprovalContext"):
-        self.context = context
-        self.gate = ApprovalGate(context)
-    
     def evaluate(self, context: "InstallationContext") -> tuple[bool, list[str]]:
-        """
-        Evaluate all safety checks and request approval if needed.
-        
-        Returns:
-            (proceed, list_of_failures)
-        """
-        # Run all non-bypassable safety checks
-        all_passed, failed = self.gate.verify_all_safety_checks(self.context)
-        
+        """Run all safety checks, then request interactive approval if needed."""
+        all_passed, failed = self.verify_all_safety_checks(context)
+
         if not all_passed:
             return False, failed
-        
-        # Request approval if not auto-approved
+
         if not self.context.auto_approve:
-            approved = self.gate.request_approval(
+            approved = self.request_approval(
                 f"\nProceed with {self.context.operation}? [y/N]: "
             )
             if not approved:
                 return False, ["User declined approval"]
-        
+
         return True, []
 
 

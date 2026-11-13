@@ -1,0 +1,18 @@
+-- Status und Zeitstempel einer bekannten Order pruefen (key-basiert).
+-- 'status' ist kein Schluesselattribut: eine Statusabfrage ohne pk/sk
+-- wuerde einen Scan ausloesen und ist hier bewusst NICHT enthalten.
+SELECT "orderId", "status", "createdAt", "updatedAt", "version"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Letzte Aenderungen im Zeitfenster ueber GSI1 (Listen-Index).
+-- Beide Grenzen als ISO-8601-UTC-Platzhalter ersetzen.
+SELECT "orderId", "status", "createdAt", "updatedAt"
+FROM "<TABLE_NAME>"."gsi1"
+WHERE "gsi1pk" = 'LIST'
+  AND "gsi1sk" BETWEEN '<FROM_ISO>' AND '<TO_ISO>';
+
+-- Grenze: Ein Statusfilter ueber alle Orders ist ohne passenden Index nicht
+-- effizient. Dafuer ist ein separater, freigegebener Abgleich noetig (P3C),
+-- kein unbegrenzter Scan.

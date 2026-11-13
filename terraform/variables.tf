@@ -13,6 +13,20 @@ variable "project_name" {
   }
 }
 
+# MO-P0B: dokumentierte Zielversion der Bereitstellung. Wird als
+# Terraform-Output `mo_version` im Remote-State abgelegt (State-Output, kein
+# unabhaengiger Nachweis des laufenden Lambda-Codes).
+variable "deployment_version" {
+  description = "Semantische Version dieser Bereitstellung (major.minor.patch); wird als Output mo_version dokumentiert."
+  type        = string
+  default     = "0.1.0"
+
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.deployment_version))
+    error_message = "deployment_version muss dem Format major.minor.patch entsprechen (z. B. 0.1.0)."
+  }
+}
+
 variable "aws_region" {
   description = "AWS-Region, in der die Infrastruktur erzeugt wird."
   type        = string
@@ -144,4 +158,93 @@ variable "lambda_execution_boundary" {
     condition     = var.lambda_execution_boundary == null || can(regex("^arn:aws:iam::[0-9]{12}:policy/", var.lambda_execution_boundary))
     error_message = "lambda_execution_boundary must be null or a valid IAM policy ARN (arn:aws:iam::<12-digit-account-id>:policy/<name>)."
   }
+}
+# MO-RC4-P02C: SQS-Zuverlaessigkeit. Fehlgeschlagene Auftraege landen in einer DLQ
+# statt stillschweigend zu verschwinden; Ablaufzeiten sind konfigurierbar.
+variable "sqs_message_retention_seconds" {
+  description = "Aufbewahrung der Order-Queue in Sekunden (60..1209600). Default 4 Tage."
+  type        = number
+  default     = 345600
+}
+
+variable "sqs_dlq_message_retention_seconds" {
+  description = "Aufbewahrung der Dead-Letter-Queue in Sekunden (60..1209600). Default 14 Tage."
+  type        = number
+  default     = 1209600
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  description = "Visibility Timeout der Order-Queue in Sekunden (0..43200). Sollte >= 6x Worker-Lambda-Timeout sein (Default 60 s bei 10 s Timeout)."
+  type        = number
+  default     = 60
+}
+
+variable "sqs_max_receive_count" {
+  description = "Zustellversuche bis zur DLQ (1..1000). Default 1: erster Fehlversuch fuehrt beim naechsten Empfang in die DLQ."
+  type        = number
+  default     = 1
+}
+
+# MO-RC4-P02F: PENDING-Recovery (opt-in). Der Scheduler ruft den bestehenden
+# Order-Handler regelmaessig auf; ohne Aktivierung entstehen keine Ressourcen.
+variable "recovery_enabled" {
+  description = "Aktiviert den Recovery-Scheduler (EventBridge Scheduler -> bestehender Handler). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "recovery_schedule_expression" {
+  description = "Schedule-Ausdruck fuer den Recovery-Lauf (Default: rate(5 minutes))."
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
+variable "recovery_window_minutes" {
+  description = "Recovery-Zeitfenster in Minuten (GSI1-Range-Query). Muss groesser als das Schedule-Intervall sein."
+  type        = number
+  default     = 60
+}
+
+variable "recovery_min_age_seconds" {
+  description = "Mindestalter einer PENDING-Order, bevor Recovery sie erneut zustellt."
+  type        = number
+  default     = 60
+}
+
+variable "recovery_limit" {
+  description = "Maximale Kandidaten pro Recovery-Lauf (Schutz vor Massenlauf)."
+  type        = number
+  default     = 50
+}
+
+variable "recovery_lease_seconds" {
+  description = "Lease-Dauer fuer den Recovery-Claim (Schutz vor parallelen Laeufen)."
+  type        = number
+  default     = 300
+}
+
+# MO-RC4-P02I-B2: automatische Processing-Recovery (abgelaufene Claims).
+# Standardmaessig AUS; unabhaengig von recovery_enabled (P02F).
+variable "processing_recovery_enabled" {
+  description = "Aktiviert die automatische Processing-Recovery (abgelaufene Processing-Claims). Default false."
+  type        = bool
+  default     = false
+}
+
+variable "processing_recovery_schedule_expression" {
+  description = "Schedule-Ausdruck der Processing-Recovery (Default: rate(5 minutes))."
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
+variable "processing_recovery_limit" {
+  description = "Maximale Kandidaten pro Processing-Recovery-Lauf."
+  type        = number
+  default     = 20
+}
+
+variable "processing_recovery_safety_margin_seconds" {
+  description = "Sicherheitsabstand zur Processing-Lease (Default 60 s)."
+  type        = number
+  default     = 60
 }

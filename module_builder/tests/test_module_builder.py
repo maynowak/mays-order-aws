@@ -98,6 +98,48 @@ class TestPreflightFailClosed(unittest.TestCase):
             self.assertTrue((target / "terraform" / "main.tf").is_file())
 
 
+class TestArtifactIntegrityGate(unittest.TestCase):
+    """MO-RC4-P02I-C1: der Builder uebernimmt keine ungueltigen Lambda-Artefakte."""
+
+    def _lambda_dir(self, root: Path, modules: dict, archived: dict) -> None:
+        (root / "lambda" / "src").mkdir(parents=True)
+        (root / "lambda" / "dist").mkdir(parents=True)
+        for name, content in modules.items():
+            (root / "lambda" / "src" / name).write_text(content)
+        import zipfile
+        with zipfile.ZipFile(root / "lambda" / "dist" / "lambda.zip", "w") as archive:
+            for name, content in archived.items():
+                archive.writestr(name, content)
+
+    def test_real_repository_artifact_is_accepted(self):
+        from module_builder.builder import _verify_lambda_artifact
+        _verify_lambda_artifact(REPO_ROOT)  # kein SystemExit
+
+    def test_stale_archive_fails_closed(self):
+        from module_builder.builder import _verify_lambda_artifact
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._lambda_dir(
+                root,
+                modules={"index.py": "a = 1\n", "sqs_handler.py": "b = 2\n"},
+                archived={"index.py": "a = 1\n"},
+            )
+            with self.assertRaises(SystemExit) as ctx:
+                _verify_lambda_artifact(root)
+            message = str(ctx.exception)
+            self.assertIn("fail-closed", message)
+            self.assertIn("sqs_handler.py", message)
+
+    def test_missing_archive_fails_closed(self):
+        from module_builder.builder import _verify_lambda_artifact
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "lambda" / "src").mkdir(parents=True)
+            (root / "lambda" / "src" / "index.py").write_text("a = 1\n")
+            with self.assertRaises(SystemExit):
+                _verify_lambda_artifact(root)
+
+
 class TestGeneratedProject(unittest.TestCase):
     """Vollständiger Build gegen das echte Repo-Quellverzeichnis."""
 
@@ -425,10 +467,12 @@ class TestModuleSelectionB1(unittest.TestCase):
             vars_kept = set(re.findall(r'^variable\s+"([a-z_]+)"',
                 (target / "terraform" / "variables.tf").read_text(), re.M))
             self.assertEqual(vars_kept, {"project_name", "aws_region", "tags",
+                                         "deployment_version",
                                          "seed_example_data", "seed_file_path"})
             outs = set(re.findall(r'^output\s+"([a-z_]+)"',
                 (target / "terraform" / "outputs.tf").read_text(), re.M))
-            self.assertEqual(outs, {"dynamodb_table_name", "dynamodb_table_arn"})
+            self.assertEqual(outs, {"dynamodb_table_name", "dynamodb_table_arn",
+                                    "mo_version"})
 
     def test_valid_combination_lambda_chain(self):
         """dynamodb,sqs,iam,lambda — gültige Kette mit Lambda-Artefakt, ohne Backup-Zip."""
@@ -457,6 +501,7 @@ class TestModuleSelectionB1(unittest.TestCase):
                 # Neu seit MODULE-CONTRACT-01: Queue-Outputs referenzieren module.sqs
                 # (in dieser Auswahl enthalten) und werden mitgefiltert:
                 "sqs_queue_url", "sqs_queue_arn", "sqs_queue_name",
+                "mo_version",
             })
 
     def test_missing_dependencies_fail_closed(self):
@@ -541,7 +586,8 @@ class TestModuleSelectionB1(unittest.TestCase):
             self.assertNotIn("module.sqs", outputs_text)
             names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
             self.assertEqual(names, {"dynamodb_table_name", "dynamodb_table_arn",
-                                     "iam_handler_role_name", "iam_handler_role_arn"})
+                                     "iam_handler_role_name", "iam_handler_role_arn",
+                                     "mo_version"})
 
     def test_lambda_without_sqs_readme_note(self):
         """Generiertes README dokumentiert den synchronen Betrieb ohne SQS."""
@@ -922,10 +968,10 @@ class TestOrdersServiceModule(unittest.TestCase):
             "iam_handler_role_name", "iam_handler_role_arn",
             "cognito_user_pool_id", "cognito_user_pool_arn",
             "cognito_user_pool_endpoint", "cognito_user_pool_client_id",
-            "cognito_user_pool_group_name",
+            "cognito_user_pool_group_name", "mo_version",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
-        self.assertEqual(len(outputs), 20)
+        self.assertEqual(len(outputs), 21)
         # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
         # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
         block = re.search(
@@ -1166,8 +1212,9 @@ class TestExternalCognitoIntegration(unittest.TestCase):
         """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 20)
+        self.assertEqual(len(names), 21)
         self.assertIn("sqs_queue_name", names)
+        self.assertIn("mo_version", names)
         # Modus-sichere Wertformen:
         self.assertIn("value       = local.cognito_endpoint", outputs)
         self.assertIn("value       = local.cognito_client_id", outputs)

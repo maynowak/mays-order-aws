@@ -82,10 +82,21 @@ class InstallationContext:
         """Initialize derived fields."""
         if self.run_dir is None:
             self.run_dir = f".mays-installer/runs/{self.run_id}"
-        # Auto-select terraform workspace per project for parallel deployments
-        if not self.terraform_workspace or self.terraform_workspace == "default":
+        # MO-RC4-P02I-E1B: Workspace-Isolation ist fail-closed.
+        # expected_workspace = project_name; der Terraform-"default"-Workspace
+        # wird nie stillschweigend verwendet.
+        self.project_name = (self.project_name or "").strip()
+        if not self.project_name:
+            raise ValueError(
+                "project_name is required for project-isolated deployments "
+                "(workspace = project_name)"
+            )
+        workspace = (self.terraform_workspace or "").strip()
+        if not workspace or workspace == "default":
             # Use project_name as workspace name for parallel isolation
             self.terraform_workspace = self.project_name
+        else:
+            self.terraform_workspace = workspace
 
     def to_dict(self) -> dict:
         """Serialize to dictionary."""
