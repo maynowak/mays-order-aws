@@ -1,15 +1,15 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / Q-02 + Q-08 + Q-10 APPROVED / P00-B INTEGRATED (VERIFICATION PENDING)
+**Status:** EXECUTION PLAN READY / Q-02 + Q-08 + Q-10 APPROVED / P00-B INTEGRATED / POST-MERGE VERIFIED
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
 
-> This plan prepares implementation orders. Q-02, Q-08 and Q-10 are
-> owner-approved. P00-B is implemented and tested on
-> `feature/mo-rc4-p00-b-secret-provider`; it is not merged. P00-C/D/E/G remain
-> separately gated.
+> Q-02, Q-08 and Q-10 are owner-approved. P00-B is integrated on
+> `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.
+> P00-C/D/E/G remain separately gated; P00-C-M01 is an open mandatory
+> cache-lifetime criterion.
 
 ---
 
@@ -49,8 +49,8 @@ Before any implementation package:
 
 **Goal:** Provider abstraction with `env` default and fail-closed resolution.
 
-**Status:** **IMPLEMENTED / TESTED / INTEGRATION REVIEW READY** — feature branch
-`feature/mo-rc4-p00-b-secret-provider`; not merged into the integration branch.
+**Status:** **INTEGRATED / POST-MERGE VERIFIED** — merge commit
+`e71f3edcb146fb7b3943b4c23fa65e771cf4611e`; 1.208 local PASS + 28 Seed.
 
 **Non-goals:** no Secrets Manager IaC, no KMS, no APP HMAC, no rotation, no
 retention.
@@ -94,6 +94,8 @@ fallback required to pass tests.
 
 **Dependencies:** P00-B; Q-02 (approved), Q-04 (optional CMK), Q-08
 (approved), Q-09, Q-10 (approved; C-01…C-07 incorporated).
+**Mandatory condition:** `P00-C-M01` effective cache lifetime is open and must be
+evidenced before P00-C integration.
 
 **Affected files (proposed):**
 

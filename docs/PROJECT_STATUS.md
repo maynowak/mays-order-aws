@@ -11,15 +11,14 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — P00 Security Implementation (P00-B on feature branch)
+RC4 Integration — P00 Security Implementation (P00-B integrated)
 
 Current Feature:
-MO-RC4 P00 — SecretProvider Foundation implemented; AWS_MANAGED/APP_MANAGED
-integration contracts prepared
+MO-RC4 P00 — SecretProvider Foundation integrated; P00-C/P00-D remain gated
 
 Current Task:
-MO-RC4-P00-B — SecretProvider Foundation IMPLEMENTATION COMPLETE / INTEGRATION
-REVIEW READY; 1.208 lokale PASS (669/128/379/32) + 28 Seed; nicht gemerged
+MO-RC4-P00-B-INTEGRATION-02 — P00-B INTEGRATED / POST-MERGE VERIFIED;
+1.208 lokale PASS (669/128/379/32) + 28 Seed; P00-C-M01 OPEN
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -39,11 +38,12 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-feature/mo-rc4-p00-b-secret-provider (P00-B implementiert, getestet; NICHT gemerged)
+release/rc4-integration @ P00-B merge e71f3edcb146fb7b3943b4c23fa65e771cf4611e
 → P00-Entscheidungen: Q-02 Secrets Manager APPROVED; Q-08 ARN/Name + Runtime-Fetch
   APPROVED; Q-10 ADR-008 APPROVED/ACCEPTED (C-01…C-07 eingearbeitet)
-→ P00-B: ENV-Default gekapselt; AWS_MANAGED/APP_MANAGED-Konfigurationsverträge;
-  Runtime-Fetch-Adapter mit injiziertem Fetcher; Cache/Fehler/Redaction; 34 neue Tests
+→ P00-B: integriert und post-merge verifiziert; 1.208 lokale PASS + 28 Seed;
+  Lambda-ZIP c35e6c8b… reproduzierbar
+→ Review-Findings: M-01 OPEN als P00-C-M01; L-01…L-04/L-06 open; L-05 FIXED
 → P00-C/P00-D: nicht gestartet (IAM/KMS/Secrets-Ressource bzw. APP-HMAC bleiben offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,

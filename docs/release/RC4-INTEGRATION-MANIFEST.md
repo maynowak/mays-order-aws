@@ -63,8 +63,9 @@ These branches remain unchanged; no work was deleted.
 |---|---|
 | Installer | **669 PASS** |
 | Module Builder | **128 PASS** |
-| Lambda | **345 PASS** |
+| Lambda | **379 PASS** |
 | E2E local (full discover: 36, 5 expected skips) | **32 PASS** |
+| **P00-B local total** | **1.208 PASS** |
 | Seed tools | **28 PASS** |
 | Terraform fmt | **PASS** |
 | Terraform init `-backend=false` | **PASS** |
@@ -76,24 +77,25 @@ These branches remain unchanged; no work was deleted.
 ## 5. P00 Status
 
 ```text
-P00 — OPEN / FEATURE-BRANCH IMPLEMENTATION ONLY
+P00 — OPEN / PARTIAL
 AWS_MANAGED: CONFIG FOUNDATION / RESOURCE + IAM + KMS MISSING
 APP_MANAGED: CONFIG CONTRACT / KEY LOADER + HMAC MISSING
 KMS backup stash: UNCHANGED, NOT APPLIED
-P00-B: IMPLEMENTED / TESTED ON FEATURE BRANCH / NOT MERGED
+P00-B: INTEGRATED / POST-MERGE VERIFIED
+P00-C-M01: OPEN — mandatory P00-C cache-lifetime criterion
 ```
 
-P00 design/ADR documents and P00-B source/tests are prepared on
-`feature/mo-rc4-p00-b-secret-provider`; they are **not** integrated into this
-branch. Q-02 (Secrets Manager), Q-08 (ARN/name reference + runtime fetch) and
-Q-10 (ADR-008, C-01…C-07) are owner-approved; ADR-008 is `ACCEPTED`.
-No P00 completion is claimed, no P00-C/D resource exists and no package is
-merged.
+P00-B source/tests are integrated on `release/rc4-integration` via merge commit
+`e71f3edcb146fb7b3943b4c23fa65e771cf4611e`; the current review documentation
+was integrated separately without duplicate product commits. Q-02 (Secrets
+Manager), Q-08 (ARN/name reference + runtime fetch) and Q-10 (ADR-008,
+C-01…C-07) are owner-approved; ADR-008 is `ACCEPTED`. P00-C/D resources and
+live AWS verification remain missing; P00-C-M01 is open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PENDING
+P00:          PARTIAL (P00-B integrated; P00-C/D pending)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```

@@ -426,3 +426,20 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-REVIEW-01.md`.
 - Review branch: `review/mo-rc4-p00-b-integration-01`; report update committed
   separately; no feature/integration branch changed.
+
+## 2026-11-13 — MO-RC4-P00-B-INTEGRATION-02
+
+**Status:** `MO-RC4-P00-B — INTEGRATED / POST-MERGE VERIFIED / P00-C-M01 OPEN`
+
+- Pre-merge: G1 review evidence (M-01, L-01…L-06) verified; P00-C-M01 documented
+  as mandatory P00-C cache-lifetime criterion; L-05 base corrected to `8ddc050`.
+- Merge `e71f3edcb146fb7b3943b4c23fa65e771cf4611e` (`--no-ff`; parents
+  `56c56b2` + `f0ea3b8`). One docs-only execution-plan conflict from the base
+  correction was resolved without product code changes.
+- Review docs integrated via docs-only cherry-picks `6c7d294`/`b4b6b1a`; no
+  duplicate product commits.
+- Post-merge: Lambda 379, Installer 669, Builder 128, E2E local 32 = **1.208
+  PASS**; Seed 28; ZIP `c35e6c8b…` (12 modules, reproducible).
+- M-01 remains OPEN; L-01…L-04/L-06 OPEN; L-05 FIXED. No P00-C/D, Terraform,
+  AWS, RIS, Jobsearch, push, main merge, tag or deployment action.
+- Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-02.md`.
