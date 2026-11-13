@@ -139,6 +139,35 @@ def is_validation_exception(err: Any) -> bool:
     return is_client_error(err, "ValidationException")
 
 
+MAX_INTERNAL_TOKEN_LENGTH = 1024
+
+
+def _constant_time_token_match(token: Any, secret: Any) -> bool:
+    """Compare internal tokens without leaking a Python TypeError.
+
+    Python's compare_digest rejects non-ASCII strings. Provider material may
+    come from Secrets Manager, so the boundary must fail closed instead of
+    allowing an unhandled TypeError to become HTTP 500.
+    """
+    try:
+        token_text = str(token)
+        secret_text = str(secret)
+    except Exception:
+        return False
+    if not token_text or not secret_text:
+        return False
+    if len(token_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if len(secret_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if not token_text.isascii() or not secret_text.isascii():
+        return False
+    try:
+        return secrets.compare_digest(token_text, secret_text)
+    except (TypeError, ValueError):
+        return False
+
+
 class OrderService:
     def __init__(
         self,
@@ -188,8 +217,9 @@ class OrderService:
         token = context.get("internal_token")
         if not token:
             raise validation_error("Internal token missing")
-        # Use constant-time compare (existing privacy contract).
-        if not secrets.compare_digest(str(token), str(internal_secret)):
+        # Use the existing constant-time privacy contract, with a fail-closed
+        # ASCII/length guard for provider-supplied material.
+        if not _constant_time_token_match(token, internal_secret):
             raise validation_error("Internal trust boundary violation")
 
     def create_order(

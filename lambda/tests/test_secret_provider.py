@@ -572,6 +572,59 @@ class TestSecurityHardening(unittest.TestCase):
         self.assertNotIn(bad_reference, str(raised.exception))
 
 
+class TestNonAsciiHardening(unittest.TestCase):
+    class Provider:
+        def __init__(self, value):
+            self.value = value
+
+        def resolve(self):
+            return SecretMaterial(provider="env", value=self.value)
+
+    def _service(self, secret):
+        return create_order_service(
+            "mays-orders",
+            client=object(),
+            secret_provider=self.Provider(secret),
+        )
+
+    def _context(self, token):
+        return {
+            "project": "mays-orders",
+            "authorized": True,
+            "privacy_inspect": True,
+            "internal_token": token,
+        }
+
+    def test_non_ascii_token_returns_validation_error_not_500(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("tökén"), "privacy_inspect")
+        self.assertEqual(raised.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(raised.exception.http_status, 400)
+        self.assertNotIn("tökén", str(raised.exception))
+
+    def test_non_ascii_secret_returns_validation_error_not_500(self):
+        service = self._service("sécret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("sécret"), "privacy_inspect")
+        self.assertEqual(raised.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(raised.exception.http_status, 400)
+
+    def test_ascii_token_still_uses_constant_time_path(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            service._require_privacy_auth(self._context("ascii-secret"), "privacy_inspect")
+
+    def test_oversized_token_fails_closed(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("a" * 1025), "privacy_inspect")
+        self.assertEqual(raised.exception.http_status, 400)
+
+
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):
     def test_order_service_uses_injected_env_provider(self):
         provider = EnvSecretProvider(
