@@ -2,6 +2,13 @@
 
 **Status:** `RESULT B — RC4 READY WITH DEPLOYMENT GATES`
 **Datum:** 2026-11-14
+
+> **Nachtrag 2026-11-14:** Der kontrollierte AWS-Development-Lebenszyklus
+> wurde nach diesem lokalen Abschluss separat ausgeführt. Siehe
+> `docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md`:
+> `mays-orders-rc4` wurde deployed, live getestet und vollständig zerstört.
+> Die Aussage „keine AWS-Mutation“ in diesem Dokument gilt nur für den
+> ursprünglichen lokalen Auftrag, nicht für den anschließenden Lifecycle-Lauf.
 **Integration-Branch:** `release/rc4-integration`
 **Merge-Commit:** `0620044779dc92a87c5554e782e13817407a0b0d`
 **Terraform plan/apply:** nicht ausgeführt

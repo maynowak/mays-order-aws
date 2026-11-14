@@ -226,7 +226,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
-| Status | **LOCAL REGRESSION PASSED** — 440 Lambda / 674 Installer (1 skipped) / 129 Builder / 23 Policy / 36 E2E (5 skipped) / 28 Seed; Terraform validate PASS; deployment gates open |
+| Status | **LOCAL + AWS DEV LIFECYCLE VERIFIED** — 58 resources deployed, post-deploy suites/live E2E PASS, 58 destroyed, state empty; production gates open |
 | Goal | Verify full P00 implementation and release boundaries |
 | Dependencies | all implemented packages |
 | Components | secret/HMAC/KMS tests, log/state audits, installer/builder gates |

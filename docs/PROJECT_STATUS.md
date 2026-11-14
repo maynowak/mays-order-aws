@@ -11,16 +11,15 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — local release candidate ready (P00-B/C/D/E/F/H/I local;
-P00-G blocked by owner decisions)
+RC4 Integration — AWS development lifecycle verified / stack destroyed
+(P00-B/C/D/E/F/H/I; P00-G blocked by owner decisions)
 
 Current Feature:
-MO-RC4-FINAL-01 — RC4 local release candidate; deployment gates open
+MO-RC4-FINAL-01 — RC4 local + AWS development lifecycle candidate
 
 Current Task:
-MO-RC4-FINAL-01 — RC4 READY WITH DEPLOYMENT GATES;
-440 Lambda / 674 Installer (1 skipped) / 129 Builder / 23 Policy / 36 E2E
-(5 skipped) / 28 Seed / Terraform validate PASS
+MO-RC4-AWS-LIFECYCLE-FINAL-01 — VALIDATE/PLAN/DEPLOY/TEST/DESTROY PASS;
+58 deployed, post-deploy suites + live E2E PASS, 58 destroyed, state empty
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -40,7 +39,9 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-release/rc4-integration @ MO-RC4-FINAL-01
+release/rc4-integration @ MO-RC4-AWS-LIFECYCLE-FINAL-01
+→ AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
+  Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
 → P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
 → P00-E merge 3b0de2f (parents 2dbbd3f + 44c3900); feature a6667ec + 44c3900
 → P00-F rotation/revocation: dad5b16
@@ -62,6 +63,8 @@ release/rc4-integration @ MO-RC4-FINAL-01
   (5 skipped) / 28 Seed / terraform fmt+init+validate PASS; kein Plan/Apply
 → MO-RC4-FINAL-01: 440 Lambda / 674 Installer (1 skipped) / 129 Builder /
   23 Policy / 36 E2E (5 skipped) / 28 Seed / Terraform validate PASS
+→ AWS Post-Deploy: 4/4 Live-E2E PASS; 36 E2E gesamt OK (1 Privacy-Live-Skip);
+  Testbenutzer angelegt/getestet/gelöscht; 58 Ressourcen destroyed; State 0
 → Lambda ZIP 46.929 B, SHA-256 20f4bab5…; zwei Builds byte-identisch
 → P00-F: APP_MANAGED Rotation/Revocation default-off lokal implementiert;
   P00-G: Retention/TTL wegen Q-05/Q-06/Q-07/Q-14 sicher deaktiviert

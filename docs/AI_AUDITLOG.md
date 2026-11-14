@@ -815,3 +815,29 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   two builds byte-identical. No plan/apply/AWS mutation/deployment/push.
 - Integration merge `0620044`; details in
   `docs/reports/MO-RC4-FINAL-01.md`.
+
+## 2026-11-14 — MO-RC4-AWS-LIFECYCLE-FINAL-01
+
+**Status:** `COMPLETE — AWS DEV LIFECYCLE VERIFIED / STACK DESTROYED`
+
+- Explicit owner request received for validate/plan/deploy/destroy plus full
+  post-deploy testing. Target: profile `mayaws`, account `240571105849`,
+  region `eu-central-1`, project/workspace `mays-orders-rc4`, version `0.2.0`.
+- Validate: 12 PASS, 1 WARN, 0 FAIL. The warning covered 7 pre-existing
+  `mays-orders-rc4-test-*` resources in the separate `mays-orders-rc4-test`
+  workspace; they were left untouched.
+- Deploy plan: 58 add / 0 change / 0 destroy; Policy Gate PASS; plan SHA-256
+  `7e029abe8a8aa0ea77ff09aa51e0110a9801e5f9252b933ebb738969c71f840d`.
+- Deploy: 58/58 created; Terraform state and AWS identity verification PASS.
+- Post-deploy: Lambda 440, Installer 674 (1 skipped), Builder 129, Policy 23,
+  local E2E 36 (5 skipped), Seed 28, Terraform fmt/validate PASS.
+- Live E2E: 4/4 PASS; full E2E discovery 36 OK with 1 privacy-live skip.
+  Temporary Cognito test user created, used and deleted; no token/password
+  stored in Git or reports.
+- Destroy plan: 58 delete; Policy Gate PASS; SHA-256
+  `4372d15426ae666c989f03f2522c6f45aea78fc078e7a2de6f12ebbff02807d9`.
+- Destroy: 58/58 deleted; post-destroy state 0; Terraform validate PASS.
+- No target `mays-orders-rc4` resources remain. The pre-existing
+  `mays-orders-rc4-test` workspace/resources remain untouched.
+- No push, main merge, production activation or RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md`.

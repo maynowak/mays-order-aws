@@ -120,7 +120,8 @@ Terraform plan/apply and AWS-live verification remain open.
 
 ```text
 Integration: COMPLETE
-P00:          LOCAL RC READY (P00-B/C/D/E/F/H/I local; P00-G blocked by
-              owner decisions; deployment/live gates open)
+P00:          LOCAL RC + AWS DEV LIFECYCLE VERIFIED / STACK DESTROYED
+              (P00-B/C/D/E/F/H/I; P00-G blocked by owner decisions;
+              production/release gates open)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```
