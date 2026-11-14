@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C IMPLEMENTED ON FEATURE BRANCH
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C SECURITY REVIEW FAILED — CORRECTIONS REQUIRED
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,13 +78,13 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **IMPLEMENTED / TESTED / SECURITY REVIEW READY** — feature branch, not merged |
+| Package status | **IMPLEMENTED / TESTED / SECURITY REVIEW FAILED — CORRECTIONS REQUIRED** — feature branch, not merged |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
 | Field | Content |
 |---|---|
-| Status | **IMPLEMENTED / TESTED — security review pending** |
+| Status | **IMPLEMENTED / TESTED — security review condition F-02 open** |
 | Source | `MO-RC4-P00-B-INTEGRATION-REVIEW-01` finding M-01 |
 | Problem | P00-B `SecretCache` was owned by a per-invocation `OrderService`; effective scope was one invocation. |
 | Implemented scope | Module-level `get_default_secret_provider()` shared by `OrderService`; provider/cache survives invocations in one execution environment. |
@@ -105,6 +105,23 @@ The order may change only with documented dependency justification.
 
 These criteria are not P00-B merge blockers, but must be evidenced before
 P00-C integration.
+
+### Security Review 03 conditions — OPEN
+
+| ID | Severity | Required correction | Merge blocker |
+|---|---|---|---|
+| F-01 | MEDIUM | Add `secretsmanager:DescribeSecret` to ADR-008 D-5/C-03, Contract §6, Q-09 and Policy Gate — or remove the KMS verification dependency. | **YES** |
+| F-02 | MEDIUM | Document forced environment recycle for rotation/compromise; define cache invalidation/TTL for P00-F. | NO (deployment gate) |
+| F-03 | MEDIUM | Add a real `index.handler` test with `PRIVACY_SECRET_PROVIDER=secretsmanager` and fake boto3; prove cross-invocation cache and no fallback. | **YES** |
+| F-04 | MEDIUM | Define exact SecretString payload/ASCII/length contract and tests. | NO (activation gate) |
+| F-05 | MEDIUM | Replace contradictory rollback wording with executable safe rollback variants. | NO (activation gate) |
+| F-06 | LOW | Add bounded boto3 connect/read timeouts and retry policy. | NO |
+| F-07 | LOW | Require string token type before `compare_digest`. | NO |
+| F-08 | LOW | Add whitelisted sanitized AWS error code to observability. | NO |
+| F-09 | LOW | Policy-Gate allowlist + inline IAM wildcard check for P00-E. | NO (P00-E gate) |
+| F-10 | LOW | Lock or document single-thread cache assumption. | NO |
+| F-11 | LOW | Replace `id()` cache identity with explicit identity token. | NO |
+| F-12 | LOW | Clarify P00-C runtime scope vs P00-E IaC/IAM/KMS. | NO |
 
 ---
 
