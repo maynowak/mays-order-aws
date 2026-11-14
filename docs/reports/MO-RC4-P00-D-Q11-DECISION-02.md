@@ -176,7 +176,51 @@ Rotation.
 
 ---
 
-## 7. Git / Grenzen
+## 7. Vollständige Owner-Fragen (ergänzende Fassung)
+
+Die folgenden Fragen aus der parallelen Dokumentationsfassung `545a82c` bleiben
+zusätzlich verbindlich:
+
+- **Q11-O1 — Start des Übergangsfensters:** Aktivierung, erste Verifikation
+  oder externer Zeitpunkt? Empfehlung: serverseitige `transitionStart`/
+  `transitionEnd`-Metadaten, keine Default-Dauer, fail-closed nach Ende.
+- **Q11-O2 — Widerruf und bestehende Signaturen:** Was bedeutet „sofortiger
+  Widerruf“ für bereits ausgestellte HMAC-Signaturen? Version sofort sperren,
+  Cache/Environment recyceln, bestehende Signaturen als kompromittiert
+  behandeln und Re-Signatur-/Migrationspfad festlegen.
+- **Q11-O3 — Kryptografische Bindung:** `keyId`/`keyVersion` müssen in die
+  kanonische HMAC-Payload aufgenommen werden; ohne Bindung ist ein
+  Version-Downgrade nicht zuverlässig ausgeschlossen.
+- **Q11-O4 — Base64-/Payload-Kanonisierung:** Welches Base64-Alphabet, welche
+  Padding-Regeln und welche JSON-Kanonisierung gelten? Empfehlung: strikte
+  Standard-Base64-Dekodierung, exakt 32 Byte, keine Whitespaces, kanonische
+  UTF-8-Payload mit definierter Feldreihenfolge.
+- **Q11-O5 — Löschung alter Schlüssel:** Dürfen Schlüssel gelöscht werden,
+  solange gültige Signaturen/Audit-Nachweise existieren? Mindestaufbewahrung
+  und Verhältnis zu Retention/Q-14 sind zu entscheiden.
+- **Q11-O6 — P00-D/P00-F-Grenze:** P00-D darf keine versteckte
+  Rotationslogik oder automatische Versionsauswahl enthalten; P00-F besitzt
+  Aktivierung, Übergang, Widerruf, Recycle und Löschung.
+
+### Alternativen zum Entscheidungsblatt
+
+- **A1:** Nur eine aktive Version, keine vorherige Version; Rotation erst nach
+  separatem P00-F-Design.
+- **A2:** Eine aktive + eine vorherige Version mit explizitem Start/Ende und
+  versionierter Payload-Bindung; längere Übergangszeit nur per Owner-Freigabe.
+- **A3:** APP_MANAGED in RC4 zurückstellen und Q-11 erst mit P00-F entscheiden.
+
+### Zusätzliche Entscheidungsfelder
+
+| Feld | Inhalt |
+|---|---|
+| Freigabe | `[ ] APPROVED — NAME/DATUM: __________________` |
+| Bedingungen | Nur nach Schließung von Q11-T1…T6/Q11-O1…O6 und separater P00-D-Implementierungsautorisierung |
+| Empfehlung | A2, sofern kanonische Payload und Widerrufssemantik vorher verbindlich definiert werden |
+
+**Keine Freigabe durch den Commander.**
+
+## 8. Git / Grenzen
 
 ```text
 Branch:        release/rc4-integration
@@ -188,6 +232,10 @@ Merge/Push:    NONE
 Deployment:    NONE
 RIS/Jobsearch: NONE
 ```
+
+**Hinweis:** Während der Bearbeitung erschien der parallele Docs-Commit
+`545a82c` auf dem Integrationsbranch. Seine Q11-Owner-Fragen wurden in diesem
+Report erhalten und konsolidiert; es gab keine Produktcode-Änderung.
 
 Keine Tests ausgeführt, da ausschließlich Dokumentation geändert wird.
 
