@@ -1371,7 +1371,7 @@ class TestDependencyDetector(unittest.TestCase):
     def test_dependency_detector_exists(self):
         """Test that dependency detector script exists."""
         from pathlib import Path
-        self.assertTrue(Path("security/dependency_detector.py").exists())
+        self.assertTrue((REPO_ROOT / "security" / "dependency_detector.py").exists())
 
     def test_version_constraint_parsing(self):
         """Test version constraint parsing."""
