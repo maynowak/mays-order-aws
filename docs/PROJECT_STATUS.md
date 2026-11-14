@@ -42,6 +42,9 @@ Current Checkpoint:
 release/rc4-integration @ MO-RC4-AWS-LIFECYCLE-FINAL-01
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
   Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
+→ Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean
+  project worktrees + 5 /tmp worktrees + 1 non-Git snapshot; RC4 HEAD 720e458
+  reachable via release/rc4-integration; no destructive action
 → P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
 → P00-E merge 3b0de2f (parents 2dbbd3f + 44c3900); feature a6667ec + 44c3900
 → P00-F rotation/revocation: dad5b16

@@ -841,3 +841,30 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   `mays-orders-rc4-test` workspace/resources remain untouched.
 - No push, main merge, production activation or RIS/Jobsearch change.
 - Report: `docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md`.
+
+## 2026-11-14 — MO-GIT-CONSOLIDATION-01
+
+**Status:** `INVENTORY COMPLETE / SAFE CHECKS ONLY / NO DESTRUCTIVE ACTION`
+
+- All 15 Git worktrees under `/home/dci-student/projects/` were clean; no
+  uncommitted or untracked files were found. No subagents were used.
+- The canonical Git common directory is
+  `/home/dci-student/projects/Mays-Orders-AWS/.git`. There is one non-Git
+  snapshot, `Mays-Orders-AWS02092026`; the other Mays-Orders-AWS folders are
+  linked worktrees, not independent clones.
+- RC4 candidate `720e458` is reachable via
+  `refs/heads/release/rc4-integration`; it is not in `main`, is 97 commits
+  ahead of all remote refs, and 188 commits ahead of `main` (0 behind).
+- Shared refs: 55 local branches, 12 remote branches, 20 tags; 44 branches
+  without upstream and 22 branches with unpushed commits. No missing branch
+  refs were found; no refs were created.
+- Local state inventory: `ci/iam` 14 resources, `ci/pipeline` 7 resources,
+  root `terraform.tfstate` 0; no state was moved or deleted. RC4 workspace
+  state was already empty after the controlled destroy.
+- Recommended target: canonical `Mays-Orders-AWS` plus the RC4 integration
+  worktree; remove the remaining feature/review/analysis and `/tmp` worktrees
+  only after explicit approval. The non-Git snapshot and ZIP archives require
+  separate archive/removal approval.
+- No deletion, worktree removal, reset, clean, branch deletion, state move,
+  push or main merge was performed.
+- Report: `docs/reports/MO-GIT-CONSOLIDATION-01.md`.
