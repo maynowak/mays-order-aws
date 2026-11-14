@@ -1,7 +1,5 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import sys
-sys.path.insert(0, '/home/dci-student/projects/Mays-Orders-AWS')
 from installer.terraform.runner import TerraformRunner, TerraformError
 
 class TestWorkspaceSafety(unittest.TestCase):

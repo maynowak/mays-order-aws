@@ -14,6 +14,7 @@ import sys
 import threading
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from errors import VALIDATION_ERROR, OrderError
@@ -31,7 +32,12 @@ KMS_KEY_ARN_ENV = "PRIVACY_KMS_KEY_ARN"
 APP_KEY_REF_ENV = "PRIVACY_APP_KEY_REF"
 APP_KEY_ID_ENV = "PRIVACY_APP_KEY_ID"
 APP_KEY_VERSION_ENV = "PRIVACY_APP_KEY_VERSION"
+APP_PREVIOUS_KEY_ID_ENV = "PRIVACY_APP_PREVIOUS_KEY_ID"
+APP_PREVIOUS_KEY_VERSION_ENV = "PRIVACY_APP_PREVIOUS_KEY_VERSION"
+APP_ROTATION_STARTED_AT_ENV = "PRIVACY_APP_ROTATION_STARTED_AT"
+APP_ROTATION_UNTIL_ENV = "PRIVACY_APP_ROTATION_UNTIL"
 APP_MANAGED_AUTH_METHOD = "HMAC-SHA256"
+MAX_ROTATION_WINDOW = timedelta(hours=24)
 
 _SECRET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9/_+=.@-]{1,512}$")
 _SECRET_ARN_PATTERN = re.compile(
@@ -75,6 +81,20 @@ def _non_empty(env: Mapping[str, str], name: str) -> str:
 def _reject_non_empty(env: Mapping[str, str], name: str) -> None:
     if (env.get(name) or "").strip():
         raise ProviderConfigurationError()
+
+
+def _parse_rotation_timestamp(value: str) -> datetime:
+    """Parse an explicit ISO-8601 rotation timestamp; require timezone."""
+    candidate = (value or "").strip()
+    if not candidate:
+        raise ProviderConfigurationError()
+    try:
+        parsed = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+    except ValueError:
+        raise ProviderConfigurationError() from None
+    if parsed.tzinfo is None:
+        raise ProviderConfigurationError()
+    return parsed.astimezone(timezone.utc)
 
 
 def _validate_identifier(value: str, max_length: int = 256) -> str:
@@ -172,6 +192,22 @@ class SecretProviderConfig:
     key_id: str | None = None
     key_version: str | None = None
     kms_key_arn: str | None = None
+    previous_key_id: str | None = None
+    previous_key_version: str | None = None
+    rotation_started_at: str | None = None
+    rotation_until: str | None = None
+
+    def rotation_allows_previous(self, now: datetime | None = None) -> bool:
+        """Return true only inside the explicit, validated transition window."""
+        if not self.rotation_started_at or not self.rotation_until:
+            return False
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+        current = current.astimezone(timezone.utc)
+        start = _parse_rotation_timestamp(self.rotation_started_at)
+        until = _parse_rotation_timestamp(self.rotation_until)
+        return start <= current <= until
 
     def to_reference(self) -> SecretReference:
         return SecretReference(
@@ -197,6 +233,10 @@ class SecretProviderConfig:
                 APP_KEY_ID_ENV,
                 APP_KEY_VERSION_ENV,
                 APP_KEY_REF_ENV,
+                APP_PREVIOUS_KEY_ID_ENV,
+                APP_PREVIOUS_KEY_VERSION_ENV,
+                APP_ROTATION_STARTED_AT_ENV,
+                APP_ROTATION_UNTIL_ENV,
                 KMS_KEY_ARN_ENV,
             ):
                 _reject_non_empty(env, name)
@@ -207,6 +247,10 @@ class SecretProviderConfig:
             _reject_non_empty(env, APP_KEY_ID_ENV)
             _reject_non_empty(env, APP_KEY_VERSION_ENV)
             _reject_non_empty(env, APP_KEY_REF_ENV)
+            _reject_non_empty(env, APP_PREVIOUS_KEY_ID_ENV)
+            _reject_non_empty(env, APP_PREVIOUS_KEY_VERSION_ENV)
+            _reject_non_empty(env, APP_ROTATION_STARTED_AT_ENV)
+            _reject_non_empty(env, APP_ROTATION_UNTIL_ENV)
             reference = validate_secret_reference(_non_empty(env, SECRET_ID_ENV))
             kms_key_arn = (env.get(KMS_KEY_ARN_ENV) or "").strip() or None
             if kms_key_arn is not None:
@@ -224,11 +268,39 @@ class SecretProviderConfig:
             reference = _validate_identifier(_non_empty(env, APP_KEY_REF_ENV))
             key_id = _validate_identifier(_non_empty(env, APP_KEY_ID_ENV))
             key_version = _validate_identifier(_non_empty(env, APP_KEY_VERSION_ENV))
+            previous_values = [
+                (env.get(APP_PREVIOUS_KEY_ID_ENV) or "").strip(),
+                (env.get(APP_PREVIOUS_KEY_VERSION_ENV) or "").strip(),
+                (env.get(APP_ROTATION_STARTED_AT_ENV) or "").strip(),
+                (env.get(APP_ROTATION_UNTIL_ENV) or "").strip(),
+            ]
+            if any(previous_values) and not all(previous_values):
+                raise ProviderConfigurationError()
+            previous_key_id = previous_key_version = None
+            rotation_started_at = rotation_until = None
+            if all(previous_values):
+                previous_key_id = _validate_identifier(previous_values[0])
+                previous_key_version = _validate_identifier(previous_values[1])
+                if (
+                    previous_key_id == key_id
+                    and previous_key_version == key_version
+                ):
+                    raise ProviderConfigurationError()
+                started = _parse_rotation_timestamp(previous_values[2])
+                until = _parse_rotation_timestamp(previous_values[3])
+                if until <= started or until - started > MAX_ROTATION_WINDOW:
+                    raise ProviderConfigurationError()
+                rotation_started_at = started.isoformat()
+                rotation_until = until.isoformat()
             return cls(
                 provider=APP_MANAGED_PROVIDER,
                 reference=reference,
                 key_id=key_id,
                 key_version=key_version,
+                previous_key_id=previous_key_id,
+                previous_key_version=previous_key_version,
+                rotation_started_at=rotation_started_at,
+                rotation_until=rotation_until,
             )
 
         raise ProviderConfigurationError()
@@ -417,10 +489,12 @@ class SecretsManagerProvider:
 
 
 class AppManagedProvider:
-    """P00-D boundary: validates key metadata, but does not resolve/HMAC keys.
+    """APP_MANAGED key boundary with explicit P00-F rotation mechanics.
 
-    The external key loader and HMAC verification are intentionally absent in
-    P00-B. Selecting APP_MANAGED before P00-D therefore fails closed.
+    The external key loader and HMAC verification remain injected/local only.
+    ``rotation_verifier`` accepts at most one previous key inside the explicit
+    transition window; ``revoke`` fails closed until the environment is
+    recycled. Production key transport is still not activated.
     """
 
     auth_method = APP_MANAGED_AUTH_METHOD
@@ -430,11 +504,17 @@ class AppManagedProvider:
         config: SecretProviderConfig,
         key_material: str | None = None,
         key_loader: Callable[[], str] | None = None,
+        previous_key_material: str | None = None,
+        previous_key_loader: Callable[[], str] | None = None,
     ) -> None:
         self._config = config
         self._key_material = key_material
         self._key_loader = key_loader
+        self._previous_key_material = previous_key_material
+        self._previous_key_loader = previous_key_loader
         self._resolved_key: AppManagedKey | None = None
+        self._resolved_previous_key: AppManagedKey | None = None
+        self._revoked = False
 
     def resolve(self) -> SecretMaterial:
         # P00-D does not activate APP_MANAGED as the bearer-token provider.
@@ -448,26 +528,79 @@ class AppManagedProvider:
         is an explicit injection point for the future protected runtime
         transport; this method does not activate HMAC auth in OrderService.
         """
+        if self._revoked:
+            raise AppKeyInvalid()
         if self._resolved_key is not None:
             return self._resolved_key
-        material = self._key_material
-        if material is None and self._key_loader is not None:
+        key = self._load_key(
+            self._config.key_id,
+            self._config.key_version,
+            self._key_material,
+            self._key_loader,
+        )
+        self._resolved_key = key
+        return key
+
+    def _load_key(
+        self,
+        key_id: str | None,
+        key_version: str | None,
+        material: str | None,
+        loader: Callable[[], str] | None,
+    ) -> AppManagedKey:
+        if material is None and loader is not None:
             try:
-                material = self._key_loader()
+                material = loader()
             except Exception:
                 raise AppKeyInvalid() from None
         if material is None:
             raise AppKeyInvalid()
         try:
-            key = AppManagedKey.from_base64(
-                self._config.key_id or "",
-                self._config.key_version or "",
+            return AppManagedKey.from_base64(
+                key_id or "",
+                key_version or "",
                 material,
             )
         except HmacContractError:
             raise AppKeyInvalid() from None
-        self._resolved_key = key
+
+    def resolve_previous_key(self) -> AppManagedKey | None:
+        """Load the optional previous key without activating it by itself."""
+        if self._config.previous_key_id is None:
+            return None
+        if self._revoked:
+            raise AppKeyInvalid()
+        if self._resolved_previous_key is not None:
+            return self._resolved_previous_key
+        key = self._load_key(
+            self._config.previous_key_id,
+            self._config.previous_key_version,
+            self._previous_key_material,
+            self._previous_key_loader,
+        )
+        self._resolved_previous_key = key
         return key
+
+    def rotation_verifier(self, now: datetime | None = None) -> HmacVerifier:
+        """Build a verifier with the previous key only in the explicit window.
+
+        There is no automatic rotation and no hot reload. Revocation is
+        fail-closed through ``revoke()`` and requires an environment recycle
+        for a new configuration.
+        """
+        active = self.resolve_key()
+        if not self._config.rotation_allows_previous(now):
+            return HmacVerifier(active, allow_previous=False)
+        previous = self.resolve_previous_key()
+        if previous is None:
+            raise AppKeyInvalid()
+        return HmacVerifier(active, previous, allow_previous=True)
+
+    def revoke(self) -> None:
+        """Revoke this provider instance; subsequent key resolution fails."""
+        self._revoked = True
+        self._resolved_key = None
+        self._resolved_previous_key = None
 
     def verifier(
         self,
@@ -489,6 +622,8 @@ def _build_provider(
     secretsmanager_descriptor: SecretsManagerDescriptor | None,
     app_key_material: str | None = None,
     app_key_loader: Callable[[], str] | None = None,
+    app_previous_key_material: str | None = None,
+    app_previous_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     if config.provider == ENV_PROVIDER:
         return EnvSecretProvider(config, env)
@@ -506,6 +641,8 @@ def _build_provider(
             config,
             key_material=app_key_material,
             key_loader=app_key_loader,
+            previous_key_material=app_previous_key_material,
+            previous_key_loader=app_previous_key_loader,
         )
     raise ProviderConfigurationError()
 
@@ -516,12 +653,15 @@ def create_secret_provider(
     secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
     app_key_material: str | None = None,
     app_key_loader: Callable[[], str] | None = None,
+    app_previous_key_material: str | None = None,
+    app_previous_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     """Build the configured provider without any implicit fallback.
 
     ENV is the backwards-compatible default. Secrets Manager runtime fetching
     uses the lazy boto3 adapter unless a test injects a fetcher. APP_MANAGED
-    validates key metadata but remains a P00-D implementation and fails closed.
+    remains fail-closed for bearer-token resolution; its HMAC/rotation material
+    is injected locally and is not activated by this factory.
     """
 
     env = os.environ if environ is None else environ
@@ -533,6 +673,8 @@ def create_secret_provider(
         secretsmanager_descriptor,
         app_key_material,
         app_key_loader,
+        app_previous_key_material,
+        app_previous_key_loader,
     )
 
 
@@ -547,6 +689,8 @@ def get_default_secret_provider(
     secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
     app_key_material: str | None = None,
     app_key_loader: Callable[[], str] | None = None,
+    app_previous_key_material: str | None = None,
+    app_previous_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     """Return the process-wide provider for one Lambda execution environment.
 
@@ -564,16 +708,28 @@ def get_default_secret_provider(
     )
     app_material_identity = id(app_key_material) if app_key_material is not None else None
     app_loader_identity = id(app_key_loader) if app_key_loader is not None else None
+    app_previous_material_identity = (
+        id(app_previous_key_material) if app_previous_key_material is not None else None
+    )
+    app_previous_loader_identity = (
+        id(app_previous_key_loader) if app_previous_key_loader is not None else None
+    )
     key = (
         config.provider,
         config.reference,
         config.key_id,
         config.key_version,
+        config.previous_key_id,
+        config.previous_key_version,
+        config.rotation_started_at,
+        config.rotation_until,
         config.kms_key_arn,
         fetcher_identity,
         descriptor_identity,
         app_material_identity,
         app_loader_identity,
+        app_previous_material_identity,
+        app_previous_loader_identity,
     )
     global _default_provider, _default_provider_key
     with _default_provider_lock:
@@ -585,6 +741,8 @@ def get_default_secret_provider(
                 secretsmanager_descriptor,
                 app_key_material,
                 app_key_loader,
+                app_previous_key_material,
+                app_previous_key_loader,
             )
             _default_provider_key = key
         return _default_provider

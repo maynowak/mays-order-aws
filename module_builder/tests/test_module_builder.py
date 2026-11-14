@@ -184,6 +184,16 @@ class TestGeneratedProject(unittest.TestCase):
         # Package-Tests gehören NICHT ins generierte Projekt (Artefakt-Konvention)
         self.assertNotIn("cognito_backup/tests/test_manifest.py", tree)
 
+    def test_complete_preset_contains_optional_privacy_secret(self):
+        """P00-E/P00-H: the complete preset carries the opt-in secret module."""
+        self.assertIn("privacy_secret", PRESETS["complete"]["modules"])
+        self.assertTrue(
+            (self.target / "terraform" / "modules" / "privacy_secret" / "main.tf").is_file()
+        )
+        variables = (self.target / "terraform" / "variables.tf").read_text()
+        self.assertIn('variable "privacy_secret_enabled"', variables)
+        self.assertIn('default     = false', variables)
+
     def test_cognito_backup_artifact_reproducible_in_target(self):
         """F1-Kern: Das generierte Projekt kann das Cognito-Backup-Artefakt
         selbst deterministisch neu bauen — gleicher sha256 wie das Quell-Repo."""
