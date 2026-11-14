@@ -1,175 +1,194 @@
-# MO-RC4-P00-D-Q11-DECISION-02
+# MO-RC4-P00-D — Q11 DECISION PACKAGE
 
-**Status:** `A — READY`
-`MO-RC4-P00-D — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
-
-**Projekt:** Mays-Orders-AWS · **Release:** RC4
+**Status:** A — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING
 **Datum:** 2026-11-14
 **Branch:** `release/rc4-integration`
 **HEAD:** `337aa4f1a58ce6765d58115d95c76f3fdb78322c`
-**Modus:** Entscheidungsvorbereitung, keine Implementierung
+**Modus:** Entscheidungsvorbereitung; keine Produktimplementierung.
 
-**Freigabestatus der vorgeschlagenen Policy: PROPOSED — NICHT APPROVED.**
+```text
+MO-RC4-P00-D — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING
+```
 
-## 1. Git-/Governance-Basis
+Die vorgeschlagene APP_MANAGED-Policy ist mit ADR-008 D-6/D-7/D-8 und dem
+P00-D-Vertrag grundsätzlich vereinbar. Die exakte kanonische HMAC-Payload und
+die sofortige Widerrufswirkung in warmen Lambda-Umgebungen benötigen jedoch
+ausdrückliche Owner-Entscheidungen. Es gibt **keinen harten Vertragskonflikt**,
+aber mehrere offene Präzisierungen.
+
+---
+
+## 1. Vorgeschlagene Q-11-Policy
+
+| Parameter | Vorgeschlagener Wert | Status |
+|---|---|---|
+| Aktive Schlüsselversion | Genau eine | PROPOSED |
+| Vorherige Version | Höchstens eine | PROPOSED |
+| Reguläres Übergangsfenster | Maximal 24 Stunden | PROPOSED |
+| Rotation | Explizit durch Owner/Operator | PROPOSED |
+| Automatische Rotation in P00-D | Nicht erlaubt | PROPOSED |
+| Kompromittierung | Sofortiger Widerruf | PROPOSED |
+| Unbekannte Key-Version | Fail-closed | PROPOSED |
+| Key-Löschung | Owner/Operator | PROPOSED |
+| Key-Material | 32 Byte, Base64-kodiert | CONTRACTED |
+| Algorithmus | HMAC-SHA256 | CONTRACTED |
+
+**Status: PROPOSED — NICHT APPROVED.** Q-11 bleibt `READY_FOR_OWNER`.
+
+---
+
+## 2. Vertragsabgleich
 
 | Prüfung | Ergebnis |
 |---|---|
-| Git HEAD | `337aa4f1a58ce6765d58115d95c76f3fdb78322c` |
-| Branch | `release/rc4-integration` |
-| Working Tree | nur Dokumentation durch diese Aufgabe; Produktcode unverändert |
-| ADR-008 | `ACCEPTED` (Q-10, 2026-11-13) |
-| D-6/D-7/D-8 | gelesen; Q-11 bleibt separat offen |
-| Contract §7 | gelesen |
-| P00-D-Authorization-01 | gelesen |
-| Decision Register Q-11 | `READY_FOR_OWNER`, nicht entschieden |
+| ADR-008 D-6: 32-Byte-Base64, HMAC, keine Eigenbau-Chiffre | **KONSISTENT** |
+| ADR-008 D-7: kein Auto-Rotator in RC4, manuelle Rotation | **KONSISTENT** |
+| ADR-008 D-8: additiv/default-off, keine Order-Änderung | **KONSISTENT** |
+| Contract §7: `keyId`/`keyVersion`, Fail-closed, kein KMS | **KONSISTENT** |
+| P00-D/P00-F-Abgrenzung | **KONSISTENT**; P00-F bleibt für Rotation/Übergang zuständig |
+| 24h-Übergangsfenster | **NEU — Owner-Parameter, kein bestehender Widerspruch** |
+| Sofortiger Widerruf | **PRÄZISIERUNGSBEDARF** in warmen Lambda-Umgebungen |
+| Kanonische HMAC-Payload | **OFFEN — exact protocol not specified** |
+| `keyId`/`keyVersion` kryptografisch gebunden | **OFFEN — abhängig von kanonischer Payload** |
 
-## 2. Vorgeschlagene Q-11-Policy
+### Kein harter Konflikt
 
-| Parameter | Vorschlag | Status |
+Die 24-Stunden-Grenze widerspricht keiner bestehenden ADR. Sie ist eine neue,
+owner-genehmigungspflichtige Policy. `P00-D` darf daraus keine automatische
+Rotation oder einen Hot-Reload ableiten.
+
+---
+
+## 3. Technische Klärungsfragen
+
+### Q11-T1 — Beginn des Übergangsfensters
+
+**Vorschlag:** Das Fenster beginnt mit einem expliziten Aktivierungszeitpunkt
+`activeVersion.activatedAt`; `retiredAt = activatedAt + window`. Kein
+implizites „jetzt + 24h“ beim ersten Request.
+
+**Owner-Frage:** Wird der Zeitpunkt durch Deployment-Konfiguration oder durch
+einen P00-F-Aktivierungsschritt festgelegt?
+
+### Q11-T2 — Sofortiger Widerruf
+
+**Vorschlag:** Kompromittierte Version wird durch explizite Konfiguration
+deaktiviert; P00-F erzwingt Environment-Recycle/Cache-Invalidierung.
+
+**Befund:** P00-C cached das Secret modulweit ohne TTL. Ein Widerruf ist in einer
+warmen Lambda-Umgebung nicht sofort wirksam, solange die Umgebung nicht
+recycelt wird. P00-D darf keinen Hot-Reload vortäuschen.
+
+**Owner-Frage:** Akzeptiert der Owner „Widerruf = neue Konfiguration +
+Environment-Recycle“ als sofortige operative Semantik, oder muss P00-F einen
+stärkeren Mechanismus liefern?
+
+### Q11-T3 — Bestehende Signaturen
+
+**Owner-Frage:** Dürfen Signaturen der bisherigen Version nach Ablauf des
+24h-Fensters weiterhin verifiziert werden (nur Verifikation, keine neuen
+Signaturen), oder müssen sie ab dem Stichtag fehlschlagen? Das beeinflusst
+gespeicherte Nachweise und Retry-/Recovery-Pfade.
+
+### Q11-T4 — Downgrade-Schutz
+
+**Vorschlag:** Die erwartete aktive `keyVersion` ist explizit konfiguriert;
+jede unbekannte oder nicht aktive Version wird abgelehnt. Kein Fallback auf
+eine ältere Version außerhalb des genehmigten Fensters.
+
+**Owner-Frage:** Wird die aktive Version ausschließlich über Deployment-
+Konfiguration festgelegt, oder darf P00-F sie zur Laufzeit wechseln?
+
+### Q11-T5 — Kanonische HMAC-Payload
+
+**Befund:** Der Vertrag verlangt HMAC-SHA256 über eine „canonical internal
+payload“, definiert aber nicht die exakten Bytes/Reihenfolge. Ohne diese
+Definition sind `keyId`/`keyVersion` nicht kryptografisch an die Daten
+gebunden.
+
+**Vorschlag zur Owner-Freigabe:** Kanonische Payload enthält mindestens:
+
+```text
+keyId
+keyVersion
+algorithm = "HMAC-SHA256"
+message (length-prefixed or canonical JSON with sorted keys)
+```
+
+Keine stillschweigende Festlegung: exakte Serialisierung, Encoding und
+Feldreihenfolge bleiben Owner-/Contract-Entscheidung.
+
+### Q11-T6 — Base64- und Längenprüfung
+
+**Vorschlag:** strikte Base64-Dekodierung (`validate=True`), exakt 32 Byte,
+keine Whitespace-/Padding-Toleranz, fail-closed. Keine Schlüsselwerte in
+Fehlern.
+
+**Owner-Frage:** Sind 32 Byte die einzige zulässige Länge, oder sollen längere
+Schlüssel später unterstützt werden?
+
+---
+
+## 4. Key-Kustodie
+
+| Aufgabe | Vorschlag | Status |
 |---|---|---|
-| Aktive Schlüsselversion | genau eine | PROPOSED |
-| Vorherige Version | höchstens eine | PROPOSED |
-| Reguläres Übergangsfenster | maximal 24 Stunden | PROPOSED |
-| Rotation | explizit durch Owner/Operator | PROPOSED |
-| Automatische Rotation in P00-D | nicht erlaubt | PROPOSED |
-| Kompromittierung | sofortiger Widerruf | PROPOSED |
-| Unbekannte Key-Version | fail-closed | PROPOSED |
-| Key-Löschung | Owner/Operator | PROPOSED |
-| Key-Material | 32 Byte, Base64-kodiert | PROPOSED |
-| Algorithmus | HMAC-SHA256 | PROPOSED |
+| Schlüsselerzeugung | Owner/Operator | PROPOSED |
+| Speicherung | externer Secret Store oder HSM | PROPOSED |
+| Bereitstellung | autorisierter Betriebsprozess | PROPOSED |
+| Runtime-Transport | explizite, geschützte Konfigurationsinjektion | PROPOSED |
+| Rotation | Owner/Operator, P00-F | PROPOSED |
+| Widerruf | Owner/Operator | PROPOSED |
+| Löschung | Owner/Operator, keine Automatik | PROPOSED |
+| Kompromittierung | Widerruf + aktive Version wechseln + Recycle + Audit | PROPOSED |
 
-Die Policy ist **kein** Ersatz für die separate P00-D-Implementierungsautorisierung.
+Keine Schlüsselwerte in Git, Terraform-State, Reports, Auditlogs oder
+Fehlermeldungen. Keine neue AWS-Abhängigkeit.
 
-## 3. Übereinstimmung mit bestehenden Verträgen
+---
 
-| Vertragspunkt | Befund |
-|---|---|
-| ADR-008 D-6: 32-Byte-Base64, HMAC-SHA256, keine Eigenbau-Chiffre | **KONSISTENT** |
-| ADR-008 D-7: keine automatische Rotation in RC4, dokumentierte manuelle Rotation, Q-11 offen | **KONSISTENT** |
-| ADR-008 D-8: additiv/default-off, RC3-Defaults plan-identisch, `orders-service` unverändert | **KONSISTENT** |
-| Contract §7: `keyId` + `keyVersion`, fail-closed, keine Key-Werte in Logs | **KONSISTENT**, aber kanonische Payload nicht definiert |
-| P00-D/P00-F-Abgrenzung | **KONSISTENT**: P00-F besitzt Rotation/Übergang/Widerruf/Cache-Recycle |
-| Keine neue AWS-Abhängigkeit | **KONSISTENT** |
-| Keine Cross-Provider-Fallbacks | **KONSISTENT** mit Contract §13 und vorhandener Provider-Isolation |
+## 5. P00-D / P00-F
 
-**Kein harter Vertragskonflikt festgestellt.** Es gibt jedoch offene Präzisierungen, die vor
-einer Approval geschlossen werden müssen. Die Entscheidung ist daher nicht `APPROVED`.
+**P00-D:** Key-Material-Validierung, HMAC-SHA256, `keyId`/`keyVersion`,
+versionierte Verifikation, sichere Provider-Integration, lokale Tests.
 
-## 4. Technischer Vertragscheck
+**P00-F:** Rotation, Übergangsfenster, Widerruf, Aktivierungswechsel,
+Cache-/Environment-Recycle.
 
-| # | Prüfpunkt | Befund |
-|---:|---|---|
-| 1 | Eindeutige Nachrichtensemantik | **OFFEN** — die kanonische interne Payload ist nicht spezifiziert |
-| 2 | Kanonische Darstellung der authentifizierten Daten | **OFFEN** — JSON-Reihenfolge, Encoding, Trennzeichen, Normalisierung nicht festgelegt |
-| 3 | `keyId`/`keyVersion` kryptografisch gebunden | **OFFEN** — Contract nennt sie als Key-Identity, nicht als Bestandteil der HMAC-Payload |
-| 4 | Exakte Base64-Dekodierung | **OFFEN** — Standard-/URL-safe-Alphabet, Padding, Whitespace nicht definiert |
-| 5 | 32-Byte-Längenprüfung | im Vertrag gefordert; P00-D-Implementierung fehlt noch |
-| 6 | Konstantzeitvergleich | im Vertrag gefordert; vorhandener Privacy-Pfad nutzt `compare_digest`-äquivalente Logik |
-| 7 | Fail-closed | im Vertrag und im bestehenden APP_MANAGED-Boundary gefordert; `AppManagedProvider.resolve()` schließt aktuell absichtlich |
-| 8 | Versionierte Verifikation | Vertraglich vorgesehen; P00-D-Implementierung fehlt |
-| 9 | Keine Cross-Provider-Fallbacks | vorhandene Konfiguration lehnt gemischte Providerfelder ab |
-| 10 | Keine Auswirkungen auf bestehende Orders | additiv/default-off gemäß D-8; keine Bestandsänderung vorgesehen |
+P00-D implementiert **keine** P00-F-Funktionalität und keine automatische
+Rotation.
 
-Der aktuelle `AppManagedProvider` ist nur eine P00-B-Grenze: Er validiert Metadaten, löst aber
-kein Key-Material auf und führt keine HMAC-Verifikation aus. Das ist kein Implementierungsnachweis
-für P00-D.
+---
 
-## 5. Key-Kustodie
-
-Der Vorschlag ist mit den Verträgen vereinbar:
-
-- Erzeugung, Speicherung, Bereitstellung, Rotation, Widerruf und Löschung: Owner/Operator.
-- Keine Key-Werte in Git, Terraform-State, Reports, Auditlogs oder Fehlermeldungen.
-- Keine neue AWS-Abhängigkeit; APP_MANAGED ist kein KMS-Key.
-- Runtime-Transport bleibt eine offene Owner-/Infrastrukturentscheidung.
-
-**Offen:** konkreter externer Store/HSM, Loader-Vertrag, Injektionsweg, Berechtigungsmodell und
-Nachweis, dass kein Key in Prozess-Env, Crash-Dumps oder Logs gelangt.
-
-## 6. Konkrete Owner-Fragen
-
-### Q11-O1 — Start des Übergangsfensters
-
-Beginnt das 24-Stunden-Fenster bei Aktivierung der neuen Version, bei der ersten Verifikation
-mit der neuen Version oder zu einem extern vorgegebenen Zeitpunkt? Der Start muss serverseitig,
-explizit und nicht aus Request-Daten ableitbar sein. **Empfehlung:** separate
-`transitionStart`/`transitionEnd`-Metadaten, keine Default-Dauer, fail-closed nach Ende.
-
-### Q11-O2 — Sofortiger Widerruf und bestehende Signaturen
-
-Was bedeutet „sofortiger Widerruf“ für bereits ausgestellte HMAC-Signaturen? Eine bereits
-erzeugte Signatur kann nicht nachträglich ungültig werden, außer die Verifikation lehnt die
-betroffene Version sofort ab oder die Daten werden neu signiert. **Owner-Entscheidung nötig:**
-Version sofort sperren, Cache/Environment recyceln, bestehende Signaturen als kompromittiert
-behandeln und einen Re-Signatur-/Migrationspfad festlegen.
-
-### Q11-O3 — Kryptografische Bindung von `keyId` und `keyVersion`
-
-Werden `keyId` und `keyVersion` in die kanonische HMAC-Payload aufgenommen? Ohne diese Bindung
-ist ein Version-Downgrade nicht zuverlässig ausgeschlossen. **Empfehlung:** ja; kanonische
-Payload mit explizitem Schema, Version und Key-ID; die serverseitige Auswahl darf nicht allein
-aus einem nicht authentifizierten Header erfolgen.
-
-### Q11-O4 — Base64- und Payload-Kanonisierung
-
-Welches Base64-Alphabet, welche Padding-Regeln und welche JSON-Kanonisierung gelten? Der
-Vertrag nennt 32 Byte und Base64, aber keine exakte Kodierung. **Empfehlung:** strikte
-Standard-Base64-Dekodierung mit Validierung, exakt 32 Byte, keine Whitespaces, keine
-URL-safe-Alternative ohne explizite Entscheidung; kanonische UTF-8-Payload mit definierter
-Feldreihenfolge.
-
-### Q11-O5 — Löschung alter Schlüssel
-
-Dürfen Schlüssel gelöscht werden, solange noch gültige Signaturen oder Audit-Nachweise mit
-dieser Version existieren? **Owner-Entscheidung nötig:** Mindestaufbewahrung, Verhältnis zu
-Retention/Q-14 und Verhalten nach Löschung.
-
-### Q11-O6 — P00-D/P00-F-Grenze
-
-P00-D soll Key-Metadaten, HMAC und versionierte Verifikation liefern. Rotation, Übergangsfenster,
-Widerruf, Cache-/Environment-Recycle und Löschung gehören zu P00-F. **Bestätigung nötig**, dass
-P00-D keine versteckte Rotationslogik oder automatische Versionsauswahl enthält.
-
-## 7. Entscheidungsblatt
+## 6. Owner-Entscheidungsblatt
 
 | Feld | Inhalt |
 |---|---|
-| Vorgeschlagene Entscheidung | Q-11-Policy wie in Abschnitt 2, mit den Präzisierungen O1–O6 |
-| Alternative 1 | Nur eine aktive Version, keine vorherige Version; Rotation erst nach separatem P00-F-Design |
-| Alternative 2 | Zwei Versionen mit explizitem Start/Ende und versionierter Payload-Bindung; längere Übergangszeit nur per Owner-Freigabe |
-| Alternative 3 | APP_MANAGED in RC4 zurückstellen und Q-11 erst mit P00-F entscheiden |
-| Sicherheitsfolgen | Ohne Payload-Bindung und klaren Widerruf besteht Downgrade-/Replay-Risiko; ohne Key-Löschungsregel bleiben Alt-Signaturen prüfbar oder werden unerwartet unprüfbar |
-| Auswirkungen P00-D | Implementiert Key-Metadaten, strikte Base64-/32-Byte-Prüfung, HMAC-SHA256, versionierte Verifikation, Fail-closed; keine Rotation |
-| Auswirkungen P00-F | Implementiert Aktivierung, Übergangsfenster, Widerruf, Cache-/Environment-Recycle, Löschung und Betriebsnachweise |
-| Offene Fragen | O1–O6 |
-| Owner-Freigabe | **[ ] APPROVED — NAME/DATUM:** __________________ |
-| Bedingungen | Nur nach Schließung von O1–O6 und separater P00-D-Implementierungsautorisierung |
+| Vorgeschlagene Entscheidung | Q-11-Policy mit 24h-Fenster, einer aktiven + einer vorherigen Version, HMAC-SHA256, Fail-closed |
+| Alternativen | (a) 0h / sofortiger Wechsel; (b) 24h; (c) anderes Fenster; (d) keine vorherige Version |
+| Sicherheitsfolgen | Längeres Fenster erhöht Missbrauchsfenster bei Kompromittierung; kürzeres Fenster erhöht Ausfallrisiko bei laufenden Retries |
+| P00-D-Auswirkung | Implementiert nur Verifikation und Metadatenbindung; keine Rotation |
+| P00-F-Auswirkung | Implementiert Aktivierung, Window, Widerruf, Recycle und Rollback |
+| Offene Fragen | Q11-T1…T6; Key-Transport; exakte kanonische Payload |
+| Freigabe | **`[ ] APPROVED  [ ] REJECTED  [ ] REVISE`** |
 
-**Die Entscheidung ist ausdrücklich nicht APPROVED. Das Freigabefeld bleibt leer.**
+**Keine Freigabe durch den Commander.**
 
-## 8. P00-D/P00-F-Abgrenzung
+---
 
-**P00-D (dieses Paket):**
+## 7. Git / Grenzen
 
-- Key-Metadaten und exakte Materialvalidierung.
-- HMAC-SHA256 über die vom Owner bestätigte kanonische Payload.
-- Versionierte Verifikation und Fail-closed-Verhalten.
-- Lokale Tests; keine AWS-Abhängigkeit.
+```text
+Branch:        release/rc4-integration
+HEAD:          337aa4f1a58ce6765d58115d95c76f3fdb78322c
+Working Tree:  CLEAN
+Product code:  NONE
+AWS/Terraform: NONE
+Merge/Push:    NONE
+Deployment:    NONE
+RIS/Jobsearch: NONE
+```
 
-**P00-F (später):**
+Keine Tests ausgeführt, da ausschließlich Dokumentation geändert wird.
 
-- Rotation, Aktivierung, Übergangsfenster.
-- Widerruf, Cache-/Environment-Recycle.
-- Löschung und operative Nachweise.
-
-Keine P00-F-Funktionalität wird in P00-D vorweggenommen.
-
-## 9. Status
-
-**A — READY**
-
-`MO-RC4-P00-D — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
-
-Keine Produktimplementierung, kein AWS-Aufruf, keine Terraform-/AWS-Mutation, kein Push,
-kein Main-Merge, kein Deployment, kein Release-Tag, keine RIS-/Jobsearch-Änderung.
+**STOP vor P00-D-Implementierung.**

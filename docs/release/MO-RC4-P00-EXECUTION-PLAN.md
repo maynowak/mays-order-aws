@@ -154,9 +154,10 @@ P00-D implementation authorization pending.
 
 **Dependencies:** P00-B; Q-10, Q-11.
 
-**Open contract parameters:** external key custody/transport, Q-11 transition
-window, maximum parallel versions, rotation trigger, deletion responsibility.
-No automatic rotation or new AWS dependency.
+**Open contract parameters:** exact canonical HMAC payload, 24h transition
+window/approval, revocation semantics in warm Lambda, existing signatures,
+external key custody/transport, deletion responsibility. No automatic rotation
+or new AWS dependency.
 
 **Affected files (proposed):**
 

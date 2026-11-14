@@ -632,6 +632,25 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 
 ## 2026-11-14 — MO-RC4-P00-D-Q11-DECISION-02
 
+**Status:** `MO-RC4-P00-D — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
+
+- Q11 proposal: one active + max one previous version, max 24h explicit
+  transition window, explicit activation timestamp, no automatic rotation, no
+  silent switch, unknown version fail-closed, immediate revocation via forced
+  recycle, HMAC-SHA256/32-byte Base64.
+- Contract check: consistent with ADR-008 D-6/D-7/D-8 and P00-D Contract §7;
+  no hard conflict. Open owner questions: exact canonical HMAC payload,
+  revocation in warm Lambda, existing signatures, downgrade pinning,
+  key transport/custody and deletion.
+- Key custody proposal: Owner/Operator owns generation/storage/delivery/
+  rotation/revocation/deletion; no key in Git/state/reports/audit/logs; no new
+  AWS dependency; runtime transport remains a protected config injection.
+- No product implementation, AWS/Terraform mutation, push/merge/deploy or
+  RIS/Jobsearch change. Q11 remains NOT APPROVED.
+- Report: `docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-Q11-DECISION-02
+
 **Status:** `Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
 
 - Verified `release/rc4-integration` at `337aa4f1a58ce6765d58115d95c76f3fdb78322c`.

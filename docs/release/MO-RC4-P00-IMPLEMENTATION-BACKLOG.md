@@ -141,8 +141,8 @@ P00-C integration.
 | Owner approval | Q-10 approved; Q-11 open; APP_MANAGED is Phase 2, not automatically RC4 |
 | Package status | **CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED** |
 | Proposed key contract | 32-byte Base64, HMAC-SHA256, unique `keyId`/`keyVersion`; no custom cipher |
-| Proposed rotation | max active + one previous only in explicit window; no automatic rotation; P00-F owns transition |
-| Open readiness items | external key custody/delivery; Q-11 window/version count; P00-D implementation authorization |
+| Proposed rotation | max active + one previous, max 24h explicit window; no automatic rotation; P00-F owns transition |
+| Open readiness items | exact canonical HMAC payload; revocation semantics in warm Lambda; existing signatures; external key custody/delivery; Q-11 approval; P00-D implementation authorization |
 
 ---
 

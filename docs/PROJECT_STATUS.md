@@ -17,8 +17,8 @@ Current Feature:
 MO-RC4 P00 — P00-C local closeout; P00-D planning ready
 
 Current Task:
-MO-RC4-P00-D-AUTHORIZATION-01 — CONTRACT PREPARED / OWNER DECISIONS PENDING;
-keine APP_MANAGED-Implementierung
+MO-RC4-P00-D-Q11-DECISION-02 — Q11 DECISION PACKAGE READY / OWNER APPROVAL
+PENDING; keine APP_MANAGED-Implementierung
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin

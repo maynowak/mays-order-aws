@@ -203,13 +203,14 @@ separately gated.
 | Compatibility | Rotation must be default-off; old/new version transition must be explicit |
 | Recommendation | **manual rotation documented in RC4; native rotation later** |
 | Proposed contract | unique `keyId`/`keyVersion`; max one active + one previous; explicit transition window; no automatic rotation; no silent active switch; no unknown-version fallback; P00-F owns rotation |
-| Open parameters | transition-window duration, parallel-version count, rotation trigger, deletion responsibility |
+| Proposed policy | max 24h transition, one previous version, explicit activation timestamp, fail-closed, immediate revocation via forced recycle |
+| Open parameters | exact canonical HMAC payload, revocation semantics in warm environments, existing signatures, key transport/custody, deletion responsibility |
 | Packages | P00-D/F |
 | Owner gate | Q-11 |
-| Status | **READY_FOR_OWNER — CONTRACT PROPOSED; OWNER DECISION PENDING** |
+| Status | **READY_FOR_OWNER — DECISION PACKAGE PREPARED; OWNER APPROVAL PENDING** |
 
-The detailed proposal is in
-`docs/reports/MO-RC4-P00-D-AUTHORIZATION-01.md`. It is not approved.
+Detailed decision package:
+`docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`. It is not approved.
 
 ---
 
