@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 + F-03 VERIFIED FIXED / INTEGRATION REVIEW READY
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C INTEGRATED / VERIFICATION PARTIAL (1 live test blocked)
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,7 +78,7 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **IMPLEMENTED / TESTED / F-01 + F-03 VERIFIED FIXED / INTEGRATION REVIEW READY** — feature branch, not merged |
+| Package status | **INTEGRATED / VERIFICATION PARTIAL (1 live test blocked)** — F-01/F-03 verified fixed; deployment gates open |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 

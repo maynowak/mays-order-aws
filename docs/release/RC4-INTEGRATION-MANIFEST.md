@@ -61,11 +61,11 @@ These branches remain unchanged; no work was deleted.
 
 | Check | Result |
 |---|---|
-| Installer | **669 PASS** |
+| Installer | **668 PASS + 1 live-profile test BLOCKED** |
 | Module Builder | **128 PASS** |
-| Lambda | **379 PASS** |
+| Lambda | **405 PASS** |
 | E2E local (full discover: 36, 5 expected skips) | **32 PASS** |
-| **P00-B local total** | **1.208 PASS** |
+| **P00-C local total** | **1.233 PASS + 1 live test BLOCKED** |
 | Seed tools | **28 PASS** |
 | Terraform fmt | **PASS** |
 | Terraform init `-backend=false` | **PASS** |
@@ -82,23 +82,26 @@ AWS_MANAGED: CONFIG FOUNDATION / RESOURCE + IAM + KMS MISSING
 APP_MANAGED: CONFIG CONTRACT / KEY LOADER + HMAC MISSING
 KMS backup stash: UNCHANGED, NOT APPLIED
 P00-B: INTEGRATED / POST-MERGE VERIFIED
-P00-C: IMPLEMENTED / TESTED ON FEATURE BRANCH / SECURITY REVIEW READY
-P00-C-M01: IMPLEMENTED / TESTED — security review pending
+P00-C: INTEGRATED / VERIFICATION PARTIAL (1 live-profile test BLOCKED)
+P00-C-M01: IMPLEMENTED / TESTED / VERIFIED FIXED
+P00-C-F01/F-03: VERIFIED FIXED
 ```
 
-P00-B source/tests are integrated on `release/rc4-integration` via merge commit
-`e71f3edcb146fb7b3943b4c23fa65e771cf4611e`; the current review documentation
-was integrated separately without duplicate product commits. Q-02 (Secrets
-Manager), Q-04 (CMK options), Q-08 (ARN/name reference + runtime fetch), Q-09
-(explicit Policy-Gate allowlist) and Q-10 (ADR-008, C-01…C-07) are owner-approved;
-ADR-008 is `ACCEPTED`. P00-C is implemented/tested on
-`feature/mo-rc4-p00-c-aws-managed` but **not integrated**; P00-C/D resources and
-live AWS verification remain missing.
+P00-B source/tests are integrated via merge commit
+`e71f3edcb146fb7b3943b4c23fa65e771cf4611e`. P00-C is integrated via merge
+`e7431708dbe634371606be788d5082e1aad04ee7` (P00-C runtime) and
+`442d296e7040279c19fe6e004900ff2616a03e87` (contract amendment/handler test);
+the Review-06 documentation was cherry-picked as docs-only commit `8e3d835`.
+The live `TestAWSProfileContextLive.test_profile_mayaws_identity` test was not
+executed because this integration is under a strict no-AWS-live boundary; all
+other 668 installer tests pass. Q-02/Q-04/Q-08/Q-09/Q-10 are approved;
+ADR-008 is `ACCEPTED`. P00-C/D resources and live AWS verification remain
+missing; deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PARTIAL (P00-B integrated; P00-C/D pending)
+P00:          PARTIAL (P00-B/C integrated; P00-D and deployment gates pending)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```

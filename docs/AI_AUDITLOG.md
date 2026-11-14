@@ -570,3 +570,24 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   deployment authorization. No merge/push/deploy, Terraform/AWS mutation or
   RIS/Jobsearch change.
 - Report: `docs/reports/MO-RC4-P00-C-SECURITY-RE-REVIEW-06.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-INTEGRATION-07
+
+**Status:** `MO-RC4-P00-C — INTEGRATION PARTIAL / VERIFICATION PENDING`
+
+- Merge 1 `e7431708dbe634371606be788d5082e1aad04ee7` (`4d4db3b` +
+  `08fde23`): P00-C runtime.
+- Merge 2 `442d296e7040279c19fe6e004900ff2616a03e87` (`e743170` + `4342163`):
+  contract amendment, correction docs and handler test.
+- Review-06 docs cherry-picked as docs-only `8e3d835e1a7df75b44c1866a0c65a2a8dc6d32bc`.
+- No duplicate product commits; no unexpected product code; no Terraform/AWS/
+  RIS/Jobsearch changes.
+- Post-merge: Lambda 405 PASS, Installer 668 PASS + 1 live-profile test
+  `BLOCKED` by no-AWS boundary, Builder 128 PASS, E2E 32 PASS = 1.233 local
+  PASS + 1 BLOCKED; Seed 28 PASS. No live AWS calls.
+- ZIP `05bc3f65b4b2c385ab4bfc1d74eb0364b2b9041663c3b3beaa438aaa7810a554`
+  (42.081 B, 12 modules, source-identical, reproducible).
+- F-01/F-03 verified fixed; M-01 handler evidence present. Deployment gates
+  F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open. No production
+  AWS_MANAGED authorization.
+- Report: `docs/reports/MO-RC4-P00-C-INTEGRATION-07.md`.
