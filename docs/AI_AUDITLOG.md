@@ -546,3 +546,27 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   deploy, Terraform/AWS mutation or RIS/Jobsearch change.
 - Report: `docs/reports/MO-RC4-P00-C-F01-AUTHORIZATION-05.md`.
 - Independent re-review required before F-01 can become VERIFIED FIXED.
+
+## 2026-11-14 — MO-RC4-P00-C-SECURITY-RE-REVIEW-06
+
+**Status:** `MO-RC4-P00-C — F-01/F-03 VERIFIED FIXED / INTEGRATION REVIEW READY`
+
+- Read-only re-review of F01-HEAD `4342163` against integration `4d4db3b`;
+  review branch `review/mo-rc4-p00-c-security-06`.
+- F-01 verified fixed: ADR-008 D-5/C-03, Q-09 limited amendment, Contract
+  §6/§8, Policy-Gate specification and runtime all agree; `DescribeSecret`
+  only with `PRIVACY_KMS_KEY_ARN`, exact Secret ARN, no wildcard, no implicit
+  CMK, no DDB/SQS CMK.
+- F-03 verified fixed: real `index.handler` tests, two invocations, one
+  `GetSecretValue`, shared module provider, reference rebuild, invalidation,
+  negative config and redaction; mutation with per-invocation provider fails.
+- Targeted tests 60 PASS; Lambda 405 PASS; prior full regression 1.234 PASS;
+  Seed 28; ZIP `05bc3f65…` unchanged. No AWS-live calls.
+- Branch graph actual: integration `4d4db3b` → feature `08fde23` → review
+  `41b8612` → correction `d3ce237` → F01 `4342163`; no duplicate product
+  commits. Proposed integration: feature merge, then F01 merge; no review-branch
+  merge.
+- Deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open; no
+  deployment authorization. No merge/push/deploy, Terraform/AWS mutation or
+  RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-C-SECURITY-RE-REVIEW-06.md`.

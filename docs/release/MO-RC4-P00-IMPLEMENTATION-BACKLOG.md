@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW PENDING
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 + F-03 VERIFIED FIXED / INTEGRATION REVIEW READY
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,7 +78,7 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **IMPLEMENTED / TESTED / F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW PENDING** — feature branch, not merged |
+| Package status | **IMPLEMENTED / TESTED / F-01 + F-03 VERIFIED FIXED / INTEGRATION REVIEW READY** — feature branch, not merged |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
@@ -91,7 +91,7 @@ The order may change only with documented dependency justification.
 | Identity isolation | Cache key includes provider, exact reference, key ID/version, KMS ARN and injected-fetcher identity; cross-identity tests pass. |
 | Rotation | `SecretCache.invalidate()` and `reset_default_secret_provider()` provide controlled invalidation; rollout is documented. |
 | Tests | Cross-invocation hit, config replacement, identity isolation, invalidation and error non-caching tests pass. |
-| Gate | Implemented/tested; independent security review remains. |
+| Gate | Implemented/tested and independently re-reviewed; F-02 remains a deployment gate. |
 
 ### P00-C review acceptance criteria
 
@@ -110,9 +110,9 @@ P00-C integration.
 
 | ID | Severity | Status | Merge blocker |
 |---|---|---|---|
-| F-01 | MEDIUM | **CONTRACT AMENDED / RE-REVIEW PENDING**; Q-09 limited amendment approved; ADR/Contract/Policy-Gate spec updated; runtime matches (DescribeSecret only with `PRIVACY_KMS_KEY_ARN`) | **until re-review** |
+| F-01 | MEDIUM | **VERIFIED FIXED**; Q-09 limited amendment approved; ADR/Contract/Policy-Gate spec updated; runtime matches (DescribeSecret only with `PRIVACY_KMS_KEY_ARN`) | NO |
 | F-02 | MEDIUM | **DOCUMENTED** in rollout: cache lifetime, forced environment recycle, parallel-generation risk; no auto rotation | NO (deployment gate) |
-| F-03 | MEDIUM | **VERIFIED** by `test_index_aws_managed.py` (5 handler-level tests) and mutation proof | NO |
+| F-03 | MEDIUM | **VERIFIED FIXED** by `test_index_aws_managed.py` (5 handler-level tests) and mutation proof | NO |
 | F-04 | MEDIUM | **DOCUMENTED** exact SecretString payload: ASCII, 1…1024, no JSON | NO (activation gate) |
 | F-05 | MEDIUM | **DOCUMENTED** two rollback paths (forward-fix / owner-approved ENV) | NO (activation gate) |
 | F-06 | LOW | **OPEN** — timeout values require Owner/Infra decision | NO |

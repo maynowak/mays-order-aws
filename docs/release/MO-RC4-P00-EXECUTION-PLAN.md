@@ -1,6 +1,6 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW PENDING
+**Status:** EXECUTION PLAN READY / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 + F-03 VERIFIED FIXED / INTEGRATION REVIEW READY
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
@@ -8,10 +8,9 @@
 
 > Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved. P00-B is integrated on
 > `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.
-> P00-C is implemented/tested on its feature branch. F-03 is verified by a real
-> handler-level test; F-01 is contract-amended by the Q-09 limited amendment
-> and waits for independent re-review. F-02/F-04/F-05 remain documented
-> deployment gates. P00-D/E/G remain separately gated.
+> P00-C is implemented/tested on its feature branch. F-03 and F-01 are
+> independently verified fixed. F-02/F-04/F-05 remain documented deployment
+> gates. P00-D/E/G remain separately gated.
 
 ---
 
@@ -94,13 +93,12 @@ fallback required to pass tests.
 
 **Goal:** Optional Secrets Manager provider and reference-only configuration.
 
-**Status:** **IMPLEMENTED / TESTED / F-01 CONTRACT AMENDED / F-03 VERIFIED /
-RE-REVIEW PENDING** — feature branch, not merged. 1.234 local PASS + 28 Seed.
+**Status:** **IMPLEMENTED / TESTED / F-01 + F-03 VERIFIED FIXED / INTEGRATION
+REVIEW READY** — feature branch, not merged. 1.234 local PASS + 28 Seed.
 
-**Security Review 03:** F-03 is verified by `test_index_aws_managed.py` and a
-mutation check. F-01 is contract-amended by the Q-09 limited amendment;
-independent re-review is still required before `VERIFIED FIXED`. F-02/F-04/F-05
-are documented deployment gates. No CRITICAL/HIGH finding.
+**Re-Review 06:** F-03 is verified by `test_index_aws_managed.py` and a
+mutation check; F-01 is verified against ADR/Contract/Q-09 and runtime.
+F-02/F-04/F-05 remain documented deployment gates. No CRITICAL/HIGH finding.
 
 **Dependencies:** P00-B; Q-02 (approved), Q-04 (approved: AWS default/existing
 ARN/opt-in CMK), Q-08 (approved), Q-09 (approved: explicit allowlist/default
