@@ -902,3 +902,20 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - `main` remains unchanged and 190 commits behind the RC4 branch; no main
   merge or push to `main`. No tags were pushed. No AWS calls.
 - Report: `docs/reports/MO-RC4-PUBLISH-01.md`.
+
+## 2026-11-14 — MO-RC4-RELEASE-01
+
+**Status:** `RESULT A — RELEASE v0.6.0-rc.1 PUBLISHED / MAIN MERGE PREPARED`
+
+- Q-12 approved: `v0.6.0-rc.1`; component versions remain Installer `0.1.0`,
+  Module Builder `0.1.0`, Deployment/Teststack `0.2.0`.
+- Release documentation updated; release commit
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`.
+- Annotated tag `v0.6.0-rc.1` created on that commit (`tag object
+  79628819717e4609d828581dff53055f2b32f8ec`), branch and tag pushed without
+  force. Remote branch and peeled tag target were verified.
+- Merge preparation: `main` `f597d14`, 192 commits ahead, 0 behind, merge-base
+  `f597d14`; `git merge-tree` and `git diff --check` clean. No main merge.
+- No AWS calls, Terraform apply, deployment, or production activation.
+- P00-G retention remains disabled; APP_MANAGED default-off.
+- Report: `docs/reports/MO-RC4-RELEASE-01.md`.

@@ -11,7 +11,7 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 v0.6.0-rc.1 — release approved; publication in progress
+RC4 v0.6.0-rc.1 — release published; main merge prepared
 
 Current Feature:
 MO-RC4-RELEASE-01 — RC4 release docs, annotated tag and branch publication
@@ -43,13 +43,15 @@ RC4 v0.6.0-rc.1 Status:
 [x] Lokale Regression: Lambda 440 / Installer 674+1 Skip / Builder 129 /
     Policy 23 / E2E 36 (5 Skip) / Seed 28
 [x] Release-Dokumentation aktualisiert
-[~] Annotierter Tag v0.6.0-rc.1 (wird nach diesem Release-Commit gesetzt)
-[~] Release-Branch/Tag-Veröffentlichung (nach Tag)
-[ ] Main-Merge: separat freizugeben
+[x] Annotierter Tag v0.6.0-rc.1 auf Release-Commit 5bc154e
+[x] Release-Branch und Tag veröffentlicht
+[ ] Main-Merge: separat freizugeben; Vorprüfung clean
 
 Current Checkpoint:
 release/rc4-integration @ MO-RC4-RELEASE-01
-→ Q-12 APPROVED: v0.6.0-rc.1; annotated tag target = release commit
+→ Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
+→ Main-Merge-Vorprüfung: main f597d14, 192 Commits voraus, 0 dahinter,
+  merge-tree ohne Konflikte; kein Main-Merge
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
   Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
 → Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean
