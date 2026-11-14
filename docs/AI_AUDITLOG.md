@@ -524,3 +524,25 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Report: `docs/reports/MO-RC4-P00-C-CORRECTION-04.md`; no merge/push/deploy,
   no Terraform/AWS mutation, no RIS/Jobsearch change. Independent re-review
   remains required.
+
+## 2026-11-14 — MO-RC4-P00-C-F01-AUTHORIZATION-05
+
+**Status:** `MO-RC4-P00-C — F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW READY`
+
+- Owner approved Q-09 limited amendment: `secretsmanager:DescribeSecret` for
+  the same exact approved secret ARN(s), only for customer-CMK metadata
+  verification; no wildcard, no implicit CMK, no DDB/SQS CMK extension.
+- Updated ADR-008 D-5/C-03, Decision Register Q-09, Contract §6/§8, Policy-Gate
+  specification and P00-C backlog. Policy-Gate code/allowlist remains P00-E and
+  is not implemented.
+- F-01 status: **CONTRACT AMENDED / RE-REVIEW PENDING**, not `VERIFIED FIXED`.
+- F-03 evidence remains valid: real `index.handler` tests (5), cross-invocation
+  cache, one `GetSecretValue`, identity isolation, invalidation, negative
+  config and mutation failure. Targeted tests: 60 PASS.
+- F-02/F-04/F-05 remain deployment gates; F-06/F-08/F-09/F-10/F-11 remain low
+  follow-ups.
+- Branch `feature/mo-rc4-p00-c-f01-authorization-05` from correction `d3ce237`;
+  feature `08fde23` and integration `4d4db3b` unchanged. No merge, push,
+  deploy, Terraform/AWS mutation or RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-C-F01-AUTHORIZATION-05.md`.
+- Independent re-review required before F-01 can become VERIFIED FIXED.

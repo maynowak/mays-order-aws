@@ -30,7 +30,7 @@
 | Q-06 | Retention-Fristen | **BLOCKED_BY_EXTERNAL_DECISION** | P00-G |
 | Q-07 | Cancel-Anonymisierung | **READY_FOR_OWNER** | P00-G |
 | Q-08 | Secret-Referenz/Fetch | **DECIDED — ARN/Name + Runtime-Fetch** | P00-B/C (Entscheidung geschlossen) |
-| Q-09 | Policy-Gate-Erweiterung | **DECIDED — explicit allowlist / default deny** | P00-C/E/H (Entscheidung geschlossen) |
+| Q-09 | Policy-Gate-Erweiterung | **DECIDED — explicit allowlist / default deny / DescribeSecret limited** | P00-C/E/H (Entscheidung geschlossen) |
 | Q-10 | ADR-008-Freigabe | **DECIDED — ADR-008 ACCEPTED** | P00-B/C/E (Entscheidung geschlossen) |
 | Q-11 | Rotation in RC4 | **READY_FOR_OWNER** | P00-D/F |
 | Q-12 | Release-Label | **READY_FOR_OWNER** | Release-Gate |
@@ -166,9 +166,10 @@ implementation; Q-10 was approved separately on 2026-11-13.
 | Compatibility | Existing resource types/rules must remain |
 | Recommendation | Extend with explicit KMS/Secrets types and rotation/least-privilege rules |
 | Owner decision | **APPROVED 2026-11-13:** explicit allowlist, default deny, least privilege, exact Secret references, `GetSecretValue` only for approved secrets, `kms:Decrypt` only for actual customer CMK, no wildcard without separate decision |
+| Limited amendment | **APPROVED 2026-11-14:** `secretsmanager:DescribeSecret` only for the same explicitly approved secret ARN(s), only for customer-CMK metadata verification; no wildcard, no implicit CMK, no DDB/SQS CMK extension |
 | Packages | P00-C/E/H |
 | Owner gate | Q-09 (closed) |
-| Status | **DECIDED** |
+| Status | **DECIDED — LIMITED AMENDMENT** |
 
 ---
 

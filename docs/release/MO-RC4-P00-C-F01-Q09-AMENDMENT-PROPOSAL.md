@@ -1,8 +1,8 @@
 # MO-RC4-P00-C — F-01 Q-09 AMENDMENT PROPOSAL
 
-**Status:** PROPOSED / OWNER DECISION PENDING
+**Status:** APPROVED — LIMITED AMENDMENT / CONTRACT AMENDED / RE-REVIEW PENDING
 **Date:** 2026-11-14
-**Scope:** Contract-only proposal. No approval, no product code, no IaC.
+**Scope:** Contract-only amendment. Owner-approved under the limits below; no product code, no IaC.
 
 ## 1. Proposed Owner Decision
 
@@ -26,8 +26,10 @@ Conditions:
 - Default Deny and least privilege remain mandatory.
 - No wildcard action/resource without separate Owner approval.
 
-**This is not approved by this proposal. F-01 remains OPEN until the Release
-Owner accepts or rejects it.**
+**Owner decision:** APPROVED as a **limited amendment** on 2026-11-14. The
+approval covers only the exact approved secret ARN(s) and only customer-CMK
+metadata verification. F-01 remains `CONTRACT AMENDED / RE-REVIEW PENDING`
+until independent re-review; it is not yet `VERIFIED FIXED`.
 
 ## 2. ADR-008 Proposed Change
 
@@ -98,11 +100,13 @@ Validator rules:
 
 ## 6. Approval Gate
 
-- Status: **PROPOSED, NOT APPROVED**
-- Required: Release Owner explicit approval of the Q-09 amendment.
-- Until approval: F-01 remains OPEN; no ADR/Contract/Policy-Gate change is
-  effective; no P00-E Terraform.
-- If rejected: remove the `DescribeSecret` CMK verification from runtime and
-  rely on the secret’s IAM/KMS binding, or defer CMK verification to P00-E.
+- Status: **APPROVED — LIMITED AMENDMENT**
+- Owner approval: 2026-11-14.
+- Contract status: **CONTRACT AMENDED / RE-REVIEW PENDING**.
+- The runtime already matches the approved scope: `DescribeSecret` only when
+  `PRIVACY_KMS_KEY_ARN` is set; exact ARN; no DDB/SQS CMK.
+- P00-E Terraform/Policy-Gate implementation is still separate and not
+  authorized by this decision.
+- F-01 becomes `VERIFIED FIXED` only after independent re-review.
 
-**STOP before contract or infrastructure changes.**
+**STOP before infrastructure changes or deployment.**
