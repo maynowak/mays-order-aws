@@ -233,6 +233,10 @@ rotation, P00-F rotation/revocation, Terraform plan/apply, AWS-live verification
 
 ## 7. Package P00-F — Rotation
 
+**Status:** `LOCALLY IMPLEMENTED / OPERATIONAL ACTIVATION OWNER-GATED` —
+`dad5b16`; one previous key in an explicit <=24h window, injected local key
+material, fail-closed `revoke()`, no KMS/hot reload.
+
 **Goal:** Owner-approved rotation mechanics and cache invalidation.
 
 **Dependencies:** P00-C/D/E; Q-11.
@@ -262,6 +266,10 @@ cache, interrupted rotation.
 ---
 
 ## 8. Package P00-G — Retention / TTL
+
+**Status:** `BLOCKED BY OWNER DECISION / SAFELY DISABLED` — Q-05/Q-06/Q-07/Q-14
+open. No retention fields, TTL, automatic deletion or backfill were implemented.
+See `docs/reports/MO-RC4-P00-G-RETENTION-DISABLED-01.md`.
 
 **Goal:** Define/implement retention mechanics without inventing legal periods.
 
@@ -295,6 +303,10 @@ scenario, no implicit deletion.
 ---
 
 ## 9. Package P00-H — Installer / Builder
+
+**Status:** `LOCALLY COMPLETE` — installer tests stabilized; `complete` preset
+includes `privacy_secret`; two builder runs are byte-identical (without
+manifest); generated Terraform fmt/init/validate PASS.
 
 **Goal:** Safe configuration of P00 modules for new and existing installs.
 
@@ -330,6 +342,10 @@ module stripping, secret leakage.
 ---
 
 ## 10. Package P00-I — Security / Regression / Release Gates
+
+**Status:** `LOCAL REGRESSION PASSED / DEPLOYMENT GATES OPEN` — Lambda 440,
+Installer 674 (1 skipped live), Builder 129, Policy 23, E2E 36 (5 skipped),
+Seed 28; Terraform fmt/init/validate PASS. No plan/apply/live call.
 
 **Goal:** Verify the full P00 implementation and release boundaries.
 

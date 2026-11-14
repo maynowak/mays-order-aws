@@ -11,16 +11,16 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — P00 Security Implementation (P00-B/C/D/E locally integrated;
-P00-E verification incomplete)
+RC4 Integration — local release candidate ready (P00-B/C/D/E/F/H/I local;
+P00-G blocked by owner decisions)
 
 Current Feature:
-MO-RC4 P00 — P00-E AWS_MANAGED secret wiring integrated; default-off
+MO-RC4-FINAL-01 — RC4 local release candidate; deployment gates open
 
 Current Task:
-MO-RC4-P00-E-INTEGRATION-02 — LOCALLY INTEGRATED / VERIFICATION INCOMPLETE;
-429 Lambda / 128 Builder / 23 Policy-Gate / 36 E2E / 28 Seed /
-Terraform validate PASS; 2 known installer harness failures + 1 live deferred
+MO-RC4-FINAL-01 — RC4 READY WITH DEPLOYMENT GATES;
+440 Lambda / 674 Installer (1 skipped) / 129 Builder / 23 Policy / 36 E2E
+(5 skipped) / 28 Seed / Terraform validate PASS
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -40,9 +40,13 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-release/rc4-integration @ P00-E integration
+release/rc4-integration @ MO-RC4-FINAL-01
 → P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
 → P00-E merge 3b0de2f (parents 2dbbd3f + 44c3900); feature a6667ec + 44c3900
+→ P00-F rotation/revocation: dad5b16
+→ Installer stabilization: 7a72c46 + 85ef5fb
+→ Builder/P00-H: cc6ab71; Lambda artifact ed17c12
+→ Final merge: 0620044 (parents 51df736 + 85ef5fb)
 → P00-D Review-05 docs: c0d8d719
 → Q-11 P00-D contract APPROVED; APP_MANAGED HMAC foundation integrated,
   default-off; production key transport/P00-F rotation open
@@ -56,10 +60,16 @@ release/rc4-integration @ P00-E integration
   erster Full-Lauf inkludierte den Live-Test einmal read-only/STS — Deviation)
 → P00-E Post-Merge: 429 Lambda / 128 Builder / 23 Policy-Gate / 36 E2E
   (5 skipped) / 28 Seed / terraform fmt+init+validate PASS; kein Plan/Apply
-→ P00-C-M01/F-01/F-03: verified fixed; F-09 integriert (P00-E-Verifikation
-  partial); F-02/F-04/F-05/F-06/F-08/F-10/F-11 offen
+→ MO-RC4-FINAL-01: 440 Lambda / 674 Installer (1 skipped) / 129 Builder /
+  23 Policy / 36 E2E (5 skipped) / 28 Seed / Terraform validate PASS
+→ Lambda ZIP 46.929 B, SHA-256 20f4bab5…; zwei Builds byte-identisch
+→ P00-F: APP_MANAGED Rotation/Revocation default-off lokal implementiert;
+  P00-G: Retention/TTL wegen Q-05/Q-06/Q-07/Q-14 sicher deaktiviert
+→ P00-C-M01/F-01/F-03: verified fixed; F-09 integriert; F-02/F-04/F-05/F-06/
+  F-08/F-10/F-11 offen
 → Eine AWS_MANAGED/APP_MANAGED-Produktionsaktivierung ist nicht freigegeben
-→ DDB/SQS-CMK, P00-F Rotation/Revocation und Secret-Value-Provisionierung offen
+→ DDB/SQS-CMK, Secret-Value-Provisionierung, Terraform Plan/Apply und
+  AWS-Live-Verifikation offen
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

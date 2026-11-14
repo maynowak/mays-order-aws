@@ -172,6 +172,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
+| Status | **LOCALLY IMPLEMENTED** — `dad5b16`; APP_MANAGED rotation/revocation mechanics, default-off; operational activation remains Owner-gated |
 | Goal | Documented, owner-controlled rotation and cache invalidation |
 | Dependencies | P00-C/D/E; Q-11 |
 | Components | Secrets Manager rotation or manual runbook; cache invalidation |
@@ -189,6 +190,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
+| Status | **BLOCKED BY OWNER DECISION / SAFELY DISABLED** — Q-05/Q-06/Q-07/Q-14 open; no retention fields, TTL, deletion or backfill implemented |
 | Goal | Define and implement retention mechanics without inventing legal periods |
 | Dependencies | P00-A; Q-05, Q-06, Q-07, Q-14 |
 | Components | `retentionUntil`, optional TTL, cancel semantics, docs |
@@ -206,6 +208,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
+| Status | **LOCALLY COMPLETE** — Installer stabilized; complete preset includes `privacy_secret`; deterministic builder tree and generated Terraform validate PASS |
 | Goal | Safe configuration of provider/KMS/retention modules for new and existing installs |
 | Dependencies | P00-B/C/E/G; Q-03, Q-08, Q-09 |
 | Components | installer flags/validation, builder catalog/preset, manifest |
@@ -223,6 +226,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
+| Status | **LOCAL REGRESSION PASSED** — 440 Lambda / 674 Installer (1 skipped) / 129 Builder / 23 Policy / 36 E2E (5 skipped) / 28 Seed; Terraform validate PASS; deployment gates open |
 | Goal | Verify full P00 implementation and release boundaries |
 | Dependencies | all implemented packages |
 | Components | secret/HMAC/KMS tests, log/state audits, installer/builder gates |

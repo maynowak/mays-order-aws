@@ -107,20 +107,20 @@ is classified `TEST HARNESS DEFECT / ENVIRONMENT DEPENDENCY` (hardcoded clean
 primary worktree). Neither is counted as PASS. Q-02/Q-04/Q-08/Q-09/Q-10 and
 Q-11 for the P00-D contract are approved; ADR-008 is `ACCEPTED`. P00-F
 rotation/revocation, production key transport, AWS-live verification and the
-existing P00-C deployment gates remain open. P00-E minimal scope is locally
-integrated via merge `3b0de2f` (`feature/mo-rc4-p00-e-simple` @ `44c3900`).
-Local verification is **PARTIAL / INCOMPLETE**: the installer suite has the
-known dependency-detector harness failures and the live profile test remains
-deferred; the first full-suite invocation also triggered that live test once
-(read-only STS identity check, no mutation). The corrected local suite excludes
-it. P00-F and DDB/SQS CMK activation remain open.
+existing P00-C deployment gates remain open. P00-E minimal scope is integrated
+via merge `3b0de2f`; final RC4 work is integrated via merge `0620044`
+(`feature/mo-rc4-final-01`). The installer is stabilized (no hardcoded primary
+worktree; AWS live profile test skipped by default) and P00-F rotation/
+revocation mechanics are implemented default-off. P00-G is **safely disabled**
+because Q-05/Q-06/Q-07/Q-14 remain Owner decisions. P00-H builder integration
+and P00-I local regression passed. DDB/SQS CMK, production activation,
+Terraform plan/apply and AWS-live verification remain open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PARTIAL (P00-B/C/D/E locally integrated; P00-E verification
-              incomplete due known harness exceptions/live-test deviation;
-              P00-F and deployment gates pending)
+P00:          LOCAL RC READY (P00-B/C/D/E/F/H/I local; P00-G blocked by
+              owner decisions; deployment/live gates open)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```

@@ -791,3 +791,27 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   **C**, not A.
 - No new product failures beyond the known dependency-detector harness defect.
 - Report: `docs/reports/MO-RC4-P00-E-INTEGRATION-02.md`.
+
+## 2026-11-14 — MO-RC4-FINAL-01
+
+**Status:** `RESULT B — RC4 READY WITH DEPLOYMENT GATES`
+
+- All worktrees were clean before the task; no foreign changes were touched.
+  No subagents were used; all writes/commits were serialized.
+- Installer stabilized: hardcoded primary-worktree paths removed, detector
+  takes an explicit repo root, deterministic tests use an offline fixture,
+  and the AWS live profile test is skipped unless `MO_AWS_LIVE_PROFILE_TEST=1`.
+- P00-F APP_MANAGED rotation/revocation implemented default-off: one previous
+  key in a validated <=24h window, injected local material, no KMS/hot reload,
+  and fail-closed `revoke()`.
+- P00-G safely disabled: Q-05/Q-06/Q-07/Q-14 remain open; no retention fields,
+  TTL, automatic deletion or backfill were added.
+- P00-H: complete builder preset includes `privacy_secret`; two builds are
+  byte-identical (excluding manifest) and generated Terraform validates.
+- P00-I: 440 Lambda, 674 Installer (1 skipped), 129 Builder, 23 Policy,
+  36 E2E (5 skipped), 28 Seed; Terraform fmt/init/validate PASS.
+- Lambda ZIP 46.929 B, SHA-256
+  `20f4bab5766529e3340273cfde3b35c601a389122759051f2aef801337b76377`;
+  two builds byte-identical. No plan/apply/AWS mutation/deployment/push.
+- Integration merge `0620044`; details in
+  `docs/reports/MO-RC4-FINAL-01.md`.
