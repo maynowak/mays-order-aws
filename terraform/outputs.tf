@@ -128,3 +128,9 @@ output "mo_version" {
   description = "Dokumentierte MO-Version dieser Bereitstellung (deployment_version)."
   value       = var.deployment_version
 }
+
+# P00-E: ARN only; the secret value is never managed by Terraform.
+output "privacy_secret_arn" {
+  description = "ARN of the optional privacy secret container (null when disabled)."
+  value       = try(module.privacy_secret[0].arn, null)
+}

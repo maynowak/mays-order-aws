@@ -187,31 +187,44 @@ version, rollback/recovery.
 
 ## 6. Package P00-E — KMS / Terraform / IAM
 
-**Goal:** Optional CMK and encryption wiring for Secrets Manager/DDB/SQS.
+**Status:** `LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED` — feature
+`feature/mo-rc4-p00-e-simple` @ `a6667ec`; no plan/apply/AWS-live call.
+Report: `docs/reports/MO-RC4-P00-E-SIMPLE-01.md`.
+
+**Goal (minimal scope):** Optional AWS_MANAGED Secrets Manager container with
+least privilege; an optional *existing* customer-managed KMS key can be
+referenced. No new KMS key, no DDB/SQS CMK wiring.
 
 **Dependencies:** Q-04, Q-09, Q-10.
 
-**Affected files (proposed):**
+**Implemented files:**
 
 ```text
-terraform/modules/kms/{main.tf,variables.tf,outputs.tf}
-terraform/modules/dynamodb/main.tf
-terraform/modules/sqs/main.tf
-terraform/modules/iam/main.tf
-terraform/modules/sqs-worker/iam.tf
+terraform/modules/privacy_secret/{main.tf,variables.tf,outputs.tf}
+terraform/main.tf
+terraform/variables.tf
+terraform/outputs.tf
+terraform/modules/iam/{main.tf,variables.tf}
+terraform/modules/lambda/{main.tf,variables.tf}
 terraform/policy/resource-policy.json
+terraform/policy/validate-plan.py
+module_builder/{catalog.py,spec.py}
+installer/tests/test_policy_gate.py
 ```
 
-**Acceptance:**
+**Acceptance (local):**
 
-- no CMK by default;
-- key rotation enabled for new CMK;
-- key policy least privilege/no wildcard;
-- DDB/SQS changes are in-place, no replacement;
-- existing AWS-owned encryption not relabelled as CMK.
+- no secret/KMS/IAM resource by default (`privacy_secret_enabled=false`);
+- no KMS key is created; empty CMK ARN uses the AWS-managed key;
+- exact Secret ARN; `DescribeSecret`/`kms:Decrypt` only with an explicit CMK;
+- no wildcard; Policy Gate accepts the new secret type and checks inline IAM;
+- `terraform fmt -check`, `terraform validate`, Policy-Gate tests PASS.
 
-**Negative tests:** missing key policy, wildcard IAM, external key ARN wrong,
-SQS/DDB policy missing, deletion window invalid.
+**Negative tests:** foreign secret name, wildcard KMS ARN, inline IAM wildcard
+actions/resources.
+
+**Excluded / separate decision:** DDB/SQS CMK activation, KMS key creation and
+rotation, P00-F rotation/revocation, Terraform plan/apply, AWS-live verification.
 
 **Integration gate:** SG-03, SG-06, SG-07, SG-08.
 

@@ -59,3 +59,21 @@ variable "queue_url" {
   type        = string
   default     = ""
 }
+
+variable "privacy_secret_enabled" {
+  description = "Adds non-secret AWS_MANAGED provider/reference environment variables. Default false."
+  type        = bool
+  default     = false
+}
+
+variable "privacy_secret_id" {
+  description = "Exact Secret ARN/name reference; required when privacy_secret_enabled=true."
+  type        = string
+  default     = ""
+}
+
+variable "privacy_kms_key_arn" {
+  description = "Optional exact customer-managed KMS key ARN reference; never a secret value."
+  type        = string
+  default     = ""
+}

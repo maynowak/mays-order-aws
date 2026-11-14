@@ -232,6 +232,64 @@ class TestTargetedSecurityChecks(unittest.TestCase):
         self.assertTrue(any("endpoint is invalid" in e for e in errors), errors)
 
 
+class TestSecretsManagerPolicy(unittest.TestCase):
+    def _secret(self, name="mays-orders-rc4-privacy-internal", kms_key_id=None):
+        return _change(
+            "aws_secretsmanager_secret",
+            "module.privacy_secret[0].aws_secretsmanager_secret.privacy",
+            {"name": name, "kms_key_id": kms_key_id, "tags_all": TAGS},
+        )
+
+    def _role_policy(self, doc):
+        return _change(
+            "aws_iam_role_policy",
+            "module.iam.aws_iam_role_policy.privacy_secret",
+            {"role": "mays-orders-rc4-handler-role", "policy": doc, "tags_all": TAGS},
+        )
+
+    def test_project_scoped_secret_passes(self):
+        self.assertEqual(_errors(self._secret()), [])
+
+    def test_foreign_secret_name_rejected(self):
+        errors = _errors(self._secret(name="foreign-privacy"))
+        self.assertTrue(any("outside the project namespace" in e for e in errors), errors)
+
+    def test_secret_kms_reference_must_be_exact_arn(self):
+        errors = _errors(self._secret(kms_key_id="arn:aws:kms:eu-central-1:123456789012:key/*"))
+        self.assertTrue(any("exact key ARN" in e for e in errors), errors)
+
+    def test_inline_privacy_policy_exact_arn_passes(self):
+        doc = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["secretsmanager:GetSecretValue"],
+                        "Resource": "arn:aws:secretsmanager:eu-central-1:123456789012:secret:mays-orders-rc4-privacy-internal",
+                    }
+                ],
+            }
+        )
+        self.assertEqual(_errors(self._role_policy(doc)), [])
+
+    def test_inline_privacy_policy_wildcard_rejected(self):
+        doc = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["secretsmanager:GetSecretValue", "kms:Decrypt"],
+                        "Resource": "*",
+                    }
+                ],
+            }
+        )
+        errors = _errors(self._role_policy(doc))
+        self.assertTrue(any("wildcard resources" in e for e in errors), errors)
+
+
 class TestRepositoryPlan(unittest.TestCase):
     @unittest.skipUnless(RC4_PLAN_JSON.exists(), "RC4-Plan-JSON nicht vorhanden")
     def test_unchanged_rc4_plan_passes(self):

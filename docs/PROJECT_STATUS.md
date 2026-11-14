@@ -11,14 +11,15 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — P00 Security Implementation (P00-B/C/D integrated)
+RC4 Integration — P00 Security Implementation (P00-B/C/D integrated;
+P00-E local feature branch)
 
 Current Feature:
-MO-RC4 P00 — P00-D HMAC foundation integrated; APP_MANAGED default-off
+MO-RC4 P00 — P00-E minimal AWS_MANAGED secret wiring; default-off
 
 Current Task:
-MO-RC4-P00-D-INTEGRATION-06 — LOCALLY INTEGRATED / POST-MERGE VERIFIED /
-DEFAULT-OFF; 429 Lambda / 667 Installer + 2 Testausnahmen / 128 Builder / 32 E2E
+MO-RC4-P00-E-SIMPLE-01 — LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED;
+429 Lambda / 128 Builder / 23 Policy-Gate / terraform validate PASS
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -45,9 +46,15 @@ release/rc4-integration @ P00-D integration
   default-off; production key transport/P00-F rotation open
 → P00-D tests: 429 Lambda / 667 Installer + 1 live deferred + 1 harness failure /
   128 Builder / 32 E2E; ZIP b70e5c94…
-→ P00-C-M01/F-01/F-03: verified fixed; F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 offen
+→ P00-E-SIMPLE-01: `feature/mo-rc4-p00-e-simple` @ a6667ec; minimal
+  AWS_MANAGED Secret-Container, count-gated IAM/Lambda, optional externer CMK;
+  default-off; kein Secret-Wert, kein KMS-Key, kein Plan/Apply
+→ P00-E local tests: 429 Lambda / 128 Builder / 23 Policy-Gate /
+  terraform fmt+validate PASS; Integration/Plan/Apply/Live-Gates offen
+→ P00-C-M01/F-01/F-03: verified fixed; F-09 lokal implementiert (Integration
+  offen); F-02/F-04/F-05/F-06/F-08/F-10/F-11 offen
 → Eine AWS_MANAGED/APP_MANAGED-Produktionsaktivierung ist nicht freigegeben
-→ P00-E: nicht gestartet (DDB/SQS-CMK/Infrastruktur offen)
+→ DDB/SQS-CMK, P00-F Rotation/Revocation und Secret-Value-Provisionierung offen
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

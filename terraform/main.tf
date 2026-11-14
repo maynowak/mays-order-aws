@@ -60,6 +60,16 @@ module "dynamodb" {
 # Bewusst NICHT erlaubt: dynamodb:Scan/BatchWriteItem/CreateTable, s3:*, iam:*.
 # DeleteItem: Erasure-Funktion. SQS:SendMessage: OPTIONAL, count-gated nur mit Queue.
 
+# P00-E — optional privacy secret container. No secret value/version is
+# managed by Terraform; the operator provisions the value out-of-band.
+module "privacy_secret" {
+  source       = "./modules/privacy_secret"
+  count        = var.privacy_secret_enabled ? 1 : 0
+  project_name = var.project_name
+  tags         = var.tags
+  kms_key_arn  = var.privacy_kms_key_arn
+}
+
 module "iam" {
   source             = "./modules/iam"
   project_name       = var.project_name
@@ -72,6 +82,11 @@ module "iam" {
   # GAP-06: plan-bekanntes Gate (Root erzeugt die Queue immer). Der ARN oben
   # ist beim Fresh-Plan noch unbekannt und bleibt Policy-Resource.
   sqs_enabled = true
+
+  # P00-E: count-gated exact Secrets Manager/KMS permissions.
+  privacy_secret_enabled = var.privacy_secret_enabled
+  privacy_secret_arn     = try(module.privacy_secret[0].arn, "")
+  privacy_kms_key_arn    = var.privacy_kms_key_arn
 }
 
 # T011-04 — Lambda: Order Handler (Zip-Build, Python 3.14)
@@ -91,6 +106,11 @@ module "lambda" {
   log_retention_days  = var.log_retention_days
   filename            = "${path.root}/../lambda/dist/lambda.zip"
   runtime             = "python3.14"
+
+  # P00-E: only references, never a secret value.
+  privacy_secret_enabled = var.privacy_secret_enabled
+  privacy_secret_id      = try(module.privacy_secret[0].arn, "")
+  privacy_kms_key_arn    = var.privacy_kms_key_arn
 }
 
 # T011-05 — Cognito: User Pool + App Client + Gruppe `staff`

@@ -47,3 +47,21 @@ variable "sqs_enabled" {
   type        = bool
   default     = false
 }
+
+variable "privacy_secret_enabled" {
+  description = "Enables exact GetSecretValue on the privacy secret ARN. Default false."
+  type        = bool
+  default     = false
+}
+
+variable "privacy_secret_arn" {
+  description = "Exact ARN of the approved privacy secret; required when privacy_secret_enabled=true."
+  type        = string
+  default     = ""
+}
+
+variable "privacy_kms_key_arn" {
+  description = "Optional exact customer-managed KMS key ARN. DescribeSecret and kms:Decrypt are granted only when set."
+  type        = string
+  default     = ""
+}
