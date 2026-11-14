@@ -118,7 +118,7 @@ P00-C integration.
 | F-06 | LOW | **OPEN** — timeout values require Owner/Infra decision | NO |
 | F-07 | LOW | **OPEN** — pre-existing type coercion; no realistic bypass demonstrated | NO |
 | F-08 | LOW | **OPEN** — sanitized AWS error code is observability follow-up | NO |
-| F-09 | LOW | **OPEN — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check | NO (P00-E gate) |
+| F-09 | LOW | **LOCAL IMPLEMENTED — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check; integration approval pending | NO (P00-E gate) |
 | F-10 | LOW | **OPEN/INFO** — single-thread Lambda assumption documented | NO |
 | F-11 | LOW | **OPEN/INFO** — `id()` is production-None; test-only risk | NO |
 | F-12 | LOW | **DOCUMENTED** — P00-C runtime scope vs P00-E IaC/IAM | NO |
@@ -153,16 +153,18 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
-| Goal | Optional customer-managed KMS for secrets/DB/SQS with least privilege |
+| Status | **LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED** — `feature/mo-rc4-p00-e-simple` @ `a6667ec`; no plan/apply/live/AWS mutation |
+| Goal | Optional AWS_MANAGED Secrets Manager container with least privilege; optional existing CMK reference only |
 | Dependencies | Q-04, Q-09, Q-10; P00-C for secret option |
-| Components | `terraform/modules/kms`, DDB/SQS optional wiring, IAM/key policy |
-| Config contract | `kms_enabled`, optional existing key ARN; default off |
-| Acceptance | no CMK by default; new CMK rotation on; no wildcard; plan valid |
-| Negative tests | missing key policy, wrong ARN, wildcard IAM, deletion window |
-| Migration risk | DDB/SQS in-place updates; no automatic replacement; plan review |
-| Security boundary | exact key ARN; no CMK for unrelated services; no CloudFront/Cognito/RIS |
-| Commit boundary | module + wiring + policy tests; no rotation execution |
-| Owner approval | Q-04, Q-09; Q-10 approved |
+| Components | `terraform/modules/privacy_secret`, count-gated IAM/Lambda wiring, Q-09 Policy Gate |
+| Config contract | `privacy_secret_enabled=false` default; optional exact `privacy_kms_key_arn`; no secret value in Terraform |
+| Acceptance (minimal) | no resource by default; no KMS key created; exact Secret/KMS ARNs; no wildcard; static validate PASS |
+| Negative tests | foreign secret name, wildcard KMS ARN, inline IAM wildcard actions/resources |
+| Migration risk | only opt-in resource creation; no DDB/SQS/API/Cognito/CloudFront changes |
+| Security boundary | exact ARN; no secret value/version in Terraform; no CMK for unrelated services; APP_MANAGED unchanged |
+| Commit boundary | module + wiring + policy tests + local validation; no plan/apply |
+| Owner approval | Q-04, Q-09; Q-10 approved; integration and deployment gates separate |
+| Excluded | DDB/SQS CMK activation, KMS key creation/rotation, P00-F rotation/revocation |
 
 ---
 

@@ -738,3 +738,32 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No production activation, merge/push/deploy, AWS/Terraform mutation or
   RIS/Jobsearch change. Report:
   `docs/reports/MO-RC4-P00-D-INTEGRATION-06.md`.
+
+## 2026-11-14 — MO-RC4-P00-E-SIMPLE-01
+
+**Status:** `RESULT B — P00-E LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED`
+
+- Feature branch `feature/mo-rc4-p00-e-simple` from integration
+  `2dbbd3f`; implementation commit `a6667ec`. The existing P00-E analysis
+  branch (`46c6e61`, docs-only) was not modified.
+- Q-01: no privacy secret exists at baseline; opt-in uses the AWS-managed
+  Secrets Manager key by default, or an explicitly supplied existing CMK ARN.
+  No KMS key is created.
+- Q-02: handler role had no Secrets/KMS permissions. Added count-gated
+  `secretsmanager:GetSecretValue` on the exact secret ARN;
+  `secretsmanager:DescribeSecret` and `kms:Decrypt` only for an explicit CMK.
+  No wildcards; no permissions when disabled.
+- Q-03: Policy Gate now allows `aws_secretsmanager_secret`, enforces project
+  namespace/exact KMS ARN, and rejects wildcard Actions/Resources in inline
+  `aws_iam_role_policy` for sensitive Secrets/KMS actions. DDB/SQS CMK and
+  KMS key creation remain excluded.
+- No secret value/version is managed by Terraform; the value is provisioned
+  out-of-band. APP_MANAGED remains unchanged/default-off. No DDB/SQS/API/
+  Cognito/CloudFront changes.
+- Local evidence: Terraform `fmt -check` and `validate` PASS; Lambda 429/429,
+  Module Builder 128/128, Policy Gate 23/23 PASS. No Terraform plan/apply,
+  AWS live call, deployment, push or merge.
+- Remaining gates: integration approval, Terraform plan, apply/AWS-live,
+  out-of-band secret value, optional CMK key policy, DDB/SQS CMK decision and
+  P00-F rotation/revocation.
+- Report: `docs/reports/MO-RC4-P00-E-SIMPLE-01.md`.

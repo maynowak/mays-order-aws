@@ -107,12 +107,16 @@ is classified `TEST HARNESS DEFECT / ENVIRONMENT DEPENDENCY` (hardcoded clean
 primary worktree). Neither is counted as PASS. Q-02/Q-04/Q-08/Q-09/Q-10 and
 Q-11 for the P00-D contract are approved; ADR-008 is `ACCEPTED`. P00-F
 rotation/revocation, production key transport, AWS-live verification and the
-existing P00-C deployment gates remain open.
+existing P00-C deployment gates remain open. P00-E minimal scope is locally
+implemented on `feature/mo-rc4-p00-e-simple` @ `a6667ec` (no plan/apply/AWS
+mutation); integration approval is still required. P00-F and DDB/SQS CMK
+activation remain open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PARTIAL (P00-B/C/D integrated; P00-E/F and deployment gates pending)
+P00:          PARTIAL (P00-B/C/D integrated; P00-E local feature branch /
+              integration approval required; P00-F and deployment gates pending)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```
