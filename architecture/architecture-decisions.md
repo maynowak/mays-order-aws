@@ -207,6 +207,14 @@ Extern bereitgestellter Schlüssel (32 Byte, Base64), **keyed authentication** (
 `compare_digest`) und KDF über stdlib. **Keine Eigenbau-Chiffre** — echte
 Datenverschlüsselung nur mit geprüfter Bibliothek oder KMS-Envelope (dann eigene ADR).
 
+*P00-D Local Contract (2026-11-14):* HMAC-Payload ist `MOAPP || 0x01 || 0x01`
+mit length-prefixed `keyId`/`keyVersion`/`messageType`/`payload`; `keyId` und
+`keyVersion` sind kryptografisch gebunden. Signatur ist Base64url ohne Padding.
+Message-Type-Allowlist: `privacy.internal.v1`. 32-Byte-Key, strikte
+Standard-Base64-Dekodierung, Constant-Time-Vergleich, Fail-closed. Die lokale
+Implementierung aktiviert APP_MANAGED nicht im Order-Pfad; Rotation, Widerruf
+und Environment-Recycle bleiben P00-F.
+
 **D-7 — Geführte Rotation als spätere Phase**
 Ablauf: Bereitstellung → Prüfung → Neuverschlüsselung → Wiederanlauf → Abschlussprüfung →
 erst dann Alt-Schlüssel entfernen. In RC4 gibt es **keinen automatischen Rotator und keine

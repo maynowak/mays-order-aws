@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from errors import VALIDATION_ERROR, OrderError
+from hmac_contract import AppManagedKey, HmacContractError, HmacVerifier
 
 ENV_PROVIDER = "env"
 SECRETS_MANAGER_PROVIDER = "secretsmanager"
@@ -424,11 +425,61 @@ class AppManagedProvider:
 
     auth_method = APP_MANAGED_AUTH_METHOD
 
-    def __init__(self, config: SecretProviderConfig) -> None:
+    def __init__(
+        self,
+        config: SecretProviderConfig,
+        key_material: str | None = None,
+        key_loader: Callable[[], str] | None = None,
+    ) -> None:
         self._config = config
+        self._key_material = key_material
+        self._key_loader = key_loader
+        self._resolved_key: AppManagedKey | None = None
 
     def resolve(self) -> SecretMaterial:
+        # P00-D does not activate APP_MANAGED as the bearer-token provider.
+        # The existing internal_token comparison remains unchanged.
         raise AppKeyInvalid()
+
+    def resolve_key(self) -> AppManagedKey:
+        """Load and validate externally supplied key metadata/material locally.
+
+        No AWS dependency and no request-controlled key selection. The loader
+        is an explicit injection point for the future protected runtime
+        transport; this method does not activate HMAC auth in OrderService.
+        """
+        if self._resolved_key is not None:
+            return self._resolved_key
+        material = self._key_material
+        if material is None and self._key_loader is not None:
+            try:
+                material = self._key_loader()
+            except Exception:
+                raise AppKeyInvalid() from None
+        if material is None:
+            raise AppKeyInvalid()
+        try:
+            key = AppManagedKey.from_base64(
+                self._config.key_id or "",
+                self._config.key_version or "",
+                material,
+            )
+        except HmacContractError:
+            raise AppKeyInvalid() from None
+        self._resolved_key = key
+        return key
+
+    def verifier(
+        self,
+        previous: AppManagedKey | None = None,
+        *,
+        allow_previous: bool = False,
+    ) -> HmacVerifier:
+        return HmacVerifier(
+            self.resolve_key(),
+            previous=previous,
+            allow_previous=allow_previous,
+        )
 
 
 def _build_provider(
@@ -436,6 +487,8 @@ def _build_provider(
     env: Mapping[str, str],
     secretsmanager_fetcher: SecretsManagerFetcher | None,
     secretsmanager_descriptor: SecretsManagerDescriptor | None,
+    app_key_material: str | None = None,
+    app_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     if config.provider == ENV_PROVIDER:
         return EnvSecretProvider(config, env)
@@ -449,7 +502,11 @@ def _build_provider(
                 descriptor = adapter.describe_secret
         return SecretsManagerProvider(config, fetcher, descriptor)
     if config.provider == APP_MANAGED_PROVIDER:
-        return AppManagedProvider(config)
+        return AppManagedProvider(
+            config,
+            key_material=app_key_material,
+            key_loader=app_key_loader,
+        )
     raise ProviderConfigurationError()
 
 
@@ -457,6 +514,8 @@ def create_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
     secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
+    app_key_material: str | None = None,
+    app_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     """Build the configured provider without any implicit fallback.
 
@@ -468,7 +527,12 @@ def create_secret_provider(
     env = os.environ if environ is None else environ
     config = SecretProviderConfig.from_environment(env)
     return _build_provider(
-        config, env, secretsmanager_fetcher, secretsmanager_descriptor
+        config,
+        env,
+        secretsmanager_fetcher,
+        secretsmanager_descriptor,
+        app_key_material,
+        app_key_loader,
     )
 
 
@@ -481,6 +545,8 @@ def get_default_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
     secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
+    app_key_material: str | None = None,
+    app_key_loader: Callable[[], str] | None = None,
 ) -> SecretProvider:
     """Return the process-wide provider for one Lambda execution environment.
 
@@ -496,6 +562,8 @@ def get_default_secret_provider(
     descriptor_identity = (
         id(secretsmanager_descriptor) if secretsmanager_descriptor is not None else None
     )
+    app_material_identity = id(app_key_material) if app_key_material is not None else None
+    app_loader_identity = id(app_key_loader) if app_key_loader is not None else None
     key = (
         config.provider,
         config.reference,
@@ -504,12 +572,19 @@ def get_default_secret_provider(
         config.kms_key_arn,
         fetcher_identity,
         descriptor_identity,
+        app_material_identity,
+        app_loader_identity,
     )
     global _default_provider, _default_provider_key
     with _default_provider_lock:
         if _default_provider is None or _default_provider_key != key:
             _default_provider = _build_provider(
-                config, env, secretsmanager_fetcher, secretsmanager_descriptor
+                config,
+                env,
+                secretsmanager_fetcher,
+                secretsmanager_descriptor,
+                app_key_material,
+                app_key_loader,
             )
             _default_provider_key = key
         return _default_provider

@@ -669,3 +669,25 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No product code, AWS/Terraform mutation, push/merge/deploy or RIS/Jobsearch
   change. Contract: `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md`;
   Report: `docs/reports/MO-RC4-P00-D-HMAC-CONTRACT-03.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-IMPLEMENTATION-04
+
+**Status:** `MO-RC4-P00-D — LOCAL IMPLEMENTATION COMPLETE / SECURITY REVIEW PENDING`
+
+- Feature branch `feature/mo-rc4-p00-d-app-managed` from `8a19d5a`.
+- D1/D2: `hmac_contract.py` implements the approved byte-exact `MOAPP`
+  envelope, HMAC-SHA256, Base64url-no-padding signatures, strict 32-byte
+  Base64 key validation, constant-time verification and fail-closed parsing.
+- D3/D4: additive local `AppManagedProvider.resolve_key()/verifier()` with
+  injected material/loader; `resolve()` remains fail-closed; no bearer-token
+  activation, no ENV/AWS_MANAGED change, no production transport.
+- Generated test vector reproduced exactly; 23 HMAC tests pass.
+- Lambda 428 PASS; Installer 667 PASS with 1 live-profile test deferred and
+  1 environment-dependent primary-worktree detector failure; Builder 128, E2E
+  32, Seed 28. No test exception counted as PASS.
+- ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, reproducible).
+- P00-F rotation/revocation, production key transport and existing-signature
+  handling remain open. No merge/push/deploy, AWS/Terraform mutation or
+  RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-D-IMPLEMENTATION-04.md`.

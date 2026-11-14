@@ -17,8 +17,8 @@ Current Feature:
 MO-RC4 P00 — P00-C local closeout; P00-D planning ready
 
 Current Task:
-MO-RC4-P00-D-HMAC-CONTRACT-03 — HMAC CONTRACT PREPARED / OWNER APPROVAL
-PENDING; keine APP_MANAGED-Implementierung
+MO-RC4-P00-D-IMPLEMENTATION-04 — APP_MANAGED HMAC FOUNDATION IMPLEMENTED /
+LOCAL VERIFIED / SECURITY REVIEW PENDING; nicht gemerged
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
