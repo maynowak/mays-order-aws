@@ -478,3 +478,71 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Tests: Lambda 400, Installer 669, Builder 128, E2E local 32 = **1.229 PASS**;
   Seed 28. ZIP `05bc3f65…` (42.081 bytes, 12 modules, reproducible).
 - Report: `docs/reports/MO-RC4-P00-C-IMPLEMENTATION-02.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-SECURITY-REVIEW-03
+
+**Status:** `MO-RC4-P00-C — SECURITY REVIEW FAILED / CORRECTIONS REQUIRED`
+
+- Read-only Multi-Agent Review of feature `08fde23` against integration
+  `4d4db3b`; ancestry PASS, merge-tree conflict-free, no product code changed,
+  no merge/push/deploy. Review branch `review/mo-rc4-p00-c-security-03`.
+- Evidence: Lambda 400 PASS, Installer 669 PASS, Builder 128 PASS, E2E lokal 32
+  PASS = 1.229 PASS; Seed 28; ZIP `05bc3f65…` (42.081 B, 12 modules,
+  source-identical, reproducible).
+- No CRITICAL/HIGH. Corrections required: F-01 `DescribeSecret` is absent from
+  ADR-008 D-5/C-03, Contract §6, Q-09 and Policy Gate; F-03 no real
+  `index.handler` test with `PRIVACY_SECRET_PROVIDER=secretsmanager` (M-01
+  mutation undetected); F-02 cache survives rotation without production
+  invalidation; F-04 payload/length contract unclear; F-05 rollback
+  contradictory. LOW: timeouts, non-string token coercion, missing AWS error
+  code, Policy-Gate inline-policy gap, cache lock, `id()` key, status scope.
+- Review probes independently confirmed fail-closed behavior and provider-level
+  cache, but no AWS-live verification. Process deviation: one accidental
+  read-only `GetSecretValue` attempt by a reviewer against a dummy ARN was
+  denied; no mutation, no secret retrieved, not used as evidence.
+- Report: `docs/reports/MO-RC4-P00-C-SECURITY-REVIEW-03.md`.
+- No merge authorization; P00-C remains on feature branch. No Terraform/AWS
+  mutation, RIS/Jobsearch change, push, main merge or deployment.
+
+## 2026-11-14 — MO-RC4-P00-C-CORRECTION-04
+
+**Status:** `MO-RC4-P00-C — F-03 VERIFIED / F-01 OWNER DECISION PENDING`
+
+- Correction branch `feature/mo-rc4-p00-c-correction-04` based on review HEAD
+  `41b8612`; feature `08fde23` and integration `4d4db3b` unchanged.
+- F-03: new `lambda/tests/test_index_aws_managed.py` exercises real
+  `index.handler` twice with fake boto3; proves module-provider reuse, one
+  fetch, reference isolation, invalidation, negative config and redaction.
+  Mutation with per-invocation provider fails the test.
+- F-01: Q-09 amendment proposal prepared in
+  `docs/release/MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md`; NOT approved.
+- F-02/F-04/F-05: cache/rotation, exact SecretString payload, and two safe
+  rollback paths documented in `docs/security/AWS-MANAGED-PROVIDER-ROLLOUT.md`.
+- F-06/F-07/F-08/F-09/F-10/F-11 remain open (P00-E/INFO); F-12 documented.
+- Tests: Lambda 405, Installer 669, Builder 128, E2E 32 = **1.234 PASS**;
+  Seed 28. ZIP unchanged `05bc3f65…` (42.081 B).
+- Report: `docs/reports/MO-RC4-P00-C-CORRECTION-04.md`; no merge/push/deploy,
+  no Terraform/AWS mutation, no RIS/Jobsearch change. Independent re-review
+  remains required.
+
+## 2026-11-14 — MO-RC4-P00-C-F01-AUTHORIZATION-05
+
+**Status:** `MO-RC4-P00-C — F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW READY`
+
+- Owner approved Q-09 limited amendment: `secretsmanager:DescribeSecret` for
+  the same exact approved secret ARN(s), only for customer-CMK metadata
+  verification; no wildcard, no implicit CMK, no DDB/SQS CMK extension.
+- Updated ADR-008 D-5/C-03, Decision Register Q-09, Contract §6/§8, Policy-Gate
+  specification and P00-C backlog. Policy-Gate code/allowlist remains P00-E and
+  is not implemented.
+- F-01 status: **CONTRACT AMENDED / RE-REVIEW PENDING**, not `VERIFIED FIXED`.
+- F-03 evidence remains valid: real `index.handler` tests (5), cross-invocation
+  cache, one `GetSecretValue`, identity isolation, invalidation, negative
+  config and mutation failure. Targeted tests: 60 PASS.
+- F-02/F-04/F-05 remain deployment gates; F-06/F-08/F-09/F-10/F-11 remain low
+  follow-ups.
+- Branch `feature/mo-rc4-p00-c-f01-authorization-05` from correction `d3ce237`;
+  feature `08fde23` and integration `4d4db3b` unchanged. No merge, push,
+  deploy, Terraform/AWS mutation or RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-C-F01-AUTHORIZATION-05.md`.
+- Independent re-review required before F-01 can become VERIFIED FIXED.

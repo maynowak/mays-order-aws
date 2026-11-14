@@ -157,7 +157,41 @@ Exit codes:
 
 A `FAIL` must not be bypassed merely to make deployment succeed. Investigate whether the finding is a real governance violation, a project configuration problem, or an intentionally approved policy change.
 
-## 8. AI agent rules
+## 8.1 Q-09 Limited Amendment — Secrets Manager/KMS (specified, P00-E implementation pending)
+
+**Status:** Contract approved 2026-11-14; Policy-Gate code/allowlist changes are
+**not implemented** and are P00-E scope.
+
+The current allowlist remains unchanged until P00-E is separately authorized.
+The intended P00-E specification is:
+
+Add resource types:
+
+```text
+aws_secretsmanager_secret
+aws_secretsmanager_secret_version
+aws_kms_key
+aws_kms_alias
+```
+
+Validation requirements:
+
+- Secrets/KMS resources are project-scoped; no `*` in names/ARNs.
+- `aws_secretsmanager_secret_version` must not expose a plaintext
+  `secret_string` in plan/state/output.
+- `secretsmanager:GetSecretValue` only on exact approved secret ARNs.
+- `secretsmanager:DescribeSecret` only on the same exact approved secret ARNs,
+  only for customer-CMK metadata verification.
+- `kms:Decrypt` only on the exact customer CMK ARN and only when actually
+  selected; the AWS-managed Secrets Manager key must not require it.
+- No wildcard actions/resources; Default Deny remains.
+- Standalone `aws_iam_policy` **and** inline `aws_iam_role_policy` documents
+  must be checked for wildcard actions/resources.
+- No implicit CMK creation; no DynamoDB/SQS CMK extension in this amendment.
+
+A plan that does not satisfy these rules must FAIL. No gate bypass is permitted.
+
+## 9. AI agent rules
 
 AI coding agents must:
 

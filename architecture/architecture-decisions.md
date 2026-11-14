@@ -126,6 +126,12 @@ fortlaufende Nummern in dieser Datei, kein separates `docs/adr/`.
 **Owner-Freigabe:** 2026-11-13 (Q-10) · Branch `release/rc4-integration` · Ausgangs-HEAD
 `dd4879951c19a60400d3b4fb7a01d394600a4a90`
 
+**Q-09 Limited Amendment (2026-11-14):** `secretsmanager:DescribeSecret` is
+approved only for the same explicitly approved secret ARN(s), only for
+customer-CMK metadata verification; no wildcard and no DDB/SQS CMK extension.
+F-01 remains `CONTRACT AMENDED / RE-REVIEW PENDING` until independent
+re-review.
+
 **Auftragsbezug:** MO-RC4-P01. Belege: `docs/reports/MO-RC4-P01-CONTRACT-INVENTORY.md`,
 `MO-RC4-P01-ORPHAN-CLEANUP-DESIGN.md`, `MO-RC4-P01-SECRET-PROVIDER-DESIGN.md`,
 `MO-RC4-P01-OPEN-QUESTIONS.md`.
@@ -189,9 +195,12 @@ Secrets Manager; Env enthält ausschließlich nicht-geheime Referenzen:
 `PRIVACY_SECRET_PROVIDER`, `PRIVACY_SECRET_ID` (ARN/Name) und — nur bei explizit
 aktivierter CMK — `PRIVACY_KMS_KEY_ARN` (Key-ARN, kein Secret-Wert). Kein Klartext in Env,
 Logs, Outputs oder State (`ephemeral`). IAM ist least privilege:
-`secretsmanager:GetSecretValue` auf dem exakten Secret-ARN; `kms:Decrypt` nur bei
-aktivierter CMK auf dem exakten Key-ARN. Kein `Resource: "*"`, kein stiller Fallback auf
-`env`. Die CMK-Aktivierung bleibt eine separate Entscheidung (Q-04/Q-09).
+`secretsmanager:GetSecretValue` auf dem exakten Secret-ARN; zusätzlich
+`secretsmanager:DescribeSecret` auf demselben exakten Secret-ARN, ausschließlich
+zur Verifikation der CMK-Metadaten (`KmsKeyId`), wenn `PRIVACY_KMS_KEY_ARN`
+explizit gesetzt ist; `kms:Decrypt` nur bei aktivierter CMK auf dem exakten
+Key-ARN. Kein `Resource: "*"`, kein stiller Fallback auf `env`. Die
+CMK-Aktivierung bleibt eine separate Entscheidung (Q-04/Q-09).
 
 **D-6 — APP_MANAGED als zweite Implementierung**
 Extern bereitgestellter Schlüssel (32 Byte, Base64), **keyed authentication** (HMAC-SHA256,
@@ -253,7 +262,7 @@ ausschließlich die Definitionen im `docs/release/MO-RC4-P00-DECISION-REGISTER.m
 |---|---|---|---|
 | C-01 | Historische Fragen eindeutig zuordnen | Tabelle „Historische P01-Fragen → P00-Zuordnung" | keine alten Q-Nummern mehr als offene P00-Fragen |
 | C-02 | Optionale `PRIVACY_KMS_KEY_ARN`-Referenz | D-5: ausschließlich nicht-geheime Referenzen, optionaler Key-ARN | kein Secret-Wert in Env/State |
-| C-03 | Least-Privilege-IAM | D-5: `GetSecretValue` exakt; `kms:Decrypt` nur bei CMK, exakter ARN; kein Wildcard | IAM-Regel im Contract §6 |
+| C-03 | Least-Privilege-IAM | D-5: `GetSecretValue` exakt; `DescribeSecret` nur bei CMK-Metadatenprüfung auf demselben exakten Secret-ARN; `kms:Decrypt` nur bei CMK, exakter ARN; kein Wildcard | IAM-Regel im Contract §6; Q-09 Amendment 2026-11-14 |
 | C-04 | Manuelle Rotation ohne Auto-Rotator | D-7: kein Automatismus; dokumentierte manuelle Rotation; Q-11 offen | Q-11 bleibt separat |
 | C-05 | `orders-service`-Vertrag unverändert | D-8: bestehender Vertrag unverändert; gehärtete Module separat; Q-03 offen | Default-Plan bleibt unverändert |
 | C-06 | ADR-006 tatsächlicher Status | ADR-006 bleibt `ACCEPTED`; ADR-008 ist die neue ADR nur für Secrets Manager/KMS | keine Statusänderung, keine pauschale Freigabe |

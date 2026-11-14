@@ -14,6 +14,11 @@ rotation and retention integration
 > contract/architecture decision only; no implementation is authorized.
 > P00-B is integrated; P00-C still requires a separate package authorization.
 > Remaining questions (Q-03, Q-05, Q-06, Q-07, Q-11…Q-14) remain open.
+>
+> **Q-09 limited amendment 2026-11-14:** `secretsmanager:DescribeSecret` is
+> approved only for the same exact secret ARN(s), only for customer-CMK
+> metadata verification. No wildcard, no implicit CMK, no DDB/SQS CMK. F-01
+> remains `CONTRACT AMENDED / RE-REVIEW PENDING`.
 
 > This is an implementation contract, not code. No field below is approved for
 > implementation until the corresponding Owner Decision is closed.
@@ -177,11 +182,12 @@ reference suffix only.
 | Secret source | AWS Secrets Manager |
 | Reference | Exact ARN/name, project-scoped |
 | Provider IAM | `secretsmanager:GetSecretValue` on exact ARN |
+| Metadata IAM | `secretsmanager:DescribeSecret` on the same exact ARN only when `PRIVACY_KMS_KEY_ARN` is set; CMK verification only |
 | Secret encryption | AWS-managed default; optional CMK via separate decision |
 | KMS IAM | `kms:Decrypt` only if CMK selected; exact key ARN; no wildcard |
 | Value in Env | **No** plaintext; only provider/reference fields, including optional non-secret `PRIVACY_KMS_KEY_ARN` |
 | Value in Terraform | **No** value in outputs/state |
-| Cache | Process-local |
+| Cache | Module-scoped process-local; no TTL; controlled invalidation |
 | Rotation | Manual/native later; not automatically enabled |
 | Failure | fail-closed, no ENV fallback |
 
@@ -230,6 +236,10 @@ APP_MANAGED is not an AWS KMS key and not a variant of AWS_MANAGED.
   encryption resources.
 - **Q-09 approved:** Policy-Gate extension is allowlist-based, default-deny and
   least-privilege; no wildcard without a separate Owner decision.
+- **Q-09 limited amendment approved 2026-11-14:**
+  `secretsmanager:DescribeSecret` is allowed only on the same exact approved
+  secret ARN(s), only for customer-CMK metadata verification. It is not a
+  general metadata permission; no DDB/SQS CMK extension and no implicit CMK.
 
 ---
 

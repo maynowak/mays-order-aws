@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C IMPLEMENTED ON FEATURE BRANCH
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,13 +78,13 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **IMPLEMENTED / TESTED / SECURITY REVIEW READY** — feature branch, not merged |
+| Package status | **IMPLEMENTED / TESTED / F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW PENDING** — feature branch, not merged |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
 | Field | Content |
 |---|---|
-| Status | **IMPLEMENTED / TESTED — security review pending** |
+| Status | **IMPLEMENTED / TESTED / HANDLER-TEST VERIFIED — F-02 deployment gate open** |
 | Source | `MO-RC4-P00-B-INTEGRATION-REVIEW-01` finding M-01 |
 | Problem | P00-B `SecretCache` was owned by a per-invocation `OrderService`; effective scope was one invocation. |
 | Implemented scope | Module-level `get_default_secret_provider()` shared by `OrderService`; provider/cache survives invocations in one execution environment. |
@@ -105,6 +105,23 @@ The order may change only with documented dependency justification.
 
 These criteria are not P00-B merge blockers, but must be evidenced before
 P00-C integration.
+
+### Security Review 03 conditions — correction status
+
+| ID | Severity | Status | Merge blocker |
+|---|---|---|---|
+| F-01 | MEDIUM | **CONTRACT AMENDED / RE-REVIEW PENDING**; Q-09 limited amendment approved; ADR/Contract/Policy-Gate spec updated; runtime matches (DescribeSecret only with `PRIVACY_KMS_KEY_ARN`) | **until re-review** |
+| F-02 | MEDIUM | **DOCUMENTED** in rollout: cache lifetime, forced environment recycle, parallel-generation risk; no auto rotation | NO (deployment gate) |
+| F-03 | MEDIUM | **VERIFIED** by `test_index_aws_managed.py` (5 handler-level tests) and mutation proof | NO |
+| F-04 | MEDIUM | **DOCUMENTED** exact SecretString payload: ASCII, 1…1024, no JSON | NO (activation gate) |
+| F-05 | MEDIUM | **DOCUMENTED** two rollback paths (forward-fix / owner-approved ENV) | NO (activation gate) |
+| F-06 | LOW | **OPEN** — timeout values require Owner/Infra decision | NO |
+| F-07 | LOW | **OPEN** — pre-existing type coercion; no realistic bypass demonstrated | NO |
+| F-08 | LOW | **OPEN** — sanitized AWS error code is observability follow-up | NO |
+| F-09 | LOW | **OPEN — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check | NO (P00-E gate) |
+| F-10 | LOW | **OPEN/INFO** — single-thread Lambda assumption documented | NO |
+| F-11 | LOW | **OPEN/INFO** — `id()` is production-None; test-only risk | NO |
+| F-12 | LOW | **DOCUMENTED** — P00-C runtime scope vs P00-E IaC/IAM | NO |
 
 ---
 
