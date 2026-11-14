@@ -231,6 +231,7 @@ AWS/Terraform: NONE
 Merge/Push:    NONE
 Deployment:    NONE
 RIS/Jobsearch: NONE
+Dokumentationscommits: fde2639 (Entscheidungspaket), c8e836a (Konsolidierung)
 ```
 
 **Hinweis:** Während der Bearbeitung erschien der parallele Docs-Commit
