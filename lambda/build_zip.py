@@ -38,7 +38,12 @@ def build() -> None:
             info = zipfile.ZipInfo(module, date_time=FIXED_DATE_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = FIXED_FILE_MODE
-            archive.writestr(info, source.read_bytes())
+            # Normalise line endings: the same commit checks out as CRLF under
+            # core.autocrlf=true and as LF otherwise. Python accepts both, but
+            # the packaged bytes (and therefore the artifact hash) must not
+            # depend on the builder's git configuration.
+            payload = source.read_bytes().replace(b"\r\n", b"\n")
+            archive.writestr(info, payload)
 
     digest = hashlib.sha256(ZIP_PATH.read_bytes()).hexdigest()
     print(f"Built {ZIP_PATH} ({ZIP_PATH.stat().st_size} bytes, sha256 {digest})")
