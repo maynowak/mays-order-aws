@@ -1,17 +1,17 @@
 # RC4 Module Release Candidate — Dossier
 
-**Status:** CANDIDATE / CONDITIONAL — **NOT RELEASED**
-**Release-Owner-Status:** **APPROVAL PENDING**
-**Datum:** 2026-11-13
+**Status:** **APPROVED FOR RELEASE — v0.6.0-rc.1**
+**Release-Owner-Status:** **Q-12 APPROVED**
+**Datum:** 2026-11-14
 **Repository:** `maynowak/mays-order-aws`
-**Branch:** `test/mo-rc4-testsuite-hardening-10a`
-**HEAD:** `0aa95484bb237edea8e417cb765b32f76b97b77f`
+**Branch:** `release/rc4-integration`
+**Release-Commit:** durch den annotierten Tag `v0.6.0-rc.1` gebunden
 **Deployment-Version im Teststack:** `0.2.0`
-**Vorgeschlagenes Release-Label:** `v0.5.0-rc.4` — **nicht freigegeben**
+**Release-Label:** `v0.6.0-rc.1` — **APPROVED**
 
-> Dieses Dossier ist eine Release-Entscheidungsgrundlage, keine
-> Veröffentlichung und kein Release-Tag. Es enthält keine Produktänderung,
-> keine AWS-Mutation und keine RIS-Integration.
+> Dieses Dossier dokumentiert die freigegebene Release-Entscheidung
+> `v0.6.0-rc.1`. Es enthält keine zusätzliche Produktänderung und keine
+> RIS-Integration. Die produktive Aktivierung bleibt separat gesperrt.
 
 ---
 
@@ -21,17 +21,17 @@
 |---|---|
 | RC4-Kandidat | Order-Modul + Teststack-Nachweise |
 | Deployment-Version | `0.2.0` (Teststack `mays-orders-rc4-test`) |
-| Vorgeschlagenes Release-Label | **`v0.5.0-rc.4`** — Release-Owner-Zustimmung ausstehend |
-| Q-12-Verträglichkeit | Fortsetzung der `v0.5.0-rc.x`-Serie; konsistent mit einem auf den Order-Kern begrenzten Kandidaten |
-| Alternative | `v0.6.0-rc.1` nur, wenn P00/KMS/Retention als Feature-Generation in RC4 bleibt |
+| Release-Label | **`v0.6.0-rc.1`** — Q-12 APPROVED |
+| Q-12-Verträglichkeit | Neue RC4-Feature-Generation; Deployment-Version bleibt separat |
+| Alternative | `v0.5.0-rc.4` wurde nicht gewählt |
 | Module-Builder-Version | `0.1.0` (`module_builder/__init__.py`) |
 | RIS-Pin | `1dbb0cb` (RC3-code-identisch) |
-| Owner-Status | **RELEASE OWNER APPROVAL PENDING** |
+| Owner-Status | **Q-12 APPROVED — v0.6.0-rc.1** |
 
-**Entscheidungsstand:** `v0.5.0-rc.4` ist ein **Vorschlag** für einen begrenzten
-Order-Core-Kandidaten. Die endgültige Festlegung und die formale
-Release-Owner-Zustimmung stehen aus. Die Version wird nicht allein aus diesem
-Dossier oder aus einer Empfehlung wirksam.
+**Entscheidungsstand:** Q-12 ist für `v0.6.0-rc.1` **APPROVED**. Die
+Komponentenversionen bleiben unabhängig: Installer `0.1.0`, Module Builder
+`0.1.0`, Deployment/Teststack `0.2.0`. Die produktive Aktivierung ist nicht
+Teil dieser Release-Freigabe.
 
 ---
 
@@ -69,14 +69,13 @@ und darf nicht als bereits beschlossen gelten.
 
 | Ebene | Vorgeschlagene Behandlung | Verbleibende Pflicht |
 |---|---|---|
-| A — Eigenständiges RC4-Modul | P00 wird **nicht als erfüllt** ausgewiesen; der Kandidat ist auf den verifizierten Order-Kern begrenzt | Release-Owner muss die Scope-Begrenzung ausdrücklich autorisieren |
+| A — Eigenständiges RC4-Modul | P00 wird **nicht als erfüllt** ausgewiesen; der Kandidat ist auf den verifizierten Order-Kern begrenzt | Scope-Begrenzung ist dokumentiert; P00-Produktionsanforderungen bleiben separat |
 | B — Installation/Deployment | Teststack nutzt temporäre Konfiguration; keine dauerhafte Secret-/KMS-Haltung | Secret-Provider, KMS, Retention und Deployment-Gates bleiben offen |
 | C — Produktiver Betrieb | **Nicht freigegeben** | P00 P-01…P-09/P-15, SEC-06, Retention, Rotation, Multi-Account-Reife |
 
-Es werden keine Sicherheitsanforderungen gestrichen. Falls der bestehende
-RC4-Vertrag P00 auch für eine reine Modulveröffentlichung zwingend vorschreibt,
-bleibt die Freigabe **BLOCKED**, bis die Release-Ownerin die Vertragsänderung
-ausdrücklich autorisiert.
+Es werden keine Sicherheitsanforderungen gestrichen. Die Release-Freigabe
+behauptet **keine** P00-Produktionserfüllung; P00-G Retention und die
+produktive Secret-/KMS-Aktivierung bleiben separat gesperrt.
 
 ---
 
@@ -155,7 +154,7 @@ Keine Live-Tests wurden in diesem Dossier wiederholt.
 
 ## 8. Bekannte Einschränkungen
 
-1. Release-Label: **`v0.5.0-rc.4` vorgeschlagen**, Release-Owner-Zustimmung ausstehend; kein RC4-Release-Artefakt.
+1. Release-Label: **`v0.6.0-rc.1` APPROVED**; Release-Artefakt/Tag wird durch diesen Release-Commit gebildet. P00-G Retention bleibt deaktiviert.
 2. P00 KMS/Secrets/Retention nicht implementiert; Scope nicht formal entschieden.
 3. SEC-06 Approval-Bindung offen.
 4. Legacy-Bestand ohne Identität bleibt 404; keine Migration.
@@ -223,7 +222,7 @@ Teststack-/Infrastrukturmaßnahme; kein Apply in diesem Auftrag.
 | Privacy B2 | **PARTIAL** | 14 PASS, 1 SKIP |
 | B2 Cleanup | **PASS** | 0/0/0/0, Rückbau |
 | Terraform-Drift | **PARTIAL** | 0 add / 2 change, kein Apply |
-| RC4-Version | **OPEN / OWNER PENDING** | Vorschlag `v0.5.0-rc.4`; Q-12 |
+| RC4-Version | **APPROVED** | `v0.6.0-rc.1`; Q-12 |
 | P00-Scope | **OPEN** | Plan, keine Entscheidung |
 | SEC-06 | **OPEN** | V2 PROPOSED |
 | Legacy-Migration | **OPEN** | 404, keine Migration |
@@ -236,31 +235,31 @@ Teststack-/Infrastrukturmaßnahme; kein Apply in diesem Auftrag.
 
 | Bereich | Entscheidung |
 |---|---|
-| **RC4-Modul** | **CONDITIONAL GO** — Code/Teststack belastbar; Version/Scope/Gate-Dossier noch nicht verbindlich |
+| **RC4-Modul** | **APPROVED — v0.6.0-rc.1** — Code/Teststack belastbar; Release-Label Q-12 entschieden |
 | **RC4-Teststack** | **GO** — isoliert verifiziert, Cleanup/Rückbau nachgewiesen |
 | **RIS-Integration** | **NO-GO** — kein RC4-Pin/Consumer-Nachweis |
 | **Produktion** | **NO-GO** — P00/SEC-06/Retention/CI-CD offen |
 
-**Keine automatische Hochstufung.** Ohne Q-12-, Scope- und Gate-Entscheidung
-bleibt die RC4-Modulfreigabe konditional.
+Die Release-Version ist entschieden. Produktion, RIS-Integration und
+produktive Secret-/Retention-Aktivierung bleiben separat gesperrt.
 
 ### 13.1 Release-Owner-Entscheidungsvorlage
 
 | Entscheidung | Vorgeschlagener Wert |
 |---|---|
-| Release-Version | `v0.5.0-rc.4` (Vorschlag; nicht freigegeben) |
+| Release-Version | `v0.6.0-rc.1` (APPROVED) |
 | RC4-Modulscope | Verifizierter Order-Kern |
 | P00 | Nicht als erfüllt ausgewiesen; Produktionsanforderungen bleiben |
 | RIS-Integration | Nicht freigegeben |
 | Produktion | Nicht freigegeben |
-| Veröffentlichung | Noch nicht autorisiert |
+| Veröffentlichung | **Autorisiert** — Branch + annotierter Tag |
 
 **Status:**
 
 ```text
-RC4 RELEASE OWNER APPROVAL PENDING
+RELEASE APPROVED — v0.6.0-rc.1
 ```
 
-Eine Zustimmung zur Dokumentation dieses Vorschlags ist **keine**
-Release-Freigabe. Ohne ausdrückliche Release-Owner-Entscheidung bleibt A
-`CONDITIONAL GO`; bei verbindlichem P00-Scope bleibt A `NO-GO`.
+Die Release-Freigabe betrifft die Veröffentlichung des RC4-Branches und des
+annotierten Tags. Sie ist **keine** Freigabe für Produktion, RIS-Integration
+oder die Aktivierung von P00-G Retention.

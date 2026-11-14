@@ -1,6 +1,6 @@
 # MO-RC4-P00 Decision Register
 
-**Status:** Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / Q-11 P00-D CONTRACT DECIDED / P00-F ROTATION PENDING
+**Status:** Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / Q-11 P00-D CONTRACT DECIDED / Q-12 APPROVED: v0.6.0-rc.1 / P00-F OPERATIONAL PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **RC4 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Integration Branch:** `release/rc4-integration`
@@ -33,7 +33,7 @@
 | Q-09 | Policy-Gate-Erweiterung | **DECIDED — explicit allowlist / default deny / DescribeSecret limited** | P00-C/E/H (Entscheidung geschlossen) |
 | Q-10 | ADR-008-Freigabe | **DECIDED — ADR-008 ACCEPTED** | P00-B/C/E (Entscheidung geschlossen) |
 | Q-11 | Rotation in RC4 | **DECIDED — P00-D CONTRACT / P00-F ROTATION PENDING** | P00-D/F |
-| Q-12 | Release-Label | **READY_FOR_OWNER** | Release-Gate |
+| Q-12 | Release-Label | **DECIDED — v0.6.0-rc.1** | Release-Gate (closed) |
 | Q-13 | AWS-Testkonto | **READY_FOR_OWNER** | P00-I |
 | Q-14 | Bestand ohne Retention | **READY_FOR_OWNER** | P00-G |
 
@@ -224,10 +224,12 @@ P00-D implementation is local-only; production activation is not authorized.
 | Existing evidence | Q-12; RC4 dossier; release history |
 | Options | `v0.5.0-rc.4` vs. `v0.6.0-rc.1` |
 | Security impact | None directly; release identity/communications |
-| Compatibility | Release tag is separate from deployment version `0.2.0` |
+| Compatibility | Release tag is separate from deployment version `0.2.0`; component versions remain `0.1.0` |
 | Recommendation | `v0.6.0-rc.1` only if P00 is a feature generation; `v0.5.0-rc.4` for limited order-core candidate |
+| Owner decision | **APPROVED 2026-11-14 — `v0.6.0-rc.1`** (new RC4 feature generation) |
 | Packages | Release gate only |
-| Owner gate | Q-12; can wait until release gate |
+| Owner gate | Q-12 closed |
+| Status | **DECIDED — APPROVED** |
 
 ---
 

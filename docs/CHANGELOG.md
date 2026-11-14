@@ -2,6 +2,33 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-11-14 — RC4 v0.6.0-rc.1
+
+### Release
+- Q-12 **APPROVED**: `v0.6.0-rc.1` als neue RC4-Feature-Generation
+- Annotierter Git-Tag `v0.6.0-rc.1` auf dem Release-Commit
+- Release-Branch `release/rc4-integration` und Tag veröffentlicht
+- Komponentenversionen unverändert: Installer `0.1.0`, Module Builder `0.1.0`,
+  Deployment/Teststack `0.2.0`
+- P00-G Retention bleibt deaktiviert; APP_MANAGED bleibt default-off
+
+### Verification
+- Lambda 440/440 PASS
+- Installer 674 PASS, 1 Skipped (AWS-Live-Profil)
+- Module Builder 129/129 PASS
+- Policy Gate 23/23 PASS
+- E2E lokal 36 PASS, 5 Skipped; Live-E2E 4/4 PASS
+- Seed 28/28 PASS
+- Terraform `fmt -check`, `init -backend=false`, `validate` PASS
+- AWS Development Lifecycle: 58 create, Live-E2E PASS, 58 destroy, State 0
+- Lambda ZIP 46.929 Bytes, SHA-256
+  `20f4bab5766529e3340273cfde3b35c601a389122759051f2aef801337b76377`
+
+### Boundaries
+- Kein Produktionsdeployment, keine RIS-Integration
+- Main-Merge nur vorbereitet, nicht ausgeführt
+- Produktive Secret-/KMS-/Retention-Aktivierung bleibt separat gesperrt
+
 ## 2026-10-31 — Release Candidate v0.5.0-rc.3 (MO-RC3-P07-P08 — Module Builder & RIS Integration)
 
 ### Release

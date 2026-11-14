@@ -1,32 +1,39 @@
 # Release Notes — Mays Orders
 
-# RC4 Module Candidate — NOT RELEASED
+## RC4 v0.6.0-rc.1 — APPROVED RELEASE CANDIDATE
 
-STATUS: `RELEASE CANDIDATE — NOT PUBLISHED`
-OWNER STATUS: `RC4 RELEASE OWNER APPROVAL PENDING`
-VERSION (PROPOSED): `v0.5.0-rc.4` — not approved, not tagged
+STATUS: `RELEASE CANDIDATE — APPROVED / TAG TARGET = THIS RELEASE COMMIT`
+OWNER STATUS: `Q-12 APPROVED — v0.6.0-rc.1`
+RELEASE VERSION: `v0.6.0-rc.1`
 DEPLOYMENT VERSION (Teststack): `0.2.0`
-BASE: `0aa95484bb237edea8e417cb765b32f76b97b77f`
+BASE: `release/rc4-integration` (annotated tag target = release commit)
+TAG: annotated `v0.6.0-rc.1` (created and published after this commit)
 
-SCOPE (proposed; owner approval required):
+SCOPE:
 - Order-API, Owner-/Consumer-Isolation, Statusmodell, SQS-Worker, DLQ,
   GSI3/Recovery, interne Privacy inspect/export/erase
 - Productive handler: `generic` only
 - Module Builder `orders-service` remains the module contract
+- P00-E Privacy-Secret ist opt-in und default-off
+- P00-F APP_MANAGED rotation/revocation mechanics sind default-off
+- P00-G Retention/TTL ist wegen Q-05/Q-06/Q-07/Q-14 bewusst deaktiviert
 
-VERIFICATION (local):
-- Installer 669 PASS
-- Module Builder 128 PASS
-- Lambda 345 PASS
-- E2E local 32 PASS
-- **Gesamt 1.174 PASS**
+VERIFICATION (2026-11-14, local):
+- Lambda: 440/440 PASS
+- Installer: 674 PASS, 1 Skipped (AWS-Live-Profil)
+- Module Builder: 129/129 PASS
+- Policy Gate: 23/23 PASS
+- E2E local: 36 PASS, 5 Skipped
+- Seed: 28/28 PASS
+- Terraform `fmt -check`, `init -backend=false`, `validate`: PASS
 
-LIVE VERIFICATION:
-- G3-FIX deployed/verified
-- G3-LIVE-B1 PASS (DLQ, GSI3, compatibility)
-- Owner-/Consumer-Isolation: VERIFIED
-- Privacy B2: 14 PASS, 1 SKIP (X13 SKIP is not a PASS)
-- B2 cleanup and rollback: VERIFIED (table/GSI3/queues/Cognito 0)
+LIVE VERIFICATION (AWS Development):
+- Deploy: 58/58 Ressourcen, Policy Gate PASS
+- Live-E2E: 4/4 PASS; Gesamt-E2E 36 OK, 1 Privacy-Live-Skip
+- Destroy: 58/58, State 0, Post-Destroy-Validate PASS
+- Lambda artifact: 46.929 Bytes, SHA-256
+  `20f4bab5766529e3340273cfde3b35c601a389122759051f2aef801337b76377`
+- Zwei Lambda-Builds byte-identisch
 
 KNOWN LIMITATIONS:
 - RC3 legacy orders without identity remain **404**; no migration in this
@@ -36,19 +43,18 @@ KNOWN LIMITATIONS:
   deduplication is not.
 - Only `generic` is the productive handler. Other handlers are not part of the
   verified RC4 scope.
-- P00 KMS/Secrets-Manager/Retention is **not represented as fulfilled** in this
-  limited module candidate. Production KMS/Secret-Management/Rotation/Retention
-  requirements remain in force and are not waived.
-- SEC-06 ApprovalEvidence V2 is proposed, not implemented.
-- Terraform teststack drift: two `source_code_hash` changes are not applied;
-  no structural/data change.
+- P00-G Retention is intentionally disabled; no legal retention period was
+  approved.
+- Production activation, production secret-value provisioning, optional CMK
+  key policy and P00-F operational activation remain separate Owner gates.
 - RIS pin remains `1dbb0cb` (RC3); no RC4 consumer acceptance.
-- **No production release.** Production privacy/retention/secret management
+- **No production activation.** Production privacy/retention/secret management
   remains BLOCKED.
-- No release tag, no publication, no RIS integration.
+- Main merge is prepared and separately gated; no main merge is included.
 
-Details: `docs/release/RC4-MODULE-RELEASE-CANDIDATE.md` and
-`docs/reports/MO-RC4-RELEASE-CANDIDATE-01.md`.
+Details: `docs/release/RC4-MODULE-RELEASE-CANDIDATE.md`,
+`docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md` and
+`docs/reports/MO-RC4-RELEASE-01.md`.
 
 ---
 
@@ -56,8 +62,10 @@ Details: `docs/release/RC4-MODULE-RELEASE-CANDIDATE.md` and
 
 RELEASE: v0.5.0-rc.3 (Pre-Release Candidate — Module Builder & RIS Integration)
 Date: 2026-10-31
-Baseline: v0.5.0-rc.2 -> 5cf50a0; Tag zeigt auf den Packaging-Commit inkl. dieser Doku
+Baseline: v0.5.0-rc.2 -> 5cf50a0
 Vorgaenger: v0.5.0-rc.2 -> 5cf50a0 (unveraendert)
+HINWEIS: v0.5.0-rc.3 wurde nie als Git-Tag veroeffentlicht; dies ist der
+historische Packaging-/Doku-Stand.
 
 FEATURES:
 - Terraform Module Builder `python -m module_builder` mit zwei Presets:

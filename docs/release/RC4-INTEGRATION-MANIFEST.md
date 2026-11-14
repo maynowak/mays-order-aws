@@ -8,8 +8,9 @@
 **Source HEAD:** `b49c59f2ca30b846477b4e0108720ff6708d899e`
 **Integration merge:** `bb8edce81f67db4767f03528d1214e5b63247992`
 
-> This manifest records the integration candidate, not a release approval,
-> tag or deployment. P00 remains an open RC4 work package.
+> This manifest records the integration and release candidate. Q-12 is
+> approved for `v0.6.0-rc.1`; production activation and deployment remain
+> separately gated. P00-G retention remains open/disabled.
 
 ---
 
@@ -101,20 +102,20 @@ P00-B source/tests are integrated via merge commit
 the Review-06 documentation was cherry-picked as docs-only commit `8e3d835`.
 P00-D is integrated via merge `3d327380` (HMAC foundation) and
 `21ff5d30` (wrong-key regression test); Review-05 docs were cherry-picked as
-`c0d8d719`. The live `TestAWSProfileContextLive` test is
-`DEFERRED — AWS READ-ONLY AUTHORIZATION REQUIRED`; the dependency-detector test
-is classified `TEST HARNESS DEFECT / ENVIRONMENT DEPENDENCY` (hardcoded clean
-primary worktree). Neither is counted as PASS. Q-02/Q-04/Q-08/Q-09/Q-10 and
-Q-11 for the P00-D contract are approved; ADR-008 is `ACCEPTED`. P00-F
-rotation/revocation, production key transport, AWS-live verification and the
-existing P00-C deployment gates remain open. P00-E minimal scope is integrated
+`c0d8d719`. The live `TestAWSProfileContextLive` test is skipped by default
+and only runs with explicit read-only opt-in. The dependency-detector tests
+were stabilized with an explicit repo root and offline fixture. Q-02/Q-04/
+Q-08/Q-09/Q-10 and Q-11 for the P00-D contract are approved; ADR-008 is
+`ACCEPTED`. P00-F rotation/revocation mechanics are implemented default-off;
+production key transport and operational activation remain open. P00-E minimal scope is integrated
 via merge `3b0de2f`; final RC4 work is integrated via merge `0620044`
 (`feature/mo-rc4-final-01`). The installer is stabilized (no hardcoded primary
 worktree; AWS live profile test skipped by default) and P00-F rotation/
 revocation mechanics are implemented default-off. P00-G is **safely disabled**
 because Q-05/Q-06/Q-07/Q-14 remain Owner decisions. P00-H builder integration
-and P00-I local regression passed. DDB/SQS CMK, production activation,
-Terraform plan/apply and AWS-live verification remain open.
+and P00-I local regression passed. The AWS development lifecycle was verified
+(58 create, live E2E, 58 destroy, state 0). DDB/SQS CMK, production activation
+and any production Terraform plan/apply remain open.
 
 ## 6. Release Readiness
 
@@ -123,5 +124,6 @@ Integration: COMPLETE
 P00:          LOCAL RC + AWS DEV LIFECYCLE VERIFIED / STACK DESTROYED
               (P00-B/C/D/E/F/H/I; P00-G blocked by owner decisions;
               production/release gates open)
-RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
+RC4 release:  v0.6.0-rc.1 APPROVED / ANNOTATED TAG TARGET = RELEASE COMMIT
+              (no production approval)
 ```

@@ -11,35 +11,45 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — AWS development lifecycle verified / stack destroyed
-(P00-B/C/D/E/F/H/I; P00-G blocked by owner decisions)
+RC4 v0.6.0-rc.1 — release approved; publication in progress
 
 Current Feature:
-MO-RC4-FINAL-01 — RC4 local + AWS development lifecycle candidate
+MO-RC4-RELEASE-01 — RC4 release docs, annotated tag and branch publication
 
 Current Task:
-MO-RC4-AWS-LIFECYCLE-FINAL-01 — VALIDATE/PLAN/DEPLOY/TEST/DESTROY PASS;
-58 deployed, post-deploy suites + live E2E PASS, 58 destroyed, state empty
+MO-RC4-RELEASE-01 — Q-12 APPROVED v0.6.0-rc.1; tag/branch publication;
+main merge prepared, not executed
 
-Hinweis Release Candidate:
-v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
-1dbb0cb den vollen Lifecycle bestanden (Plan 169 add, Apply, No-Op, 7 Live-Tests inkl.
-SQS->Worker->DDB PENDING->CONFIRMED, Destroy, CLEAN; Account 262370457690).
-Delta zu 8b61922: nur Whitespace in terraform/main.tf plus Docs (git diff -w leer).
-Vorgaenger v0.5.0-rc.2 -> 5bdde18 unveraendert. Tag/GitHub-Release nur noch menschlich.
-Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
+Hinweis Release:
+v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
+bleibt 0.2.0; Installer und Module Builder bleiben 0.1.0. Der AWS-Development-
+Lifecycle (58 create, Live-E2E, 58 destroy, State 0) ist verifiziert. Produktion,
+P00-G Retention und produktive Secret-/KMS-Aktivierung bleiben BLOCKED.
+Historisch: letzter tatsaechlicher Tag ist v0.5.0-rc.2; v0.5.0-rc.3 wurde nie
+getaggt.
 
-RC.3 Status:
+RC.3 Status (historisch):
 [x] P00 Git-Baseline, P01 Merge-Readiness, P02 Merge nach main
 [x] P03 Release-Baseline / Builder-Inventar / Gate-Matrix
 [x] P04 Builder-Verifikation (90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS)
 [x] P05/P06 RIS-Evidence: F-03 RESOLVED, IAM-Portabilitaet im Fremdkonto belegt
 [x] P07/P08 Packaging: Dossier (MD+PDF, 5 S. A4), Release Notes, Changelog, Gate-Report
-[ ] Tag v0.5.0-rc.3 + GitHub-Release: wartet auf menschliche Freigabe (P09)
+[!] v0.5.0-rc.3: Dokumentationsstand, kein Git-Tag
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
+RC4 v0.6.0-rc.1 Status:
+[x] Q-12 Release-Label APPROVED
+[x] AWS-Development-Lifecycle: 58 create, Live-E2E, 58 destroy, State 0
+[x] Lokale Regression: Lambda 440 / Installer 674+1 Skip / Builder 129 /
+    Policy 23 / E2E 36 (5 Skip) / Seed 28
+[x] Release-Dokumentation aktualisiert
+[~] Annotierter Tag v0.6.0-rc.1 (wird nach diesem Release-Commit gesetzt)
+[~] Release-Branch/Tag-Veröffentlichung (nach Tag)
+[ ] Main-Merge: separat freizugeben
+
 Current Checkpoint:
-release/rc4-integration @ MO-RC4-AWS-LIFECYCLE-FINAL-01
+release/rc4-integration @ MO-RC4-RELEASE-01
+→ Q-12 APPROVED: v0.6.0-rc.1; annotated tag target = release commit
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
   Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
 → Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean
