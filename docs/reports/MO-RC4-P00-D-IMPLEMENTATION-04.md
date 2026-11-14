@@ -143,6 +143,7 @@ Rebuild byte-identisch
 Branch:        feature/mo-rc4-p00-d-app-managed
 Base:          8a19d5a880d5bc9aa02e41529a8b7fa7d089cd14
 Code-Commit:   2b1f58314c527e6c4d811f135a27670964d569f0
+Docs-Commit:   6e87140de978cb045c55ef1ec1930b2ce3ede85e
 Merge/Push:    NONE
 AWS/Terraform: NONE
 Deployment:    NONE
