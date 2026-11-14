@@ -133,7 +133,6 @@ Deployment:    NONE
 RIS/Jobsearch: NONE
 ```
 
-Der finale Dokumentationscommit wird nach dem Commit im Abschlussbericht
-dokumentiert.
+Closeout-Dokumentationscommit: `f52c28cbb0dbe2e48458e3c9b2a6a82166f3a9ef`.
 
 **STOP vor P00-D-Implementierung.**
