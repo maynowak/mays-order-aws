@@ -176,8 +176,8 @@ Merge/Push/Deploy: NONE
 | Gate | Commit |
 |---|---|
 | F-03 Handler-Test | `e800906e69c3cafe8ff09e6ea0031b9f2987801b` |
-| F-01/F-02/F-04/F-05 Docs | `[nach Commit eintragen]` |
-| Abschluss-Evidenz | `[nach Commit eintragen]` |
+| F-01/F-02/F-04/F-05 Docs | `2d4a8de9b5e1542c01c43d67092c80f9a33f5f92` |
+| Abschluss-Evidenz | `2d4a8de9b5e1542c01c43d67092c80f9a33f5f92` |
 
 ---
 
