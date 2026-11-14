@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import os
 import unittest
 from unittest.mock import patch
@@ -12,6 +13,7 @@ from secret_provider import (
     ENV_PROVIDER,
     SECRETS_MANAGER_PROVIDER,
     AppKeyInvalid,
+    Boto3SecretsManagerFetcher,
     EnvSecretProvider,
     ProviderConfigurationError,
     SecretAccessDenied,
@@ -23,7 +25,11 @@ from secret_provider import (
     SecretProviderConfig,
     SecretReference,
     SecretUnavailable,
+    SecretsManagerProvider,
     create_secret_provider,
+    get_default_secret_provider,
+    log_secret_provider_failure,
+    reset_default_secret_provider,
 )
 
 
@@ -142,6 +148,18 @@ class TestProviderContract(unittest.TestCase):
         self.assertEqual(material.value, "after-retry")
         self.assertEqual(calls, [1, 1])
 
+    def test_cache_isolates_different_identity_keys(self):
+        cache = SecretCache()
+        calls = []
+
+        def load(value):
+            calls.append(value)
+            return SecretMaterial(provider="env", value=value)
+
+        self.assertEqual(cache.get_or_load(("sm", "a"), lambda: load("a")).value, "a")
+        self.assertEqual(cache.get_or_load(("sm", "b"), lambda: load("b")).value, "b")
+        self.assertEqual(calls, ["a", "b"])
+
 
 class _ClientError(Exception):
     def __init__(self, code):
@@ -222,9 +240,103 @@ class TestSecretsManagerProvider(unittest.TestCase):
         self.assertEqual(calls, [self.ARN])
 
     def test_missing_runtime_adapter_fails_closed(self):
-        provider = create_secret_provider(self._env())
+        config = SecretProviderConfig.from_environment(self._env())
+        provider = SecretsManagerProvider(config, fetcher=None)
         with self.assertRaises(SecretUnavailable):
             provider.resolve()
+
+    def test_default_secretsmanager_provider_uses_boto3_adapter(self):
+        provider = create_secret_provider(self._env())
+        self.assertIsInstance(provider, SecretsManagerProvider)
+        self.assertIsNotNone(provider._fetcher)
+
+    def test_boto3_fetcher_uses_injected_client_without_aws(self):
+        calls = []
+        kms_arn = self.KMS_ARN
+
+        class FakeClient:
+            def get_secret_value(self, **kwargs):
+                calls.append(("get", kwargs))
+                return {"SecretString": "from-fake-client"}
+
+            def describe_secret(self, **kwargs):
+                calls.append(("describe", kwargs))
+                return {"KmsKeyId": kms_arn}
+
+        fetcher = Boto3SecretsManagerFetcher(FakeClient())
+        provider = SecretsManagerProvider(self._config(), fetcher.get_secret_value)
+        material = provider.resolve()
+        self.assertEqual(material.value, "from-fake-client")
+        self.assertEqual(calls, [("get", {"SecretId": self.ARN})])
+
+    def test_kms_binding_is_verified_through_describe_secret(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(("get", reference))
+            return {"SecretString": "with-cmk"}
+
+        def descriptor(reference):
+            calls.append(("describe", reference))
+            return {"KmsKeyId": self.KMS_ARN}
+
+        provider = SecretsManagerProvider(
+            self._config_with_kms(), fetcher, descriptor
+        )
+        self.assertEqual(provider.resolve().value, "with-cmk")
+        self.assertEqual(
+            calls,
+            [("describe", self.ARN), ("get", self.ARN)],
+        )
+
+    def test_kms_binding_mismatch_fails_closed_without_fetch(self):
+        def fetcher(reference):
+            raise AssertionError("GetSecretValue must not run after mismatch")
+
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            fetcher,
+            lambda reference: {"KmsKeyId": self.KMS_ARN + "-other"},
+        )
+        with self.assertRaises(SecretInvalid):
+            provider.resolve()
+
+    def test_kms_binding_requires_descriptor(self):
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            lambda reference: {"SecretString": "never"},
+        )
+        with self.assertRaises(SecretUnavailable):
+            provider.resolve()
+
+    def test_kms_descriptor_access_denied_is_redacted(self):
+        provider = SecretsManagerProvider(
+            self._config_with_kms(),
+            lambda reference: {"SecretString": "never"},
+            lambda reference: (_ for _ in ()).throw(_ClientError("AccessDeniedException")),
+        )
+        with self.assertRaises(SecretAccessDenied) as raised:
+            provider.resolve()
+        self.assertNotIn(self.ARN, str(raised.exception))
+
+    def test_no_kms_config_does_not_call_descriptor(self):
+        calls = []
+
+        provider = SecretsManagerProvider(
+            self._config(),
+            lambda reference: {"SecretString": "without-cmk"},
+            lambda reference: calls.append(reference) or {"KmsKeyId": self.KMS_ARN},
+        )
+        self.assertEqual(provider.resolve().value, "without-cmk")
+        self.assertEqual(calls, [])
+
+    def _config(self):
+        return SecretProviderConfig.from_environment(self._env())
+
+    def _config_with_kms(self):
+        return SecretProviderConfig.from_environment(
+            self._env(PRIVACY_KMS_KEY_ARN=self.KMS_ARN)
+        )
 
     def test_provider_errors_are_classified_without_raw_details(self):
         cases = (
@@ -266,6 +378,79 @@ class TestSecretsManagerProvider(unittest.TestCase):
                 provider = create_secret_provider(self._env(), lambda reference, response=response: response)
                 with self.assertRaises(SecretInvalid):
                     provider.resolve()
+
+
+class TestModuleCacheLifetime(unittest.TestCase):
+    ARN_A = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:orders/a-AbCdEf"
+    ARN_B = "arn:aws:secretsmanager:eu-central-1:123456789012:secret:orders/b-AbCdEf"
+
+    def setUp(self):
+        reset_default_secret_provider()
+
+    def tearDown(self):
+        reset_default_secret_provider()
+
+    def _env(self, reference):
+        return {
+            "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+            "PRIVACY_SECRET_ID": reference,
+        }
+
+    def test_default_provider_is_shared_across_invocations(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": "cached-secret"}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        second = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertIs(first, second)
+        self.assertEqual(first.resolve().value, "cached-secret")
+        self.assertEqual(second.resolve().value, "cached-secret")
+        self.assertEqual(calls, [self.ARN_A])
+
+    def test_config_change_replaces_provider_and_isolates_identity(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": reference}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        second = get_default_secret_provider(self._env(self.ARN_B), fetcher)
+        self.assertIsNot(first, second)
+        self.assertEqual(first.resolve().value, self.ARN_A)
+        self.assertEqual(second.resolve().value, self.ARN_B)
+        self.assertEqual(calls, [self.ARN_A, self.ARN_B])
+
+    def test_cache_invalidate_forces_fresh_fetch(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": f"value-{len(calls)}"}
+
+        provider = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertEqual(provider.resolve().value, "value-1")
+        provider.invalidate()
+        self.assertEqual(provider.resolve().value, "value-2")
+        self.assertEqual(calls, [self.ARN_A, self.ARN_A])
+
+    def test_reset_drops_module_provider(self):
+        calls = []
+
+        def fetcher(reference):
+            calls.append(reference)
+            return {"SecretString": "value"}
+
+        first = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        reset_default_secret_provider()
+        second = get_default_secret_provider(self._env(self.ARN_A), fetcher)
+        self.assertIsNot(first, second)
+        first.resolve()
+        second.resolve()
+        self.assertEqual(calls, [self.ARN_A, self.ARN_A])
 
 
 class TestAppManagedProviderContract(unittest.TestCase):
@@ -343,7 +528,7 @@ class TestSecurityHardening(unittest.TestCase):
         with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
             service._require_privacy_auth(context, "privacy_inspect")
 
-    def test_provider_error_does_not_log_secret(self):
+    def test_provider_error_logs_only_safe_structured_fields(self):
         class FailingProvider:
             def resolve(self):
                 raise SecretAccessDenied()
@@ -355,11 +540,31 @@ class TestSecurityHardening(unittest.TestCase):
         )
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            with self.assertRaises(OrderError):
-                service._resolve_privacy_secret()
-        self.assertNotIn("secret", stdout.getvalue().lower())
-        self.assertNotIn("secret", stderr.getvalue().lower())
+        with patch.dict(
+            os.environ,
+            {"PRIVACY_SECRET_PROVIDER": "secretsmanager", "ORDERS_PROJECT_NAME": "mays-orders"},
+            clear=False,
+        ):
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                with self.assertRaises(OrderError):
+                    service._resolve_privacy_secret()
+        self.assertEqual(stdout.getvalue(), "")
+        line = stderr.getvalue().strip()
+        payload = json.loads(line)
+        self.assertEqual(payload["event"], "secret_provider_failure")
+        self.assertEqual(payload["provider"], "secretsmanager")
+        self.assertEqual(payload["errorClass"], "SecretAccessDenied")
+        self.assertNotIn("arn:", line.lower())
+        self.assertNotIn("raw-secret", line)
+        self.assertNotIn("super-secret", line)
+
+    def test_log_helper_does_not_include_secret_message(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            log_secret_provider_failure(SecretAccessDenied("raw-secret-value"), "secretsmanager")
+        line = stderr.getvalue().strip()
+        self.assertNotIn("raw-secret-value", line)
+        self.assertIn("SecretAccessDenied", line)
 
     def test_backend_exception_cause_is_not_exposed(self):
         def fetcher(reference):
@@ -387,6 +592,130 @@ class TestSecurityHardening(unittest.TestCase):
                 }
             )
         self.assertNotIn(bad_reference, str(raised.exception))
+
+
+class TestNonAsciiHardening(unittest.TestCase):
+    class Provider:
+        def __init__(self, value):
+            self.value = value
+
+        def resolve(self):
+            return SecretMaterial(provider="env", value=self.value)
+
+    def _service(self, secret):
+        return create_order_service(
+            "mays-orders",
+            client=object(),
+            secret_provider=self.Provider(secret),
+        )
+
+    def _context(self, token):
+        return {
+            "project": "mays-orders",
+            "authorized": True,
+            "privacy_inspect": True,
+            "internal_token": token,
+        }
+
+    def test_non_ascii_token_returns_validation_error_not_500(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("tökén"), "privacy_inspect")
+        self.assertEqual(raised.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(raised.exception.http_status, 400)
+        self.assertNotIn("tökén", str(raised.exception))
+
+    def test_non_ascii_secret_returns_validation_error_not_500(self):
+        service = self._service("sécret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("sécret"), "privacy_inspect")
+        self.assertEqual(raised.exception.code, "VALIDATION_ERROR")
+        self.assertEqual(raised.exception.http_status, 400)
+
+    def test_ascii_token_still_uses_constant_time_path(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            service._require_privacy_auth(self._context("ascii-secret"), "privacy_inspect")
+
+    def test_oversized_token_fails_closed(self):
+        service = self._service("ascii-secret")
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(self._context("a" * 1025), "privacy_inspect")
+        self.assertEqual(raised.exception.http_status, 400)
+
+
+class TestProviderHardeningAdditional(unittest.TestCase):
+    def test_order_service_construction_does_not_eagerly_resolve_provider(self):
+        with patch.dict(
+            os.environ,
+            {"PRIVACY_SECRET_PROVIDER": "unknown", "PRIVACY_INTERNAL_SECRET": "ignored"},
+            clear=False,
+        ):
+            service = create_order_service("mays-orders", client=object())
+            self.assertIsNone(service._secret_provider)
+            with self.assertRaises(OrderError):
+                service._resolve_privacy_secret()
+
+    def test_wrong_token_with_malicious_context_still_fails(self):
+        class Provider:
+            def resolve(self):
+                return SecretMaterial(provider="env", value="expected")
+
+        service = create_order_service(
+            "mays-orders", client=object(), secret_provider=Provider()
+        )
+        context = {
+            "project": "mays-orders",
+            "authorized": True,
+            "privacy_inspect": True,
+            "internal_token": "wrong",
+            "secretProvider": "env",
+            "secretReference": "orders/other",
+            "provider": "env",
+        }
+        with patch.dict(os.environ, {"ORDERS_PROJECT_NAME": "mays-orders"}, clear=False):
+            with self.assertRaises(OrderError) as raised:
+                service._require_privacy_auth(context, "privacy_inspect")
+        self.assertEqual(raised.exception.http_status, 400)
+
+    def test_two_services_share_the_process_wide_default_provider(self):
+        material = SecretMaterial(provider="env", value="shared")
+        calls = []
+
+        class Provider:
+            def resolve(self):
+                calls.append(1)
+                return material
+
+        provider = Provider()
+        with patch("order_service.get_default_secret_provider", return_value=provider):
+            first = create_order_service("mays-orders", client=object())
+            second = create_order_service("mays-orders", client=object())
+            self.assertEqual(first._resolve_privacy_secret(), "shared")
+            self.assertEqual(second._resolve_privacy_secret(), "shared")
+        self.assertEqual(calls, [1, 1])
+
+    def test_aws_error_message_is_not_exposed(self):
+        class ErrorWithSecret(_ClientError):
+            def __init__(self):
+                super().__init__("AccessDeniedException")
+                self.response["Error"]["Message"] = "raw-secret-value"
+
+        provider = SecretsManagerProvider(
+            SecretProviderConfig.from_environment(
+                {
+                    "PRIVACY_SECRET_PROVIDER": SECRETS_MANAGER_PROVIDER,
+                    "PRIVACY_SECRET_ID": "orders/privacy",
+                }
+            ),
+            lambda reference: (_ for _ in ()).throw(ErrorWithSecret()),
+        )
+        with self.assertRaises(SecretAccessDenied) as raised:
+            provider.resolve()
+        self.assertNotIn("raw-secret-value", str(raised.exception))
 
 
 class TestOrderServiceSecretProviderIntegration(unittest.TestCase):

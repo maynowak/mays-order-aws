@@ -82,8 +82,8 @@ AWS_MANAGED: CONFIG FOUNDATION / RESOURCE + IAM + KMS MISSING
 APP_MANAGED: CONFIG CONTRACT / KEY LOADER + HMAC MISSING
 KMS backup stash: UNCHANGED, NOT APPLIED
 P00-B: INTEGRATED / POST-MERGE VERIFIED
-P00-C: Q-04/Q-09 APPROVED / IMPLEMENTATION AUTHORIZATION PENDING
-P00-C-M01: OPEN — mandatory P00-C cache-lifetime criterion
+P00-C: IMPLEMENTED / TESTED ON FEATURE BRANCH / SECURITY REVIEW READY
+P00-C-M01: IMPLEMENTED / TESTED — security review pending
 ```
 
 P00-B source/tests are integrated on `release/rc4-integration` via merge commit
@@ -91,8 +91,9 @@ P00-B source/tests are integrated on `release/rc4-integration` via merge commit
 was integrated separately without duplicate product commits. Q-02 (Secrets
 Manager), Q-04 (CMK options), Q-08 (ARN/name reference + runtime fetch), Q-09
 (explicit Policy-Gate allowlist) and Q-10 (ADR-008, C-01…C-07) are owner-approved;
-ADR-008 is `ACCEPTED`. P00-C/D resources and live AWS verification remain
-missing; P00-C-M01 is open.
+ADR-008 is `ACCEPTED`. P00-C is implemented/tested on
+`feature/mo-rc4-p00-c-aws-managed` but **not integrated**; P00-C/D resources and
+live AWS verification remain missing.
 
 ## 6. Release Readiness
 

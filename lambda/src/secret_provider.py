@@ -7,8 +7,11 @@ APP_MANAGED key material/HMAC integration (P00-D) are separate packages.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import sys
+import threading
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -251,6 +254,10 @@ class SecretCache:
         self._values[key] = material
         return material
 
+    def invalidate(self) -> None:
+        """Drop cached material; the next resolve performs a fresh load."""
+        self._values.clear()
+
 
 class EnvSecretProvider:
     """Backwards-compatible implementation of the existing ENV trust boundary."""
@@ -271,6 +278,38 @@ class EnvSecretProvider:
 
 
 SecretsManagerFetcher = Callable[[str], Mapping[str, Any]]
+SecretsManagerDescriptor = Callable[[str], Mapping[str, Any]]
+
+
+class Boto3SecretsManagerFetcher:
+    """Lazy boto3 adapter for AWS_MANAGED runtime fetching.
+
+    No boto3 import or AWS call happens at module import. The client is created
+    on first use and kept for the lifetime of this adapter (module-scoped in
+    the production path); unit tests inject a fake client.
+    """
+
+    def __init__(self, client: Any = None) -> None:
+        self._client = client
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            import boto3  # type: ignore[reportMissingImports]  # provided by the Lambda runtime
+
+            self._client = boto3.client(
+                "secretsmanager",
+                region_name=os.environ.get("AWS_REGION", "eu-central-1"),
+            )
+        return self._client
+
+    def get_secret_value(self, secret_id: str) -> Mapping[str, Any]:
+        return self._get_client().get_secret_value(SecretId=secret_id)
+
+    def describe_secret(self, secret_id: str) -> Mapping[str, Any]:
+        return self._get_client().describe_secret(SecretId=secret_id)
+
+    def __call__(self, secret_id: str) -> Mapping[str, Any]:
+        return self.get_secret_value(secret_id)
 
 
 def _aws_error_code(exc: Exception) -> str:
@@ -294,9 +333,11 @@ class SecretsManagerProvider:
         self,
         config: SecretProviderConfig,
         fetcher: SecretsManagerFetcher | None = None,
+        descriptor: SecretsManagerDescriptor | None = None,
     ) -> None:
         self._config = config
         self._fetcher = fetcher
+        self._descriptor = descriptor
         self._cache = SecretCache()
 
     def resolve(self) -> SecretMaterial:
@@ -311,17 +352,15 @@ class SecretsManagerProvider:
         return self._cache.get_or_load(key, self._load)
 
     def _load(self) -> SecretMaterial:
+        if self._config.kms_key_arn:
+            self._verify_kms_key()
+
         try:
             response = self._fetcher(self._config.reference)  # type: ignore[misc]
         except SecretProviderError:
             raise
         except Exception as exc:
-            code = _aws_error_code(exc)
-            if code in ("ResourceNotFoundException", "ResourceNotFound"):
-                raise SecretNotFound() from None
-            if code in ("AccessDeniedException", "AccessDenied", "KMSAccessDeniedException"):
-                raise SecretAccessDenied() from None
-            raise SecretUnavailable() from None
+            self._raise_mapped_error(exc)
 
         if not isinstance(response, Mapping):
             raise SecretInvalid()
@@ -334,6 +373,46 @@ class SecretsManagerProvider:
             key_id=self._config.key_id,
             key_version=self._config.key_version,
         )
+
+    def _verify_kms_key(self) -> None:
+        """Verify the configured CMK binding through DescribeSecret.
+
+        Secrets Manager decrypts with the secret's own KMS key; the request
+        cannot select a different CMK. This check makes PRIVACY_KMS_KEY_ARN
+        behaviorally effective and fails closed on a mismatch. It requires
+        secretsmanager:DescribeSecret in addition to GetSecretValue.
+        """
+        if self._descriptor is None:
+            raise SecretUnavailable()
+        try:
+            response = self._descriptor(self._config.reference)
+        except SecretProviderError:
+            raise
+        except Exception as exc:
+            self._raise_mapped_error(exc)
+
+        if not isinstance(response, Mapping):
+            raise SecretInvalid()
+        actual_key = response.get("KmsKeyId")
+        if not isinstance(actual_key, str) or not actual_key:
+            raise SecretInvalid()
+        if actual_key != self._config.kms_key_arn:
+            raise SecretInvalid()
+
+    @staticmethod
+    def _raise_mapped_error(exc: Exception) -> None:
+        code = _aws_error_code(exc)
+        if code in ("ResourceNotFoundException", "ResourceNotFound"):
+            raise SecretNotFound() from None
+        if code in ("AccessDeniedException", "AccessDenied", "KMSAccessDeniedException"):
+            raise SecretAccessDenied() from None
+        if type(exc).__name__ in ("ParamValidationError", "InvalidParameterException"):
+            raise ProviderConfigurationError() from None
+        raise SecretUnavailable() from None
+
+    def invalidate(self) -> None:
+        """Invalidate this provider's cache for a controlled rotation/deploy."""
+        self._cache.invalidate()
 
 
 class AppManagedProvider:
@@ -352,24 +431,110 @@ class AppManagedProvider:
         raise AppKeyInvalid()
 
 
+def _build_provider(
+    config: SecretProviderConfig,
+    env: Mapping[str, str],
+    secretsmanager_fetcher: SecretsManagerFetcher | None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None,
+) -> SecretProvider:
+    if config.provider == ENV_PROVIDER:
+        return EnvSecretProvider(config, env)
+    if config.provider == SECRETS_MANAGER_PROVIDER:
+        fetcher = secretsmanager_fetcher
+        descriptor = secretsmanager_descriptor
+        if fetcher is None:
+            adapter = Boto3SecretsManagerFetcher()
+            fetcher = adapter.get_secret_value
+            if descriptor is None:
+                descriptor = adapter.describe_secret
+        return SecretsManagerProvider(config, fetcher, descriptor)
+    if config.provider == APP_MANAGED_PROVIDER:
+        return AppManagedProvider(config)
+    raise ProviderConfigurationError()
+
+
 def create_secret_provider(
     environ: Mapping[str, str] | None = None,
     secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
 ) -> SecretProvider:
     """Build the configured provider without any implicit fallback.
 
     ENV is the backwards-compatible default. Secrets Manager runtime fetching
-    is available through the injected P00-C adapter; without an adapter the
-    selected provider fails closed. APP_MANAGED validates key metadata but
-    remains a P00-D implementation and currently fails closed on resolution.
+    uses the lazy boto3 adapter unless a test injects a fetcher. APP_MANAGED
+    validates key metadata but remains a P00-D implementation and fails closed.
     """
 
     env = os.environ if environ is None else environ
     config = SecretProviderConfig.from_environment(env)
-    if config.provider == ENV_PROVIDER:
-        return EnvSecretProvider(config, env)
-    if config.provider == SECRETS_MANAGER_PROVIDER:
-        return SecretsManagerProvider(config, secretsmanager_fetcher)
-    if config.provider == APP_MANAGED_PROVIDER:
-        return AppManagedProvider(config)
-    raise ProviderConfigurationError()
+    return _build_provider(
+        config, env, secretsmanager_fetcher, secretsmanager_descriptor
+    )
+
+
+_default_provider: SecretProvider | None = None
+_default_provider_key: tuple[Any, ...] | None = None
+_default_provider_lock = threading.Lock()
+
+
+def get_default_secret_provider(
+    environ: Mapping[str, str] | None = None,
+    secretsmanager_fetcher: SecretsManagerFetcher | None = None,
+    secretsmanager_descriptor: SecretsManagerDescriptor | None = None,
+) -> SecretProvider:
+    """Return the process-wide provider for one Lambda execution environment.
+
+    The cache is keyed by provider, exact reference, key metadata, KMS reference
+    and an injected-fetcher identity. A changed configuration replaces the
+    provider; errors are never cached. ``reset_default_secret_provider`` is a
+    controlled invalidation hook for rotation/deployment or tests.
+    """
+
+    env = os.environ if environ is None else environ
+    config = SecretProviderConfig.from_environment(env)
+    fetcher_identity = id(secretsmanager_fetcher) if secretsmanager_fetcher is not None else None
+    descriptor_identity = (
+        id(secretsmanager_descriptor) if secretsmanager_descriptor is not None else None
+    )
+    key = (
+        config.provider,
+        config.reference,
+        config.key_id,
+        config.key_version,
+        config.kms_key_arn,
+        fetcher_identity,
+        descriptor_identity,
+    )
+    global _default_provider, _default_provider_key
+    with _default_provider_lock:
+        if _default_provider is None or _default_provider_key != key:
+            _default_provider = _build_provider(
+                config, env, secretsmanager_fetcher, secretsmanager_descriptor
+            )
+            _default_provider_key = key
+        return _default_provider
+
+
+def reset_default_secret_provider() -> None:
+    """Drop the module-level provider/cache (controlled rotation/tests only)."""
+    global _default_provider, _default_provider_key
+    with _default_provider_lock:
+        _default_provider = None
+        _default_provider_key = None
+
+
+def configured_provider_name(environ: Mapping[str, str] | None = None) -> str:
+    """Return a safe provider label for diagnostics; never a secret/reference."""
+    env = os.environ if environ is None else environ
+    provider = (env.get(PROVIDER_ENV) or ENV_PROVIDER).strip().lower()
+    return provider if provider in SUPPORTED_PROVIDERS else "invalid"
+
+
+def log_secret_provider_failure(error: SecretProviderError, provider: str) -> None:
+    """Emit one structured, secret-safe failure event to stderr/CloudWatch."""
+    payload = {
+        "event": "secret_provider_failure",
+        "provider": provider,
+        "errorClass": type(error).__name__,
+    }
+    print(json.dumps(payload, sort_keys=True, separators=(",", ":")), file=sys.stderr)

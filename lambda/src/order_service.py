@@ -27,7 +27,13 @@ from identity import (
 )
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
-from secret_provider import SecretProvider, SecretProviderError, create_secret_provider
+from secret_provider import (
+    SecretProvider,
+    SecretProviderError,
+    configured_provider_name,
+    get_default_secret_provider,
+    log_secret_provider_failure,
+)
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
@@ -139,6 +145,35 @@ def is_validation_exception(err: Any) -> bool:
     return is_client_error(err, "ValidationException")
 
 
+MAX_INTERNAL_TOKEN_LENGTH = 1024
+
+
+def _constant_time_token_match(token: Any, secret: Any) -> bool:
+    """Compare internal tokens without leaking a Python TypeError.
+
+    Python's compare_digest rejects non-ASCII strings. Provider material may
+    come from Secrets Manager, so the boundary must fail closed instead of
+    allowing an unhandled TypeError to become HTTP 500.
+    """
+    try:
+        token_text = str(token)
+        secret_text = str(secret)
+    except Exception:
+        return False
+    if not token_text or not secret_text:
+        return False
+    if len(token_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if len(secret_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if not token_text.isascii() or not secret_text.isascii():
+        return False
+    try:
+        return secrets.compare_digest(token_text, secret_text)
+    except (TypeError, ValueError):
+        return False
+
+
 class OrderService:
     def __init__(
         self,
@@ -151,19 +186,21 @@ class OrderService:
         self._secret_provider = secret_provider
 
     def _resolve_privacy_secret(self) -> str:
-        """Resolve the internal privacy secret once per service instance.
+        """Resolve the internal privacy secret through the process-wide provider.
 
         Provider selection comes only from configuration, never from request
-        data. Provider errors are mapped to the existing fail-closed 400 path
-        without exposing provider internals, ARNs or secret values.
+        data. The default provider/cache survives multiple invocations in the
+        same Lambda execution environment; injected providers remain scoped to
+        their service instance. Provider errors map to the fail-closed 400 path.
         """
         try:
             provider = self._secret_provider
             if provider is None:
-                provider = create_secret_provider()
+                provider = get_default_secret_provider()
                 self._secret_provider = provider
             material = provider.resolve()
         except SecretProviderError as exc:
+            log_secret_provider_failure(exc, configured_provider_name())
             raise validation_error(exc.public_message) from None
         if not material.value:
             raise validation_error("Internal secret not configured")
@@ -187,8 +224,9 @@ class OrderService:
         token = context.get("internal_token")
         if not token:
             raise validation_error("Internal token missing")
-        # Use constant-time compare (existing privacy contract).
-        if not secrets.compare_digest(str(token), str(internal_secret)):
+        # Use the existing constant-time privacy contract, with a fail-closed
+        # ASCII/length guard for provider-supplied material.
+        if not _constant_time_token_match(token, internal_secret):
             raise validation_error("Internal trust boundary violation")
 
     def create_order(

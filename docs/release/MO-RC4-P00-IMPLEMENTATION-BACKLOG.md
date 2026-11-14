@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C AUTHORIZATION PENDING
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C IMPLEMENTED ON FEATURE BRANCH
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,30 +78,30 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **READY FOR IMPLEMENTATION AUTHORIZATION** — not started |
+| Package status | **IMPLEMENTED / TESTED / SECURITY REVIEW READY** — feature branch, not merged |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
 | Field | Content |
 |---|---|
-| Status | **OPEN — mandatory P00-C acceptance criterion** |
+| Status | **IMPLEMENTED / TESTED — security review pending** |
 | Source | `MO-RC4-P00-B-INTEGRATION-REVIEW-01` finding M-01 |
-| Problem | P00-B `SecretCache` is owned by a per-invocation `OrderService` (`index.py:252`); effective scope is one invocation, not one Lambda execution environment. |
-| Required scope | Document the actual cache scope and implement either a module-scoped provider/cache or an explicitly documented per-invocation fetch policy. |
-| Identity isolation | Cache key must remain bound to provider, exact reference/identity, key version/fingerprint and KMS reference; no cross-identity reuse. |
-| Rotation | Define cache invalidation/refresh for the approved Q-11 rotation procedure; no silent stale material. |
-| Tests | Add positive/negative tests for cross-invocation reuse and cross-identity isolation; preserve ENV default behavior. |
-| Gate | Must be evidenced before P00-C integration; it is not a retroactive P00-B merge blocker. |
+| Problem | P00-B `SecretCache` was owned by a per-invocation `OrderService`; effective scope was one invocation. |
+| Implemented scope | Module-level `get_default_secret_provider()` shared by `OrderService`; provider/cache survives invocations in one execution environment. |
+| Identity isolation | Cache key includes provider, exact reference, key ID/version, KMS ARN and injected-fetcher identity; cross-identity tests pass. |
+| Rotation | `SecretCache.invalidate()` and `reset_default_secret_provider()` provide controlled invalidation; rollout is documented. |
+| Tests | Cross-invocation hit, config replacement, identity isolation, invalidation and error non-caching tests pass. |
+| Gate | Implemented/tested; independent security review remains. |
 
 ### P00-C review acceptance criteria
 
 | ID | Criterion | Status |
 |---|---|---|
-| L-01 | Non-ASCII resolved material/token must not produce an unhandled `TypeError`/500; validate or map fail-closed. | **OPEN** |
-| L-02 | Provider failures need sanitized observability without ARN/reference/secret values. | **OPEN** |
-| L-03 | `PRIVACY_KMS_KEY_ARN` must have a tested runtime effect when CMK is selected, or be rejected until implemented. | **OPEN** |
-| L-04 | Add negative tests for lazy provider initialization, request-context isolation and actual redaction. | **OPEN** |
-| L-06 | Document/test the atomic provider switch (set provider + remove plaintext env/reference). | **OPEN** |
+| L-01 | Non-ASCII resolved material/token must not produce an unhandled `TypeError`/500; validate or map fail-closed. | **IMPLEMENTED / TESTED** |
+| L-02 | Provider failures need sanitized observability without ARN/reference/secret values. | **IMPLEMENTED / TESTED** |
+| L-03 | `PRIVACY_KMS_KEY_ARN` must have a tested runtime effect when CMK is selected, or be rejected until implemented. | **IMPLEMENTED / TESTED** — `DescribeSecret` required for CMK |
+| L-04 | Add negative tests for lazy provider initialization, request-context isolation and actual redaction. | **IMPLEMENTED / TESTED** |
+| L-06 | Document/test the atomic provider switch (set provider + remove plaintext env/reference). | **DOCUMENTED / LOCAL TESTS** |
 
 These criteria are not P00-B merge blockers, but must be evidenced before
 P00-C integration.
