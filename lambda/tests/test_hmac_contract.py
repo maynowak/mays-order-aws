@@ -163,6 +163,16 @@ class TestHmacVerifier(unittest.TestCase):
         envelope = build_envelope(KEY_ID, KEY_VERSION, MESSAGE_TYPE, PAYLOAD)
         self.assertFalse(HmacVerifier(self._key()).verify(envelope, SIGNATURE[:-1] + "A"))
 
+    def test_different_key_material_with_same_metadata_fails(self):
+        # R5-L01: valid, distinct 32-byte key; same keyId/keyVersion and envelope.
+        other_key_b64 = "//79/Pv6+fj39vX08/Lx8O/u7ezr6uno5+bl5OPi4eA="
+        other_key = AppManagedKey.from_base64(KEY_ID, KEY_VERSION, other_key_b64)
+        envelope = build_envelope(KEY_ID, KEY_VERSION, MESSAGE_TYPE, PAYLOAD)
+        signature = sign_envelope(KEY_BYTES, envelope)
+        self.assertTrue(HmacVerifier(self._key()).verify(envelope, signature))
+        self.assertFalse(HmacVerifier(other_key).verify(envelope, signature))
+        self.assertNotEqual(self._key().material, other_key.material)
+
 
 class TestAppManagedKeyBoundary(unittest.TestCase):
     def _config(self):
