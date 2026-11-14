@@ -352,3 +352,13 @@ Date: 2026-11-13
 - Default-off preserved: module count = var.enable_agent_transport (default false); with the flag on the Orders module contributes 10 active resources plus one optional KMS policy.
 - Validation: terraform fmt -check = 0, terraform validate = Success, static wiring tests 12 passed, full Orders suite 217 OK.
 - No AWS call, no plan, no apply, no deployment; the account and secret remain unverified/provisioned outside this gate.
+
+
+[MO-RIS-AWS-PLAN-REVIEW-01 / R1 DISCOVERY (ORDERS SIDE)]
+Status: READ-ONLY - no code or infrastructure change.
+Date: 2026-11-14
+- Baseline: feature/mo-agent-order-body-01 @ c54467d, clean, identical to origin.
+- Verified for this repository: backend bucket mays-orders-tfstate-central-240571105849 (region eu-central-1, lock mays-orders-terraform-locks, workspace prefix env:); only one local AWS profile exists (default, 262370457690) so the target account 240571105849 remains unverified live and no state was read.
+- Module inventory: modules/agent_transport defines 11 resources, of which the KMS policy is count = 0 unless result_secret_kms_key_arn is set, giving 10 active resources; the module is gated by enable_agent_transport (default false).
+- Artifact: lambda/dist/lambda.zip exists (29531 B, sha256 010feb64...) and contains 13 modules including result_consumer.py and result_envelope.py; handler result_consumer.handler, runtime python3.14.
+- No plan, no apply, no secret access, no state mutation. Full cross-repository findings are recorded in the RIS report docs/reports/MO-RIS-AWS-PLAN-REVIEW-01-R1.md.
