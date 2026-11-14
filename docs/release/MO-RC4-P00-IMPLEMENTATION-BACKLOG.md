@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C SECURITY REVIEW FAILED — CORRECTIONS REQUIRED
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C F-03 VERIFIED / F-01 OWNER DECISION PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,13 +78,13 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **IMPLEMENTED / TESTED / SECURITY REVIEW FAILED — CORRECTIONS REQUIRED** — feature branch, not merged |
+| Package status | **IMPLEMENTED / TESTED / F-03 VERIFIED / F-01 OWNER DECISION PENDING** — feature branch, not merged |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
 | Field | Content |
 |---|---|
-| Status | **IMPLEMENTED / TESTED — security review condition F-02 open** |
+| Status | **IMPLEMENTED / TESTED / HANDLER-TEST VERIFIED — F-02 deployment gate open** |
 | Source | `MO-RC4-P00-B-INTEGRATION-REVIEW-01` finding M-01 |
 | Problem | P00-B `SecretCache` was owned by a per-invocation `OrderService`; effective scope was one invocation. |
 | Implemented scope | Module-level `get_default_secret_provider()` shared by `OrderService`; provider/cache survives invocations in one execution environment. |
@@ -106,22 +106,22 @@ The order may change only with documented dependency justification.
 These criteria are not P00-B merge blockers, but must be evidenced before
 P00-C integration.
 
-### Security Review 03 conditions — OPEN
+### Security Review 03 conditions — correction status
 
-| ID | Severity | Required correction | Merge blocker |
+| ID | Severity | Status | Merge blocker |
 |---|---|---|---|
-| F-01 | MEDIUM | Add `secretsmanager:DescribeSecret` to ADR-008 D-5/C-03, Contract §6, Q-09 and Policy Gate — or remove the KMS verification dependency. | **YES** |
-| F-02 | MEDIUM | Document forced environment recycle for rotation/compromise; define cache invalidation/TTL for P00-F. | NO (deployment gate) |
-| F-03 | MEDIUM | Add a real `index.handler` test with `PRIVACY_SECRET_PROVIDER=secretsmanager` and fake boto3; prove cross-invocation cache and no fallback. | **YES** |
-| F-04 | MEDIUM | Define exact SecretString payload/ASCII/length contract and tests. | NO (activation gate) |
-| F-05 | MEDIUM | Replace contradictory rollback wording with executable safe rollback variants. | NO (activation gate) |
-| F-06 | LOW | Add bounded boto3 connect/read timeouts and retry policy. | NO |
-| F-07 | LOW | Require string token type before `compare_digest`. | NO |
-| F-08 | LOW | Add whitelisted sanitized AWS error code to observability. | NO |
-| F-09 | LOW | Policy-Gate allowlist + inline IAM wildcard check for P00-E. | NO (P00-E gate) |
-| F-10 | LOW | Lock or document single-thread cache assumption. | NO |
-| F-11 | LOW | Replace `id()` cache identity with explicit identity token. | NO |
-| F-12 | LOW | Clarify P00-C runtime scope vs P00-E IaC/IAM/KMS. | NO |
+| F-01 | MEDIUM | **OPEN — OWNER DECISION PENDING**; proposal `MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md` prepared; not approved | **YES** |
+| F-02 | MEDIUM | **DOCUMENTED** in rollout: cache lifetime, forced environment recycle, parallel-generation risk; no auto rotation | NO (deployment gate) |
+| F-03 | MEDIUM | **VERIFIED** by `test_index_aws_managed.py` (5 handler-level tests) and mutation proof | NO |
+| F-04 | MEDIUM | **DOCUMENTED** exact SecretString payload: ASCII, 1…1024, no JSON | NO (activation gate) |
+| F-05 | MEDIUM | **DOCUMENTED** two rollback paths (forward-fix / owner-approved ENV) | NO (activation gate) |
+| F-06 | LOW | **OPEN** — timeout values require Owner/Infra decision | NO |
+| F-07 | LOW | **OPEN** — pre-existing type coercion; no realistic bypass demonstrated | NO |
+| F-08 | LOW | **OPEN** — sanitized AWS error code is observability follow-up | NO |
+| F-09 | LOW | **OPEN — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check | NO (P00-E gate) |
+| F-10 | LOW | **OPEN/INFO** — single-thread Lambda assumption documented | NO |
+| F-11 | LOW | **OPEN/INFO** — `id()` is production-None; test-only risk | NO |
+| F-12 | LOW | **DOCUMENTED** — P00-C runtime scope vs P00-E IaC/IAM | NO |
 
 ---
 

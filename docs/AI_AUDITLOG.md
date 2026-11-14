@@ -503,3 +503,24 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Report: `docs/reports/MO-RC4-P00-C-SECURITY-REVIEW-03.md`.
 - No merge authorization; P00-C remains on feature branch. No Terraform/AWS
   mutation, RIS/Jobsearch change, push, main merge or deployment.
+
+## 2026-11-14 — MO-RC4-P00-C-CORRECTION-04
+
+**Status:** `MO-RC4-P00-C — F-03 VERIFIED / F-01 OWNER DECISION PENDING`
+
+- Correction branch `feature/mo-rc4-p00-c-correction-04` based on review HEAD
+  `41b8612`; feature `08fde23` and integration `4d4db3b` unchanged.
+- F-03: new `lambda/tests/test_index_aws_managed.py` exercises real
+  `index.handler` twice with fake boto3; proves module-provider reuse, one
+  fetch, reference isolation, invalidation, negative config and redaction.
+  Mutation with per-invocation provider fails the test.
+- F-01: Q-09 amendment proposal prepared in
+  `docs/release/MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md`; NOT approved.
+- F-02/F-04/F-05: cache/rotation, exact SecretString payload, and two safe
+  rollback paths documented in `docs/security/AWS-MANAGED-PROVIDER-ROLLOUT.md`.
+- F-06/F-07/F-08/F-09/F-10/F-11 remain open (P00-E/INFO); F-12 documented.
+- Tests: Lambda 405, Installer 669, Builder 128, E2E 32 = **1.234 PASS**;
+  Seed 28. ZIP unchanged `05bc3f65…` (42.081 B).
+- Report: `docs/reports/MO-RC4-P00-C-CORRECTION-04.md`; no merge/push/deploy,
+  no Terraform/AWS mutation, no RIS/Jobsearch change. Independent re-review
+  remains required.
