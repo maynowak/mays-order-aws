@@ -139,8 +139,10 @@ P00-C integration.
 | Security boundary | no custom cipher; no key in data/items/logs |
 | Commit boundary | APP adapter + tests + docs |
 | Owner approval | Q-10 approved; Q-11 open; APP_MANAGED is Phase 2, not automatically RC4 |
-| Package status | **PLANNING READY / NOT IMPLEMENTED** — P00-D implementation authorization pending |
-| Open readiness items | external key custody/delivery; Q-11 version/rotation window; implementation authorization |
+| Package status | **CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED** |
+| Proposed key contract | 32-byte Base64, HMAC-SHA256, unique `keyId`/`keyVersion`; no custom cipher |
+| Proposed rotation | max active + one previous only in explicit window; no automatic rotation; P00-F owns transition |
+| Open readiness items | external key custody/delivery; Q-11 window/version count; P00-D implementation authorization |
 
 ---
 

@@ -149,10 +149,14 @@ secret value absent from plan/state/output/logs.
 
 **Goal:** External key material with explicit key ID/version and HMAC-SHA256.
 
-**Status:** **PLANNING READY / NOT IMPLEMENTED** — implementation authorization
-pending.
+**Status:** **CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED** —
+P00-D implementation authorization pending.
 
 **Dependencies:** P00-B; Q-10, Q-11.
+
+**Open contract parameters:** external key custody/transport, Q-11 transition
+window, maximum parallel versions, rotation trigger, deletion responsibility.
+No automatic rotation or new AWS dependency.
 
 **Affected files (proposed):**
 

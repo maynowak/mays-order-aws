@@ -209,6 +209,22 @@ reference suffix only.
 
 APP_MANAGED is not an AWS KMS key and not a variant of AWS_MANAGED.
 
+### 7.1 Proposed P00-D custody and rotation (owner decision pending)
+
+**Status: PROPOSED — NOT APPROVED.**
+
+- Key generation, secure storage, delivery, rotation, revocation and deletion
+  are Owner/Operator responsibilities; MO only consumes injected material.
+- No new AWS dependency; the concrete external store/loader is an Owner decision.
+- One active `keyVersion`; at most one previous version only inside an explicit
+  Owner-approved transition window.
+- No automatic rotation, no silent active switch, no fallback to an unknown
+  version, no automatic key deletion.
+- P00-F implements rotation/transition mechanics; P00-D only verifies the
+  versioned HMAC contract.
+- Exact transport, key format beyond 32-byte Base64, transition duration and
+  parallel-version policy remain open.
+
 ---
 
 ## 8. KMS / Encryption Contract

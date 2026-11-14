@@ -202,8 +202,14 @@ separately gated.
 | Security impact | Native rotation requires cache invalidation and failure handling; unsupported rotation risks auth outage |
 | Compatibility | Rotation must be default-off; old/new version transition must be explicit |
 | Recommendation | **manual rotation documented in RC4; native rotation later** |
+| Proposed contract | unique `keyId`/`keyVersion`; max one active + one previous; explicit transition window; no automatic rotation; no silent active switch; no unknown-version fallback; P00-F owns rotation |
+| Open parameters | transition-window duration, parallel-version count, rotation trigger, deletion responsibility |
 | Packages | P00-D/F |
 | Owner gate | Q-11 |
+| Status | **READY_FOR_OWNER — CONTRACT PROPOSED; OWNER DECISION PENDING** |
+
+The detailed proposal is in
+`docs/reports/MO-RC4-P00-D-AUTHORIZATION-01.md`. It is not approved.
 
 ---
 

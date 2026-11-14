@@ -610,3 +610,22 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Q-11 and implementation/key-custody decisions remain open.
 - No AWS-live call, Terraform/AWS mutation, merge/push/deploy, RIS/Jobsearch
   change. Report: `docs/reports/MO-RC4-P00-C-CLOSEOUT-08.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-AUTHORIZATION-01
+
+**Status:** `MO-RC4-P00-D — CONTRACT PREPARED / OWNER DECISIONS PENDING`
+
+- P00-D contract preparation only; no APP_MANAGED implementation.
+- Q-11 proposal: unique `keyId`/`keyVersion`, at most one active + one previous
+  inside an explicit window, no automatic rotation, no silent switch, no
+  unknown-version fallback, P00-F owns rotation/transition.
+- Key custody: Owner/Operator generates/stores/delivers/revokes/deletes;
+  MO consumes injected material only; no new AWS dependency, no key in Git or
+  logs. Exact transport remains an Owner decision.
+- Key material: 32-byte Base64, HMAC-SHA256, fail-closed on invalid/length/
+  version/format; no custom cipher.
+- Open: Q-11 window/version policy, external key custody/transport, P00-D
+  implementation authorization.
+- No product code, AWS/Terraform mutation, push/main merge/tag/deploy or
+  RIS/Jobsearch change. Report:
+  `docs/reports/MO-RC4-P00-D-AUTHORIZATION-01.md`.
