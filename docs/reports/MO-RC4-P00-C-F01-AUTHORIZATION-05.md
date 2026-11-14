@@ -142,7 +142,16 @@ Keine Änderung am Integrationsbranch. Kein Merge, Push oder Deployment.
 
 ---
 
-## 8. Status
+## 8. Commits
+
+| Commit | Inhalt |
+|---|---|
+| `e800906e69c3cafe8ff09e6ea0031b9f2987801b` | F-03 Handler-Regressionstest |
+| `2d4a8de9b5e1542c01c43d67092c80f9a33f5f92` | F-01-Vorschlag und Deployment-Gates |
+| `d3ce23749d31642ef303b5e71b7df6b0721e62e8` | Correction-04 Commit-Evidenz / Basis |
+| `5cb0b0bf1a089c28ee55f635cc8e944e12f07f15` | Q-09 Contract Amendment, Decision Register, ADR, Contract, Policy-Gate-Spezifikation, Backlog, Auditlog, Report |
+
+## 9. Status
 
 ```text
 MO-RC4-P00-C — F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW READY
