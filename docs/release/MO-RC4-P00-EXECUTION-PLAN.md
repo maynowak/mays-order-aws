@@ -187,9 +187,10 @@ version, rollback/recovery.
 
 ## 6. Package P00-E — KMS / Terraform / IAM
 
-**Status:** `LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED` — feature
-`feature/mo-rc4-p00-e-simple` @ `a6667ec`; no plan/apply/AWS-live call.
-Report: `docs/reports/MO-RC4-P00-E-SIMPLE-01.md`.
+**Status:** `LOCALLY INTEGRATED / VERIFICATION INCOMPLETE` — merge `3b0de2f`
+from `feature/mo-rc4-p00-e-simple` @ `44c3900`; no plan/apply/deployment.
+Installer exceptions: known dependency-detector harness failure and deferred
+live-profile test. Report: `docs/reports/MO-RC4-P00-E-INTEGRATION-02.md`.
 
 **Goal (minimal scope):** Optional AWS_MANAGED Secrets Manager container with
 least privilege; an optional *existing* customer-managed KMS key can be

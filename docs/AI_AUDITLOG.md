@@ -767,3 +767,27 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   out-of-band secret value, optional CMK key policy, DDB/SQS CMK decision and
   P00-F rotation/revocation.
 - Report: `docs/reports/MO-RC4-P00-E-SIMPLE-01.md`.
+
+## 2026-11-14 — MO-RC4-P00-E-INTEGRATION-02
+
+**Status:** `RESULT C — P00-E LOCALLY INTEGRATED / VERIFICATION INCOMPLETE`
+
+- All existing worktrees were clean; no foreign changes were touched and no
+  subagents were used in this task.
+- Feature `feature/mo-rc4-p00-e-simple` @ `44c3900` merged `--no-ff` into
+  `release/rc4-integration` as `3b0de2f`; parents are `2dbbd3f` + `44c3900`.
+- Integration check passed: opt-in secret, no default Secret/IAM resources,
+  no secret value/version, no KMS key creation, optional exact CMK ARN,
+  exact Secret ARN IAM, no wildcard, ENV default unchanged, APP_MANAGED
+  default-off, no DDB/SQS/Cognito/CloudFront changes.
+- Post-merge: Lambda 429 PASS; Installer local 673 tests with 2 known
+  dependency-detector harness failures and 1 live-profile test deferred;
+  Builder 128, Policy Gate 23, E2E 36 (5 skipped), Seed 28 PASS; Terraform
+  fmt/init/validate and `git diff --check` PASS. No plan/apply/deployment.
+- **Deviation:** the first full installer invocation used a wrong test-ID
+  filter and therefore executed the live profile test once. It performed a
+  read-only STS identity check and passed; no mutation or deployment occurred.
+  The corrected local suite excludes the test. This is why the result is
+  **C**, not A.
+- No new product failures beyond the known dependency-detector harness defect.
+- Report: `docs/reports/MO-RC4-P00-E-INTEGRATION-02.md`.

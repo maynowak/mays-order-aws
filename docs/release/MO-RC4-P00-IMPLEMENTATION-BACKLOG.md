@@ -118,7 +118,7 @@ P00-C integration.
 | F-06 | LOW | **OPEN** — timeout values require Owner/Infra decision | NO |
 | F-07 | LOW | **OPEN** — pre-existing type coercion; no realistic bypass demonstrated | NO |
 | F-08 | LOW | **OPEN** — sanitized AWS error code is observability follow-up | NO |
-| F-09 | LOW | **LOCAL IMPLEMENTED — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check; integration approval pending | NO (P00-E gate) |
+| F-09 | LOW | **INTEGRATED — P00-E** — Policy-Gate allowlist/inline-IAM wildcard check; verification follows P00-E integration | NO (P00-E gate) |
 | F-10 | LOW | **OPEN/INFO** — single-thread Lambda assumption documented | NO |
 | F-11 | LOW | **OPEN/INFO** — `id()` is production-None; test-only risk | NO |
 | F-12 | LOW | **DOCUMENTED** — P00-C runtime scope vs P00-E IaC/IAM | NO |
@@ -153,7 +153,7 @@ P00-C integration.
 
 | Field | Content |
 |---|---|
-| Status | **LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED** — `feature/mo-rc4-p00-e-simple` @ `a6667ec`; no plan/apply/live/AWS mutation |
+| Status | **LOCALLY INTEGRATED / VERIFICATION INCOMPLETE** — merge `3b0de2f`; known installer harness exceptions + deferred live test; no plan/apply/deployment |
 | Goal | Optional AWS_MANAGED Secrets Manager container with least privilege; optional existing CMK reference only |
 | Dependencies | Q-04, Q-09, Q-10; P00-C for secret option |
 | Components | `terraform/modules/privacy_secret`, count-gated IAM/Lambda wiring, Q-09 Policy Gate |

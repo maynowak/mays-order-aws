@@ -108,15 +108,19 @@ primary worktree). Neither is counted as PASS. Q-02/Q-04/Q-08/Q-09/Q-10 and
 Q-11 for the P00-D contract are approved; ADR-008 is `ACCEPTED`. P00-F
 rotation/revocation, production key transport, AWS-live verification and the
 existing P00-C deployment gates remain open. P00-E minimal scope is locally
-implemented on `feature/mo-rc4-p00-e-simple` @ `a6667ec` (no plan/apply/AWS
-mutation); integration approval is still required. P00-F and DDB/SQS CMK
-activation remain open.
+integrated via merge `3b0de2f` (`feature/mo-rc4-p00-e-simple` @ `44c3900`).
+Local verification is **PARTIAL / INCOMPLETE**: the installer suite has the
+known dependency-detector harness failures and the live profile test remains
+deferred; the first full-suite invocation also triggered that live test once
+(read-only STS identity check, no mutation). The corrected local suite excludes
+it. P00-F and DDB/SQS CMK activation remain open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PARTIAL (P00-B/C/D integrated; P00-E local feature branch /
-              integration approval required; P00-F and deployment gates pending)
+P00:          PARTIAL (P00-B/C/D/E locally integrated; P00-E verification
+              incomplete due known harness exceptions/live-test deviation;
+              P00-F and deployment gates pending)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```
