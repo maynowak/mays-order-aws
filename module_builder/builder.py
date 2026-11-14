@@ -620,13 +620,17 @@ def build(
     written.append(str(readme))
 
     # Build manifest (provenance, written last)
+    commit = ""
     try:
         commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             cwd=source_root, capture_output=True, text=True, timeout=10,
         ).stdout.strip()
     except Exception:
-        commit = "unknown"
+        commit = ""
+    if not commit:
+        # A release-ready module must name its exact source commit.
+        _fail("Source-Commit nicht ermittelbar; Manifest waere nicht reproduzierbar.")
     manifest = {
         "builder_version": __version__,
         "preset": preset_name if selection is None else "custom",
@@ -825,7 +829,7 @@ def build_module(
 ) -> BuildResult:
     """Orders-Service-Modul generieren (WP2–WP5, MAYS-ORDERS-MODULE-CONTRACT-01).
 
-    Wiederverwendung der Foundation-Generatorfunktionen; feste 7-Modul-
+    Wiederverwendung der Foundation-Generatorfunktionen; feste 8-Modul-
     Zusammensetzung; Dateien liegen DIREKT im Zielordner (lokales Modul).
     """
     from module_builder.spec import ORDERS_SERVICE_MODULES, ORDERS_SERVICE_VARIABLES
@@ -849,9 +853,9 @@ def build_module(
         mod_dir = source_root / "terraform" / "modules" / MODULE_CATALOG[module]["dir"]
         if not mod_dir.is_dir() or not any(mod_dir.glob("*.tf")):
             missing.append(f"terraform/modules/{MODULE_CATALOG[module]['dir']}/")
-    for artifact in ("lambda/dist/lambda.zip",) + tuple(
-        ["lambda/src", "lambda/build_zip.py"]
-    ):
+    # MO-RIS-ORDERS-MODULE-REBUILD-01: the artifact is BUILT below from this
+    # source state; a pre-existing dist zip is never trusted or required.
+    for artifact in ("lambda/src", "lambda/build_zip.py"):
         if not (source_root / artifact).exists():
             missing.append(artifact)
     if missing:
@@ -923,15 +927,21 @@ def build_module(
                 '  count = var.external_cognito == null ? 1 : 0',
                 1,
             )
-        if block["name"] == "api":
-            # JWT-Autorisierung bleibt in beiden Varianten aktiv; die Werte
-            # stammen aus den locals (MANAGED: eigener Pool; EXTERNAL: Referenz).
-            text = text.replace(
-                "module.cognito.user_pool_endpoint", "local.cognito_endpoint"
-            )
-            text = text.replace(
-                "module.cognito.user_pool_client_id", "local.cognito_client_id"
-            )
+        # EXTERNAL-Variante: `module.cognito` ist ab jetzt gezaehlt (count).
+        # JEDE Referenz in den verbleibenden Modulbloecken (api, lambda, ...)
+        # muss modus-sicher sein: endpoint/client_id kommen aus den locals,
+        # alle uebrigen Attribute ueber one(splat) -> EXTERNAL bleibt leer.
+        text = text.replace(
+            "module.cognito.user_pool_endpoint", "local.cognito_endpoint"
+        )
+        text = text.replace(
+            "module.cognito.user_pool_client_id", "local.cognito_client_id"
+        )
+        text = re.sub(
+            r"module\.cognito\.([a-z_]+)",
+            r"one(module.cognito[*].\1)",
+            text,
+        )
         kept_blocks.append(dict(block, text=text))
     (target_dir / "versions.tf").write_text(
         terraform_blocks[0]["text"] + "\n", encoding="utf-8"
@@ -988,6 +998,21 @@ def build_module(
 
     # Artefakte: lambda.zip + Quelle + Build-Skript (modulsrelativ, path.module)
     artifact_hashes: Dict[str, str] = {}
+
+    # Build the Lambda bundle from the selected source commit. The previous
+    # behaviour copied lambda/dist/lambda.zip verbatim, so a stale artifact
+    # could ship fewer modules than the source (7 instead of 13).
+    import sys as _sys
+    build_proc = subprocess.run(
+        [_sys.executable, str(source_root / "lambda" / "build_zip.py")],
+        cwd=str(source_root / "lambda"),
+        capture_output=True, text=True, timeout=300,
+    )
+    if build_proc.returncode != 0:
+        _fail(
+            "Lambda-Bundle konnte nicht aus der Quelle gebaut werden: "
+            + (build_proc.stderr or build_proc.stdout)[-400:]
+        )
     _copy_file(
         source_root / "lambda/dist/lambda.zip",
         target_dir / "lambda/dist/lambda.zip",
@@ -1002,13 +1027,17 @@ def build_module(
         _copy_file(py_file, target_dir / "lambda/src" / py_file.name, written)
 
     # Manifest
+    commit = ""
     try:
         commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             cwd=source_root, capture_output=True, text=True, timeout=10,
         ).stdout.strip()
     except Exception:
-        commit = "unknown"
+        commit = ""
+    if not commit:
+        # A release-ready module must name its exact source commit.
+        _fail("Source-Commit nicht ermittelbar; Manifest waere nicht reproduzierbar.")
     manifest = {
         "builder_version": __version__,
         "preset": "orders-service",
@@ -1019,7 +1048,7 @@ def build_module(
         "artifacts_sha256": artifact_hashes,
         "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
         "notes": {
-            "contract": "MAYS-ORDERS-MODULE-CONTRACT-01: fixed 7-module Orders-Service composition",
+            "contract": "MAYS-ORDERS-MODULE-CONTRACT-01: fixed 8-module Orders-Service composition",
             "external_cognito": "runtime variable: null = MANAGED (own pool, default), object = EXTERNAL (existing pool, fail-closed validated)",
             "module_mode": "local Terraform module (no provider block, path.module artifacts)",
             "policy_gate": "root-level responsibility of the integrating project",

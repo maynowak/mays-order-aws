@@ -882,8 +882,9 @@ class TestOrdersServiceModule(unittest.TestCase):
         main_tf = (self.target / "main.tf").read_text()
         # Genau die 7 Vertragsmodule
         modules = set(re.findall(r'^module\s+"([a-z_]+)"', main_tf, re.M))
-        self.assertEqual(modules, {"api", "cognito", "dynamodb", "iam",
-                                  "lambda", "sqs", "sqs_worker"})
+        self.assertEqual(modules, {"agent_transport", "api", "cognito",
+                                  "dynamodb", "iam", "lambda", "sqs",
+                                  "sqs_worker"})
         # Kindmodul-Vertrag: kein Provider-/terraform-Block im Modul-main
         self.assertNotRegex(main_tf, r'^provider\s', "Provider-Block im Modul verboten")
         self.assertNotRegex(main_tf, r'^terraform\s', "terraform-Block gehört in versions.tf")
@@ -891,19 +892,22 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertNotIn("terraform_data", main_tf)
         self.assertNotIn("seed", main_tf)
         # Artefakte modulrelativ (path.module statt path.root)
-        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 2)
+        # lambda + sqs_worker + agent_transport (result consumer)
+        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 3)
         self.assertNotIn("path.root", main_tf)
-        # Tag-Parität: alle 7 Modulblöcke nutzen local.default_tags (Maker/Environment)
+        # Tag-Parität: alle 8 Modulblöcke nutzen local.default_tags (Maker/Environment)
         self.assertEqual(main_tf.count("tags         = local.default_tags")
                          + len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)) >= 1
-                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 7)
+                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 8)
 
     def test_variables_contract(self):
         variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
                           (self.target / "variables.tf").read_text(), re.M))
         self.assertEqual(variables, {"project_name", "tags",
                                      "monitoring_enabled", "log_retention_days",
-                                     "external_cognito"})
+                                     "external_cognito",
+                                     "enable_agent_transport",
+                                     "ris_result_producer_role_arns"})
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
 
@@ -979,7 +983,9 @@ class TestOrdersServiceModule(unittest.TestCase):
             (self.target / "variables.tf").read_text(), re.M))
         self.assertEqual(variables, {"project_name", "tags",
                                      "monitoring_enabled", "log_retention_days",
-                                     "external_cognito"})
+                                     "external_cognito",
+                                     "enable_agent_transport",
+                                     "ris_result_producer_role_arns"})
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()
@@ -994,8 +1000,8 @@ class TestOrdersServiceModule(unittest.TestCase):
         )
         self.assertEqual(manifest["preset"], "orders-service")
         self.assertEqual(manifest["modules"],
-                         ["api", "cognito", "dynamodb", "iam", "lambda",
-                          "sqs", "sqs_worker"])
+                         ["agent_transport", "api", "cognito", "dynamodb",
+                          "iam", "lambda", "sqs", "sqs_worker"])
         self.assertEqual(manifest["project_name"], "contract-orders")
         self.assertIn("lambda/dist/lambda.zip", manifest["artifacts_sha256"])
 
@@ -1158,7 +1164,7 @@ class TestExternalCognitoIntegration(unittest.TestCase):
 
     def test_tags_preserved(self):
         """11) Bestehende Tags bleiben erhalten (local.default_tags)."""
-        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 7)
+        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 8)
 
     def test_output_names_and_external_safe_values(self):
         """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""

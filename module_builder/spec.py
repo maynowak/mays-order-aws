@@ -77,7 +77,7 @@ COMPLETE_POLICY_FILES: List[str] = [
 
 # Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): unveränderliche
 # Zusammensetzung des wiederverwendbaren Mays-Orders-AWS-Terraform-Moduls.
-# Diese 7 Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
+# Diese 8 Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
 # Orders-Tabelle, Orders-IAM) — api benötigt die vom Modul verwaltete
 # Cognito-Ressource (JWT-Authorizer). Monitoring/CloudTrail/Cognito-Backups
 # und Seed sind NICHT Teil des Orders-Service-Vertrags (Root-Projekt-Extras).
@@ -89,9 +89,10 @@ ORDERS_SERVICE_MODULES: List[str] = [
     "lambda",
     "sqs",
     "sqs_worker",
+    "agent_transport",
 ]
 
-# Modul-Eingaben des Orders-Service-Vertrags (auditiert, WP4): die 7 Module
+# Modul-Eingaben des Orders-Service-Vertrags (auditiert, WP4): die 8 Module
 # verbrauchen genau diese Root-Variablen (aws_region entfällt — Region liefert
 # der Provider des aufrufenden Projekts; Seed-/Backup-/Alarm-Variablen entfallen,
 # da die zugehörigen Bestandteile nicht Vertragsbestandteil sind).
@@ -100,6 +101,8 @@ ORDERS_SERVICE_VARIABLES: List[str] = [
     "tags",
     "monitoring_enabled",
     "log_retention_days",
+    "enable_agent_transport",
+    "ris_result_producer_role_arns",
 ]
 
 # Seed tooling (opt-in via var.seed_example_data, default false).

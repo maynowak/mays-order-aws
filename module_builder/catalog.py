@@ -35,6 +35,10 @@ MODULE_CATALOG: Dict[str, Dict] = {
     "lambda": {"dir": "lambda", "deps": ["dynamodb", "iam"], "optional_deps": ["sqs"]},
     "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"], "optional_deps": []},
     "api": {"dir": "api", "deps": ["cognito", "lambda"], "optional_deps": []},
+    # MO-RIS-ORDERS-MODULE-REBUILD-01: agent transport boundary (queues,
+    # result consumer, secret). Optional, default-off in the generated module.
+    "agent_transport": {"dir": "agent_transport", "deps": ["dynamodb"],
+                        "optional_deps": []},
     "monitoring": {"dir": "monitoring", "deps": ["api", "dynamodb", "lambda"], "optional_deps": []},
     "cognito_backup_automation": {
         "dir": "cognito_backup_automation",
