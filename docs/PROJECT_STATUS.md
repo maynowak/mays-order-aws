@@ -17,7 +17,7 @@ Current Feature:
 MO-RC4 P00 — P00-C local closeout; P00-D planning ready
 
 Current Task:
-MO-RC4-P00-D-Q11-DECISION-02 — Q11 DECISION PACKAGE READY / OWNER APPROVAL
+MO-RC4-P00-D-HMAC-CONTRACT-03 — HMAC CONTRACT PREPARED / OWNER APPROVAL
 PENDING; keine APP_MANAGED-Implementierung
 
 Hinweis Release Candidate:

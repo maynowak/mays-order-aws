@@ -204,7 +204,8 @@ separately gated.
 | Recommendation | **manual rotation documented in RC4; native rotation later** |
 | Proposed contract | unique `keyId`/`keyVersion`; max one active + one previous; explicit transition window; no automatic rotation; no silent active switch; no unknown-version fallback; P00-F owns rotation |
 | Proposed policy | max 24h transition, one previous version, explicit activation timestamp, fail-closed, immediate revocation via forced recycle |
-| Open parameters | exact canonical HMAC payload, revocation semantics in warm environments, existing signatures, key transport/custody, deletion responsibility |
+| Proposed payload | `MOAPP` + protocol/algorithm + length-prefixed `keyId`/`keyVersion`/message type + payload; HMAC-SHA256 |
+| Open parameters | signature wire format, revocation semantics in warm environments, existing signatures, key transport/custody, deletion responsibility |
 | Packages | P00-D/F |
 | Owner gate | Q-11 |
 | Status | **READY_FOR_OWNER — DECISION PACKAGE PREPARED; OWNER APPROVAL PENDING** |

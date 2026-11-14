@@ -224,6 +224,9 @@ APP_MANAGED is not an AWS KMS key and not a variant of AWS_MANAGED.
   versioned HMAC contract.
 - Exact transport, key format beyond 32-byte Base64, transition duration and
   parallel-version policy remain open.
+- Proposed byte-exact HMAC payload:
+  `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md` (PROPOSED / owner
+  approval pending).
 
 ---
 

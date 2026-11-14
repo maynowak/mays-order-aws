@@ -149,15 +149,16 @@ secret value absent from plan/state/output/logs.
 
 **Goal:** External key material with explicit key ID/version and HMAC-SHA256.
 
-**Status:** **CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED** —
-P00-D implementation authorization pending.
+**Status:** **HMAC CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT
+IMPLEMENTED** — P00-D implementation authorization pending.
 
 **Dependencies:** P00-B; Q-10, Q-11.
 
-**Open contract parameters:** exact canonical HMAC payload, 24h transition
+**Open contract parameters:** signature wire format, 24h transition
 window/approval, revocation semantics in warm Lambda, existing signatures,
-external key custody/transport, deletion responsibility. No automatic rotation
-or new AWS dependency.
+external key custody/transport, deletion responsibility. Canonical payload
+proposal: `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md`. No automatic
+rotation or new AWS dependency.
 
 **Affected files (proposed):**
 

@@ -650,3 +650,22 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Report: `docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`.
 - Note: concurrent docs commit `545a82c` was present when this entry was
   committed; its Q11 owner questions are preserved in the report appendix.
+
+## 2026-11-14 — MO-RC4-P00-D-HMAC-CONTRACT-03
+
+**Status:** `MO-RC4-P00-D — HMAC CONTRACT PREPARED / OWNER APPROVAL PENDING`
+
+- Verified existing state: no APP_MANAGED HMAC implementation, no signatures,
+  no canonical payload; existing privacy auth is an `internal_token` comparison.
+- Proposed byte-exact length-prefixed envelope: `MOAPP` + protocol/algorithm +
+  keyId/keyVersion/messageType/payload; HMAC-SHA256 over exact bytes.
+- Binds keyId/keyVersion, protocol and algorithm; unknown/expired version,
+  protocol change, malformed Base64/length and trailing fields fail closed;
+  no cross-provider fallback.
+- Synthetic test vector provided (public key, no real secret): HMAC
+  `9793052f…e79c`; negative/rejection vectors enumerated.
+- Q-11 T1–T6 remain PROPOSED; no owner approval. Signature wire format,
+  revocation/existing signatures, key transport and deletion remain open.
+- No product code, AWS/Terraform mutation, push/merge/deploy or RIS/Jobsearch
+  change. Contract: `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md`;
+  Report: `docs/reports/MO-RC4-P00-D-HMAC-CONTRACT-03.md`.
