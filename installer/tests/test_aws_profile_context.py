@@ -22,6 +22,10 @@ def _fake_context(profile="mayaws", account_id="240571105849"):
     )
 
 
+@unittest.skipUnless(
+    os.environ.get("MO_AWS_LIVE_PROFILE_TEST") == "1",
+    "AWS live profile test DEFERRED; set MO_AWS_LIVE_PROFILE_TEST=1 only with explicit read-only approval",
+)
 class TestAWSProfileContextLive(unittest.TestCase):
     """Live check against the real mayaws profile (requires AWS credentials)."""
 

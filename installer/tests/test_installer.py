@@ -19,6 +19,8 @@ from installer.terraform.runner import TerraformRunner, PlanResult, TerraformRes
 from installer.terraform.plan_analysis import evaluate_plan_safety, analyze_plan_safety
 from installer.run.manager import RunDirectoryManager, PlanArtifactManager
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _make_installer_context(tmpdir: str) -> InstallationContext:
     """Build a fully mocked, non-AWS installer context for command tests."""
@@ -1412,7 +1414,7 @@ class TestDependencyDetector(unittest.TestCase):
         from security.dependency_detector import parse_terraform_providers
         from pathlib import Path
 
-        deps = parse_terraform_providers(Path("terraform/main.tf"))
+        deps = parse_terraform_providers(REPO_ROOT / "terraform/main.tf")
 
         self.assertGreaterEqual(len(deps), 2)
         names = {d.name for d in deps}
@@ -1424,21 +1426,18 @@ class TestDependencyDetector(unittest.TestCase):
             self.assertIn("hashicorp/", dep.current_reference)
 
     def test_dependency_detector_runs(self):
-        """Test that dependency detector runs without error."""
-        import subprocess
+        """Test that dependency detection produces valid output offline."""
         import json
+        from security.dependency_detector import detect_all_changes
 
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
-        )
+        with patch(
+            "security.dependency_detector.fetch_latest_terraform_provider_version",
+            return_value=("99.0.0", "offline fixture"),
+        ):
+            result = detect_all_changes(REPO_ROOT)
 
-        self.assertEqual(result.returncode, 1)  # Changes detected
-
-        # Parse JSON output
-        output = json.loads(result.stdout)
+        self.assertEqual(result.status, "DEPENDENCY_CHANGE_DETECTED")
+        output = json.loads(result.to_json())
         self.assertIn("status", output)
         self.assertIn("run_id", output)
         self.assertIn("timestamp", output)
@@ -1455,7 +1454,7 @@ class TestDependencyDetector(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         output = json.loads(result.stdout)
@@ -1483,7 +1482,7 @@ class TestDependencyDetector(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         output = result.stdout
@@ -1495,26 +1494,16 @@ class TestDependencyDetector(unittest.TestCase):
         self.assertNotIn("password", output.lower())
 
     def test_deterministic_output(self):
-        """Test that detector output is deterministic for same input."""
-        import subprocess
+        """Test deterministic status/structure with a fixed provider fixture."""
         import json
+        from security.dependency_detector import detect_all_changes
 
-        result1 = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
-        )
-        result2 = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
-        )
-
-        # Both should have same status and dependency structure
-        out1 = json.loads(result1.stdout)
-        out2 = json.loads(result2.stdout)
+        with patch(
+            "security.dependency_detector.fetch_latest_terraform_provider_version",
+            return_value=("99.0.0", "offline fixture"),
+        ):
+            out1 = json.loads(detect_all_changes(REPO_ROOT).to_json())
+            out2 = json.loads(detect_all_changes(REPO_ROOT).to_json())
 
         self.assertEqual(out1["status"], out2["status"])
         self.assertEqual(len(out1["dependencies"]), len(out2["dependencies"]))
@@ -1531,7 +1520,7 @@ class TestDependencyDetector(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         output = json.loads(result.stdout)
@@ -1566,7 +1555,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
         native_result = json.loads(result.stdout)
 
@@ -1575,7 +1564,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         self.assertEqual(result.returncode, 0)
@@ -1607,7 +1596,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
         native_result = json.loads(result.stdout)
 
@@ -1615,7 +1604,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         with open("dependency_result.sarif") as f:
@@ -1637,7 +1626,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
         native_result = json.loads(result.stdout)
 
@@ -1645,7 +1634,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         with open("dependency_result.sarif") as f:
@@ -1681,7 +1670,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "security/dependency_detector.py"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
         native_result = json.loads(result.stdout)
 
@@ -1689,7 +1678,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         with open("dependency_result.sarif") as f:
@@ -1715,13 +1704,13 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result1.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
         result2 = subprocess.run(
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result2.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         self.assertEqual(result1.returncode, 0)
@@ -1745,7 +1734,7 @@ class TestSarifAdapter(unittest.TestCase):
             ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
-            cwd="/home/dci-student/projects/Mays-Orders-AWS"
+            cwd=str(REPO_ROOT)
         )
 
         sarif_output = result.stdout + result.stderr
