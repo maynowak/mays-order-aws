@@ -22,6 +22,10 @@ MODULES = sorted(
     path.name for path in SRC_DIR.glob("*.py") if not path.name.startswith("_")
 )
 
+# Deterministic archive metadata: the ZIP must not depend on checkout mtimes.
+FIXED_DATE_TIME = (1980, 1, 1, 0, 0, 0)
+FIXED_FILE_MODE = 0o644 << 16
+
 
 def build() -> None:
     DIST_DIR.mkdir(parents=True, exist_ok=True)
@@ -31,7 +35,10 @@ def build() -> None:
             source = SRC_DIR / module
             if not source.exists():
                 raise FileNotFoundError(f"Missing source module: {source}")
-            archive.write(source, arcname=module)
+            info = zipfile.ZipInfo(module, date_time=FIXED_DATE_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = FIXED_FILE_MODE
+            archive.writestr(info, source.read_bytes())
 
     digest = hashlib.sha256(ZIP_PATH.read_bytes()).hexdigest()
     print(f"Built {ZIP_PATH} ({ZIP_PATH.stat().st_size} bytes, sha256 {digest})")
