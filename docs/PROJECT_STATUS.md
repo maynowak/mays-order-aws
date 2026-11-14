@@ -48,6 +48,8 @@ release/rc4-integration @ MO-RC4-AWS-LIFECYCLE-FINAL-01
 → MO-GIT-CONSOLIDATION-02: 18 worktrees regular entfernt (kein --force);
   nur Mays-Orders-AWS + Mays-Orders-AWS-rc4-integration verbleiben; Branches/Tags
   unverändert; RC4 720e458 erreichbar
+→ MO-RC4-PUBLISH-01: release/rc4-integration nach exakter Zählung von 99
+  Commits gepusht; Upstream gesetzt, Remote-Tip e73cd8a; main unverändert
 → P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
 → P00-E merge 3b0de2f (parents 2dbbd3f + 44c3900); feature a6667ec + 44c3900
 → P00-F rotation/revocation: dad5b16

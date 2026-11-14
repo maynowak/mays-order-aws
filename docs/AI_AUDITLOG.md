@@ -888,3 +888,17 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   reports no missing objects.
 - Non-Git snapshot, ZIP archives and Terraform states remain untouched.
 - Report: `docs/reports/MO-GIT-CONSOLIDATION-02.md`.
+
+## 2026-11-14 — MO-RC4-PUBLISH-01
+
+**Status:** `COMPLETE — RC4 BRANCH PUBLISHED / MAIN UNTOUCHED`
+
+- Pre-push count verified: **99 unpushed commits** on
+  `release/rc4-integration`; no upstream and no remote branch existed.
+- Pushed the branch without force:
+  `git push -u origin release/rc4-integration:release/rc4-integration`.
+- Remote and local tip were verified as
+  `e73cd8abf3f4aa098bd5ffeda402a03b162575cc`; unpushed count is now 0.
+- `main` remains unchanged and 190 commits behind the RC4 branch; no main
+  merge or push to `main`. No tags were pushed. No AWS calls.
+- Report: `docs/reports/MO-RC4-PUBLISH-01.md`.
