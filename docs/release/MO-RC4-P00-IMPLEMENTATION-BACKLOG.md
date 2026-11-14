@@ -139,12 +139,12 @@ P00-C integration.
 | Security boundary | no custom cipher; no key in data/items/logs |
 | Commit boundary | APP adapter + tests + docs |
 | Owner approval | Q-10 approved; Q-11 P00-D contract approved; P00-F rotation pending |
-| Package status | **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PENDING** — not merged/deployed |
+| Package status | **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PASSED / MERGE REVIEW READY** — not merged/deployed |
 | Implemented components | `lambda/src/hmac_contract.py`, additive `AppManagedProvider.resolve_key/verifier`, local injected loader |
 | Key contract | 32-byte Base64, HMAC-SHA256, unique `keyId`/`keyVersion`; no custom cipher |
 | Payload | `MOAPP` + version/alg + length-prefixed keyId/keyVersion/messageType/payload |
 | Rotation | P00-F only; max active + one previous, max 24h explicit window |
-| Open readiness items | security review; production key transport; P00-F rotation/revocation; existing signatures |
+| Open readiness items | production key transport; P00-F rotation/revocation; existing signatures; R5-L01 wrong-key test; R6-L01 dependency-test harness |
 
 ---
 

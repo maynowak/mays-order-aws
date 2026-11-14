@@ -149,8 +149,8 @@ secret value absent from plan/state/output/logs.
 
 **Goal:** External key material with explicit key ID/version and HMAC-SHA256.
 
-**Status:** **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PENDING** —
-feature branch, not merged/deployed.
+**Status:** **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PASSED / MERGE
+REVIEW READY** — feature branch, not merged/deployed.
 
 **Dependencies:** P00-B; Q-10, Q-11.
 

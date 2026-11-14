@@ -691,3 +691,28 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   handling remain open. No merge/push/deploy, AWS/Terraform mutation or
   RIS/Jobsearch change.
 - Report: `docs/reports/MO-RC4-P00-D-IMPLEMENTATION-04.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-SECURITY-REVIEW-05
+
+**Status:** `MO-RC4-P00-D — SECURITY REVIEW PASSED / MERGE REVIEW READY`
+
+- Read-only review of feature `18cf541` against integration `8a19d5a`;
+  ancestry PASS, no product changes, no merge/push/deploy.
+- R1 HMAC-SHA256/32-byte strict Base64/constant-time: PASS; published vector
+  reproduced independently (`9793052f…e79c`, signature `l5MFL…55w`).
+- R2 envelope format/lengths/ASCII/1 MiB/no trailing/field binding: PASS.
+- R3 ENV/AWS_MANAGED unchanged, APP_MANAGED default-off, no request selection,
+  no fallback, `AppManagedProvider.resolve()` fail-closed, `verifier()` not
+  wired into OrderService: PASS.
+- R4 local key custody, no key in Git/reports/logs/state, no AWS dependency:
+  PASS; production transport still open.
+- R5 23/23 HMAC tests, Lambda 428/428: PASS. LOW R5-L01: no direct wrong-key
+  material test. R6 dependency detector classified **TEST HARNESS DEFECT /
+  ENVIRONMENT DEPENDENCY**: hardcoded primary worktree clean vs expected
+  changes; not a P00-D regression.
+- R7 ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, source-identical/reproducible).
+- No CRITICAL/HIGH/MEDIUM. Merge review ready; deployment remains blocked by
+  P00-F rotation/revocation, production transport and installer environment
+  tests.
+- Report: `docs/reports/MO-RC4-P00-D-SECURITY-REVIEW-05.md`.
