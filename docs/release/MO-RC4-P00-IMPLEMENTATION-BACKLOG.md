@@ -138,12 +138,13 @@ P00-C integration.
 | Migration risk | key loss or version mismatch; require dual-version transition |
 | Security boundary | no custom cipher; no key in data/items/logs |
 | Commit boundary | APP adapter + tests + docs |
-| Owner approval | Q-10 approved; Q-11 open; APP_MANAGED is Phase 2, not automatically RC4 |
-| Package status | **HMAC CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED** |
-| Proposed key contract | 32-byte Base64, HMAC-SHA256, unique `keyId`/`keyVersion`; no custom cipher |
-| Proposed payload | `MOAPP` + version/alg + length-prefixed keyId/keyVersion/messageType/payload |
-| Proposed rotation | max active + one previous, max 24h explicit window; no automatic rotation; P00-F owns transition |
-| Open readiness items | signature wire format; revocation in warm Lambda; existing signatures; external key custody/delivery; Q-11 approval; P00-D implementation authorization |
+| Owner approval | Q-10 approved; Q-11 P00-D contract approved; P00-F rotation pending |
+| Package status | **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PENDING** — not merged/deployed |
+| Implemented components | `lambda/src/hmac_contract.py`, additive `AppManagedProvider.resolve_key/verifier`, local injected loader |
+| Key contract | 32-byte Base64, HMAC-SHA256, unique `keyId`/`keyVersion`; no custom cipher |
+| Payload | `MOAPP` + version/alg + length-prefixed keyId/keyVersion/messageType/payload |
+| Rotation | P00-F only; max active + one previous, max 24h explicit window |
+| Open readiness items | security review; production key transport; P00-F rotation/revocation; existing signatures |
 
 ---
 

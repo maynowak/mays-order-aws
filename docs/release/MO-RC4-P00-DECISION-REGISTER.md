@@ -1,6 +1,6 @@
 # MO-RC4-P00 Decision Register
 
-**Status:** Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / OTHER QUESTIONS PENDING
+**Status:** Q-02 + Q-04 + Q-08 + Q-09 + Q-10 DECIDED / Q-11 P00-D CONTRACT DECIDED / P00-F ROTATION PENDING
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **RC4 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
 **Integration Branch:** `release/rc4-integration`
@@ -32,7 +32,7 @@
 | Q-08 | Secret-Referenz/Fetch | **DECIDED — ARN/Name + Runtime-Fetch** | P00-B/C (Entscheidung geschlossen) |
 | Q-09 | Policy-Gate-Erweiterung | **DECIDED — explicit allowlist / default deny / DescribeSecret limited** | P00-C/E/H (Entscheidung geschlossen) |
 | Q-10 | ADR-008-Freigabe | **DECIDED — ADR-008 ACCEPTED** | P00-B/C/E (Entscheidung geschlossen) |
-| Q-11 | Rotation in RC4 | **READY_FOR_OWNER** | P00-D/F |
+| Q-11 | Rotation in RC4 | **DECIDED — P00-D CONTRACT / P00-F ROTATION PENDING** | P00-D/F |
 | Q-12 | Release-Label | **READY_FOR_OWNER** | Release-Gate |
 | Q-13 | AWS-Testkonto | **READY_FOR_OWNER** | P00-I |
 | Q-14 | Bestand ohne Retention | **READY_FOR_OWNER** | P00-G |
@@ -205,13 +205,15 @@ separately gated.
 | Proposed contract | unique `keyId`/`keyVersion`; max one active + one previous; explicit transition window; no automatic rotation; no silent active switch; no unknown-version fallback; P00-F owns rotation |
 | Proposed policy | max 24h transition, one previous version, explicit activation timestamp, fail-closed, immediate revocation via forced recycle |
 | Proposed payload | `MOAPP` + protocol/algorithm + length-prefixed `keyId`/`keyVersion`/message type + payload; HMAC-SHA256 |
-| Open parameters | signature wire format, revocation semantics in warm environments, existing signatures, key transport/custody, deletion responsibility |
+| Owner decision P00-D | **APPROVED 2026-11-14:** one active + max one previous, max 24h explicit window, no automatic rotation, no silent switch, unknown version fail-closed, HMAC-SHA256, 32-byte Base64, canonical payload/signature |
+| Open P00-F parameters | revocation in warm environments, existing signatures, deletion/retention, operational activation |
 | Packages | P00-D/F |
-| Owner gate | Q-11 |
-| Status | **READY_FOR_OWNER — DECISION PACKAGE PREPARED; OWNER APPROVAL PENDING** |
+| Owner gate | Q-11 (P00-D contract closed; P00-F open) |
+| Status | **DECIDED — P00-D CONTRACT; P00-F ROTATION PENDING** |
 
 Detailed decision package:
-`docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`. It is not approved.
+`docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`.
+P00-D implementation is local-only; production activation is not authorized.
 
 ---
 

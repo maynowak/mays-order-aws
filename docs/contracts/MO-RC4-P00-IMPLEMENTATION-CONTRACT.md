@@ -197,36 +197,38 @@ reference suffix only.
 
 | Item | Contract |
 |---|---|
-| Material | Externally supplied 32-byte Base64 key |
-| Authentication | HMAC-SHA256 over canonical internal payload |
-| Comparison | `hmac.compare_digest`-equivalent |
-| Key identity | `keyId` + `keyVersion` |
-| Rotation | Manual/guided; old version only during approved window |
+| Material | Externally supplied 32-byte Base64 key; strict standard decoding |
+| Authentication | HMAC-SHA256 over the byte-exact envelope in `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md` |
+| Comparison | constant-time `hmac.compare_digest`-equivalent |
+| Key identity | `keyId` + `keyVersion`, bound into the HMAC input |
+| Signature | Base64url without padding; 32-byte HMAC |
+| Message type | Allowlist `privacy.internal.v1` |
+| Key delivery | Injected local loader/interface only; production transport is not activated |
+| Rotation | P00-F; one active + max one previous in explicit window; no automatic rotation |
 | Crypto | No custom cipher; no AES implementation |
 | KMS | Not implied; KMS-envelope is a separate AWS_MANAGED-style choice |
-| Failure | fail-closed on missing/invalid key/version |
+| Failure | fail-closed on missing/invalid key/version/encoding/trailing bytes |
 | Audit | keyId/version and decision, never key value |
 
 APP_MANAGED is not an AWS KMS key and not a variant of AWS_MANAGED.
 
-### 7.1 Proposed P00-D custody and rotation (owner decision pending)
+### 7.1 P00-D custody and rotation boundary
 
-**Status: PROPOSED — NOT APPROVED.**
+**P00-D contract: APPROVED FOR LOCAL IMPLEMENTATION; production activation is
+not authorized.**
 
 - Key generation, secure storage, delivery, rotation, revocation and deletion
   are Owner/Operator responsibilities; MO only consumes injected material.
-- No new AWS dependency; the concrete external store/loader is an Owner decision.
+- No new AWS dependency; the concrete external store/loader remains an
+  operational/P00-F decision.
 - One active `keyVersion`; at most one previous version only inside an explicit
-  Owner-approved transition window.
+  24h Owner-approved transition window.
 - No automatic rotation, no silent active switch, no fallback to an unknown
   version, no automatic key deletion.
-- P00-F implements rotation/transition mechanics; P00-D only verifies the
-  versioned HMAC contract.
-- Exact transport, key format beyond 32-byte Base64, transition duration and
-  parallel-version policy remain open.
-- Proposed byte-exact HMAC payload:
-  `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md` (PROPOSED / owner
-  approval pending).
+- P00-F implements rotation/transition/revocation mechanics; P00-D only
+  verifies the versioned HMAC contract.
+- Canonical byte-exact payload and signature:
+  `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md`.
 
 ---
 

@@ -1,12 +1,14 @@
 # MO-RC4-P00-D — HMAC Payload Contract
 
-**Status:** PROPOSED — OWNER APPROVAL PENDING
+**Status:** APPROVED FOR LOCAL P00-D IMPLEMENTATION / PRODUCTION + P00-F PENDING
 **Datum:** 2026-11-14
-**Scope:** APP_MANAGED signierte Nachrichten; keine Produktimplementierung.
+**Owner approval:** 2026-11-14 (Q-11 P00-D contract, HMAC protocol, local key custody)
+**Scope:** APP_MANAGED HMAC contract; local implementation only.
 **Reference:** `docs/reports/MO-RC4-P00-D-HMAC-CONTRACT-03.md`
 
-> This contract is a proposal. It does not authorize implementation and does not
-> change ENV/AWS_MANAGED behavior.
+> ENV/AWS_MANAGED behavior remains unchanged. Production activation,
+> rotation/revocation and key transport remain P00-F/operations and are not
+> authorized by this contract.
 
 ---
 
@@ -163,18 +165,19 @@ the companion report.
 
 ---
 
-## 6. Open Owner Decisions
+## 6. Owner Decisions
 
-| ID | Decision | Proposed |
+| ID | Decision | Status |
 |---|---|---|
-| Q11-T1 | Transition-window start | Explicit activation timestamp |
-| Q11-T2 | Revocation / existing signatures | Immediate version disable + forced environment recycle; define re-signing |
-| Q11-T3 | Key metadata binding | Yes, in canonical envelope |
-| Q11-T4 | Payload canonicalization | Length-prefixed envelope above |
-| Q11-T5 | Key deletion/retention | Owner/Operator; no automatic deletion |
-| Q11-T6 | P00-D/P00-F boundary | P00-F owns rotation/transition/revocation |
-| Q11-O5 | Existing signature treatment | Owner decision |
-| — | Signature wire format (hex/base64) | Owner decision |
-| — | Exact non-AWS key transport/loader | Owner/Infrastructure decision |
+| Q11-T1 | Transition-window start at explicit activation timestamp | APPROVED P00-D / P00-F operation pending |
+| Q11-T2 | Immediate revocation via version disable + forced environment recycle | APPROVED P00-D policy / P00-F implementation pending |
+| Q11-T3 | Key metadata binding in canonical envelope | **APPROVED P00-D** |
+| Q11-T4 | Length-prefixed canonical payload | **APPROVED P00-D** |
+| Q11-T5 | No automatic key deletion; Owner/Operator retention | **APPROVED P00-D policy** |
+| Q11-T6 | P00-F owns rotation/transition/revocation | **APPROVED boundary** |
+| — | Signature wire format: Base64url without padding | **APPROVED P00-D** |
+| — | Message type allowlist `privacy.internal.v1` | **APPROVED P00-D** |
+| Q11-O5 | Existing signature treatment after revocation/retention | **OPEN — P00-F/operations** |
+| — | Production key transport/loader | **OPEN — operations; local injected loader only** |
 
-**No decision in this document is approved.**
+No production activation is authorized by this document.
