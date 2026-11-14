@@ -868,3 +868,23 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No deletion, worktree removal, reset, clean, branch deletion, state move,
   push or main merge was performed.
 - Report: `docs/reports/MO-GIT-CONSOLIDATION-01.md`.
+
+## 2026-11-14 — MO-GIT-CONSOLIDATION-02
+
+**Status:** `RESULT A — CLEAN / TWO WORKTREES REMAIN`
+
+- Rechecked all 20 worktrees: clean, unlocked, no process using a removable
+  worktree. RC4 `720e458` remained reachable via `release/rc4-integration`.
+- Removed exactly 18 worktrees with regular `git worktree remove` and no
+  `--force`: 13 under `/home/dci-student/projects/` and five `/tmp/opencode`
+  worktrees. Their branches/HEADs remain unchanged.
+- Gitignored `.mays-installer` test artifacts were copied to
+  `/tmp/opencode/mo-git-consolidation-02-ignored/` (56 files, ca. 1.7 MB)
+  before removal. No product data or Terraform state was moved.
+- Remaining worktrees: `Mays-Orders-AWS` (`0756563`) and
+  `Mays-Orders-AWS-rc4-integration` (`2319b04`); both clean.
+- 55 local branches, 12 remote branches and 20 tags remain; no branch/tag
+  deletion, reset, clean, push or main merge. `git fsck --connectivity-only`
+  reports no missing objects.
+- Non-Git snapshot, ZIP archives and Terraform states remain untouched.
+- Report: `docs/reports/MO-GIT-CONSOLIDATION-02.md`.
