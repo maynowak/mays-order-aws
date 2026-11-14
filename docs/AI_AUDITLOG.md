@@ -716,3 +716,25 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   P00-F rotation/revocation, production transport and installer environment
   tests.
 - Report: `docs/reports/MO-RC4-P00-D-SECURITY-REVIEW-05.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-INTEGRATION-06
+
+**Status:** `MO-RC4-P00-D — LOCALLY INTEGRATED / POST-MERGE VERIFIED / DEPLOYMENT GATES OPEN`
+
+- Additional wrong-key regression test `73bd07c` (key A signs, key B verifies →
+  false; same keyId/keyVersion/envelope). No HMAC product change.
+- Merge 1 `3d3273803b66b6c3ed592084e552fa3319c929cf` (`8a19d5a` + `18cf541`):
+  P00-D HMAC foundation.
+- Merge 2 `21ff5d301a416ff59bacb01bc4ec9409c9f6b19b` (`3d32738` + `73bd07c`):
+  wrong-key regression test.
+- Review-05 docs cherry-picked as docs-only `c0d8d719`.
+- Post-merge: Lambda 429 PASS, Installer 667 PASS + 1 live-profile deferred +
+  1 dependency-test harness failure, Builder 128, E2E 32; Seed 28. Exceptions
+  not counted as PASS.
+- ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, source-identical/reproducible).
+- R5-L01 fixed; R6-L01 remains test harness defect. P00-F rotation/revocation,
+  production key transport and existing-signature handling remain open.
+- No production activation, merge/push/deploy, AWS/Terraform mutation or
+  RIS/Jobsearch change. Report:
+  `docs/reports/MO-RC4-P00-D-INTEGRATION-06.md`.

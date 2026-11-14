@@ -1,6 +1,6 @@
 # MO-RC4-P00 Execution Plan
 
-**Status:** EXECUTION PLAN READY / P00-B INTEGRATED / P00-C LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED / P00-D PLANNING READY
+**Status:** EXECUTION PLAN READY / P00-B/C/D LOCALLY INTEGRATED / P00-D POST-MERGE VERIFIED / DEPLOYMENT GATES OPEN
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
@@ -8,10 +8,12 @@
 
 > Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved. P00-B is integrated on
 > `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.
-> P00-C is locally integrated on `release/rc4-integration` (merges `e743170`
-> and `442d296`). F-03/F-01 are verified fixed. All local code suites pass;
-> one live AWS profile test is `DEFERRED — AWS READ-ONLY AUTHORIZATION
-> REQUIRED`. F-02/F-04/F-05 and all other deployment gates remain open.
+> P00-C is locally integrated (merges `e743170`/`442d296`); F-01/F-03 fixed.
+> P00-D is locally integrated (merges `3d32738`/`21ff5d3`) with HMAC foundation
+> and wrong-key regression; APP_MANAGED remains default-off. Installer has one
+> live-profile test deferred and one dependency-test harness failure. P00-F
+> rotation/revocation, production transport and all deployment gates remain
+> open.
 > P00-D is planning-ready only; implementation is not authorized.
 
 ---
@@ -149,8 +151,8 @@ secret value absent from plan/state/output/logs.
 
 **Goal:** External key material with explicit key ID/version and HMAC-SHA256.
 
-**Status:** **IMPLEMENTED / LOCAL VERIFIED / SECURITY REVIEW PASSED / MERGE
-REVIEW READY** — feature branch, not merged/deployed.
+**Status:** **LOCALLY INTEGRATED / POST-MERGE VERIFIED / DEFAULT-OFF** —
+not deployed/activated.
 
 **Dependencies:** P00-B; Q-10, Q-11.
 

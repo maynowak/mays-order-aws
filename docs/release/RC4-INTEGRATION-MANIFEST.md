@@ -61,11 +61,11 @@ These branches remain unchanged; no work was deleted.
 
 | Check | Result |
 |---|---|
-| Installer | **668 PASS + 1 live-profile test DEFERRED** |
+| Installer | **667 PASS + 1 live-profile test DEFERRED + 1 test-harness failure** |
 | Module Builder | **128 PASS** |
-| Lambda | **405 PASS** |
+| Lambda | **429 PASS** |
 | E2E local (full discover: 36, 5 expected skips) | **32 PASS** |
-| **P00-C local total** | **1.233 PASS + 1 live test DEFERRED** |
+| **P00-D local total** | **1.256 PASS + 2 test exceptions** |
 | Seed tools | **28 PASS** |
 | Terraform fmt | **PASS** |
 | Terraform init `-backend=false` | **PASS** |
@@ -85,7 +85,9 @@ P00-B: INTEGRATED / POST-MERGE VERIFIED
 P00-C: LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED
 P00-C-M01: IMPLEMENTED / TESTED / VERIFIED FIXED
 P00-C-F01/F-03: VERIFIED FIXED
-P00-D: IMPLEMENTED ON FEATURE BRANCH / LOCAL VERIFIED / SECURITY REVIEW PENDING
+P00-D: LOCALLY INTEGRATED / POST-MERGE VERIFIED / DEFAULT-OFF
+P00-D-HMAC: LOCAL FOUNDATION (13 modules, hmac_contract.py)
+P00-D-LIVE: NOT ACTIVATED / P00-F + TRANSPORT OPEN
 ```
 
 `TestAWSProfileContextLive.test_profile_mayaws_identity` is classified
@@ -97,16 +99,20 @@ P00-B source/tests are integrated via merge commit
 `e7431708dbe634371606be788d5082e1aad04ee7` (P00-C runtime) and
 `442d296e7040279c19fe6e004900ff2616a03e87` (contract amendment/handler test);
 the Review-06 documentation was cherry-picked as docs-only commit `8e3d835`.
-The live `TestAWSProfileContextLive.test_profile_mayaws_identity` test was not
-executed because this integration is under a strict no-AWS-live boundary; all
-other 668 installer tests pass. Q-02/Q-04/Q-08/Q-09/Q-10 are approved;
-ADR-008 is `ACCEPTED`. P00-C/D resources and live AWS verification remain
-missing; deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open.
+P00-D is integrated via merge `3d327380` (HMAC foundation) and
+`21ff5d30` (wrong-key regression test); Review-05 docs were cherry-picked as
+`c0d8d719`. The live `TestAWSProfileContextLive` test is
+`DEFERRED — AWS READ-ONLY AUTHORIZATION REQUIRED`; the dependency-detector test
+is classified `TEST HARNESS DEFECT / ENVIRONMENT DEPENDENCY` (hardcoded clean
+primary worktree). Neither is counted as PASS. Q-02/Q-04/Q-08/Q-09/Q-10 and
+Q-11 for the P00-D contract are approved; ADR-008 is `ACCEPTED`. P00-F
+rotation/revocation, production key transport, AWS-live verification and the
+existing P00-C deployment gates remain open.
 
 ## 6. Release Readiness
 
 ```text
 Integration: COMPLETE
-P00:          PARTIAL (P00-B/C integrated; P00-D and deployment gates pending)
+P00:          PARTIAL (P00-B/C/D integrated; P00-E/F and deployment gates pending)
 RC4 release:  NOT RELEASED / NO TAG / NO PRODUCTION APPROVAL
 ```

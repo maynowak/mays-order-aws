@@ -11,14 +11,14 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 Integration — P00 Security Implementation (P00-B/C integrated)
+RC4 Integration — P00 Security Implementation (P00-B/C/D integrated)
 
 Current Feature:
-MO-RC4 P00 — P00-C local closeout; P00-D planning ready
+MO-RC4 P00 — P00-D HMAC foundation integrated; APP_MANAGED default-off
 
 Current Task:
-MO-RC4-P00-D-IMPLEMENTATION-04 — APP_MANAGED HMAC FOUNDATION IMPLEMENTED /
-LOCAL VERIFIED / SECURITY REVIEW PENDING; nicht gemerged
+MO-RC4-P00-D-INTEGRATION-06 — LOCALLY INTEGRATED / POST-MERGE VERIFIED /
+DEFAULT-OFF; 429 Lambda / 667 Installer + 2 Testausnahmen / 128 Builder / 32 E2E
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -38,17 +38,15 @@ RC.3 Status:
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
 Current Checkpoint:
-release/rc4-integration @ P00-C integration
-→ P00-B merge e71f3ed; P00-C merge e743170 + contract/handler merge 442d296
-→ P00-Entscheidungen: Q-02 Secrets Manager, Q-04 CMK-Optionen, Q-08 ARN/Name +
-  Runtime-Fetch, Q-09 Policy-Gate (inkl. DescribeSecret-Limited-Amendment) und
-  Q-10 ADR-008 APPROVED; ADR-008 ACCEPTED
-→ P00-C: boto3-Fetcher, modulweiter Cache, KMS-Binding, Non-ASCII-Guard,
-  strukturierte Observability, Rollout-Doku; 405/668+1 DEFERRED/128/32
+release/rc4-integration @ P00-D integration
+→ P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
+→ P00-D Review-05 docs: c0d8d719
+→ Q-11 P00-D contract APPROVED; APP_MANAGED HMAC foundation integrated,
+  default-off; production key transport/P00-F rotation open
+→ P00-D tests: 429 Lambda / 667 Installer + 1 live deferred + 1 harness failure /
+  128 Builder / 32 E2E; ZIP b70e5c94…
 → P00-C-M01/F-01/F-03: verified fixed; F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 offen
-→ P00-C lokal integriert, aber keine AWS_MANAGED-Produktionsfreigabe
-→ P00-D: CONTRACT PREPARED / OWNER DECISIONS PENDING / NOT IMPLEMENTED;
-  Q-11, Key-Kustodie/-Transport und Implementierungsautorisierung offen
+→ Eine AWS_MANAGED/APP_MANAGED-Produktionsaktivierung ist nicht freigegeben
 → P00-E: nicht gestartet (DDB/SQS-CMK/Infrastruktur offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
