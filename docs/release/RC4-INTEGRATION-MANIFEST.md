@@ -61,11 +61,11 @@ These branches remain unchanged; no work was deleted.
 
 | Check | Result |
 |---|---|
-| Installer | **668 PASS + 1 live-profile test BLOCKED** |
+| Installer | **668 PASS + 1 live-profile test DEFERRED** |
 | Module Builder | **128 PASS** |
 | Lambda | **405 PASS** |
 | E2E local (full discover: 36, 5 expected skips) | **32 PASS** |
-| **P00-C local total** | **1.233 PASS + 1 live test BLOCKED** |
+| **P00-C local total** | **1.233 PASS + 1 live test DEFERRED** |
 | Seed tools | **28 PASS** |
 | Terraform fmt | **PASS** |
 | Terraform init `-backend=false` | **PASS** |
@@ -82,10 +82,15 @@ AWS_MANAGED: CONFIG FOUNDATION / RESOURCE + IAM + KMS MISSING
 APP_MANAGED: CONFIG CONTRACT / KEY LOADER + HMAC MISSING
 KMS backup stash: UNCHANGED, NOT APPLIED
 P00-B: INTEGRATED / POST-MERGE VERIFIED
-P00-C: INTEGRATED / VERIFICATION PARTIAL (1 live-profile test BLOCKED)
+P00-C: LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED
 P00-C-M01: IMPLEMENTED / TESTED / VERIFIED FIXED
 P00-C-F01/F-03: VERIFIED FIXED
+P00-D: PLANNING READY / NOT IMPLEMENTED / Q-11 OPEN
 ```
+
+`TestAWSProfileContextLive.test_profile_mayaws_identity` is classified
+`DEFERRED — AWS READ-ONLY AUTHORIZATION REQUIRED`; it is not counted as PASS.
+It depends only on a real AWS profile/STS call, not on P00-C code.
 
 P00-B source/tests are integrated via merge commit
 `e71f3edcb146fb7b3943b4c23fa65e771cf4611e`. P00-C is integrated via merge

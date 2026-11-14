@@ -14,11 +14,11 @@ Current Phase:
 RC4 Integration — P00 Security Implementation (P00-B/C integrated)
 
 Current Feature:
-MO-RC4 P00 — AWS_MANAGED runtime integrated; deployment gates remain open
+MO-RC4 P00 — P00-C local closeout; P00-D planning ready
 
 Current Task:
-MO-RC4-P00-C-INTEGRATION-07 — P00-C INTEGRATED / VERIFICATION PARTIAL;
-1.233 lokale PASS + 1 Live-Profil-Test BLOCKED + 28 Seed
+MO-RC4-P00-C-CLOSEOUT-08 — LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST
+DEFERRED; 1.233 lokale PASS + 1 Live-Test DEFERRED + 28 Seed
 
 Hinweis Release Candidate:
 v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
@@ -44,10 +44,11 @@ release/rc4-integration @ P00-C integration
   Runtime-Fetch, Q-09 Policy-Gate (inkl. DescribeSecret-Limited-Amendment) und
   Q-10 ADR-008 APPROVED; ADR-008 ACCEPTED
 → P00-C: boto3-Fetcher, modulweiter Cache, KMS-Binding, Non-ASCII-Guard,
-  strukturierte Observability, Rollout-Doku; 405/668+1 BLOCKED/128/32
+  strukturierte Observability, Rollout-Doku; 405/668+1 DEFERRED/128/32
 → P00-C-M01/F-01/F-03: verified fixed; F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 offen
-→ P00-C integriert, aber keine AWS_MANAGED-Produktionsfreigabe
-→ P00-D/P00-E: nicht gestartet (APP-HMAC bzw. DDB/SQS-CMK/Infrastruktur offen)
+→ P00-C lokal integriert, aber keine AWS_MANAGED-Produktionsfreigabe
+→ P00-D: PLANNING READY / NOT IMPLEMENTED; Q-11 und Implementierungsautorisierung offen
+→ P00-E: nicht gestartet (DDB/SQS-CMK/Infrastruktur offen)
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

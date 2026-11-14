@@ -1,6 +1,6 @@
 # MO-RC4-P00 Implementation Backlog
 
-**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C INTEGRATED / VERIFICATION PARTIAL (1 live test blocked)
+**Status:** DRAFTED / Q-02 + Q-04 + Q-08 + Q-09 + Q-10 APPROVED / P00-B INTEGRATED / P00-C LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED / P00-D PLANNING READY
 **Reference:** `docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md`
 **Baseline:** `086a8be`
 **Branch:** `release/rc4-integration`
@@ -78,7 +78,7 @@ The order may change only with documented dependency justification.
 | Security boundary | least privilege, exact ARN, no fallback to ENV |
 | Commit boundary | IaC + provider tests + contract docs; no APP/rotation |
 | Owner approval | Q-02/Q-04/Q-08/Q-09/Q-10 approved |
-| Package status | **INTEGRATED / VERIFICATION PARTIAL (1 live test blocked)** — F-01/F-03 verified fixed; deployment gates open |
+| Package status | **LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED** — F-01/F-03 verified fixed; deployment gates open |
 
 ### P00-C-M01 — Effective SecretProvider Cache Lifetime
 
@@ -139,6 +139,8 @@ P00-C integration.
 | Security boundary | no custom cipher; no key in data/items/logs |
 | Commit boundary | APP adapter + tests + docs |
 | Owner approval | Q-10 approved; Q-11 open; APP_MANAGED is Phase 2, not automatically RC4 |
+| Package status | **PLANNING READY / NOT IMPLEMENTED** — P00-D implementation authorization pending |
+| Open readiness items | external key custody/delivery; Q-11 version/rotation window; implementation authorization |
 
 ---
 

@@ -591,3 +591,22 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open. No production
   AWS_MANAGED authorization.
 - Report: `docs/reports/MO-RC4-P00-C-INTEGRATION-07.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-CLOSEOUT-08
+
+**Status:** `MO-RC4-P00-C — LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED`
+
+- Closeout of local P00-C integration. Test counts confirmed: Lambda 405 PASS,
+  Installer 668 PASS, Module Builder 128 PASS, local E2E 32 PASS = 1.233 local
+  PASS; Seed 28 PASS.
+- `TestAWSProfileContextLive.test_profile_mayaws_identity` classified
+  `DEFERRED — AWS READ-ONLY AUTHORIZATION REQUIRED`; requires real mayaws
+  profile/STS, tests no P00-C code, not counted as PASS.
+- Deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open. No
+  AWS_MANAGED production/deployment authorization.
+- P00-D readiness reviewed: external 32-byte key material, HMAC-SHA256,
+  keyId/keyVersion, no custom cipher, no key logging, secure provider selection,
+  ENV/AWS_MANAGED compatibility. P00-D is planning-only, not implemented;
+  Q-11 and implementation/key-custody decisions remain open.
+- No AWS-live call, Terraform/AWS mutation, merge/push/deploy, RIS/Jobsearch
+  change. Report: `docs/reports/MO-RC4-P00-C-CLOSEOUT-08.md`.
