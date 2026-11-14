@@ -177,6 +177,7 @@ AWS/Terraform: NONE
 Merge/Push:    NONE
 Deployment:    NONE
 RIS/Jobsearch: NONE
+Dokumentationscommit: 39545a6e64902047121031eadaa08d4c1b12ff4d
 ```
 
 Keine Tests ausgeführt, da ausschließlich Dokumentation geändert wird.
