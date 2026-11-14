@@ -248,3 +248,25 @@ variable "processing_recovery_safety_margin_seconds" {
   type        = number
   default     = 60
 }
+
+# P00-E — optional AWS_MANAGED Secrets Manager integration.
+# Default false: RC3/RC4 ENV default remains unchanged.
+variable "privacy_secret_enabled" {
+  description = "Creates the privacy Secrets Manager secret container and wires the handler to AWS_MANAGED. Default false."
+  type        = bool
+  default     = false
+}
+
+variable "privacy_kms_key_arn" {
+  description = "Optional exact customer-managed KMS key ARN for the privacy secret. Empty uses the AWS-managed key; no KMS key is created."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = (
+      var.privacy_kms_key_arn == "" ||
+      can(regex("^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$", var.privacy_kms_key_arn))
+    )
+    error_message = "privacy_kms_key_arn must be empty or an exact KMS key ARN. No KMS key is created by this module."
+  }
+}

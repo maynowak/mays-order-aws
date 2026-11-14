@@ -119,3 +119,71 @@ resource "aws_iam_role_policy" "sqs" {
   role   = aws_iam_role.handler.name
   policy = data.aws_iam_policy_document.sqs[0].json
 }
+
+# P00-E — exact-ARN Secrets Manager access. No wildcard; no permission when
+# the privacy secret is disabled (count = 0).
+data "aws_iam_policy_document" "privacy_secret" {
+  count = var.privacy_secret_enabled ? 1 : 0
+
+  statement {
+    sid    = "PrivacySecretValue"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+    ]
+    resources = [var.privacy_secret_arn]
+  }
+
+  lifecycle {
+    precondition {
+      condition     = trimspace(var.privacy_secret_arn) != ""
+      error_message = "privacy_secret_enabled = true requires a non-empty privacy_secret_arn."
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "privacy_secret" {
+  count  = var.privacy_secret_enabled ? 1 : 0
+  name   = "${var.project_name}-handler-privacy-secret-policy"
+  role   = aws_iam_role.handler.name
+  policy = data.aws_iam_policy_document.privacy_secret[0].json
+}
+
+# P00-E — CMK metadata verification and decryption only when an external CMK
+# is explicitly configured. This is not created/permissioned for the default
+# AWS-managed Secrets Manager key.
+data "aws_iam_policy_document" "privacy_kms" {
+  count = var.privacy_secret_enabled && trimspace(var.privacy_kms_key_arn) != "" ? 1 : 0
+
+  statement {
+    sid    = "PrivacySecretMetadata"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:DescribeSecret",
+    ]
+    resources = [var.privacy_secret_arn]
+  }
+
+  statement {
+    sid    = "PrivacySecretKmsDecrypt"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+    ]
+    resources = [var.privacy_kms_key_arn]
+  }
+
+  lifecycle {
+    precondition {
+      condition     = trimspace(var.privacy_kms_key_arn) != ""
+      error_message = "privacy_kms_key_arn must be non-empty when the privacy CMK policy is enabled."
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "privacy_kms" {
+  count  = var.privacy_secret_enabled && trimspace(var.privacy_kms_key_arn) != "" ? 1 : 0
+  name   = "${var.project_name}-handler-privacy-kms-policy"
+  role   = aws_iam_role.handler.name
+  policy = data.aws_iam_policy_document.privacy_kms[0].json
+}
