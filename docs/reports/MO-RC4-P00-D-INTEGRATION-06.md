@@ -123,7 +123,8 @@ APP_MANAGED bleibt default-off und im produktiven Order-Pfad fail-closed.
 
 ```text
 Branch:        release/rc4-integration
-Finaler HEAD:  6637299e6b145c265677b93da8599e62d926e0a0
+Dokumentationscommit: 6637299e6b145c265677b93da8599e62d926e0a0
+Evidence-Commit:      016f820a63fa8cba91e875aa225535246ebb83ee
 Working Tree:  CLEAN
 Push:          NONE
 Main-Merge:    NONE
