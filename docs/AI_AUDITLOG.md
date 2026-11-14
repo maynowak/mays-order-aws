@@ -629,3 +629,23 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No product code, AWS/Terraform mutation, push/main merge/tag/deploy or
   RIS/Jobsearch change. Report:
   `docs/reports/MO-RC4-P00-D-AUTHORIZATION-01.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-Q11-DECISION-02
+
+**Status:** `Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
+
+- Verified `release/rc4-integration` at `337aa4f1a58ce6765d58115d95c76f3fdb78322c`.
+- Reviewed ADR-008 D-6/D-7/D-8, Contract §7, Q-11 register and
+  `MO-RC4-P00-D-AUTHORIZATION-01`.
+- Proposed Q-11 policy is compatible with ADR/Contract in principle; no hard
+  conflict found. It remains **PROPOSED / not APPROVED**.
+- Open owner questions: transition-window start, immediate revocation versus
+  already-issued signatures, cryptographic binding of `keyId`/`keyVersion`,
+  exact Base64/payload canonicalization, old-key deletion/retention, and the
+  P00-D/P00-F boundary.
+- Current `AppManagedProvider` is only the P00-B fail-closed metadata boundary;
+  no HMAC implementation is claimed. No product code changed.
+- No AWS call, Terraform/AWS mutation, implementation, push, merge, deploy,
+  tag or RIS/Jobsearch change.
+- Decision package:
+  `docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`.
