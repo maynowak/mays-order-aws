@@ -1004,3 +1004,40 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   secret/KMS activation and production deployment. Q-12 remains approved.
 - No AWS calls, Terraform operations, tags or new worktrees.
 - Report: `docs/reports/MO-RC4-POST-MERGE-DOC-SYNC-01.md`.
+
+## 2026-11-15 — MO-RELEASE-DIRECTORY-CONSOLIDATION-01
+
+**Status:** `RESULT B — PARTIAL / SAFE PRESERVATION`
+
+- Branched from `main` @ `c291d4a` as
+  `docs/mo-release-directory-consolidation-01`; no new worktrees.
+- Inventoried all 23 files under `docs/release/`, including official release
+  documents, release assets, technical dossiers and internal P00 governance
+  artifacts.
+- No files were moved or deleted: every internal-file candidate is referenced
+  by historical reports/audit logs over its existing path. The established
+  release naming convention was preserved.
+- Verified current README links and release references. Pre-existing broken
+  v0.4.0 image references were documented, not rewritten.
+- Official release PDF, technical package PDF, GitHub release asset, tag and
+  remote release body remain unchanged.
+- Report: `docs/reports/MO-RELEASE-DIRECTORY-CONSOLIDATION-01.md`.
+
+## 2026-11-15 — MO-RELEASE-DIRECTORY-CONSOLIDATION-01 — FINAL CLOSEOUT
+
+**Status:** `RESULT A — CONSOLIDATED BY SAFE PRESERVATION / MAIN INTEGRATED`
+
+- Owner accepted safe preservation as the final consolidation decision: no
+  moves, deletions, renames or duplicates; official release convention intact.
+- Added `docs/release/README.md` documenting the existing structure, naming
+  convention, technical dossiers, historical decision/planning documents,
+  technical detail PDF, GitHub asset and the five pre-existing missing v0.4.0
+  image references.
+- Updated `MO-RELEASE-DIRECTORY-CONSOLIDATION-01.md` to Result A with
+  23 inventoried files, 0 necessary moves, preserved historical references,
+  accepted owner decisions and known asset gaps.
+- No changes to release documents, PDFs, GitHub release, tag, product code or
+  AWS infrastructure. No new worktrees or subdirectories.
+- Feature branch committed and pushed; regular main integration follows after
+  preflight and conflict-free merge verification.
+- Report: `docs/reports/MO-RELEASE-DIRECTORY-CONSOLIDATION-01.md`.
