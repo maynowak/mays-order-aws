@@ -1044,7 +1044,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 
 ## 2026-11-15 — MO-RELEASE-DIRECTORY-FIX-02
 
-**Status:** `A — SIX FILES RELOCATED · REFERENCES VERIFIED · MAIN INTEGRATION PENDING`
+**Status:** `A — SIX FILES RELOCATED · REFERENCES VERIFIED · MAIN INTEGRATED`
 
 - Moved six internal RC4 documents with `git mv` out of `docs/release/`:
   two to `docs/adr/`, one to `docs/reports/`, three to `docs/roadmap/`.
@@ -1057,5 +1057,6 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Validated file locations, current links, unchanged release PDFs, unchanged
   tag `5bc154e`, and no product/Terraform/AWS changes.
 - Feature branch `docs/mo-release-directory-fix-02` pushed; Pull Request #1
-  created. Main integration follows after successful PR checks.
+  merged via GitHub merge commit `cd3f5fd56e45065aceff5cfe184b866622ebf5bd`.
+- Remote `main` verified at `cd3f5fd`; tag remains `5bc154e`.
 - Report: `docs/reports/MO-RELEASE-DIRECTORY-FIX-02.md`.

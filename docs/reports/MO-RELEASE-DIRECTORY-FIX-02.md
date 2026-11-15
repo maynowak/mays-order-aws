@@ -1,10 +1,10 @@
 # MO-RELEASE-DIRECTORY-FIX-02 — Sechs Dokumente verschoben
 
-**Status:** `A — SIX FILES RELOCATED · REFERENCES VERIFIED · MAIN INTEGRATION PENDING`
+**Status:** `A — SIX FILES RELOCATED · REFERENCES VERIFIED · MAIN INTEGRATED`
 **Datum:** 2026-11-15
 **Branch:** `docs/mo-release-directory-fix-02`
 **Base main:** `96cafc55410a074be391d18f6552ba16c0c86dba`
-**Pull Request:** #1
+**Pull Request:** #1 — MERGED
 
 ## 1. Ausgangsstand
 
@@ -73,7 +73,9 @@ vorbestehende historische Lücke bestehen.
 - Report-/Audit-Commit: dieser Commit
 - Remote-Feature-Branch: `docs/mo-release-directory-fix-02`
 - Pull Request: **#1**
-- Merge nach `main`: nach erfolgreicher PR-Prüfung
+- Pull Request #1 wurde über GitHub regulär gemerged (`--merge`)
+- Merge-Commit: `cd3f5fd56e45065aceff5cfe184b866622ebf5bd`
+- Remote-`main`: `cd3f5fd56e45065aceff5cfe184b866622ebf5bd`
 - Kein Force-Push, kein Tag-Rewrite, kein Deployment
 
 ## 7. Grenzen
