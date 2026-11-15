@@ -969,3 +969,17 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   without separate approval.
 - No AWS calls, Terraform apply, deployment or new worktrees.
 - Report: `docs/reports/MO-RC4-MAIN-MERGE-01.md`.
+
+## 2026-11-15 — MO-RC4-MAIN-PUSH-01
+
+**Status:** `MAIN MERGE PUSHED`
+
+- After separate approval, pushed local `main` without force:
+  `f597d14..4247a1c  main -> main`.
+- Local and remote `main` verified as
+  `4247a1c6c68ff7144e52f8a32d4785445c10c2a5`.
+- Annotated tag `v0.6.0-rc.1` remains unchanged at
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`.
+- No AWS calls, Terraform apply, deployment or new worktrees.
+- Post-push documentation commit will be recorded on `main` and pushed
+  separately.

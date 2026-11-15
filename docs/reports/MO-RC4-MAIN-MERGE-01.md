@@ -1,6 +1,6 @@
 # MO-RC4-MAIN-MERGE-01 — RC4 in main integriert
 
-**Status:** `LOCAL MAIN MERGE COMPLETE / REMOTE MAIN NOT PUSHED`
+**Status:** `MAIN MERGE COMPLETE / REMOTE MAIN PUSHED`
 **Datum:** 2026-11-15
 **Merge-Commit:** `82f7ae14cf3a78512b03e8280aea39b1c8c298a0`
 
@@ -31,14 +31,13 @@
 | Ref | Stand |
 |---|---|
 | Lokales `main` | `82f7ae1` (Merge) |
-| Remote `main` | `f597d14` (unverändert) |
+| Remote `main` | `4247a1c` (gepusht) |
 | Lokaler Release-Branch | `76f7b3b` |
 | Remote Release-Branch | `76f7b3b` |
 | Remote-Tag | unverändert |
 
-**Wichtig:** Der Main-Merge ist lokal erfolgt. Es wurde **kein Push auf `main`**
-durchgeführt; Remote-`main` bleibt bis zu einer separaten Freigabe auf
-`f597d14`.
+**Wichtig:** Der Main-Merge wurde nach separater Freigabe auf `main`
+gepusht. Remote-`main` steht auf demselben Stand wie lokal.
 
 ## 4. Grenzen
 
@@ -51,5 +50,6 @@ durchgeführt; Remote-`main` bleibt bis zu einer separaten Freigabe auf
 
 ## 5. Nächster Schritt
 
-Separate Freigabe für `git push origin main`; danach kann Remote-`main` auf den
-Merge-Commit aktualisiert werden.
+Remote-`main` ist synchronisiert. Nächste Schritte sind ausschließlich
+Produktionsfreigaben/Deployment-Gates; kein AWS-Deployment ist Teil dieses
+Merges.

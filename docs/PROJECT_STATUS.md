@@ -53,7 +53,7 @@ release/rc4-integration @ MO-RC4-RELEASE-01
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF
   (`MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`) veröffentlicht
 → Main-Merge lokal: 82f7ae1 (Eltern f597d14 + 76f7b3b); Remote-main
-  noch f597d14, kein Push auf main
+  nach separater Freigabe auf 4247a1c gepusht
 → Main-Merge-Vorprüfung: main f597d14, 192 Commits voraus, 0 dahinter,
   merge-tree ohne Konflikte; kein Main-Merge
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
