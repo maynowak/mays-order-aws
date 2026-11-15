@@ -1004,3 +1004,21 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   secret/KMS activation and production deployment. Q-12 remains approved.
 - No AWS calls, Terraform operations, tags or new worktrees.
 - Report: `docs/reports/MO-RC4-POST-MERGE-DOC-SYNC-01.md`.
+
+## 2026-11-15 — MO-RELEASE-DIRECTORY-CONSOLIDATION-01
+
+**Status:** `RESULT B — PARTIAL / SAFE PRESERVATION`
+
+- Branched from `main` @ `c291d4a` as
+  `docs/mo-release-directory-consolidation-01`; no new worktrees.
+- Inventoried all 23 files under `docs/release/`, including official release
+  documents, release assets, technical dossiers and internal P00 governance
+  artifacts.
+- No files were moved or deleted: every internal-file candidate is referenced
+  by historical reports/audit logs over its existing path. The established
+  release naming convention was preserved.
+- Verified current README links and release references. Pre-existing broken
+  v0.4.0 image references were documented, not rewritten.
+- Official release PDF, technical package PDF, GitHub release asset, tag and
+  remote release body remain unchanged.
+- Report: `docs/reports/MO-RELEASE-DIRECTORY-CONSOLIDATION-01.md`.
