@@ -11,14 +11,14 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 v0.6.0-rc.1 — GitHub release published; local main merge complete
+RC4 v0.6.0-rc.1 — released, main merged and pushed; post-merge docs synchronized
 
 Current Feature:
-MO-RC4-RELEASE-01 — RC4 release docs, annotated tag and branch publication
+MO-RC4-POST-MERGE-DOC-SYNC-01 — canonical docs and development roadmap
 
 Current Task:
-MO-RC4-RELEASE-01 — Q-12 APPROVED v0.6.0-rc.1; tag/branch publication;
-main merge prepared, not executed
+MO-RC4-POST-MERGE-DOC-SYNC-01 — release status, canonical references and
+roadmap synced; main baseline 7724c43
 
 Hinweis Release:
 v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
@@ -45,17 +45,23 @@ RC4 v0.6.0-rc.1 Status:
 [x] Release-Dokumentation aktualisiert
 [x] Annotierter Tag v0.6.0-rc.1 auf Release-Commit 5bc154e
 [x] Release-Branch und Tag veröffentlicht
-[ ] Main-Merge: separat freizugeben; Vorprüfung clean
+[x] GitHub Pre-Release veröffentlicht
+[x] README und PDF veröffentlicht
+[x] Main-Merge abgeschlossen (82f7ae1)
+[x] Main-Push abgeschlossen
+[!] Produktivdeployment: NICHT durchgeführt
 
 Current Checkpoint:
-release/rc4-integration @ MO-RC4-RELEASE-01
+main baseline 7724c43 — RC4 v0.6.0-rc.1 released and integrated; post-merge docs sync commit follows
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
-→ GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF
-  (`MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`) veröffentlicht
-→ Main-Merge lokal: 82f7ae1 (Eltern f597d14 + 76f7b3b); Remote-main
-  nach separater Freigabe auf 4247a1c gepusht
-→ Main-Merge-Vorprüfung: main f597d14, 192 Commits voraus, 0 dahinter,
-  merge-tree ohne Konflikte; kein Main-Merge
+→ GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
+→ Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen
+→ Main-Historie enthält zusätzlich autorisierte Release-Dokumente:
+  RELEASE-v0.6.0-rc.1.md/.pdf und Hero-Bild
+→ Kanonische Release-Dateien sind erhalten; Post-Tag-/Post-Merge-Status
+  wird in Release Notes und PROJECT_STATUS geführt
+→ Kein Produktivdeployment, keine Retention-Aktivierung, kein RIS-Rollout
+→ Kanonische Roadmap: docs/roadmap/ROADMAP.md; Future-Extensions historisch
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
   Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
 → Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean

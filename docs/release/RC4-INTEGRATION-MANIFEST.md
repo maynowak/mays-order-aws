@@ -124,6 +124,8 @@ Integration: COMPLETE
 P00:          LOCAL RC + AWS DEV LIFECYCLE VERIFIED / STACK DESTROYED
               (P00-B/C/D/E/F/H/I; P00-G blocked by owner decisions;
               production/release gates open)
-RC4 release:  v0.6.0-rc.1 APPROVED / ANNOTATED TAG TARGET = RELEASE COMMIT
+RC4 release:  v0.6.0-rc.1 APPROVED / TAG 5bc154e / MAIN MERGED + PUSHED
+              canonical: RELEASE-v0.6.0-rc.1.md/.pdf
+              detailed package: MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf
               (no production approval)
 ```

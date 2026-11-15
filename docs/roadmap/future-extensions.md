@@ -1,5 +1,9 @@
 # Future Extensions / Roadmap — May's Orders
 
+> **Historical idea catalogue — not the current development roadmap.**
+> The canonical current roadmap is [`ROADMAP.md`](ROADMAP.md). Some statuses
+> below predate RC4 and are retained for historical/context purposes only.
+
 > **Quelle:** `presentation/friday-review-prep.md` (Abschnitt 7)
 > **Zweck:** Roadmap / Future Extensions — NICHT aktueller Prüfungsstand
 > **Navigation:** Questions → `presentation/friday-review-prep.md` | Answers → `docs/learning/exam-answers.md` | Traceability → `docs/learning/requirements-traceability.md` | Glossary → `docs/learning/glossary.md`

@@ -268,13 +268,16 @@ remain separate owner gates.
 ## Documentation
 
 - [Release Notes](docs/RELEASE_NOTES.md)
-- [Release PDF](docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf)
+- [Official Release Document](docs/release/RELEASE-v0.6.0-rc.1.md)
+- [Official Release PDF](docs/release/RELEASE-v0.6.0-rc.1.pdf)
+- [Detailed Release Package PDF](docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf)
 - [RC4 Module Release Candidate](docs/release/RC4-MODULE-RELEASE-CANDIDATE.md)
 - [Architecture](docs/architecture/MAYS-ORDERS-ARCHITECTURE.md)
 - [Installer Guide](docs/INSTALLER_GUIDE.md)
 - [Installer Lifecycle](docs/INSTALLER-LIFECYCLE.md)
 - [Terraform Policy Gate](docs/TERRAFORM_POLICY_GATE.md)
 - [Product Overview](docs/PRODUCT_OVERVIEW.md)
+- [Development Roadmap](docs/roadmap/ROADMAP.md)
 - [Module Builder Foundation](docs/reports/MAYS-ORDERS-MODULE-BUILDER-FOUNDATION-01.md)
 - [Module Builder Hardening](docs/reports/MAYS-ORDERS-MODULE-BUILDER-HARDENING-01.md)
 - [Module Builder Options](docs/reports/MAYS-ORDERS-MODULE-BUILDER-OPTIONS-01.md)

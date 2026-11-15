@@ -18,7 +18,17 @@ RELEASE VERSION: `v0.6.0-rc.1`
 DEPLOYMENT VERSION (Teststack): `0.2.0`
 BASE: `release/rc4-integration`
 TAG: annotated `v0.6.0-rc.1` → `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`
-PDF: `docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`
+DOCUMENT STATUS: post-merge synchronization 2026-11-15
+OFFICIAL RELEASE DOCUMENT: `docs/release/RELEASE-v0.6.0-rc.1.md`
+OFFICIAL RELEASE PDF: `docs/release/RELEASE-v0.6.0-rc.1.pdf`
+DETAILED PACKAGE PDF: `docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`
+GITHUB RELEASE ASSET: `MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf` (unchanged; replacement requires separate approval)
+
+CANONICAL NOTE: The official `RELEASE-v0.6.0-rc.1.md/.pdf` files retain the
+project owner's release-time body and carry an explicit post-merge addendum
+(2026-11-15). This aggregated release-notes file and `docs/PROJECT_STATUS.md`
+are the current status sources for post-merge operations. The tag boundary above
+remains authoritative.
 
 SCOPE:
 - Order-API, Owner-/Consumer-Isolation, Statusmodell, SQS-Worker, DLQ,
@@ -61,7 +71,7 @@ KNOWN LIMITATIONS:
 - RIS pin remains `1dbb0cb` (RC3); no RC4 consumer acceptance.
 - **No production activation.** Production privacy/retention/secret management
   remains BLOCKED.
-- Main merge is prepared and separately gated; no main merge is included.
+- Main merge is complete: `82f7ae1`; `main` was pushed to `7724c43`/current tip. No production deployment is included.
 
 Details: `docs/release/RC4-MODULE-RELEASE-CANDIDATE.md`,
 `docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md` and

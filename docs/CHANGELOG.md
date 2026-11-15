@@ -2,6 +2,23 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-11-15 — Post-Merge Documentation Sync
+
+### Documentation
+- RC4-Release, Main-Merge und Main-Push in `docs/PROJECT_STATUS.md` synchronisiert
+- Kanonische Release-Dateien dokumentiert:
+  `docs/release/RELEASE-v0.6.0-rc.1.md` und
+  `docs/release/RELEASE-v0.6.0-rc.1.pdf`
+- Aggregierte Release Notes und detailliertes PDF als ergänzende Paketdokumente
+  gekennzeichnet
+- Neue kanonische Entwicklungsroadmap: `docs/roadmap/ROADMAP.md`
+- Bestehende Future-Extensions als historische Ideensammlung abgegrenzt
+
+### Boundaries
+- Keine Produktcode-, Tag- oder Versionsänderung
+- Kein GitHub-Release-Asset-Austausch ohne separate Freigabe
+- Kein AWS-Deployment
+
 ## 2026-11-14 — RC4 v0.6.0-rc.1
 
 ### Release
@@ -26,7 +43,7 @@
 
 ### Boundaries
 - Kein Produktionsdeployment, keine RIS-Integration
-- Main-Merge nur vorbereitet, nicht ausgeführt
+- Main-Merge abgeschlossen und `main` gepusht; keine Produktionsaktivierung
 - Produktive Secret-/KMS-/Retention-Aktivierung bleibt separat gesperrt
 
 ## 2026-10-31 — Release Candidate v0.5.0-rc.3 (MO-RC3-P07-P08 — Module Builder & RIS Integration)

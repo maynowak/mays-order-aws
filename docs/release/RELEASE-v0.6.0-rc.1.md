@@ -1,8 +1,17 @@
 # Mays Orders AWS — RC4 Release Notes
 
+> **Post-Merge Addendum (2026-11-15):** The release-time body below is preserved.
+> Current verified status: annotated tag `v0.6.0-rc.1` → `5bc154e`;
+> main merge `82f7ae1`; `main` pushed and published; GitHub pre-release
+> published; AWS Development lifecycle completed (58 create, live E2E, 58
+> destroy, state 0). Production deployment remains **not performed**. The
+> release-time statements in section 7 about tag/main verification are
+> superseded by this addendum. Canonical current status:
+> `docs/PROJECT_STATUS.md` and `docs/RELEASE_NOTES.md`.
+
 **Release-Label:** `v0.6.0-rc.1` · **Entwicklungsstand:** RC4 · **Dokumentstand:** 14. November 2026
 
-![Mays Orders AWS — freundliches RC4-Infografikmotiv](a_bright_modern_illustrated_infographic_hero_ban.png)
+![Mays Orders AWS — freundliches RC4-Infografikmotiv](../assets/a_bright_modern_illustrated_infographic_hero_ban.png)
 
 > **Build modular. Secure by design. Verify the full lifecycle.**
 
@@ -82,8 +91,8 @@ Der Lifecycle wurde mit dem AWS-Development-Profil `mayaws` in `eu-central-1` do
 | Module Builder | `0.1.0` — unverändert |
 | Installer | `0.1.0` — unverändert |
 | Deployment-/Teststack | `0.2.0` — unverändert |
-| Git-Tag `v0.6.0-rc.1` | Erstellung/Push beauftragt; Abschluss bislang nicht belegt |
-| Main-Merge | Nicht ausgeführt; separate Freigabe nötig |
+| Git-Tag `v0.6.0-rc.1` | vorhanden; Ziel `5bc154e` |
+| Main-Merge | abgeschlossen (`82f7ae1`); `main` gepusht |
 | Produktionsdeployment | Nicht durchgeführt |
 
 **Freigabegrenze:** Ein beschlossenes Release-Label ist nicht dasselbe wie ein nachgewiesen gepushter Git-Tag oder ein produktiver Rollout. Optionales APP_MANAGED und Retention werden durch das Release-Label nicht automatisch aktiviert.
@@ -92,7 +101,7 @@ Der Lifecycle wurde mit dem AWS-Development-Profil `mayaws` in `eu-central-1` do
 
 - **Q-05/Q-06/Q-07/Q-14:** Retention und Aufbewahrungs-/Löschentscheidungen.
 - **Q-11:** Operative Rotation/Revocation und Secret-Bereitstellung.
-- **Release-Verifikation:** Tag- und Branch-Ziel nach dem finalen Release-Commit nachweisen; Main-Merge separat prüfen und freigeben.
+- **Release-Verifikation:** Tag- und Branch-Ziel sind verifiziert; Main-Merge ist abgeschlossen. Kein Produktionsdeployment.
 - **Datenschutzbetrieb:** Rechtliche/organisatorische Datenschutzprüfung und produktive Betriebsprozesse ergänzen.
 
 ---

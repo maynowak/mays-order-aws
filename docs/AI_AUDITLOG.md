@@ -983,3 +983,24 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No AWS calls, Terraform apply, deployment or new worktrees.
 - Post-push documentation commit will be recorded on `main` and pushed
   separately.
+
+## 2026-11-15 — MO-RC4-POST-MERGE-DOC-SYNC-01
+
+**Status:** `RESULT A — DOC SYNC & ROADMAP COMPLETE`
+
+- Preflight found remote `main` at `7724c43`, two authorized owner commits
+  ahead of local `ece8b1e` (`RELEASE-v0.6.0-rc.1.md/.pdf` and hero image).
+  After confirmation, local `main` was fast-forwarded without rewriting history.
+- Synchronized release/main status in `PROJECT_STATUS`, `CHANGELOG`,
+  `RELEASE_NOTES`, integration manifest and README. The official release
+  document/PDF retain the owner's release-time body; an explicit post-merge
+  addendum was added without deleting the original body.
+- Added canonical `docs/roadmap/ROADMAP.md`; `future-extensions.md` is marked
+  as a historical idea catalogue.
+- Official/canonical PDF is 5 pages (addendum + original 4 pages), SHA-256
+  `165bf8b3…`; detailed package PDF remains 7 pages, SHA-256 `968a9276…`.
+  GitHub release asset was **not changed**; replacement needs separate approval.
+- Open gates: Q-05/Q-06/Q-07/Q-14, Q-11 operational activation, production
+  secret/KMS activation and production deployment. Q-12 remains approved.
+- No AWS calls, Terraform operations, tags or new worktrees.
+- Report: `docs/reports/MO-RC4-POST-MERGE-DOC-SYNC-01.md`.
