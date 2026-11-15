@@ -46,11 +46,20 @@ Entscheidung bezieht sich auf **diesen** Branch.
 | `MO-RC4-P00-EXECUTION-PLAN.md` | interner Execution Plan | `docs/roadmap/` | 7 | behalten | historische Reports referenzieren den Pfad |
 | `MO-RC4-P00-IMPLEMENTATION-BACKLOG.md` | interner Backlog | `docs/roadmap/` | 8 | behalten | historische Reports referenzieren den Pfad |
 | `img/ChatGPT Image 14. Sept. 2026, 15_54_35.png` | Release-Asset | `docs/assets/` | 1 | behalten | bestehendes Release-Asset-Verzeichnis; keine aktuelle Release-Doku verweist darauf |
-| `img/mays-orders-release-overview.png` | **fehlend** | — | — | offener Punkt | wird von `RELEASE-v0.4.0.md` referenziert, ist aber nicht im Checkout |
-| `img/mays-orders-architecture.png` | **fehlend** | — | — | offener Punkt | dito |
-| `img/mays-orders-e2e-flow.png` | **fehlend** | — | — | offener Punkt | dito |
-| `img/mays-orders-project-journey.png` | **fehlend** | — | — | offener Punkt | dito |
-| `img/mays-orders-ecosystem.png` | **fehlend** | — | — | offener Punkt | dito |
+
+### Fehlende, aber referenzierte Assets
+
+`RELEASE-v0.4.0.md` verweist auf fünf Bilder, die im Checkout nicht vorhanden
+sind:
+
+- `docs/release/img/mays-orders-release-overview.png`
+- `docs/release/img/mays-orders-architecture.png`
+- `docs/release/img/mays-orders-e2e-flow.png`
+- `docs/release/img/mays-orders-project-journey.png`
+- `docs/release/img/mays-orders-ecosystem.png`
+
+Diese Lücke ist vorbestehend und wurde nicht durch diese Aufgabe verursacht.
+Es wurde keine Ersatzgrafik erzeugt.
 
 ## 3. Tatsächlich verschobene Dateien
 
