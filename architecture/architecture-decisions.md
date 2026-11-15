@@ -262,7 +262,7 @@ macht die Bedeutung eindeutig und verhindert eine Verwechslung mit dem P00-Regis
 **Abgrenzung:** P00 Q-03, Q-05, Q-06 und Q-13 sind **nicht** die historischen P01-Fragen
 gleicher Nummer. Für historische Fragen ohne 1:1-Entsprechung wird keine P00-ID
 erfunden; sie sind ausdrücklich als „keine Entsprechung“ markiert. Maßgeblich sind
-ausschließlich die Definitionen im `docs/release/MO-RC4-P00-DECISION-REGISTER.md`.
+ausschließlich die Definitionen im `docs/adr/MO-RC4-P00-DECISION-REGISTER.md`.
 
 ### Umsetzung der Owner-Klarstellungen C-01…C-07
 

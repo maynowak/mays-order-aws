@@ -4,7 +4,7 @@
 **Base:** `release/rc4-integration` @ `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **Feature base:** `feature/mo-rc4-p00-b-secret-provider` branched from `8ddc0503a851533c71027fcb122fe9f62f89dc4f`
 **RC3 Baseline:** `086a8bea4c608724d400de834c21df5456b7ccac`
-**Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
+**Reference:** `docs/adr/MO-RC4-P00-DECISION-REGISTER.md`
 
 > Q-02, Q-04, Q-08, Q-09 and Q-10 are owner-approved. P00-B is integrated on
 > `release/rc4-integration` (merge `e71f3ed`) and post-merge verified.

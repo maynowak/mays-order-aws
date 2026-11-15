@@ -1,7 +1,7 @@
 # MO-RC4-P00 Dependency Graph
 
 **Status:** PLANNING ARTIFACT / OWNER APPROVAL PENDING
-**Reference:** `docs/release/MO-RC4-P00-DECISION-REGISTER.md`
+**Reference:** `docs/adr/MO-RC4-P00-DECISION-REGISTER.md`
 **Base:** `/home/dci-student/projects/Mays-Orders-AWS-rc4-integration` @ `release/rc4-integration`
 
 > **Decision status 2026-11-13:** Q-02, Q-04, Q-08, Q-09 and Q-10 are DECIDED;

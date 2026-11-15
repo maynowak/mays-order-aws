@@ -1,6 +1,6 @@
 # Release Directory — Purpose and Conventions
 
-This directory contains the official release record, technical RC4 release
+This directory contains official release documents, technical RC4 release
 dossiers, historical release evidence and the assets needed by those documents.
 
 ## Naming Convention
@@ -29,22 +29,26 @@ Historical release documents are retained unchanged under this convention.
 | Official release documents | `RELEASE-v*.md` and `RELEASE-v*.pdf` |
 | Technical RC4 dossiers | `RC4-MODULE-RELEASE-CANDIDATE.md`, `RC4-INTEGRATION-MANIFEST.md` |
 | Historical release evidence | `RELEASE-GATES-v0.5.0-rc.3.md` |
-| RC4 decision and planning record | `MO-RC4-P00-DECISION-REGISTER.md`, dependency graph, execution plan and implementation backlog |
-| Internal proposals | `MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md`, `MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` |
 | Technical detail package | `MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf` |
 | Release images | `img/`, `RELEASE-v0.5.0-rc.2-COVER.png` |
 
-## Why Historical Internal Documents Remain Here
+## Relocated Internal Documents
 
-The `MO-RC4-P00-*` decision and planning documents are not official release
-notes, but they are deliberately kept at their existing paths. Historical
-reports and audit logs reference these exact paths. Moving them would break
-the historical record, which takes precedence over an idealized directory
-layout.
+The following internal RC4 documents were moved out of `docs/release/` to
+their functional homes. Historical reports and audit logs retain their original
+references as historical evidence; current documentation uses the new paths.
 
-The RC4 integration manifest and release-candidate dossier are technical
-release records. They remain in this directory because they are part of the
-release evidence and are referenced by current and historical documentation.
+| Former path | Current path |
+|---|---|
+| `docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` | `docs/adr/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md` |
+| `docs/release/MO-RC4-P00-DECISION-REGISTER.md` | `docs/adr/MO-RC4-P00-DECISION-REGISTER.md` |
+| `docs/release/MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md` | `docs/reports/MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md` |
+| `docs/release/MO-RC4-P00-DEPENDENCY-GRAPH.md` | `docs/roadmap/MO-RC4-P00-DEPENDENCY-GRAPH.md` |
+| `docs/release/MO-RC4-P00-EXECUTION-PLAN.md` | `docs/roadmap/MO-RC4-P00-EXECUTION-PLAN.md` |
+| `docs/release/MO-RC4-P00-IMPLEMENTATION-BACKLOG.md` | `docs/roadmap/MO-RC4-P00-IMPLEMENTATION-BACKLOG.md` |
+
+The release directory now contains only official release documents, technical
+release dossiers, historical release evidence and release assets.
 
 ## GitHub Release Asset
 
