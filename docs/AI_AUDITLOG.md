@@ -956,3 +956,16 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No AWS calls, Terraform apply, deployment or main merge. `main` remains
   `f597d14`.
 - Report: `docs/reports/MO-RC4-RELEASE-PACKAGE-FINAL-01.md`.
+
+## 2026-11-15 — MO-RC4-MAIN-MERGE-01
+
+**Status:** `LOCAL MAIN MERGE COMPLETE / REMOTE MAIN NOT PUSHED`
+
+- Merged `release/rc4-integration` @ `76f7b3b` into `main` @ `f597d14` with
+  `--no-ff`; merge commit `82f7ae14cf3a78512b03e8280aea39b1c8c298a0`.
+- Merge was conflict-free: 196 commits ahead, 0 behind, merge-tree PASS and
+  diff check PASS. No tag rewrite; `v0.6.0-rc.1` remains at `5bc154e`.
+- `main` was **not pushed**; remote `main` remains `f597d14`. No main push
+  without separate approval.
+- No AWS calls, Terraform apply, deployment or new worktrees.
+- Report: `docs/reports/MO-RC4-MAIN-MERGE-01.md`.

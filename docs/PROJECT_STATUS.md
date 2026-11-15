@@ -11,7 +11,7 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 v0.6.0-rc.1 — GitHub release package published; main merge prepared
+RC4 v0.6.0-rc.1 — GitHub release published; local main merge complete
 
 Current Feature:
 MO-RC4-RELEASE-01 — RC4 release docs, annotated tag and branch publication
@@ -52,6 +52,8 @@ release/rc4-integration @ MO-RC4-RELEASE-01
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF
   (`MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`) veröffentlicht
+→ Main-Merge lokal: 82f7ae1 (Eltern f597d14 + 76f7b3b); Remote-main
+  noch f597d14, kein Push auf main
 → Main-Merge-Vorprüfung: main f597d14, 192 Commits voraus, 0 dahinter,
   merge-tree ohne Konflikte; kein Main-Merge
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
