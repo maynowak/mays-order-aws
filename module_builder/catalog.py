@@ -27,6 +27,7 @@ from typing import Dict, List
 # Basis: Research A/C (MAYS-ORDERS-MODULARIZATION-01-A/-C-EXECUTION_LOG).
 MODULE_CATALOG: Dict[str, Dict] = {
     "dynamodb": {"dir": "dynamodb", "deps": [], "optional_deps": []},
+    "privacy_secret": {"dir": "privacy_secret", "deps": [], "optional_deps": []},
     "sqs": {"dir": "sqs", "deps": [], "optional_deps": []},
     "cognito": {"dir": "cognito", "deps": [], "optional_deps": []},
     "cloudtrail": {"dir": "cloudtrail", "deps": [], "optional_deps": []},
@@ -47,7 +48,7 @@ MODULE_CATALOG: Dict[str, Dict] = {
 
 # Root-Variablen: immer erforderlich (provider/locals/Namen) ODER Modul-zugeordnet.
 # Basis: tatsächliche var.-Nutzung je Modulblock in main.tf (verifiziert).
-ALWAYS_VARIABLES = {"project_name", "aws_region", "tags"}
+ALWAYS_VARIABLES = {"project_name", "aws_region", "tags", "deployment_version"}
 VARIABLE_MODULES: Dict[str, List[str]] = {
     "seed_example_data": ["dynamodb"],
     "seed_file_path": ["dynamodb"],
@@ -83,6 +84,8 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "notification_email": ["cognito_backup_automation"],
     "enable_cognito_backup": ["cognito_backup", "cognito_backup_automation"],
     "enable_cognito_backup_automation": ["cognito_backup_automation"],
+    "privacy_secret_enabled": ["privacy_secret", "iam", "lambda"],
+    "privacy_kms_key_arn": ["privacy_secret", "iam", "lambda"],
 }
 
 # Ressourcen-Bedarf je Auswahl (Lambda-Artefakte/-Quellen nur bei Bedarf):

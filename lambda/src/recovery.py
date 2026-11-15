@@ -253,7 +253,7 @@ def run_recovery(
 
 def run_processing_recovery(
     table: Any,
-    send_message: Callable[[str], None],
+    send_message: Callable[..., None],
     *,
     now: Optional[datetime] = None,
     limit: int = DEFAULT_PROCESSING_LIMIT,
@@ -265,7 +265,15 @@ def run_processing_recovery(
     prueft per GetItem nach und sendet an die bestehende Queue. Der Worker
     entscheidet atomar ueber den neuen Claim (Budget, Lease, Privacy, Status).
 
-    `send_message(order_id)` muss bei Fehlern eine Exception werfen.
+    `send_message(order_id, status=target_status)` muss bei Fehlern eine
+    Exception werfen. Fuer PENDING wird CONFIRMED gesendet; fuer bereits
+    weiter fortgeschrittene Prozess-Status wird der aktuelle Status gesendet,
+    damit der Processing-Pfad den Claim uebernehmen kann, ohne einen
+    unzulaessigen Statusrueckfall zu erzeugen.
+
+    Skip-Eintraege im GSI3 (CANCELLED, Budget, anonymisiert) verbrauchen
+    nicht das `limit`; es werden bis zu einem begrenzten Scan-Budget weitere
+    Kandidaten gesucht.
     """
     from sqs_handler import (
         MAX_PROCESSING_ATTEMPTS,
@@ -303,10 +311,15 @@ def run_processing_recovery(
     def skip(reason: str) -> None:
         skipped[reason] = skipped.get(reason, 0) + 1
 
-    # ---------- 1) Kandidaten ueber GSI3 (nur abgelaufene Claims) ----------
-    order_ids = []
+    # ---------- 1) GSI3-Selektion + GetItem-Recheck ----------
+    # Skip-Eintraege (CANCELLED, Budget, Anonymize) sollen den `limit`-Slot
+    # nicht verbrauchen. Der Scan ist dennoch hart begrenzt, damit ein
+    # dauerhaft "vergifteter" GSI3 nicht unbegrenzt gelesen wird.
+    scan_limit = max(limit * 10, 100)
+    selected = []  # (order_id, target_status)
     start_key = None
-    while len(order_ids) < limit:
+    while len(selected) < limit and report["scanned"] < scan_limit:
+        query_limit = min(limit, scan_limit - report["scanned"])
         query_kwargs: Dict[str, Any] = {
             "IndexName": GSI3_NAME,
             "KeyConditionExpression": "gsi3pk = :pk AND gsi3sk <= :cutoff",
@@ -315,12 +328,15 @@ def run_processing_recovery(
                 ":cutoff": cutoff,
             },
             "ScanIndexForward": True,  # aelteste Claims zuerst
-            "Limit": limit,
+            "Limit": query_limit,
         }
         if start_key:
             query_kwargs["ExclusiveStartKey"] = start_key
         page = table.query(**query_kwargs)
-        for entry in page.get("Items", []):
+        entries = page.get("Items", [])
+        for entry in entries:
+            if report["scanned"] >= scan_limit or len(selected) >= limit:
+                break
             report["scanned"] += 1
             order_id = entry.get("orderId")
             if not order_id:
@@ -331,55 +347,61 @@ def run_processing_recovery(
             if not order_id:
                 skip("missing_order_id")
                 continue
-            order_ids.append(order_id)
-            if len(order_ids) >= limit:
-                break
+
+            try:
+                item = table.get_item(
+                    Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
+                    ConsistentRead=True,
+                ).get("Item")
+            except Exception:
+                skip("read_error")
+                continue
+
+            report["checked"] += 1
+            if item is None:
+                skip("order_missing")
+                continue
+            if item.get("processingState") != "running":
+                skip("not_running")
+                continue
+            claimed_at = item.get("processingClaimedAt")
+            if not isinstance(claimed_at, str) or claimed_at > cutoff:
+                skip("lease_not_expired")
+                continue
+            attempts = item.get("processingAttempts")
+            try:
+                attempts_value = int(attempts) if attempts is not None else 0
+            except (TypeError, ValueError):
+                attempts_value = 0
+            if attempts_value >= MAX_PROCESSING_ATTEMPTS:
+                report["budgetExhausted"] += 1
+                skip("budget_exhausted")
+                continue
+            if not item.get("subjectId"):
+                skip("anonymized")
+                continue
+            if item.get("status") == "CANCELLED":
+                skip("cancelled")
+                continue
+
+            current_status = item.get("status")
+            target_status = "CONFIRMED" if current_status in (None, "PENDING") else current_status
+            selected.append((order_id, target_status))
+
+        if len(selected) >= limit:
+            break
         start_key = page.get("LastEvaluatedKey")
         if not start_key:
             break
 
-    report["candidates"] = len(order_ids)
+    report["candidates"] = len(selected)
+    if report["scanned"] >= scan_limit and len(selected) < limit:
+        skip("scan_limit_reached")
 
-    # ---------- 2) GetItem-Recheck + erneute Zustellung ----------
-    for order_id in order_ids:
+    # ---------- 2) Erneute Zustellung ----------
+    for order_id, target_status in selected:
         try:
-            item = table.get_item(
-                Key={"pk": f"{ORDER_ID_PREFIX}{order_id}", "sk": ORDER_SK},
-                ConsistentRead=True,
-            ).get("Item")
-        except Exception:
-            skip("read_error")
-            continue
-
-        report["checked"] += 1
-        if item is None:
-            skip("order_missing")
-            continue
-        if item.get("processingState") != "running":
-            skip("not_running")
-            continue
-        claimed_at = item.get("processingClaimedAt")
-        if not isinstance(claimed_at, str) or claimed_at > cutoff:
-            skip("lease_not_expired")
-            continue
-        attempts = item.get("processingAttempts")
-        try:
-            attempts_value = int(attempts) if attempts is not None else 0
-        except (TypeError, ValueError):
-            attempts_value = 0
-        if attempts_value >= MAX_PROCESSING_ATTEMPTS:
-            report["budgetExhausted"] += 1
-            skip("budget_exhausted")
-            continue
-        if not item.get("subjectId"):
-            skip("anonymized")
-            continue
-        if item.get("status") == "CANCELLED":
-            skip("cancelled")
-            continue
-
-        try:
-            send_message(order_id)
+            send_message(order_id, status=target_status)
         except Exception:
             report["failed"] += 1
             skip("send_failed")

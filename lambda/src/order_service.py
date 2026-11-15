@@ -27,6 +27,13 @@ from identity import (
 )
 from state_machine import can_transition
 from order_types import GSI1_PK, GSI2_NAME, GSI2_PK_PREFIX, ORDER_ID_PREFIX, ORDER_SK, TABLE_INDEX_NAME
+from secret_provider import (
+    SecretProvider,
+    SecretProviderError,
+    configured_provider_name,
+    get_default_secret_provider,
+    log_secret_provider_failure,
+)
 from validation import validate_create_order
 
 # version = Optimistic-Locking-Feld (intern); isTestData = reiner Seed-Marker,
@@ -138,10 +145,66 @@ def is_validation_exception(err: Any) -> bool:
     return is_client_error(err, "ValidationException")
 
 
+MAX_INTERNAL_TOKEN_LENGTH = 1024
+
+
+def _constant_time_token_match(token: Any, secret: Any) -> bool:
+    """Compare internal tokens without leaking a Python TypeError.
+
+    Python's compare_digest rejects non-ASCII strings. Provider material may
+    come from Secrets Manager, so the boundary must fail closed instead of
+    allowing an unhandled TypeError to become HTTP 500.
+    """
+    try:
+        token_text = str(token)
+        secret_text = str(secret)
+    except Exception:
+        return False
+    if not token_text or not secret_text:
+        return False
+    if len(token_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if len(secret_text) > MAX_INTERNAL_TOKEN_LENGTH:
+        return False
+    if not token_text.isascii() or not secret_text.isascii():
+        return False
+    try:
+        return secrets.compare_digest(token_text, secret_text)
+    except (TypeError, ValueError):
+        return False
+
+
 class OrderService:
-    def __init__(self, table_name: str, client: Any = None) -> None:
+    def __init__(
+        self,
+        table_name: str,
+        client: Any = None,
+        secret_provider: Optional[SecretProvider] = None,
+    ) -> None:
         self._table_name = table_name
         self._table = client if client is not None else _get_dynamodb_resource().Table(table_name)
+        self._secret_provider = secret_provider
+
+    def _resolve_privacy_secret(self) -> str:
+        """Resolve the internal privacy secret through the process-wide provider.
+
+        Provider selection comes only from configuration, never from request
+        data. The default provider/cache survives multiple invocations in the
+        same Lambda execution environment; injected providers remain scoped to
+        their service instance. Provider errors map to the fail-closed 400 path.
+        """
+        try:
+            provider = self._secret_provider
+            if provider is None:
+                provider = get_default_secret_provider()
+                self._secret_provider = provider
+            material = provider.resolve()
+        except SecretProviderError as exc:
+            log_secret_provider_failure(exc, configured_provider_name())
+            raise validation_error(exc.public_message) from None
+        if not material.value:
+            raise validation_error("Internal secret not configured")
+        return material.value
 
     def _require_privacy_auth(self, context: Optional[Dict[str, Any]], permission: str) -> None:
         if not context or not context.get("project"):
@@ -155,16 +218,15 @@ class OrderService:
             raise validation_error("Unauthorized privacy operation")
         if not context.get(permission):
             raise validation_error(f"Missing permission {permission}")
-        # Internal trust boundary: secret must be configured and token must match
-        internal_secret = os.environ.get("PRIVACY_INTERNAL_SECRET")
-        if not internal_secret:
-            raise validation_error("Internal secret not configured")
+        # Internal trust boundary: secret must be configured and token must match.
+        # The provider remains ENV by default; no request field can select it.
+        internal_secret = self._resolve_privacy_secret()
         token = context.get("internal_token")
         if not token:
             raise validation_error("Internal token missing")
-        # Use constant-time compare
-        import secrets
-        if not secrets.compare_digest(str(token), str(internal_secret)):
+        # Use the existing constant-time privacy contract, with a fail-closed
+        # ASCII/length guard for provider-supplied material.
+        if not _constant_time_token_match(token, internal_secret):
             raise validation_error("Internal trust boundary violation")
 
     def create_order(
@@ -606,13 +668,23 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,pk,sk,subjectId,version,createdAt",
+                    # consumerId is not projected by GSI2. Only the orderId is
+                    # read from the index; the complete item (including
+                    # consumerId/version) is loaded consistently below before
+                    # the optional consumer-scope filter is applied.
+                    "ProjectionExpression": "orderId",
                 }
                 if last_evaluated_key:
                     query_kwargs["ExclusiveStartKey"] = last_evaluated_key
                 result = self._table.query(**query_kwargs)
                 items = result.get("Items", [])
-                for item in items:
+                for entry in items:
+                    order_id = entry.get("orderId")
+                    if not order_id:
+                        continue
+                    item = self._load_order_item(order_id)
+                    if item is None:
+                        continue
                     affected.append({
                         "pk": item.get("pk"),
                         "sk": item.get("sk"),
@@ -773,5 +845,9 @@ class OrderService:
         }
 
 
-def create_order_service(table_name: str, client: Any = None) -> OrderService:
-    return OrderService(table_name, client)
+def create_order_service(
+    table_name: str,
+    client: Any = None,
+    secret_provider: Optional[SecretProvider] = None,
+) -> OrderService:
+    return OrderService(table_name, client, secret_provider=secret_provider)

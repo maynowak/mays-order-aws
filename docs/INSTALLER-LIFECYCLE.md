@@ -24,6 +24,16 @@ TEST
 DESTROY PLAN
 ```
 
+### Order data backup (P3A, local)
+
+`backup --orders --dry-run` plant ein DynamoDB-On-Demand-Backup ohne AWS-Aufruf;
+`--execute` ist doppelt gesperrt (siehe `docs/ORDER-BACKUP-LIFECYCLE.md`).
+Evidenz wird an Deployment-Kontext und Terraform-State-Baseline gebunden; nur
+`AVAILABLE` gilt als erfolgreich, PITR wird separat zur Laufzeit geprüft.
+Fuer Upgrade-Plaene mit Versionswechsel ist `--backup-evidence` verpflichtend;
+Readiness und `deploy --plan` pruefen Hash/Identitaet/State erneut.
+Kein Restore, keine Migration, kein zweiter Apply-Pfad.
+
 ### Current Milestone: D0-D5 (Foundation)
 
 | Phase | Status | Description |
@@ -471,14 +481,16 @@ All commands use validated `AWSExecutionContext`.
 - Merges with existing tags preserving unrelated tags
 - Canonical tags take precedence for identity/version metadata
 
-#### 7. Existing Resource / Upgrade Awareness
-- `OwnershipAnalyzer` classifies existing resources:
-  - `OWNED` — belongs to current deployment
-  - `FOREIGN` — belongs to different project/environment/account
-  - `AMBIGUOUS` — same deployment ID but different version/phase
-  - `UNMANAGED` — no deployment metadata
-- Ambiguous ownership surfaced, not silently adopted
-- Existing resources considered in future upgrade planning
+#### 7. Existing Resource / Upgrade Awareness (Stand P0A)
+- **Implementiert:** das aktionsbasierte **Upgrade-Safety-Gate** (siehe
+  „Upgrade Safety Gate (P0A)" unten) blockiert DELETE/REPLACE geschützter
+  Ressourcen bei Planerstellung **und** vor dem Apply eines gespeicherten Plans.
+- **Nicht implementiert (Korrektur):** `OwnershipAnalyzer`/`ResourceOwnership`
+  existieren im Code (`installer/core/deployment_identity.py`), werden aber von
+  keinem Produktionspfad aufgerufen; eine Ownership-Klassifikation findet derzeit
+  **nicht** statt.
+- Ebenso ist `DevelopmentState.compare` (Versionsvergleich) vorhanden, aber nicht
+  verdrahtet — es gibt noch keine automatische Kompatibilitätsprüfung.
 
 #### 8. Configuration / Context Separation
 - **INSTALLER CONTEXT:** installer name, version, commit
@@ -561,18 +573,20 @@ All commands use validated `AWSExecutionContext`.
 - Metadata validated before DEPLOY/DESTROY
 
 #### 7. AWS Resource Tagging
-- Uses H2 TagSet canonical model
-- Identity tags: Project, Environment, DeploymentId
-- Version tags: Version, DevelopmentPhase, DevelopmentStep
-- Governance tags: ManagedBy, Owner, Maker
-- Custom tags prefixed with `Custom:`
-- Preserves existing unrelated tags
+- **Korrektur:** `TagSet` ist als Modell definiert
+  (`installer/core/deployment_identity.py`), wird aber **nicht** auf Ressourcen
+  angewendet. Die tatsächlichen Tags setzt Terraform: `Project` je Ressource plus
+  `default_tags` (`Project`, `Maker`, `Environment`) im Root-Modul.
+- `DeploymentId`/`Version`/`DevelopmentPhase`-Tags werden derzeit **nicht** gesetzt.
 
 #### 8. Existing Resource / Upgrade Boundary
-- OwnershipAnalyzer classifies resources: OWNED, FOREIGN, AMBIGUOUS, UNMANAGED
-- Ambiguous ownership surfaced, not silently adopted
-- Migration execution NOT implemented - HARD STOP on MIGRATION_REQUIRED/INCOMPATIBLE
-- No automatic destroy/recreate as workaround
+- **HARD STOP ist implementiert** — aber aktionsbasiert: DELETE/REPLACE von
+  DynamoDB-Tabellen, S3-Buckets, Cognito User Pools und SQS Queues wird bei
+  Planerstellung und vor dem Apply blockiert (`UPGRADE_BLOCKED_MIGRATION_REQUIRED`).
+- **Nicht implementiert:** automatische Versions-/Kompatibilitätsprüfung
+  (`DevelopmentState.compare` ungenutzt), Ownership-Klassifikation
+  (`OwnershipAnalyzer` ungenutzt), automatische Migration, Rollback.
+- Kein automatisches Destroy/Recreate als Workaround.
 
 #### 9. Environment Progression Support
 - Architecture supports: development → test → integration → staging → production
@@ -861,6 +875,309 @@ If `--plan` is omitted from `deploy` or `destroy`, the installer automatically f
 This eliminates manual path copying and ensures the correct plan is always used.
 
 ---
+
+## Upgrade Safety Gate (P0A)
+
+**Ziel:** Ein Upgrade eines bestehenden Systems darf keine zustandsbehafteten
+Ressourcen löschen oder ersetzen, ohne dass eine Migrationsprüfung stattgefunden hat.
+
+### Geschützte Ressourcentypen
+
+| Typ | DELETE | REPLACE |
+|---|---|---|
+| `aws_dynamodb_table` | **BLOCK** | **BLOCK** |
+| `aws_s3_bucket` | **BLOCK** | **BLOCK** |
+| `aws_cognito_user_pool` | **BLOCK** | **BLOCK** |
+| `aws_sqs_queue` | **BLOCK** | **BLOCK** |
+
+Die Klassifikation erfolgt ausschließlich über die **Terraform-Plan-Aktionen**
+(`delete`, `create`+`delete`, `delete`+`create`) — nie über Namenspräfixe.
+`replace_paths` werden im Bericht ausgewiesen.
+
+### Wo das Gate greift
+
+1. **Planerstellung (Deploy):** Nach `terraform plan` wird das Plan-JSON analysiert.
+   Bei kritischen Änderungen: `UPGRADE_BLOCKED_MIGRATION_REQUIRED`, Exit 1,
+   **kein Manifest** (der Plan ist nicht anwendbar).
+2. **Apply (gespeicherter Plan):** Nach der Manifest-/SHA-256-Prüfung und **vor**
+   dem Kopieren/Anwenden wird das Gate erneut ausgeführt. Ein gültiger Hash allein
+   macht einen Plan **nicht** sicher.
+3. **Destroy:** Der Destroy-Befehl akzeptiert nur echte Destroy-Pläne
+   (ausschließlich `delete`/`no-op`/`read`); ein Deploy-Plan kann nicht über
+   `destroy --plan …` angewendet werden. Der bestehende Destroy-Lifecycle
+   (State-Ziel, Cleanup-Vertrag, Freigabe) bleibt unverändert.
+
+### Fail-closed
+
+Fehlendes, unlesbares oder unbekanntes Plan-JSON (z. B. unbekannte Aktion,
+fehlende `resource_changes`) führt zum **Abbruch**, nicht zu einer Warnung.
+Es wird kein `terraform apply` gestartet.
+
+### Migrationsplan
+
+Bei einer Blockade schreibt der Installer ins Run-Verzeichnis:
+
+- `upgrade-migration-plan.json` (Schema-Version 1, Ressourcen, Aktionen,
+  `replacePaths`, Risiko, `approved: false`)
+- `upgrade-migration-plan.md` (Ausgangs-/Zielumgebung, Planidentität, kritische
+  Änderungen, Datenverlustrisiken, Strategien A–D, Vorbedingungen,
+  Abnahmekriterien, offene Entscheidungen)
+
+Der Bericht ist eine **Planung**, keine Ausführungsfreigabe. Es wird **keine**
+Migration ausgeführt.
+
+### Bekannte Einschränkungen
+
+- Versionsbindung fehlt weiterhin (`sourceVersion`/`targetVersion` sind `null`;
+  `git_commit` im Manifest ist derzeit `null`).
+- Keine automatische Kompatibilitäts-/Ownership-Prüfung.
+- Nicht geschützte Typen (Lambda, API, IAM) werden nur über die bestehende
+  Safety-Analyse (Destroys blockiert) und den Plan-Review betrachtet.
+- Kein Rollback/Resume.
+
+## Version Binding (P0B)
+
+**Ziel:** Nachvollziehbare, prüfbare Bindung von Quellcode, Plan und installierter
+Version — ohne eine installierte Version zu erfinden.
+
+### Felder (Manifest-Schema `manifest_version = 2`)
+
+| Feld | Bedeutung |
+|---|---|
+| `source_version` | nachweislich installierte Ausgangsversion (`null`, wenn unbekannt) |
+| `target_version` | Zielversion des Plans (= `--deployment-version`, SemVer) |
+| `git_commit` | vollständige 40-stellige Commit-SHA des verwendeten MO-Quellcodes |
+| `git_dirty` | Working Tree enthält Änderungen an **getrackten** Dateien |
+| `version_status` | `VERIFIED` · `LEGACY_UNKNOWN` · `UNVERIFIED` |
+| `version_source` | Herkunft: `terraform_output` · `state_without_version` · `no_remote_state` |
+
+Unverändert erhalten bleiben: Plan-SHA-256, Account, Region, Workspace,
+Backend-Identität, State-Key, Projektidentität, Operation.
+
+### Quellcode-Identität
+
+- Ermittelt aus dem Installer-Repository (`git rev-parse HEAD`), **nicht** aus
+  einem fremden Repository oder CWD.
+- **Dirty** = getrackte Änderungen (`git status --porcelain --untracked-files=no`).
+  Ein Commit allein beschreibt lokal geänderten Code nicht.
+- Detached HEAD wird unterstützt; fehlende Git-Metadaten (kein `.git`, kein
+  `git`-Binary) ⇒ Remote-Plan wird **blockiert** (`UPGRADE_SOURCE_UNVERIFIED`).
+- Remote-Pläne sind bei dirty Tree standardmäßig blockiert
+  (`UPGRADE_SOURCE_DIRTY`); Freigabe nur mit `--allow-dirty-source`
+  (wird im Manifest dokumentiert). Offline-Dry-Run ist nicht betroffen.
+
+### Installierte Version
+
+- Gelesen aus dem Remote-State: `terraform state list` (Existenz) und
+  `terraform output -json` (`mo_version`).
+- `VERIFIED` = Output vorhanden · `LEGACY_UNKNOWN` = State existiert, aber ohne
+  Versionskennung · `UNVERIFIED` = kein State (Neuinstallation) ·
+  `UNREADABLE` = State nicht lesbar ⇒ **Abbruch** (keine Neuinstallations-Annahme).
+- Es wird **nie** `0.1.0` oder eine andere Version angenommen.
+
+### Versionskennung im Stack
+
+- Root-Variable `deployment_version` (SemVer, Default `0.1.0`), die der Installer
+  als `-var deployment_version=<version>` setzt.
+- Terraform-Output `mo_version` dokumentiert die Zielversion im State.
+- **Grenze:** Der Output ist State-Metadaten, kein unabhängiger Nachweis des
+  tatsächlich laufenden Lambda-Codes. Bestehende Stacks erhalten ihn erst beim
+  nächsten Apply.
+
+### Plan-/Apply-Prüfung
+
+Vor dem Apply wird geprüft: Plan-Hash (bestehend), Projekt-/Backend-/Workspace-
+Identität (bestehend), **Zielversion**, **Commit**, **Dirty-Status**,
+**installierte Ausgangsversion** und P0A-Safety. Abweichungen brechen ab:
+
+```text
+UPGRADE_VERSION_BINDING_MISSING     (Manifest < v2 oder fehlend)
+UPGRADE_VERSION_BINDING_MISMATCH    (Zielversion/Commit/Dirty/Quellversion)
+UPGRADE_SOURCE_DIRTY                (dirty, ohne --allow-dirty-source)
+UPGRADE_LEGACY_SOURCE_UNKNOWN       (LEGACY_UNKNOWN, ohne --allow-legacy-source)
+UPGRADE_STATE_UNREADABLE            (State nicht lesbar)
+UPGRADE_SOURCE_UNVERIFIED           (keine Git-Metadaten)
+```
+
+Ein gültiger Plan-Hash legitimiert **keine** widersprüchlichen Versionsangaben.
+
+### Manifest-Kompatibilität
+
+- v1-Manifeste bleiben lesbar, gelten aber **nicht** als upgradefähig:
+  Deploy blockiert (`UPGRADE_VERSION_BINDING_MISSING`, Hinweis auf
+  `plan --remote`); Destroy akzeptiert sie weiterhin (kein Upgrade).
+- Keine automatische Migration alter Manifeste.
+
+### Bekannte Grenzen
+
+- Das Manifest ist **nicht signiert**; es enthält nur Integritäts-/Identitätsdaten
+  und die Plan-SHA-256. Wer Schreibzugriff auf das Run-Verzeichnis hat, kann
+  Manifest und Plan gemeinsam austauschen — die Prüfung schützt vor Verwechslung,
+  nicht vor einem lokal manipulierten Gesamtauftritt.
+- Keine automatische Kompatibilitätsprüfung (`DevelopmentState.compare` ungenutzt),
+  keine Datenmigration, kein Rollback/Resume.
+- Version im Stack nur so gut wie der letzte Apply (Legacy-Stacks bleiben
+  `LEGACY_UNKNOWN` bis zu einem kontrollierten Upgrade).
+
+## State Baseline and Drift Safety (P0C)
+
+**Ziel:** Vor einem Upgrade nachweisen, ob der Terraform-State unverändert ist
+und ob Abweichungen (Drift) oder geplante Änderungen vorliegen — ohne
+State-Inhalte offenzulegen.
+
+### State-Baseline
+
+Beim Remote-Plan wird `terraform state pull` gelesen und **nur** Folgendes
+gespeichert/im Manifest gebunden:
+
+| Feld | Bedeutung |
+|---|---|
+| `serial` | Terraform-State-Serial |
+| `lineage` | Terraform-State-Lineage |
+| `resources` | Anzahl der Ressourcen im State |
+| `fingerprint` | SHA-256 des Roh-States (nicht rückführbar) |
+| `status` | `VERIFIED` · `NO_STATE` · `MISSING_LINEAGE` · `MISSING_SERIAL` · `UNREADABLE` |
+| `captured_at` | Zeitpunkt der Bestandsaufnahme |
+
+Regeln:
+
+- Keine State-Werte in Manifest/Berichten; der Fingerprint ersetzt keine
+  inhaltliche Prüfung.
+- Fehlende Lineage/Serial wird ausdrücklich gekennzeichnet, nicht erfunden.
+- Unlesbarer State ⇒ Abbruch (`UPGRADE_STATE_UNREADABLE`), **keine**
+  Neuinstallations-Annahme.
+- Ein leerer State (`NO_STATE`) ist eine gültige Baseline mit Serial/Lineage.
+
+### Drift-Erkennung
+
+- Quelle: `resource_drift` im Terraform-Plan-JSON (Refresh-Ergebnis),
+  getrennt von `resource_changes` (geplante Änderungen).
+- `NO_DRIFT` nur, wenn ein Refresh nachweislich stattfand und keine
+  Drift-Einträge mit Aktionen außerhalb `no-op`/`read` vorliegen.
+- Fehlendes/nicht interpretierbares `resource_drift` ⇒ `DRIFT_UNKNOWN` und
+  **`UPGRADE_DRIFT_UNVERIFIED`** (fail-closed).
+- Ohne vorherigen State (verifiziert leer) ist Drift nicht anwendbar
+  (`NO_DRIFT`, dokumentiert).
+- Drift an geschützten Ressourcentypen (P0A) blockiert das Upgrade.
+
+### No-op-Klassifikation
+
+| Ergebnis | Bedingung |
+|---|---|
+| `NO_OP_VERIFIED` | keine relevanten `resource_changes`, keine Output-Änderungen, Drift geprüft und ohne Drift, Plan vollständig |
+| `CHANGES_PLANNED` | geplante Ressourcen- **oder** Output-Änderungen |
+| `NO_OP_UNVERIFIED` | unvollständiger Plan, unbekannte Aktion, fehlende Drift-Bewertung oder erkannte Drift |
+
+Ein leerer `resource_changes`-Block allein ist **kein** No-op-Nachweis.
+
+### Manifest und Apply-Gate
+
+- Manifest v2 bleibt kompatibel und erhält optionale Felder:
+  `state_baseline`, `drift_status`, `noop_status`.
+- Vor dem Apply werden geprüft: Manifest → Plan-Hash → Versionsbindung (P0B) →
+  **State-Baseline** (Serial/Lineage/Fingerprint) → P0A-Safety.
+- Abweichung ⇒ `UPGRADE_STATE_BASELINE_MISMATCH` (bzw.
+  `UPGRADE_STATE_BASELINE_MISSING` für alte Pläne ohne Baseline,
+  `UPGRADE_DRIFT_UNVERIFIED` ohne Drift-Nachweis). Kein Apply.
+- Ältere v2-Pläne ohne Baseline müssen neu geplant werden (Destroy bleibt
+  weiterhin möglich).
+
+### Berichte
+
+`upgrade-drift-report.json` + `.md` im Run-Verzeichnis: Projekt, Environment,
+Workspace, State-Identität, Baseline, Quell-/Zielversion, Git-Commit,
+Drift-Status, No-op-Status, geplante Änderungen, Drift-Funde, kritische
+Änderungen (P0A), blockierende Gründe, Nachweisgrenzen. Keine Freigabe.
+
+### Terraform-eigene Schutzmechanismen
+
+Ein gespeicherter Terraform-Plan wird von Terraform selbst abgelehnt, wenn der
+State sich seit der Planerstellung geändert hat (Serial/Lineage). Der Installer
+umgeht das nicht und erstellt während eines Apply keinen neuen Plan. Die
+Baseline-Prüfung ist eine zusätzliche, nachvollziehbare Schicht.
+
+### Grenzen
+
+- **TOCTOU:** Eine Prüfung unmittelbar vor Apply verhindert keine Änderungen
+  danach.
+- Drift erfasst nur Ressourcen, die Terraform beim Refresh liest.
+- Der Fingerprint erkennt State-Schreibvorgänge, aber keine Änderungen
+  außerhalb des States (die wiederum als Drift erscheinen können).
+- Keine automatische Datenmigration, kein Rollback.
+
+## Upgrade Orchestration (P1)
+
+**Ziel:** Ein bestehendes System kontrolliert auf eine neue Version vorbereiten —
+ohne automatische Ausführung, ohne Datenmigration.
+
+### CLI
+
+```bash
+./Mays-Order-AWS-installer \
+  --project-name mays-orders-rc4 --environment development \
+  --deployment-version 0.2.0 \
+  plan --remote --upgrade --out .mays-installer/runs/<run>/plans
+```
+
+Der Apply bleibt der bestehende Pfad: `deploy --plan <artefakt>`.
+
+### Voraussetzungen (`--upgrade`)
+
+| Prüfung | Verhalten |
+|---|---|
+| `--remote` erforderlich | sonst `UPGRADE_REQUIRES_REMOTE` |
+| Bestehende Installation | `VERIFIED` oder `LEGACY_UNKNOWN`; kein State → `UPGRADE_SOURCE_INSTALLATION_MISSING` |
+| Unlesbarer State | `UPGRADE_STATE_UNREADABLE` (keine Neuinstallations-Annahme) |
+| Zielversion | `--deployment-version` (SemVer, validiert) |
+
+### Versionskompatibilität
+
+| Konstellation | Status |
+|---|---|
+| gleiche Version | `COMPATIBLE` |
+| Patch-Upgrade | `COMPATIBLE` |
+| Minor-Upgrade ohne Nachweis | `REVIEW_REQUIRED` |
+| Minor-Upgrade mit Nachweis | `COMPATIBLE` (im aktuellen CLI noch nicht verdrahtet) |
+| Major-Upgrade | `MIGRATION_REQUIRED` |
+| Downgrade | `INCOMPATIBLE` |
+| Legacy/unbekannte Quelle | `UNKNOWN` |
+| ungültige Version | `UNKNOWN` |
+
+`MIGRATION_REQUIRED`, `INCOMPATIBLE` und `UNKNOWN` blockieren.
+`REVIEW_REQUIRED` verlangt beim Apply `--accept-upgrade-review`.
+`COMPATIBLE` ersetzt **keine** P0A-/P0B-/P0C-Prüfung.
+
+### Change-Klassifikation
+
+- `SAFE`: neue, unkritische Ressourcen; No-op.
+- `REVIEW`: Updates, neue öffentliche/sicherheitsrelevante Ressourcen,
+  DELETE/REPLACE nicht geschützter Typen, nicht-kritische Drift.
+- `CRITICAL`: P0A-kritische Änderungen, Drift geschützter Typen, unbekannte
+  Aktionen, unverifizierte Drift/No-op, blockierende Kompatibilität.
+- Gesamtbewertung = höchste Kategorie.
+
+### Readiness-Bericht
+
+`upgrade-readiness.json` + `.md` im Run-Verzeichnis:
+
+Projekt/Environment, AWS-Account/Region, Backend/Workspace, State-Lineage/Serial,
+Ausgangs-/Zielversion, Git-Commit, Kompatibilität, Drift-/No-op-Status, geplante
+Änderungen, SAFE/REVIEW/CRITICAL, migrationspflichtige Änderungen, blockierende
+Gründe, nächste Schritte, Nachweisgrenzen.
+
+Status: `READY` · `REVIEW_REQUIRED` · `BLOCKED` · `NO_CHANGES`.
+**Keine Ausführungsfreigabe:** Der Apply-Pfad liest die Datei nicht als Freigabe,
+sondern prüft Manifest, Plan-Hash, Versionsbindung, State-Baseline, Kompatibilität
+und P0A erneut.
+
+### Grenzen
+
+- Keine automatische Migration, kein Rollback/Resume.
+- SemVer-Differenz ist kein technischer Kompatibilitätsnachweis; eine
+  Kompatibilitätsmatrix/Evidenz ist noch nicht hinterlegt (Minor → REVIEW).
+- Legacy-Installationen (`LEGACY_UNKNOWN`) blockieren ein Upgrade als `UNKNOWN`
+  (kontrollierte Legacy-Übernahme bleibt offen).
+- TOCTOU: Prüfungen vor Apply verhindern keine späteren Änderungen.
 
 ## Security Considerations
 

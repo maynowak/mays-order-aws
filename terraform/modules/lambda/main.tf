@@ -14,11 +14,20 @@ resource "aws_lambda_function" "handler" {
   source_code_hash = filebase64sha256(var.filename)
 
   environment {
-    variables = {
-      ORDERS_TABLE        = var.dynamodb_table_name
-      SQS_QUEUE_URL       = var.queue_url
-      ORDERS_PROJECT_NAME = var.project_name
-    }
+    variables = merge(
+      {
+        ORDERS_TABLE        = var.dynamodb_table_name
+        SQS_QUEUE_URL       = var.queue_url
+        ORDERS_PROJECT_NAME = var.project_name
+      },
+      var.privacy_secret_enabled ? {
+        PRIVACY_SECRET_PROVIDER = "secretsmanager"
+        PRIVACY_SECRET_ID       = var.privacy_secret_id
+      } : {},
+      var.privacy_secret_enabled && trimspace(var.privacy_kms_key_arn) != "" ? {
+        PRIVACY_KMS_KEY_ARN = var.privacy_kms_key_arn
+      } : {},
+    )
   }
 
   tags = merge({ "Project" = var.project_name }, var.tags)

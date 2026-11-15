@@ -41,6 +41,9 @@ def build_plan_variables(context, parsed) -> dict:
     if "project_name" not in var:
         var["project_name"] = context.project_name
 
+    # MO-P0B: Zielversion im State dokumentieren (Output mo_version).
+    var.setdefault("deployment_version", context.deployment_version)
+
     # MO-RC4-P02I-E2B: Recovery-Schedules bleiben fuer den ersten RC4-Plan
     # aus. Die Defaults werden explizit gesetzt (statt sich auf Terraform-
     # Defaults zu verlassen); ein bewusstes --var ...=true gewinnt.
@@ -120,6 +123,27 @@ class InstallerCLI:
             help="Run in dry-run mode (default: False)"
         )
         parser.add_argument(
+            "--allow-dirty-source",
+            action="store_true",
+            default=False,
+            help="Allow remote plans/applies from a dirty tracked working tree "
+                 "(documented in the manifest; default: block)."
+        )
+        parser.add_argument(
+            "--allow-legacy-source",
+            action="store_true",
+            default=False,
+            help="Allow applying an upgrade plan whose installed source version is "
+                 "LEGACY_UNKNOWN (default: block; no version is assumed)."
+        )
+        parser.add_argument(
+            "--accept-upgrade-review",
+            action="store_true",
+            default=False,
+            help="Explicitly accept REVIEW_REQUIRED upgrade changes after manual "
+                 "review (compatibility/classification). Default: block."
+        )
+        parser.add_argument(
             "--notification-email",
             default=None,
             help="Optional email for Cognito backup SNS notifications"
@@ -187,6 +211,26 @@ class InstallerCLI:
             default=False,
             help="Controlled remote plan: uses the configured S3 backend and the "
                  "project workspace, stores a verifiable artifact, never applies."
+        )
+        plan_parser.add_argument(
+            "--upgrade",
+            action="store_true",
+            default=False,
+            help="Explicit upgrade mode: requires an existing remote installation, "
+                 "evaluates version compatibility and writes an upgrade readiness "
+                 "report. Never applies."
+        )
+        plan_parser.add_argument(
+            "--backup-evidence",
+            default=None,
+            help="Path to a P3A order-backup-evidence.json. Required for upgrade "
+                 "plans with a version change; bound into the plan manifest."
+        )
+        plan_parser.add_argument(
+            "--backup-arn",
+            default=None,
+            help="Independently supplied expected DynamoDB backup ARN. Required "
+                 "for upgrade plans and bound into the plan manifest."
         )
         plan_parser.add_argument(
             "--var-file",
@@ -268,6 +312,53 @@ class InstallerCLI:
             "-y",
             action="store_true",
             help="Skip approval prompt (use with caution)"
+        )
+
+        # backup command (P3A: Order-DynamoDB On-Demand-Backup)
+        backup_parser = subparsers.add_parser(
+            "backup",
+            help="Plan or create a verified DynamoDB on-demand backup (P3A)"
+        )
+        backup_parser.add_argument(
+            "--orders",
+            action="store_true",
+            help="Target the Order table (only supported resource)."
+        )
+        backup_parser.add_argument(
+            "--dry-run",
+            dest="backup_dry_run",
+            action="store_true",
+            help="Offline plan only; never creates a backup or calls AWS."
+        )
+        backup_parser.add_argument(
+            "--execute",
+            action="store_true",
+            help="Actually create a backup. Requires ALLOW_AWS_OPERATIONS=true and "
+                 "MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true (not used in P3A development)."
+        )
+        backup_parser.add_argument(
+            "--state-baseline",
+            default=None,
+            help="Verified Terraform state baseline JSON (lineage/serial/fingerprint); "
+                 "required for --execute."
+        )
+        backup_parser.add_argument(
+            "--poll-interval",
+            type=float,
+            default=10.0,
+            help="DescribeBackup poll interval in seconds (default: 10)."
+        )
+        backup_parser.add_argument(
+            "--timeout",
+            type=float,
+            default=900.0,
+            help="Overall polling timeout in seconds (default: 900)."
+        )
+        backup_parser.add_argument(
+            "--max-attempts",
+            type=int,
+            default=90,
+            help="Maximum DescribeBackup attempts (default: 90)."
         )
 
         # state command
@@ -401,6 +492,8 @@ class InstallerCLI:
             return self._cmd_deploy(context, parsed, run_dir)
         elif parsed.command == "destroy":
             return self._cmd_destroy(context, parsed, run_dir)
+        elif parsed.command == "backup":
+            return self._cmd_backup(context, parsed, run_dir)
         elif parsed.command == "state":
             return self._cmd_state(context, parsed, run_dir)
         elif parsed.command == "output":
@@ -546,6 +639,13 @@ class InstallerCLI:
 
         # MO-RC4-P02I-E2B: Controlled Remote Plan (expliziter Modus).
         remote = bool(getattr(parsed, "remote", False))
+        upgrade = bool(getattr(parsed, "upgrade", False))
+        if upgrade and not remote:
+            print(
+                "UPGRADE_REQUIRES_REMOTE: Ein Upgrade benoetigt einen Remote-Plan "
+                "(State-Bezug). Bitte `plan --remote --upgrade` verwenden."
+            )
+            return 1
         backend_contract = None
         if remote:
             from installer.core.plan_contract import (
@@ -611,6 +711,23 @@ class InstallerCLI:
             print(f"Terraform validate failed: {validate_result.stderr}")
             return 1
         print("Terraform validate passed")
+
+        # MO-P0B: Quellcode-Identitaet fuer verbindliche Remote-Plaene.
+        source_identity = None
+        if remote:
+            from installer.core.source_identity import resolve_source_identity
+            from installer.core.version_binding import check_source_for_plan
+
+            source_identity = resolve_source_identity()
+            source_check = check_source_for_plan(
+                source_identity,
+                allow_dirty_source=bool(getattr(parsed, "allow_dirty_source", False)),
+            )
+            if not source_check.ok:
+                print(source_check.message())
+                return 1
+            dirty_note = " (dirty)" if source_identity.dirty else ""
+            print(f"Source: {source_identity.commit[:12]}{dirty_note}")
 
         # H2: Get deployment context for plan identity
         deployment_context = context.get_deployment_context()
@@ -691,6 +808,239 @@ class InstallerCLI:
             run_dir, str(plan_output), "destroy" if parsed.destroy else "deploy"
         )
 
+        # P0A-02: Upgrade-Safety-Gate bereits bei der Planerstellung.
+        # Remote-Plaene werden weiter unten zusammen mit P0B/P0C bewertet;
+        # Destroy-Plaene werden hier nicht bewertet (siehe _verify_destroy_plan).
+        if not parsed.destroy and not remote:
+            if not self._enforce_upgrade_safety(context, Path(saved_plan), run_dir):
+                return 1
+
+        # MO-P0B: installierte Ausgangsversion ermitteln (nur Remote-Plan).
+        installed = None
+        baseline = None
+        drift_assessment = None
+        compatibility = None
+        readiness = None
+        backup_assessment = None
+        backup_required = False
+        if remote:
+            from installer.core.version_binding import UNREADABLE, detect_installed_version
+
+            installed = detect_installed_version(runner)
+            if installed.status == UNREADABLE:
+                print(
+                    "UPGRADE_STATE_UNREADABLE: Der installierte State ist nicht lesbar; "
+                    "eine Neuinstallation darf nicht angenommen werden (fail-closed)."
+                )
+                return 1
+            detail = f" {installed.version}" if installed.version else ""
+            print(f"Installed version: {installed.status}{detail}")
+
+            if upgrade:
+                from installer.core.upgrade_mode import check_upgrade_source
+
+                ok, code, message = check_upgrade_source(installed, remote=remote)
+                if not ok:
+                    print(message)
+                    return 1
+                print("Upgrade mode: existing installation detected")
+
+                # P1B: Versionskompatibilitaet (fail-closed).
+                from installer.core.compatibility import assess_compatibility
+
+                compatibility = assess_compatibility(
+                    installed.version if installed.status == "VERIFIED" else None,
+                    context.deployment_version,
+                    source_status=installed.status,
+                )
+                print(
+                    f"Compatibility: {compatibility.status} "
+                    f"({compatibility.reason})"
+                )
+
+            # MO-P0C: State-Baseline + Drift-/No-op-Bewertung.
+            from installer.core.drift import (
+                DRIFT_UNKNOWN,
+                assess_plan,
+                build_drift_report,
+                write_drift_report,
+            )
+            from installer.core.plan_manifest import sha256_file
+            from installer.core.state_baseline import capture_state_baseline
+            from installer.core.upgrade_safety import (
+                PROTECTED_RESOURCE_TYPES,
+                analyze_plan,
+            )
+
+            baseline = capture_state_baseline(runner)
+            if baseline.status == "UNREADABLE":
+                print(
+                    "UPGRADE_STATE_UNREADABLE: State-Baseline nicht ermittelbar "
+                    "(fail-closed)."
+                )
+                return 1
+
+            # MO-RC4-UPGRADE-RELEASE-GATES-01: P3A-Backup-Evidenz fuer
+            # Upgrade-Plaene mit Versionswechsel verbindlich.
+            from installer.core.backup_gate import (
+                assess_backup_evidence,
+                copy_evidence_to_run_dir,
+                requires_backup,
+            )
+
+            backup_required = bool(
+                requires_backup(
+                    installed.version if installed and installed.status == "VERIFIED" else None,
+                    context.deployment_version,
+                    operation="destroy" if parsed.destroy else "deploy",
+                )
+            )
+            backup_evidence_path = None
+            if backup_required and getattr(parsed, "backup_evidence", None):
+                try:
+                    backup_evidence_path = copy_evidence_to_run_dir(
+                        parsed.backup_evidence, Path(saved_plan).parent
+                    )
+                except OSError as exc:
+                    print(f"Backup evidence copy failed: {exc}")
+                    return 1
+            backup_assessment = assess_backup_evidence(
+                backup_evidence_path,
+                required=backup_required,
+                expected_project=context.project_name,
+                expected_environment=context.environment,
+                expected_account=context.aws_execution_context.account_id,
+                expected_region=context.aws_region,
+                state_lineage=baseline.lineage,
+                state_serial=baseline.serial,
+                state_fingerprint=baseline.fingerprint,
+                state_fingerprint_version=baseline.fingerprint_version,
+                expected_backup_arn=getattr(parsed, "backup_arn", None),
+            )
+            print(
+                f"Backup evidence: {backup_assessment.status} "
+                f"({backup_assessment.message})"
+            )
+
+            plan_json = self._load_plan_json(context, Path(saved_plan))
+            if plan_json is None:
+                return 1
+
+            drift_assessment = assess_plan(
+                plan_json, has_prior_state=(baseline.resources or 0) > 0
+            )
+            safety_assessment = analyze_plan(plan_json)
+
+            # P1C: Change-Klassifikation (SAFE/REVIEW/CRITICAL).
+            from installer.core.change_classification import classify_changes
+
+            classification = classify_changes(
+                safety_findings=[finding.to_dict() for finding in safety_assessment.findings],
+                drift_status=drift_assessment.drift_status,
+                drift_findings=drift_assessment.drift_findings,
+                planned_changes=drift_assessment.planned_changes,
+                noop_status=drift_assessment.noop_status,
+                compatibility_status=(compatibility.status if compatibility else None),
+                protected_types=PROTECTED_RESOURCE_TYPES,
+            )
+
+            blocking_reasons = []
+            if drift_assessment.drift_status == DRIFT_UNKNOWN:
+                blocking_reasons.append(
+                    "UPGRADE_DRIFT_UNVERIFIED: Drift konnte nicht belastbar bewertet "
+                    "werden (kein Refresh-Nachweis)."
+                )
+            protected_drift = [
+                finding
+                for finding in drift_assessment.drift_findings
+                if finding.resource_type in PROTECTED_RESOURCE_TYPES
+                and not getattr(finding, "benign", False)
+            ]
+            if protected_drift:
+                blocking_reasons.append(
+                    "UPGRADE_BLOCKED_MIGRATION_REQUIRED: Drift an geschuetzten "
+                    "Ressourcen: "
+                    + ", ".join(f.address for f in protected_drift)
+                )
+            for finding in safety_assessment.findings:
+                blocking_reasons.append(
+                    f"UPGRADE_BLOCKED_MIGRATION_REQUIRED: {finding.address} "
+                    f"({finding.resource_type}) — {finding.reason}"
+                )
+            if compatibility is not None and compatibility.blocked:
+                blocking_reasons.append(
+                    f"UPGRADE_BLOCKED_COMPATIBILITY: {compatibility.reason}"
+                )
+            if backup_assessment is not None and backup_assessment.blocking:
+                blocking_reasons.append(
+                    f"{backup_assessment.code}: {backup_assessment.message}"
+                )
+
+            report = build_drift_report(
+                drift_assessment,
+                project=context.project_name,
+                environment=context.environment,
+                workspace=context.terraform_workspace,
+                baseline=baseline.to_dict(),
+                source_version=(installed.version if installed else None),
+                target_version=context.deployment_version,
+                git_commit=(source_identity.commit if source_identity else None),
+                critical_changes=[f.to_dict() for f in safety_assessment.findings],
+                blocking_reasons=blocking_reasons,
+            )
+            drift_json, drift_md = write_drift_report(run_dir, report)
+            print(
+                f"Drift: {drift_assessment.drift_status} | "
+                f"No-op: {drift_assessment.noop_status}"
+            )
+
+            # P1D: Upgrade-Readiness-Bericht.
+            from installer.core.upgrade_readiness import (
+                ReadinessInput,
+                build_readiness_report,
+                write_readiness_report,
+            )
+
+            readiness = build_readiness_report(
+                ReadinessInput(
+                    project=context.project_name,
+                    environment=context.environment,
+                    region=context.aws_region,
+                    account_id=getattr(
+                        context.aws_execution_context, "account_id", None
+                    ),
+                    backend=backend_contract.comparison_dict(),
+                    workspace=context.terraform_workspace,
+                    baseline=baseline.to_dict(),
+                    source_version=(installed.version if installed else None),
+                    target_version=context.deployment_version,
+                    git_commit=(source_identity.commit if source_identity else None),
+                    plan_sha256=sha256_file(Path(saved_plan)),
+                    compatibility_status=(compatibility.status if compatibility else None),
+                    compatibility_reason=(compatibility.reason if compatibility else None),
+                    drift_status=drift_assessment.drift_status,
+                    noop_status=drift_assessment.noop_status,
+                    planned_changes=[c.to_dict() for c in drift_assessment.planned_changes],
+                    classification=classification.to_dict(),
+                    blocking_reasons=blocking_reasons,
+                    backup_required=backup_required,
+                    backup_status=(backup_assessment.status if backup_assessment else None),
+                    backup_reason=(backup_assessment.message if backup_assessment else None),
+                    backup_evidence=(backup_assessment.to_dict() if backup_assessment else None),
+                )
+            )
+            readiness_json, readiness_md = write_readiness_report(run_dir, readiness)
+            print(f"Readiness: {readiness['status']}")
+            print(f"Readiness-Bericht: {readiness_json}")
+
+            if blocking_reasons:
+                for reason in blocking_reasons:
+                    print(reason)
+                print(f"Drift-Zusammenfassung: {drift_md}")
+                print(f"Readiness-Zusammenfassung: {readiness_md}")
+                return 1
+            print(f"Drift-Bericht: {drift_json}")
+
         # Save plan metadata alongside plan file
         plan_metadata_path = run_dir / "plans" / f"{plan_file_name}.meta.json"
         plan_metadata_path.write_text(plan_metadata.to_json())
@@ -719,7 +1069,26 @@ class InstallerCLI:
                 workspace=context.terraform_workspace,
                 backend=backend_contract,
                 variables=var,
-                git_commit=plan_metadata.git_commit,
+                git_commit=(source_identity.commit if source_identity else None),
+                source_version=(installed.version if installed and installed.status == "VERIFIED" else None),
+                target_version=context.deployment_version,
+                git_dirty=(source_identity.dirty if source_identity else None),
+                version_status=(installed.status if installed else None),
+                version_source=(installed.source if installed else None),
+                state_baseline=(baseline.to_dict() if baseline else None),
+                drift_status=(drift_assessment.drift_status if drift_assessment else None),
+                noop_status=(drift_assessment.noop_status if drift_assessment else None),
+                compatibility_status=(compatibility.status if compatibility else None),
+                readiness_status=(readiness.get("status") if readiness else None),
+                backup_required=backup_required,
+                backup_evidence=(
+                    backup_assessment.to_manifest()
+                    if backup_assessment is not None and backup_assessment.required
+                    else None
+                ),
+                backup_expected_arn=(
+                    getattr(parsed, "backup_arn", None) if backup_required else None
+                ),
             )
             manifest_path = manifest.write(saved_plan)
             print(f"  Plan manifest: {manifest_path}")
@@ -745,11 +1114,19 @@ class InstallerCLI:
         # Remote-Plan verlangt --out ausdruecklich (siehe _cmd_plan).
         return self._cmd_plan(context, parsed, run_dir)
 
-    def _verify_plan_manifest(self, context, plan_file: Path, operation: PlanOperation) -> bool:
-        """Prueft das Plan-Manifest (falls vorhanden) gegen den aktuellen Kontext.
+    def _verify_plan_manifest(
+        self,
+        context,
+        plan_file: Path,
+        operation: PlanOperation,
+        require_manifest: bool = True,
+        allow_legacy_manifest: bool = False,
+    ) -> bool:
+        """Prueft das Plan-Manifest gegen den aktuellen Kontext.
 
-        Legacy-Plaene ohne Manifest bleiben zulaessig (bestehende Pruefungen
-        greifen weiter), aber Remote-Plaene tragen immer ein Manifest.
+        Deploy verlangt ein Manifest (Schema 2 mit Versionsbindung); Destroy
+        akzeptiert Legacy-Plaene (v1) ohne Versionsbindung, da ein Destroy kein
+        Upgrade ist.
         """
         from installer.core.plan_contract import BackendContractError, load_backend_contract
         from installer.core.plan_manifest import PlanManifest
@@ -761,9 +1138,16 @@ class InstallerCLI:
             return False
 
         if manifest is None:
+            if require_manifest:
+                print(
+                    "UPGRADE_VERSION_BINDING_MISSING: Der Plan hat kein Manifest "
+                    "(keine Versions-/Identitaetsbindung). Bitte mit `plan --remote` "
+                    "neu planen."
+                )
+                return False
             print(
                 "WARNING: Plan has no manifest (legacy artifact); "
-                "falling back to filename/context checks."
+                "destroy continues with filename/context/cleanup checks only."
             )
             return True
 
@@ -781,6 +1165,7 @@ class InstallerCLI:
             workspace=context.terraform_workspace,
             backend=backend,
             operation=operation,
+            allow_legacy_manifest=allow_legacy_manifest,
         )
         if not ok:
             print(f"Plan manifest mismatch: {message}")
@@ -792,6 +1177,276 @@ class InstallerCLI:
             f"sha256={manifest.plan_sha256[:12]}...)"
         )
         return True
+
+    def _load_plan_json(self, context, plan_path: Path):
+        """Liest das Plan-JSON (fail-closed). Gibt None bei Fehlern zurueck."""
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            print(
+                "UPGRADE_PLAN_UNREADABLE: Plan-JSON konnte nicht gelesen werden "
+                f"(fail-closed): {(result.stderr or '').strip()[:400]}"
+            )
+            return None
+        try:
+            return json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            print(f"UPGRADE_PLAN_UNREADABLE: Plan-JSON ungueltig (fail-closed): {exc}")
+            return None
+
+    def _verify_upgrade_readiness(self, context, plan_file: Path, parsed) -> bool:
+        """Prueft die Upgrade-Kompatibilitaet erneut (Readiness ist keine Freigabe)."""
+        from installer.core.compatibility import assess_compatibility
+        from installer.core.plan_manifest import PlanManifest
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_READINESS_INVALID: {exc}")
+            return False
+
+        if manifest is None:
+            print("UPGRADE_READINESS_MISSING: kein Plan-Manifest vorhanden.")
+            return False
+
+        if not manifest.compatibility_status:
+            print("Upgrade readiness: n/a (kein Upgrade-Plan)")
+            return True
+
+        assessment = assess_compatibility(
+            manifest.source_version,
+            context.deployment_version,
+            source_status=(manifest.version_status or "UNVERIFIED"),
+        )
+        if assessment.blocked:
+            print(f"Upgrade readiness: BLOCKED ({assessment.status})")
+            print(assessment.reason)
+            return False
+        if assessment.review_required and not getattr(
+            parsed, "accept_upgrade_review", False
+        ):
+            print(
+                "UPGRADE_REVIEW_APPROVAL_REQUIRED: Upgrade erfordert eine "
+                "ausdrueckliche Freigabe (--accept-upgrade-review) nach manueller "
+                "Pruefung."
+            )
+            print(assessment.reason)
+            return False
+
+        print(f"Upgrade readiness: {assessment.status}")
+        return True
+
+    def _verify_backup_gate(self, context, plan_file: Path) -> bool:
+        """Prueft P3A-Backup-Evidenz bei Upgrade-Plaenen (Manifest-gebunden)."""
+        from installer.core.backup_gate import (
+            BACKUP_VERIFIED,
+            assess_manifest_evidence,
+            requires_backup,
+        )
+        from installer.core.plan_manifest import PlanManifest
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_BACKUP_EVIDENCE_UNREADABLE: {exc}")
+            return False
+        if manifest is None:
+            print("UPGRADE_BACKUP_EVIDENCE_MISSING: kein Plan-Manifest vorhanden.")
+            return False
+        required = bool(manifest.backup_required) or requires_backup(
+            manifest.source_version, manifest.target_version
+        )
+        if not required:
+            print("Upgrade backup gate: n/a (kein Versionswechsel)")
+            return True
+
+        baseline = manifest.state_baseline or {}
+        assessment = assess_manifest_evidence(
+            plan_file,
+            manifest.backup_evidence,
+            expected_project=context.project_name,
+            expected_environment=context.environment,
+            expected_account=context.aws_execution_context.account_id,
+            expected_region=context.aws_region,
+            state_lineage=baseline.get("lineage"),
+            state_serial=baseline.get("serial"),
+            state_fingerprint=baseline.get("fingerprint"),
+            state_fingerprint_version=baseline.get("fingerprintVersion"),
+            expected_backup_arn=manifest.backup_expected_arn,
+        )
+        if assessment.status != BACKUP_VERIFIED:
+            print(
+                f"Upgrade backup gate: BLOCKED ({assessment.status}) "
+                f"{assessment.code}: {assessment.message}"
+            )
+            return False
+        print(f"Upgrade backup gate: {assessment.status} ({assessment.backup_arn})")
+        return True
+
+    def _verify_state_baseline(self, context, plan_file: Path) -> bool:
+        """Vergleicht die im Manifest gebundene State-Baseline mit dem State."""
+        from installer.core.drift import DRIFT_UNKNOWN
+        from installer.core.plan_manifest import PlanManifest
+        from installer.core.state_baseline import (
+            capture_state_baseline,
+            compare_state_baseline,
+        )
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_STATE_BASELINE_MISMATCH: {exc}")
+            return False
+
+        if manifest is None:
+            print(
+                "UPGRADE_STATE_BASELINE_MISSING: kein Plan-Manifest vorhanden "
+                "(plan --remote erforderlich)."
+            )
+            return False
+
+        if manifest.drift_status == DRIFT_UNKNOWN:
+            print(
+                "UPGRADE_DRIFT_UNVERIFIED: Der Plan traegt keinen belastbaren "
+                "Drift-Nachweis; Apply ist blockiert."
+            )
+            return False
+
+        current = capture_state_baseline(self._make_runner(context))
+        ok, code, message = compare_state_baseline(manifest.state_baseline, current)
+        if not ok:
+            print(f"State baseline: BLOCKED ({code})")
+            print(message)
+            return False
+
+        serial = (manifest.state_baseline or {}).get("serial")
+        print(f"State baseline: OK (serial={serial})")
+        return True
+
+    def _verify_version_binding(self, context, plan_file: Path, parsed) -> bool:
+        """Prueft die Versionsbindung eines gespeicherten Plans vor dem Apply.
+
+        Ein gueltiger Plan-Hash legitimiert keine widerspruechlichen
+        Versionsinformationen. Fehlende/unlesbare Informationen blockieren.
+        """
+        from installer.core.plan_manifest import PlanManifest
+        from installer.core.source_identity import resolve_source_identity
+        from installer.core.version_binding import (
+            check_version_binding,
+            detect_installed_version,
+        )
+
+        try:
+            manifest = PlanManifest.load(plan_file)
+        except ValueError as exc:
+            print(f"UPGRADE_VERSION_BINDING_MISMATCH: {exc}")
+            return False
+
+        if manifest is None:
+            print(
+                "UPGRADE_VERSION_BINDING_MISSING: kein Plan-Manifest vorhanden "
+                "(plan --remote erforderlich)."
+            )
+            return False
+
+        runner = self._make_runner(context)
+        installed = detect_installed_version(runner)
+        identity = resolve_source_identity()
+        check = check_version_binding(
+            manifest,
+            current_target_version=context.deployment_version,
+            identity=identity,
+            installed=installed,
+            allow_dirty_source=bool(getattr(parsed, "allow_dirty_source", False)),
+            allow_legacy_source=bool(getattr(parsed, "allow_legacy_source", False)),
+        )
+        if not check.ok:
+            print(f"Upgrade version binding: BLOCKED ({check.code})")
+            print(check.message())
+            return False
+
+        source = manifest.source_version or manifest.version_status
+        print(
+            f"Version binding: OK (target={manifest.target_version}, "
+            f"source={source}, commit={(manifest.git_commit or '')[:12]})"
+        )
+        return True
+
+    def _enforce_upgrade_safety(self, context, plan_path: Path, run_dir: Path) -> bool:
+        """P0A: block delete/replace of protected resources (fail-closed).
+
+        Runs for deploy plans at creation time and again immediately before a
+        saved plan is applied. A valid manifest/SHA-256 alone does not make a
+        plan safe. Explicit destroy plans are handled separately
+        (_verify_destroy_plan) and are not subject to this gate.
+        """
+        from installer.core.upgrade_safety import (
+            STATUS_SAFE,
+            analyze_plan,
+            build_migration_plan,
+            format_block_message,
+            sha256_file,
+            write_migration_plan,
+        )
+
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            print("UPGRADE_BLOCKED_PLAN_UNREADABLE")
+            print(
+                "Plan-JSON konnte nicht gelesen werden (fail-closed): "
+                f"{(result.stderr or '').strip()[:400]}"
+            )
+            return False
+
+        try:
+            plan_json = json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            print("UPGRADE_BLOCKED_PLAN_UNREADABLE")
+            print(f"Plan-JSON ist nicht interpretierbar (fail-closed): {exc}")
+            return False
+
+        assessment = analyze_plan(plan_json, sha256_file(plan_path))
+        if assessment.status == STATUS_SAFE:
+            print("Upgrade safety: PASS (keine geschuetzte Ressource wird geloescht/ersetzt)")
+            return True
+
+        migration_plan = build_migration_plan(
+            assessment,
+            project=context.project_name,
+            environment=context.environment,
+            workspace=context.terraform_workspace,
+        )
+        json_path, md_path = write_migration_plan(run_dir, migration_plan, assessment)
+        print(format_block_message(assessment))
+        print(f"Migrationsplan (JSON): {json_path}")
+        print(f"Migrationsbericht (MD): {md_path}")
+        return False
+
+    def _verify_destroy_plan(self, context, plan_path: Path) -> tuple:
+        """P0A: a destroy command may only apply a genuine destroy plan.
+
+        Prevents using `destroy --plan <deploy-plan>` as a bypass of the
+        upgrade safety gate.
+        """
+        from installer.core.upgrade_safety import is_destroy_plan
+
+        runner = self._make_runner(context)
+        result = runner.show_plan(str(Path(plan_path).resolve()))
+        if not result.success:
+            return False, (
+                "Plan-JSON konnte nicht gelesen werden (fail-closed): "
+                f"{(result.stderr or '').strip()[:400]}"
+            )
+        try:
+            plan_json = json.loads(result.stdout)
+        except (TypeError, ValueError) as exc:
+            return False, f"Plan-JSON ist nicht interpretierbar (fail-closed): {exc}"
+
+        ok, reason = is_destroy_plan(plan_json)
+        if not ok:
+            return False, reason
+        return True, ""
 
     def _cmd_deploy(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Apply a saved deployment plan with H2 deployment identity validation."""
@@ -846,7 +1501,33 @@ class InstallerCLI:
         # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Plan kopiert oder angewendet wird.
-        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY):
+        if not self._verify_plan_manifest(
+            context, plan_file, PlanOperation.DEPLOY, require_manifest=True
+        ):
+            return 1
+
+        # MO-P0B: verbindliche Versionsbindung (Zielversion, Commit, Dirty,
+        # installierte Ausgangsversion) — vor jedem Apply.
+        if not self._verify_version_binding(context, plan_file, parsed):
+            return 1
+
+        # MO-P0C: State-Baseline (Serial/Lineage/Fingerprint) vor dem Apply.
+        if not self._verify_state_baseline(context, plan_file):
+            return 1
+
+        # MO-RC4-UPGRADE-RELEASE-GATES-01: Backup-Evidenz aus dem Manifest
+        # erneut pruefen (Hash, Identitaet, State-Bindung, VERIFIED).
+        if not self._verify_backup_gate(context, plan_file):
+            return 1
+
+        # P1D: Upgrade-Readiness (Kompatibilitaet) erneut pruefen — die
+        # Readiness-Datei ist keine Freigabe.
+        if not self._verify_upgrade_readiness(context, plan_file, parsed):
+            return 1
+
+        # P0A-02: Auch ein gespeicherter Plan mit gueltigem Manifest/SHA-256
+        # muss das Upgrade-Safety-Gate erneut bestehen.
+        if not self._enforce_upgrade_safety(context, plan_file, run_dir):
             return 1
 
         # Validate plan matches deployment identity BEFORE copying
@@ -894,7 +1575,10 @@ class InstallerCLI:
 
         # H2: Verify plan metadata matches deployment context
         plan_discovery = PlanDiscovery()
-        meta = PlanMetadata.parse_filename(plan_file.name)
+        meta = PlanMetadata.parse_filename(
+            plan_file.name,
+            expected_deployment_id=deployment_context.deployment_id,
+        )
         if meta:
             if not meta.matches_deployment(deployment_context.deployment_id):
                 print(f"ERROR: Plan deployment ID mismatch!")
@@ -1106,7 +1790,22 @@ class InstallerCLI:
         # MO-RC4-P02I-E2B: Manifest-basierte Identitaetsbindung pruefen
         # (Account/Projekt/Environment/Region/Workspace/Backend/Checksumme),
         # bevor der Destroy-Plan kopiert oder angewendet wird.
-        if not self._verify_plan_manifest(context, plan_file, PlanOperation.DESTROY):
+        if not self._verify_plan_manifest(
+            context,
+            plan_file,
+            PlanOperation.DESTROY,
+            require_manifest=False,
+            allow_legacy_manifest=True,
+        ):
+            return 1
+
+        # P0A-03: Destroy darf nicht als Bypass fuer das Upgrade-Gate dienen;
+        # es werden ausschliesslich echte Destroy-Plaene angewendet.
+        destroy_ok, destroy_reason = self._verify_destroy_plan(context, plan_file)
+        if not destroy_ok:
+            print("DESTROY_PLAN_REQUIRED")
+            print(destroy_reason)
+            print("Es wurde kein Destroy ausgefuehrt.")
             return 1
 
         # Validate plan matches deployment identity BEFORE copying
@@ -1154,7 +1853,10 @@ class InstallerCLI:
 
         # H2: Verify plan metadata matches deployment context
         plan_discovery = PlanDiscovery()
-        meta = PlanMetadata.parse_filename(plan_file.name)
+        meta = PlanMetadata.parse_filename(
+            plan_file.name,
+            expected_deployment_id=deployment_context.deployment_id,
+        )
         if meta:
             if not meta.matches_deployment(deployment_context.deployment_id):
                 print(f"ERROR: Plan deployment ID mismatch!")
@@ -1355,6 +2057,119 @@ class InstallerCLI:
             print(f"Error: {result.stderr}")
             return 1
         return 0
+    def _cmd_backup(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
+        """P3A: Order-DynamoDB-Backup — dry-run nur lokal, execute doppelt gesperrt."""
+        import json
+        import os
+
+        from installer.core.order_backup import (
+            CODE_EXECUTION_BLOCKED,
+            CODE_STATE_BASELINE_REQUIRED,
+            OVERALL_VERIFIED,
+            OrderBackupError,
+            execute_order_backup,
+            expected_table_identity,
+            plan_order_backup,
+            write_evidence,
+            write_plan,
+        )
+
+        if not getattr(parsed, "orders", False):
+            print("ERROR: backup requires --orders (only the Order table is supported).")
+            return 2
+        if getattr(parsed, "backup_dry_run", False) and getattr(parsed, "execute", False):
+            print("ERROR: --dry-run and --execute are mutually exclusive.")
+            return 2
+
+        baseline = None
+        baseline_path = getattr(parsed, "state_baseline", None)
+        if baseline_path:
+            try:
+                data = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+                baseline = data.get("state_baseline", data)
+                if not isinstance(baseline, dict):
+                    raise ValueError("state baseline is not an object")
+            except (OSError, ValueError) as exc:
+                print(f"ERROR: state baseline unreadable: {exc}")
+                return 2
+
+        if not getattr(parsed, "execute", False):
+            # Default und expliziter Dry-Run: kein Client, kein AWS-Aufruf.
+            try:
+                plan = plan_order_backup(
+                    project=context.project_name,
+                    environment=context.environment,
+                    aws_account=context.aws_account_id,
+                    region=context.aws_region,
+                    state_baseline=baseline,
+                )
+            except OrderBackupError as exc:
+                print(f"BLOCKED [{exc.code}]: {exc.message}")
+                return 1
+            json_path, md_path = write_plan(run_dir, plan)
+            print("Order backup DRY-RUN (no AWS call, identity/PITR UNVERIFIED)")
+            print(f"Table: {plan.table_name}")
+            print(f"Backup name: {plan.backup_name}")
+            print(f"Plan: {json_path}")
+            print(f"Plan (MD): {md_path}")
+            return 0
+
+        if os.environ.get("MAYS_ORDER_BACKUP_ALLOW_EXECUTE", "").lower() != "true":
+            print(
+                "BLOCKED [{}]: set MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true in addition to "
+                "ALLOW_AWS_OPERATIONS=true and explicit human approval.".format(
+                    CODE_EXECUTION_BLOCKED
+                )
+            )
+            return 2
+        if not context.allow_aws_operations:
+            print(
+                "BLOCKED [{}]: set ALLOW_AWS_OPERATIONS=true in addition to "
+                "MAYS_ORDER_BACKUP_ALLOW_EXECUTE=true.".format(CODE_EXECUTION_BLOCKED)
+            )
+            return 2
+        if not baseline or baseline.get("status") != "VERIFIED":
+            print(f"BLOCKED [{CODE_STATE_BASELINE_REQUIRED}]: verified state baseline required.")
+            return 2
+        if not context.validate_aws_context():
+            print("AWS context validation failed. Cannot proceed.")
+            return 1
+        aws_ctx = context.aws_execution_context
+        account_id = aws_ctx.account_id if aws_ctx else context.aws_account_id
+
+        try:
+            expected = expected_table_identity(
+                project=context.project_name,
+                environment=context.environment,
+                aws_account=account_id,
+                region=context.aws_region,
+                state_baseline=baseline,
+            )
+            import boto3  # lazy: dry-run and tests never need it
+            session = boto3.Session(profile_name=context.aws_profile or None)
+            client = session.client("dynamodb", region_name=context.aws_region)
+            evidence = execute_order_backup(
+                client,
+                expected,
+                poll_interval=parsed.poll_interval,
+                timeout_seconds=parsed.timeout,
+                max_attempts=parsed.max_attempts,
+            )
+            json_path, md_path = write_evidence(run_dir, evidence)
+        except OrderBackupError as exc:
+            print(f"BLOCKED [{exc.code}]: {exc.message}")
+            return 1
+        except Exception as exc:  # noqa: BLE001 - keine Rohantwort ausgeben
+            print(f"BLOCKED [ORDER_BACKUP_UNEXPECTED]: {type(exc).__name__}")
+            return 1
+
+        print(f"Backup status: {evidence.backup_status}")
+        print(f"PITR status: {evidence.pitr_status}")
+        print(f"Overall: {evidence.overall_status}")
+        print(f"Evidence: {json_path}")
+        print(f"Evidence (MD): {md_path}")
+        return 0 if evidence.overall_status == OVERALL_VERIFIED else 1
+
     def _cmd_identity(self, context: "InstallationContext", parsed, run_dir: Path) -> int:
         """Show AWS identity information."""
         # Validate AWS context first

@@ -27,7 +27,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from installer.core.deployment_identity import DeploymentId, PlanOperation
 
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 MANIFEST_SUFFIX = ".manifest.json"
 
 # Nur diese (nicht-geheimen) Variablen werden gebunden/gespeichert.
@@ -62,6 +62,25 @@ class PlanManifest:
     plan_size: int
     variables: Dict[str, str] = field(default_factory=dict)
     git_commit: Optional[str] = None
+    # MO-P0B: Versionsbindung (Manifest-Schema 2). Aeltere Manifeste (v1)
+    # bleiben lesbar, gelten aber nicht als upgrade-fähig (siehe CLI-Gate).
+    source_version: Optional[str] = None
+    target_version: Optional[str] = None
+    git_dirty: Optional[bool] = None
+    version_status: Optional[str] = None
+    version_source: Optional[str] = None
+    # MO-P0C: State-Baseline und Drift-/No-op-Klassifikation (v2-kompatibel,
+    # optionale Felder; Apply verlangt die Baseline explizit).
+    state_baseline: Optional[Dict[str, Any]] = None
+    drift_status: Optional[str] = None
+    noop_status: Optional[str] = None
+    compatibility_status: Optional[str] = None
+    readiness_status: Optional[str] = None
+    # MO-RC4-UPGRADE-RELEASE-GATES-01: P3A-Backup-Evidenz (optional; nur fuer
+    # Upgrade-Plaene verbindlich). Enthaelt Metadaten, keine Evidenz-Inhalte.
+    backup_required: Optional[bool] = None
+    backup_evidence: Optional[Dict[str, Any]] = None
+    backup_expected_arn: Optional[str] = None
     created_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -80,6 +99,19 @@ class PlanManifest:
         backend: Any,
         variables: Optional[Dict[str, str]] = None,
         git_commit: Optional[str] = None,
+        source_version: Optional[str] = None,
+        target_version: Optional[str] = None,
+        git_dirty: Optional[bool] = None,
+        version_status: Optional[str] = None,
+        version_source: Optional[str] = None,
+        state_baseline: Optional[Dict[str, Any]] = None,
+        drift_status: Optional[str] = None,
+        noop_status: Optional[str] = None,
+        compatibility_status: Optional[str] = None,
+        readiness_status: Optional[str] = None,
+        backup_required: Optional[bool] = None,
+        backup_evidence: Optional[Dict[str, Any]] = None,
+        backup_expected_arn: Optional[str] = None,
     ) -> "PlanManifest":
         plan = Path(plan_path)
         safe_vars = {
@@ -100,6 +132,19 @@ class PlanManifest:
             plan_size=plan.stat().st_size,
             variables=safe_vars,
             git_commit=git_commit,
+            source_version=source_version,
+            target_version=target_version,
+            git_dirty=git_dirty,
+            version_status=version_status,
+            version_source=version_source,
+            state_baseline=state_baseline,
+            drift_status=drift_status,
+            noop_status=noop_status,
+            compatibility_status=compatibility_status,
+            readiness_status=readiness_status,
+            backup_required=backup_required,
+            backup_evidence=backup_evidence,
+            backup_expected_arn=backup_expected_arn,
         )
 
     # -- Persistenz --------------------------------------------------------
@@ -131,6 +176,21 @@ class PlanManifest:
             plan_size=int(data.get("plan_size", 0)),
             variables=dict(data.get("variables") or {}),
             git_commit=data.get("git_commit"),
+            source_version=data.get("sourceVersion", data.get("source_version")),
+            target_version=data.get("targetVersion", data.get("target_version")),
+            git_dirty=data.get("gitDirty", data.get("git_dirty")),
+            version_status=data.get("versionStatus", data.get("version_status")),
+            version_source=data.get("versionSource", data.get("version_source")),
+            state_baseline=data.get("stateBaseline", data.get("state_baseline")),
+            drift_status=data.get("driftStatus", data.get("drift_status")),
+            noop_status=data.get("noopStatus", data.get("noop_status")),
+            compatibility_status=data.get("compatibilityStatus", data.get("compatibility_status")),
+            readiness_status=data.get("readinessStatus", data.get("readiness_status")),
+            backup_required=data.get("backupRequired", data.get("backup_required")),
+            backup_evidence=data.get("backupEvidence", data.get("backup_evidence")),
+            backup_expected_arn=data.get(
+                "backupExpectedArn", data.get("backup_expected_arn")
+            ),
             created_at=data.get("created_at", ""),
             manifest_version=int(data.get("manifest_version", MANIFEST_VERSION)),
         )
@@ -155,15 +215,21 @@ class PlanManifest:
         workspace: str,
         backend: Any,
         operation: PlanOperation,
+        allow_legacy_manifest: bool = False,
     ) -> Tuple[bool, str]:
-        """Prueft Manifest gegen Plan-Datei und aktuellen Kontext."""
+        """Prueft Manifest gegen Plan-Datei und aktuellen Kontext.
+
+        ``allow_legacy_manifest`` ist ausschliesslich fuer den Destroy-Pfad
+        gedacht (kein Upgrade); Deploy verlangt Schema-Version 2.
+        """
         plan = Path(plan_path)
 
         if self.manifest_version != MANIFEST_VERSION:
-            return False, (
-                f"Manifest-Version {self.manifest_version} wird nicht unterstuetzt "
-                f"(erwartet {MANIFEST_VERSION})."
-            )
+            if not (allow_legacy_manifest and self.manifest_version == 1):
+                return False, (
+                    f"Manifest-Version {self.manifest_version} wird nicht unterstuetzt "
+                    f"(erwartet {MANIFEST_VERSION})."
+                )
         if not plan.exists():
             return False, f"Plan-Datei fehlt: {plan}"
         if plan.name != self.plan_file:

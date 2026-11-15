@@ -4,41 +4,97 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-02)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-14)
 
 ```text
 May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-Release Candidate — v0.5.0-rc.3 (MO-Modul-Integration + RIS) — GO fuer RC
+RC4 v0.6.0-rc.1 — GitHub release package published; main merge prepared
 
 Current Feature:
-MO-RC3 — Module Builder & RIS-Integration (Release-Vorbereitung)
+MO-RC4-RELEASE-01 — RC4 release docs, annotated tag and branch publication
 
 Current Task:
-MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 — abgeschlossen: Verify PASS, E2E 9/9 PASS, Destroy 58/58,
-RC4-State (inkl. Versionen) entfernt; Main-Integration BLOCKED (Auto-Apply-Pipeline `directAWSGit`)
+MO-RC4-RELEASE-01 — Q-12 APPROVED v0.6.0-rc.1; tag/branch publication;
+main merge prepared, not executed
 
-Hinweis Release Candidate:
-v0.5.0-rc.3 ist RC-faehig. RIS-AWS-E2E (RIS-MO-RC-01, 2026-10-30) hat auf Builder-Pin
-1dbb0cb den vollen Lifecycle bestanden (Plan 169 add, Apply, No-Op, 7 Live-Tests inkl.
-SQS->Worker->DDB PENDING->CONFIRMED, Destroy, CLEAN; Account 262370457690).
-Delta zu 8b61922: nur Whitespace in terraform/main.tf plus Docs (git diff -w leer).
-Vorgaenger v0.5.0-rc.2 -> 5bdde18 unveraendert. Tag/GitHub-Release nur noch menschlich.
-Produktion Privacy bleibt BLOCKED bis Secret-Management implementiert ist.
+Hinweis Release:
+v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
+bleibt 0.2.0; Installer und Module Builder bleiben 0.1.0. Der AWS-Development-
+Lifecycle (58 create, Live-E2E, 58 destroy, State 0) ist verifiziert. Produktion,
+P00-G Retention und produktive Secret-/KMS-Aktivierung bleiben BLOCKED.
+Historisch: letzter tatsaechlicher Tag ist v0.5.0-rc.2; v0.5.0-rc.3 wurde nie
+getaggt.
 
-RC.3 Status:
+RC.3 Status (historisch):
 [x] P00 Git-Baseline, P01 Merge-Readiness, P02 Merge nach main
 [x] P03 Release-Baseline / Builder-Inventar / Gate-Matrix
 [x] P04 Builder-Verifikation (90/90 Builder, 76/76 Lambda, 81/81 Installer, validate PASS)
 [x] P05/P06 RIS-Evidence: F-03 RESOLVED, IAM-Portabilitaet im Fremdkonto belegt
 [x] P07/P08 Packaging: Dossier (MD+PDF, 5 S. A4), Release Notes, Changelog, Gate-Report
-[ ] Tag v0.5.0-rc.3 + GitHub-Release: wartet auf menschliche Freigabe (P09)
+[!] v0.5.0-rc.3: Dokumentationsstand, kein Git-Tag
 [!] Produktionsfreigabe: BLOCKED (Privacy/Secret-Management; F-01 als Betriebsfrage)
 
+RC4 v0.6.0-rc.1 Status:
+[x] Q-12 Release-Label APPROVED
+[x] AWS-Development-Lifecycle: 58 create, Live-E2E, 58 destroy, State 0
+[x] Lokale Regression: Lambda 440 / Installer 674+1 Skip / Builder 129 /
+    Policy 23 / E2E 36 (5 Skip) / Seed 28
+[x] Release-Dokumentation aktualisiert
+[x] Annotierter Tag v0.6.0-rc.1 auf Release-Commit 5bc154e
+[x] Release-Branch und Tag veröffentlicht
+[ ] Main-Merge: separat freizugeben; Vorprüfung clean
+
 Current Checkpoint:
-feature/mo-rc4-kms-privacy-retention (RC4-Entwicklungsbranch, Basis 086a8be; P00 dokumentiert, keine Implementierung)
+release/rc4-integration @ MO-RC4-RELEASE-01
+→ Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
+→ GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF
+  (`MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`) veröffentlicht
+→ Main-Merge-Vorprüfung: main f597d14, 192 Commits voraus, 0 dahinter,
+  merge-tree ohne Konflikte; kein Main-Merge
+→ AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
+  Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
+→ Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean
+  project worktrees + 5 /tmp worktrees + 1 non-Git snapshot; RC4 HEAD 720e458
+  reachable via release/rc4-integration
+→ MO-GIT-CONSOLIDATION-02: 18 worktrees regular entfernt (kein --force);
+  nur Mays-Orders-AWS + Mays-Orders-AWS-rc4-integration verbleiben; Branches/Tags
+  unverändert; RC4 720e458 erreichbar
+→ MO-RC4-PUBLISH-01: release/rc4-integration nach exakter Zählung von 99
+  Commits gepusht; Upstream gesetzt, Remote-Tip e73cd8a; main unverändert
+→ P00-B merge e71f3ed; P00-C e743170 + 442d296; P00-D 3d32738 + 21ff5d3
+→ P00-E merge 3b0de2f (parents 2dbbd3f + 44c3900); feature a6667ec + 44c3900
+→ P00-F rotation/revocation: dad5b16
+→ Installer stabilization: 7a72c46 + 85ef5fb
+→ Builder/P00-H: cc6ab71; Lambda artifact ed17c12
+→ Final merge: 0620044 (parents 51df736 + 85ef5fb)
+→ P00-D Review-05 docs: c0d8d719
+→ Q-11 P00-D contract APPROVED; APP_MANAGED HMAC foundation integrated,
+  default-off; production key transport/P00-F rotation open
+→ P00-D tests: 429 Lambda / 667 Installer + 1 live deferred + 1 harness failure /
+  128 Builder / 32 E2E; ZIP b70e5c94…
+→ P00-E-SIMPLE-01: `feature/mo-rc4-p00-e-simple` @ a6667ec; minimal
+  AWS_MANAGED Secret-Container, count-gated IAM/Lambda, optional externer CMK;
+  default-off; kein Secret-Wert, kein KMS-Key, kein Plan/Apply
+→ P00-E-INTEGRATION-02: merge 3b0de2f; lokal integriert, Verifikation
+  INCOMPLETE (2 bekannte Installer-Harness-Failures + 1 Live-Test deferred;
+  erster Full-Lauf inkludierte den Live-Test einmal read-only/STS — Deviation)
+→ P00-E Post-Merge: 429 Lambda / 128 Builder / 23 Policy-Gate / 36 E2E
+  (5 skipped) / 28 Seed / terraform fmt+init+validate PASS; kein Plan/Apply
+→ MO-RC4-FINAL-01: 440 Lambda / 674 Installer (1 skipped) / 129 Builder /
+  23 Policy / 36 E2E (5 skipped) / 28 Seed / Terraform validate PASS
+→ AWS Post-Deploy: 4/4 Live-E2E PASS; 36 E2E gesamt OK (1 Privacy-Live-Skip);
+  Testbenutzer angelegt/getestet/gelöscht; 58 Ressourcen destroyed; State 0
+→ Lambda ZIP 46.929 B, SHA-256 20f4bab5…; zwei Builds byte-identisch
+→ P00-F: APP_MANAGED Rotation/Revocation default-off lokal implementiert;
+  P00-G: Retention/TTL wegen Q-05/Q-06/Q-07/Q-14 sicher deaktiviert
+→ P00-C-M01/F-01/F-03: verified fixed; F-09 integriert; F-02/F-04/F-05/F-06/
+  F-08/F-10/F-11 offen
+→ Eine AWS_MANAGED/APP_MANAGED-Produktionsaktivierung ist nicht freigegeben
+→ DDB/SQS-CMK, Secret-Value-Provisionierung, Terraform Plan/Apply und
+  AWS-Live-Verifikation offen
 → Verlauf: feature/lambda-python-cleanup (T011-04-CLEANUP) → Recovery T011-06 → T011-07 Review → Seed T011-10 → Monitoring T011-11
 → P02I-E1B: Cognito-Backup-Bucket projektgebunden benannt (Default-Name unverändert), Workspace fail-closed,
   Destroy-Plan mit Projektkontext, Backup-IAM nutzt Bucket-ARN statt Namensrekonstruktion

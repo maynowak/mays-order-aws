@@ -49,6 +49,7 @@
       "aws_s3_bucket_public_access_block",
       "aws_s3_bucket_server_side_encryption_configuration",
       "aws_s3_bucket_versioning",
+      "aws_secretsmanager_secret",
       "aws_scheduler_schedule",
       "aws_sns_topic",
       "aws_sns_topic_policy",

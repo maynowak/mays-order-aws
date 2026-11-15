@@ -120,3 +120,17 @@ output "sqs_worker_lambda_arn" {
   description = "ARN der Orders-Worker-Lambda (SQS-Consumer)."
   value       = module.sqs_worker.function_arn
 }
+
+# MO-P0B: Versionskennung im State (nur fuer neue Apply-Laeufe; bestehende
+# Staende erhalten den Output beim naechsten Apply). Kein unabhaengiger
+# Nachweis des tatsaechlich laufenden Codes — dokumentierte Grenze.
+output "mo_version" {
+  description = "Dokumentierte MO-Version dieser Bereitstellung (deployment_version)."
+  value       = var.deployment_version
+}
+
+# P00-E: ARN only; the secret value is never managed by Terraform.
+output "privacy_secret_arn" {
+  description = "ARN of the optional privacy secret container (null when disabled)."
+  value       = try(module.privacy_secret[0].arn, null)
+}

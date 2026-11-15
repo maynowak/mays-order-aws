@@ -77,6 +77,38 @@ def _check_policy_document_actions(address: str, policy_doc: Any, errors: list[s
                 )
 
 
+def _check_sensitive_policy_resources(address: str, policy_doc: Any, errors: list[str]) -> None:
+    """Reject sensitive Secrets/KMS actions with wildcard resources.
+
+    Existing Logs wildcards are intentionally outside this narrow Q-09 check.
+    """
+    if not isinstance(policy_doc, str):
+        return
+    try:
+        doc = json.loads(policy_doc)
+    except (TypeError, ValueError):
+        return
+    for statement in doc.get("Statement") or []:
+        if not isinstance(statement, dict):
+            continue
+        action = statement.get("Action")
+        actions = action if isinstance(action, list) else [action]
+        sensitive = any(
+            isinstance(entry, str)
+            and (entry.startswith("secretsmanager:") or entry.startswith("kms:"))
+            for entry in actions
+        )
+        if not sensitive:
+            continue
+        resource = statement.get("Resource")
+        resources = resource if isinstance(resource, list) else [resource]
+        for entry in resources:
+            if entry == "*" or (isinstance(entry, str) and entry.endswith("*")):
+                errors.append(
+                    f"{address}: Secrets Manager/KMS actions must not use wildcard resources."
+                )
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as handle:
@@ -295,6 +327,17 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
                     f"{address}: IAM policy name '{name}' is outside the project namespace '{project}-*'."
                 )
             _check_policy_document_actions(address, resource.get("policy"), errors)
+            _check_sensitive_policy_resources(address, resource.get("policy"), errors)
+
+        elif resource_type == "aws_iam_role_policy":
+            role = resource.get("role")
+            if isinstance(role, str) and not role.startswith(f"{project}-"):
+                errors.append(
+                    f"{address}: inline IAM policy targets role '{role}' outside the "
+                    f"project namespace '{project}-*'."
+                )
+            _check_policy_document_actions(address, resource.get("policy"), errors)
+            _check_sensitive_policy_resources(address, resource.get("policy"), errors)
 
         elif resource_type == "aws_iam_role_policy_attachment":
             role = resource.get("role")
@@ -302,6 +345,23 @@ def check(plan: dict[str, Any], policy: dict[str, Any]) -> list[str]:
                 errors.append(
                     f"{address}: IAM role policy attachment targets role '{role}' outside the "
                     f"project namespace '{project}-*'."
+                )
+
+        elif resource_type == "aws_secretsmanager_secret":
+            name = resource.get("name")
+            if isinstance(name, str) and not name.startswith(f"{project}-"):
+                errors.append(
+                    f"{address}: Secrets Manager secret name '{name}' is outside the "
+                    f"project namespace '{project}-*'."
+                )
+            kms_key_id = resource.get("kms_key_id")
+            if (
+                isinstance(kms_key_id, str)
+                and kms_key_id
+                and ("*" in kms_key_id or not kms_key_id.startswith("arn:aws:kms:"))
+            ):
+                errors.append(
+                    f"{address}: Secrets Manager secret KMS key must be an exact key ARN."
                 )
 
         elif resource_type == "aws_sns_topic":

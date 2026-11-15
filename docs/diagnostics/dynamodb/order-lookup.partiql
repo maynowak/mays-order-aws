@@ -1,0 +1,18 @@
+-- Order per vollstaendigem Schluessel nachschlagen (Punktzugriff, kein Scan).
+-- Platzhalter <ORDER_PK> ersetzen, z. B. 'ord_ord_0123456789abcdef01234567'.
+-- Der Sort Key ist bei Orders konstant '#ORDER'.
+SELECT "pk", "sk", "orderId", "status", "orderType", "currency", "totalAmount",
+       "createdAt", "updatedAt", "version"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Existenzpruefung: minimal projizieren, keine PII.
+SELECT "pk", "sk"
+FROM "<TABLE_NAME>"
+WHERE "pk" = '<ORDER_PK>'
+  AND "sk" = '#ORDER';
+
+-- Hinweis: Die Order-ID allein ist kein Partition Key. Das implementierte
+-- Muster lautet pk = 'ord_' + orderId (orderId = 'ord_' + 24 Hex-Zeichen).
+-- Erst pk bilden, dann diese Abfrage ausfuehren; kein Scan als Standard.

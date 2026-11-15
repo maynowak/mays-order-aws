@@ -208,19 +208,36 @@ class TestApplyPathBinding(ManifestTestCase):
 
     def test_deploy_verifies_deploy_operation_only(self):
         source = inspect.getsource(InstallerCLI._cmd_deploy)
-        self.assertIn("_verify_plan_manifest(context, plan_file, PlanOperation.DEPLOY)", source)
+        self.assertIn("PlanOperation.DEPLOY", source)
+        self.assertIn("require_manifest=True", source)
         self.assertNotIn("PlanOperation.DESTROY", source)
 
     def test_destroy_verifies_destroy_operation_only(self):
         source = inspect.getsource(InstallerCLI._cmd_destroy)
-        self.assertIn("_verify_plan_manifest(context, plan_file, PlanOperation.DESTROY)", source)
+        self.assertIn("PlanOperation.DESTROY", source)
+        self.assertIn("allow_legacy_manifest=True", source)
         self.assertNotIn("PlanOperation.DEPLOY", source)
 
-    def test_legacy_plan_without_manifest_is_allowed(self):
+    def test_legacy_plan_without_manifest_blocked_for_deploy(self):
+        """P0B: Deploy ohne Manifest ist nicht upgrade-fähig (blockiert)."""
+        manifest_path_for(self.plan).unlink()
+        cli = InstallerCLI()
+        self.assertFalse(
+            cli._verify_plan_manifest(self._context(), self.plan, PlanOperation.DEPLOY)
+        )
+
+    def test_destroy_allows_manifest_less_plan(self):
+        """Destroy ist kein Upgrade und bleibt für Legacy-Plaene nutzbar."""
         manifest_path_for(self.plan).unlink()
         cli = InstallerCLI()
         self.assertTrue(
-            cli._verify_plan_manifest(self._context(), self.plan, PlanOperation.DEPLOY)
+            cli._verify_plan_manifest(
+                self._context(),
+                self.plan,
+                PlanOperation.DESTROY,
+                require_manifest=False,
+                allow_legacy_manifest=True,
+            )
         )
 
 

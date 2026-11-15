@@ -652,7 +652,13 @@ def build(
         ).stdout.strip()
     except Exception:
         commit = "unknown"
+    file_hashes = {
+        str(Path(path).relative_to(target_dir)): _sha256(Path(path))
+        for path in written
+        if Path(path).is_file()
+    }
     manifest = {
+        "manifest_version": 2,
         "builder_version": __version__,
         "preset": preset_name if selection is None else "custom",
         "modules": sorted(selection) if selection is not None else sorted_module_catalog(),
@@ -661,6 +667,7 @@ def build(
         "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
         "artifacts_sha256": artifact_hashes,
         "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
+        "files": dict(sorted(file_hashes.items())),
         "notes": {
             "backend": "not included — configure your own remote backend",
             "privacy_production_activation": "BLOCKED (secret management missing)",

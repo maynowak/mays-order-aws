@@ -2,7 +2,7 @@
 
 The 'complete' preset mirrors the full existing Mays-Orders-Stack:
 
-    terraform root wiring (main/variables/outputs) + 11 child modules
+    terraform root wiring (main/variables/outputs) + 12 child modules
     + Lambda artifacts (order handler zip, cognito backup zip)
     + Lambda source + build script (artifact reproducibility)
     + seed tooling (scripts/seed_orders.py + seed files, opt-in via variable)
@@ -32,6 +32,7 @@ COMPLETE_MODULES: List[str] = [
     "cognito_backup",
     "cognito_backup_automation",
     "dynamodb",
+    "privacy_secret",
     "iam",
     "lambda",
     "monitoring",

@@ -340,3 +340,619 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-DEV-APPLY-03 → RC4-Development-Apply: 58/58 Ressourcen, Policy Gate PASS, E2E 9/9 PASS (Cognito/API/DDB/Worker/DLQ/Observability/Backup-Config), Testdaten bereinigt
 - MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01 → docs/reports/MO-RC4-DEV-INSTALL-LIFECYCLE-TEST-01-EXECUTION_LOG.md (Verify PASS, Apply 58, Destroy 58, RC4-State inkl. Versionen entfernt, Shared Backend + RIS unverändert)
 - MO-RC4-MAIN-INTEGRATION-01 → BLOCKED: `directAWSGit-Mays-Order-AWS` triggert bei Push auf `main` `terraform apply -auto-approve` ohne Approval; Push/Merge bis Pipeline-Sicherheitsgate nicht durchgeführt
+- MO-INSTALLER-UPGRADE-SAFETY-P0A-01 → docs/reports/MO-INSTALLER-UPGRADE-SAFETY-P0A-01.md (aktionsbasierte DELETE/REPLACE-Blockade für DynamoDB/S3/Cognito/SQS, Gate bei Plan und Apply, Destroy-Guard, Migrationsplan; 315 Tests)
+- MO-INSTALLER-UPGRADE-VERSIONING-P0B-01 → docs/reports/MO-INSTALLER-UPGRADE-VERSIONING-P0B-01.md (Git-Commit-/Dirty-Bindung, Manifest v2 mit source/targetVersion, installierte Version via `mo_version`-Output, Legacy-Erkennung, Apply-Gate; 347 Tests)
+- MO-BUILDER-INSTALLER-UPGRADE-MIGRATION-PLAN → docs/reports/MO-BUILDER-INSTALLER-UPGRADE-MIGRATION-PLAN.md (10-Phasen-Fahrplan, Status je Phase; keine AWS-Autorisierung)
+- MO-INSTALLER-UPGRADE-DRIFT-SAFETY-P0C-01 → docs/reports/MO-INSTALLER-UPGRADE-DRIFT-SAFETY-P0C-01.md (State-Baseline mit Serial/Lineage/Fingerprint, Drift-Erkennung aus `resource_drift`, No-op-Klassifikation, Baseline-Gate vor Apply, `upgrade-drift-report.json/.md`; 377 Tests)
+- MO-INSTALLER-UPGRADE-ORCHESTRATION-P1-01 → docs/reports/MO-INSTALLER-UPGRADE-ORCHESTRATION-P1-01.md (expliziter `plan --remote --upgrade`, Versionskompatibilität, SAFE/REVIEW/CRITICAL, `upgrade-readiness.json/.md`, Review-Gate; 422 Tests)
+- MO-BUILDER-UPGRADE-P2-01 → docs/reports/MO-BUILDER-UPGRADE-P2-01.md (Builder-Manifest Schema 2 mit Datei-Fingerprints, Projektstatus/Datei-Diff, Konfigurationserhalt, `upgrade --dry-run|--apply`, Konflikt-/Pfadschutz; 35 neue Builder-Tests, Builder 128 PASS)
+- MO-ORDER-DATA-MIGRATION-P3-PLANNING-01 → docs/reports/MO-ORDER-DATA-MIGRATION-P3-PLANNING-01.md (P3-Architektur: DynamoDB-Backup/Restore, Migration/Cutover, PartiQL-Diagnose, DSGVO/Erasure-Ledger, P0A–P2-Integration; reine Planung)
+- MO-ORDER-PARTIQL-DIAGNOSTICS-P3D-01 → docs/reports/MO-ORDER-PARTIQL-DIAGNOSTICS-P3D-01.md (read-only PartiQL-Diagnosepaket unter docs/diagnostics/dynamodb/, Schema-Referenz mit ORDER#/-Konflikt, GSI3 KEYS_ONLY, IAM-/DSGVO-Grenzen, 15 statische Tests; keine AWS-Ausführung)
+- MO-ORDER-BACKUP-ORCHESTRATION-P3A-01 → docs/reports/MO-ORDER-BACKUP-ORCHESTRATION-P3A-01.md (Order-Backup-Kern mit Tabellenidentität gegen Deployment-Kontext, AVAILABLE-only-Polling, PITR-Laufzeitprüfung, Evidenzvertrag, Dry-Run/doppelt gesperrte CLI; 53 Fake-Client-Tests, Installer 490 PASS; kein AWS-Aufruf)
+- MO-ORDER-ERASURE-LEDGER-P3E-01 → docs/reports/MO-ORDER-ERASURE-LEDGER-P3E-01.md (lokales OrderErasureLedgerV1 mit HMAC-Pseudonymisierung, Integritäts-/Vollständigkeitsprüfung, fail-closed Restore-Reconciliation-Planer und Privacy-Gates; 49 Tests, Installer 539 PASS; keine Persistenz/Restore/Datenänderung)
+- MO-ORDER-LEDGER-PERSISTENCE-P3E-02 → docs/reports/MO-ORDER-LEDGER-PERSISTENCE-P3E-02.md (RC4-Scope-Gate POST_RC4: keine Ledger-Persistenz, keine AWS-Ressource; Erasure-Konsistenz/Transaktionsanalyse; Restore/Cutover bleiben gesperrt) + docs/reports/MO-RC4-READINESS-PRECHECK-01.md (lokal 539/128/326 PASS, RC4 CONDITIONAL, kein realer AWS-Backup-/Upgrade-Nachweis)
+- MO-RC4-UPGRADE-RELEASE-GATES-01 → docs/reports/MO-RC4-UPGRADE-RELEASE-GATES-01.md (P3A-Backup-Evidenz in Readiness/Manifest/Apply gebunden, Hash-/Identitaets-/State-Pruefung, exakte Minor-Matrix 0.1.0→0.2.0; 42 neue Tests, Installer 582 PASS, Builder 128, Lambda 326; kein AWS/Apply/Push)
+- MO-RC4-AWS-UPGRADE-PLAN-02 → docs/reports/MO-RC4-AWS-UPGRADE-PLAN-02.md (RC4 2e09e72 gegen RC3 0.1.0; Plan 2 create/7 update/0 delete/0 replace/1 read, GSI3 additiv; Backup-Evidence VERIFIED/SHA 9475284f…; P0C BLOCKED durch Drift aws_s3_bucket.trail + cognito_user_pool.users; State 4/lineage 45f61e6a…/fingerprint cbb81a…; kein Manifest/Apply)
+- MO-RC4-P0C-DRIFT-FORENSIC-01 → docs/reports/MO-RC4-P0C-DRIFT-FORENSIC-01.md (S3-Policy-Drift = computed/state representation, AWS=State-Policy 2a6c5525…; Cognito null→[] Provider-Normalisierung, Plan no-op; State-Fingerprint instabil durch check_results-Reihenfolge, 3 Pulls verschiedene Hashes bei identischem State; P0C zu streng, Backup-Gate ohne Fingerprint; keine AWS-/State-Mutation)
+- MO-RC4-P0C-DRIFT-FIX-01 → docs/reports/MO-RC4-P0C-DRIFT-FIX-01.md (S3 computed-policy + Cognito null/[] nur bei no-op als benigne; kanonischer State-Fingerprint canonical-sha256-v1; Backup-Gate verlangt Fingerprint+Version, Legacy-Evidence fail-closed; 22 neue Tests, Installer 604/Builder 128/Lambda 326 PASS; keine AWS-/State-Mutation)
+- MO-RC4-P3A-EVIDENCE-REBIND-01 → docs/reports/MO-RC4-P3A-EVIDENCE-REBIND-01.md (bestehendes Backup ARN 017937… erneut AWS-verifiziert AVAILABLE/PITR; kanonischer Fingerprint 670bc917…/canonical-sha256-v1; neue Evidence 4e2129ff… als EXISTING_BACKUP_REVALIDATION; Gate VERIFIED, Legacy INVALID; negatives Backup-ARN-Gate passiert fälschlich → CONTRACT DECISION REQUIRED; kein neues Backup/keine AWS-Mutation)
+- MO-RC4-P3A-BACKUP-ARN-GATE-FIX-01 → docs/reports/MO-RC4-P3A-BACKUP-ARN-GATE-FIX-01.md (strukturelle + explizite Backup-ARN-Bindung via --backup-arn/backupExpectedArn; evidenceKind CREATED/EXISTING_BACKUP_REVALIDATION; falsche ARN jetzt BLOCKED; Revalidierungs-Evidence 4e2129ff… VERIFIED, Legacy BLOCKED; Installer 610/Builder 128/Lambda 326 PASS; keine AWS-Mutation)
+- MO-RC4-AWS-TEST-UPGRADE-PLAN-03 → docs/reports/MO-RC4-AWS-TEST-UPGRADE-PLAN-03.md (RC4 0.1.0→0.2.0 realer Testplan: 2 create/7 update/0 delete/0 replace/1 read; GSI3 additiv; P0A PASS, P0C benigne Drift, P1 REVIEW_REQUIRED, P3A VERIFIED; Plan 8fe8facf…, Manifest 64371e6d…, Code ffbebe9; kein Apply/Backup/AWS-Mutation)
+- MO-RC4-AWS-TEST-UPGRADE-APPLY-04 → docs/reports/MO-RC4-AWS-TEST-UPGRADE-APPLY-04.md (Pre-Op VERIFIED, kein Apply: Plan 8fe8facf…, Manifest 64371e6d…, 2 create/7 update/0 delete/0 replace; P0A/P0C/P3A pass, P1 REVIEW_REQUIRED; Backup-ARN/Evidence verifiziert; APPLY_NOT_AUTHORIZED)
+- MO-RC4-AWS-TEST-UPGRADE-APPLY-04B → docs/reports/MO-RC4-AWS-TEST-UPGRADE-APPLY-04B.md (Apply-Versuche ohne Apply: erster Versuch Quellcommit-Mismatch 53bc5d9 vs Plan ffbebe9; zweiter Versuch aus ffbebe9 durch PlanMetadata-Parser für Environment rc4-test blockiert; State serial 4/GSI1+2 unverändert, kein Backup; BLOCKED — PRECONDITION FAILED)
+- MO-RC4-PLAN-METADATA-PARSER-FIX-05 → docs/reports/MO-RC4-PLAN-METADATA-PARSER-FIX-05.md (hyphenierte Projekt-/Environment-Namen: erwartete Deployment-ID aus validiertem Kontext, exakter Prefix, feste Suffixfelder; Discovery/Sequenz/Deploy/Destroy/Plan-Integrität/--out angepasst; 11 neue Tests, Installer 621/Builder 128/Lambda 326 PASS; historischer Plan unverändert, kein AWS/Plan/Apply)
+- MO-RC4-AWS-TEST-UPGRADE-REPLAN-06 → docs/reports/MO-RC4-AWS-TEST-UPGRADE-REPLAN-06.md (neuer Plan mit Parser-Fix 00125ee: 2 create/7 update/0 delete/0 replace, GSI3 additiv; P0A/P0C/P3A pass, P1 REVIEW_REQUIRED; Plan 7eec0a6e…, Manifest 029ff935…; Deployment-ID 240571105849:mays-orders-rc4-test:rc4-test korrekt; kein Apply/AWS-Mutation)
+- MO-RC4-AWS-TEST-UPGRADE-APPLY-07 → docs/reports/MO-RC4-AWS-TEST-UPGRADE-APPLY-07.md (Apply Plan 7eec0a6e…/Manifest 029ff935… über Installer, Code 00125ee: 2 added/7 changed/0 destroyed; State serial 8, mo_version 0.2.0, GSI3 ACTIVE; IAM-SQS/Redrive nachgewiesen; lokale Tests 621/128/326 PASS; Live-Funktionstests PENDING; keine RIS/Produktion)
+- MO-RC4-AWS-TEST-FUNCTIONAL-VERIFY-08 → docs/reports/MO-RC4-AWS-TEST-FUNCTIONAL-VERIFY-08.md (read-only Verify: RC4 0.2.0/serial 8/39 managed, GSI3 ACTIVE; unauthentifizierter GET 401 PASS; authentifizierte Handler/SQS/Worker/GSI3-Tests BLOCKED wegen leerem Cognito-Pool/fehlender Testidentität; DLQ NOT EXECUTED; keine AWS-Schreiboperation; Regression 621/128/326 PASS)
+- MO-RC4-TESTSUITE-HARDENING-10A → docs/reports/MO-RC4-TESTSUITE-HARDENING-10A.md (sechs Installer-Platzhalter durch Deploy-/Destroy-Approval-, Missing-Plan-, `--yes`- und Workspace-Isolationstests ersetzt; 6 fokussierte Tests PASS, Installer 621/Builder 128/Lambda 326 PASS; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-TESTSUITE-HARDENING-10B → docs/reports/MO-RC4-TESTSUITE-HARDENING-10B.md (11 lokale Komponententests für API→OrderService→FakeDynamoDB/FakeSQS→Worker→Status; gemeinsamer In-Memory-Zustand, Conditional-Update-/Idempotenz-/Fehler-/Identitäts-/Status-Tests; 11/621/128/337 PASS; zwei Mutationstests FAIL wie erwartet; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-TESTSUITE-HARDENING-10C → docs/reports/MO-RC4-TESTSUITE-HARDENING-10C.md (Live-E2E isoliert: pro Test eigene E2ERun/Order, expliziter Live-Opt-in und vorab bereitgestellter Token, unabhängiger lokaler 401-Test, run-scoped Fixtures, Ownership-Cleanup mit Fehler-/Fremddaten-Schutz, Diagnostik-Redaktion; 16 lokale Harness-Tests PASS, 4 Live-Tests BLOCKED/SKIP, Regression 621/128/337 PASS, zwei Mutationstests FAIL wie erwartet; kein Live-/AWS-Aufruf, kein Push)
+- MO-RC4-TESTSUITE-HARDENING-10D → docs/reports/MO-RC4-TESTSUITE-HARDENING-10D.md (Branch-Coverage 7.4.4: Lambda 90,15 %/82,22 %, Installer 73,43 %/63,85 %, Builder 91,22 %/84,93 %, E2E-Harness separat 91,58 %/88,46 %; 12 Installer-Sicherheitsmodule nicht importiert; Regression 621/128/337/16 = 1.102 PASS, 4 Live-E2E BLOCKED; Coverage-Artefakte nur in `/tmp`)
+- MO-RC4-TESTSUITE-HARDENING-10E-A → docs/reports/MO-RC4-TESTSUITE-HARDENING-10E-A.md (43 lokale Tests für Approval-Kontext, Workspace-Grenzen und Fail-Closed-Guards; 664/128/337/16 = 1.145 PASS, 4 Live-E2E BLOCKED; Coverage Approval 53,73 %/27,08 %, Workspace 84,62 %/75,00 %, Fail-Closed 74,88 %/43,42 %, Installer 73,13 %/62,43 % bei erweitertem Scope; 3 Mutationstests FAIL wie erwartet; Befund: ApprovalGate-RecursionError und FailClosedValidator-Defekte → PARTIAL; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-SECURITY-DEFECT-CORRECTION-11A → docs/reports/MO-RC4-SECURITY-DEFECT-CORRECTION-11A.md (SEC-01–05 korrigiert: ApprovalGate-Duplikat/Rekursion, `_has_valid_deployment_id`, Planintegritäts-Namen, Plan-Fingerprint-Match, Workspace-Root; SEC-06 als CONTRACT GAP/NEEDS DECISION ausgeklammert; 48 fokussierte Tests, Installer 669/Builder 128/Lambda 337/E2E 16 = 1.150 PASS, 4 Live-E2E BLOCKED; Coverage Installer 74,08 %/64,04 %, Approval 83,08 %/62,50 %, Workspace 84,62 %/75,00 %, Fail-Closed 79,54 %/64,00 %; vier Mutationstests FAIL wie erwartet; Code-Commit `0138e60`; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-SECURITY-APPROVAL-CONTRACT-12A → docs/reports/MO-RC4-SECURITY-APPROVAL-CONTRACT-12A.md + docs/adr/ADR-RC4-APPROVAL-CONTEXT-BINDING.md (SEC-06 read-only analysiert: bestehende CLI bindet Plan/Workspace vor Approval, aber ApprovalContext ist nicht CLI-integriert, keine Approval-ID/Ablauf/Plan-Fingerprint-Bindung; ApprovalEvidence V2 PROPOSED, `--yes` nur Prompt-Unterdrückung; Bedrohungsmodell T01–T08, Invarianten INV-01–10, Migrationsvarianten A/B/C, Testmatrix SEC06-01–12; keine Implementierung, keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-SECURITY-APPROVAL-DECISION-12A-1 → docs/reports/MO-RC4-SECURITY-APPROVAL-DECISION-12A-1.md + ADR-Nachtrag (Trust-Modelle A/B/C, V2-Datenvertrag, `--yes`-Matrix, CI-Workflows `deploy.yml`/`destroy.yml`, TOCTOU-/Planpfad-Befund, Ablauf/Replay, Legacy/Destroy, Evidence/Keys, 16 Testfälle V2-01–16, 10 Entscheidungen mit Freigabevorbehalt; ADR bleibt PROPOSED; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-TESTSUITE-CONSOLIDATION-13A → docs/reports/MO-RC4-TESTSUITE-CONSOLIDATION-13A.md (Testinventur 1.150 PASS + 28 Seed-Tests separat + 4 Live-E2E BLOCKED; Coverage Lambda 90,15 %/82,22 %, Builder 91,22 %/84,93 %, Installer 74,08 %/64,04 %, E2E-Harness separat 91,58 %/88,46 %; Order-Traceability, P00-Scope-Abweichung KMS/Secrets/Retention, Dokumentationsdrift, P0/P1/P2-Lücken und 10 Folgepakete; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
+- MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
+- MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
+- MO-RC3-RC4-G3-EXT-ORCHESTRATION → docs/reports/MO-RC3-RC4-G3-EXT-ORCHESTRATION.md + docs/reports/MO-RC3-RC4-G3-EXT-LIVE-TEST-MANIFEST.md (Commander + Agenten A–D read-only: 1.153 lokale PASS/28 Seed/4 Live-PASS; DLQ- und GSI3-Live offen, Privacy durch Secret blockiert; F-PRV-01 Consumer-Scope-Erase-No-op, GSI3-GAP-01/02/03, API-Idempotenz/P00/SEC-06/Processing als offene Entscheidungen; Gate B ohne neue Freigabe BLOCKED, Manifest READY FOR LIVE APPROVAL; keine AWS-/Terraform-/Produktmutation, kein Push)
+- MO-RC4-G4-A-DLQ-RETRY-RESEARCH-01 → docs/reports/MO-RC3-RC4-G3-EXT-ORCHESTRATION.md#agent-a (Subagent A, read-only: Batch-/Retry-Matrix, maxReceiveCount=1, DLQ-Konfiguration, lokale 27/17/Component-Tests; Live-DLQ NOT TESTED; G3-Cleanup-Race kein DLQ-Test; Plan DLQ-01/02/03/04; keine Datei-/AWS-/Terraform-Änderung)
+- MO-RC4-G4-B-GSI3-RECOVERY-RESEARCH-01 → docs/reports/MO-RC3-RC4-G3-EXT-ORCHESTRATION.md#agent-b (Subagent B, read-only: 340 Lambda/55 Recovery-Tests, GSI3 ACTIVE/0, GAP-01/02 Starvation, GAP-03 STALE/stranded, nur generic; Live-Plan 10 Fixtures; keine Datei-/AWS-/Terraform-Änderung)
+- MO-RC4-G4-C-PRIVACY-TOOLKIT-01 → docs/reports/MO-RC3-RC4-G3-EXT-ORCHESTRATION.md#agent-c (Subagent C, read-only: 340 Lambda/36 Privacy-Tests, Inspect/Export/Erase/ANONYMIZE/RETAIN; Live BLOCKED Secret + Invoke; F-PRV-01 bestätigt; Testmanifest; keine Secret-/Datei-/AWS-Änderung)
+- MO-RC4-G4-D-COMPAT-RELEASE-01 → docs/reports/MO-RC3-RC4-G3-EXT-ORCHESTRATION.md#agent-d (Subagent D, read-only: RC3/RC4-Kompatibilität, Legacy-Datenbruch, generic-only Registry, API-Idempotenz, P00/SEC-06, Builder/Installer; ORANGE; keine Datei-/AWS-/Terraform-Änderung)
+- MO-RC3-RC4-G3-FIX-DEFECT-CORRECTION → docs/reports/MO-RC3-RC4-G3-FIX-DEFECT-CORRECTION.md (F-PRV-01 Consumer-Scope-Erase via vollständigem GetItem gefixt; GSI3-GAP-01/02 Scan-/Limit-Auswahl gefixt; GSI3-GAP-03 sendet aktuellen PROCESSING-/SHIPPED-Status; Lambda-Artefakt rebuild; Regression 669/128/345/16 = 1.158 PASS + 28 Seed; die G3-EXT-Mutationszeile war falsch: G3-EXT war read-only, G3-Testdaten wurden separat bereinigt; Fix-Commits `7d82ad4`/`51094bf`/`75a32fc`; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC3-RC4-G3-LIVE-PREP-01 → docs/reports/MO-RC3-RC4-G3-LIVE-PREP-01.md (read-only AWS: Account/Stack/Queues/DLQ/ESM/GSI3/Alarme bestätigt; lokales G3-FIX-ZIP `1584ee0d…`/`FYTuDcz…` ≠ AWS CodeSha `vW8nl…`; AWS entspricht altem ZIP `bd6f2795…` → Deployment Update Required; GSI2 ohne consumerId, GSI3 ACTIVE/0, keine Recovery-Schedules, Privacy-Secret/Invoke fehlt; keine AWS-/Terraform-Mutation, kein Push)
+- MO-RC3-RC4-G3-LIVE-DEPLOY-01A → docs/reports/MO-RC3-RC4-G3-LIVE-DEPLOY-01A.md (read-only Deployment-Vorbereitung: lokales G3-FIX-ZIP `1584ee0d…`/`FYTuDcz…`, AWS CodeSha `vW8nl…` = altes ZIP `bd6f2795…`; Handler/Worker Active/$LATEST, keine Aliasse/Versionen; IAM UpdateFunctionCode allowed; direkter CLI-Update löst keine Pipeline aus, Terraform-Drift separat; Rollback-Artefakt verifiziert; keine AWS-/Terraform-Mutation, kein Deployment, kein Push)
+- MO-RC3-RC4-G3-LIVE-DEPLOY-01B → docs/reports/MO-RC3-RC4-G3-LIVE-DEPLOY-01B.md (autorisiertes Lambda-Code-Update nur Handler+Worker auf G3-FIX-ZIP `1584ee0d…`/`FYTuDcz…`; RevisionIds `1e1b…`/`6293…` → `c559…`/`96db…`; CodeSha vorher `vW8nl…`, nachher `FYTu…`; State Active/Successful; Konfiguration/ESM/Queues/GSI3/Alarme unverändert; Terraform read-only Plan 0 add/2 change nur source_code_hash, kein Apply; Rollback-Artefakt vorhanden/nicht benötigt; keine Live-E2E, kein Push/Merge)
+- MO-RC3-RC4-G3-LIVE-B1-01 → docs/reports/MO-RC3-RC4-G3-LIVE-B1-01.md (autorisierte Live-Tests: DLQ-01/02 PASS, RC3/RC4/PATCH/Legacy-404 PASS, GSI3 10-Fixture-Recovery `sent=4`, A/B/L stabil, M CONFIRMED/version3, Duplikat stabil; GAP-01/02 Starvation PASS; GAP-03 SHIPPED idempotent PASS; `candidates=4` vs Manifest 8 = PARTIAL; Cleanup Tabelle/GSI3/Queues/Cognito 0; Foreign-Identity BLOCKED; keine Privacy/Terraform/Produktänderung, kein Push)
+- MO-RC3-RC4-G3-LIVE-B1-CLOSE-01 → docs/reports/MO-RC3-RC4-G3-LIVE-B1-CLOSE-01.md (read-only Reconciliation: `candidates=len(selected)` nach allen Skips; Live `scanned=8`, `checked=8`, `candidates=4`, `sent=4`; `budgetExhausted=1` per-Kandidat, kein Scan-Abbruch; Manifest-Erwartung 8 war falsch → auf 4 korrigiert und Semantik dokumentiert; Foreign-Identity-Testplan mit zwei synthetischen Usern, A 201/200, B 404/404, A unverändert, Listen-Isolation, exaktem Owner-Cleanup; keine AWS-Mutation/User-Erstellung/Invocation, kein Terraform, kein Push)
+- MO-RC3-RC4-G3-LIVE-B1-IDENTITY-01 → docs/reports/MO-RC3-RC4-G3-LIVE-B1-IDENTITY-01.md (autorisierter Live-Test: zwei synthetische Cognito-User A/B im selben Pool/Client, unterschiedliche `sub`; A POST 201, A GET 200/CONFIRMED/version2, B GET 404 ORDER_NOT_FOUND ohne Orderfelder, B PATCH 404 und Status/Version unverändert, B List 200/count0 ohne A-Order, A Integrity 200/CONFIRMED/version2; DDB/Owner-Bindung konsistent; exakter Owner-Cleanup, Tabelle/GSI3/Queues/Cognito 0, CodeSha unverändert; keine Privacy/DLQ/Recovery/Kompatibilitätswiederholung, keine Terraform-/IAM-/Cognito-Konfigurationsänderung, kein Push)
+- MO-RC3-RC4-G3-LIVE-B2-PREP-01 → docs/reports/MO-RC3-RC4-G3-LIVE-B2-PREP-01.md (read-only Privacy-Discovery: inspect/export/erase + interner Dispatch vorhanden, lokal 345/44 PASS, deployed CodeSha `FYTu…` mit F-PRV-01; AWS ohne Privacy-Route/Function-URL, Handler-Env ohne `PRIVACY_INTERNAL_SECRET`, keine Secrets-Manager-/SSM-/KMS-Referenz, Resource-Policy nur API GW, keine least-privilege Invoke-Rolle, GSI2 ohne `consumerId`, TTL DISABLED, PITR 35 Tage; B2 `CONFIGURATION REQUIRED`; keine AWS-Mutation/Invoke/Secret-Wert, kein Terraform, kein Push; G3X-PRV-X12 auf F-PRV-01-Fix korrigiert)
+- MO-RC4-B2-TESTSUITE-INTEGRATION-01 → docs/reports/MO-RC4-B2-TESTSUITE-INTEGRATION-01.md (Privacy-Live-Suite G3X-PRV-X01…X13 integriert: neue `privacy_e2e_harness`/Live-Gates, 15 lokale Harness-Tests, 15 opt-in Live-Tests, `ExactKeyCleanupBackend` für ANONYMIZE/Consumer-Fixtures; lokal 669 Installer + 128 Builder + 345 Lambda + 31 E2E = 1.173 PASS, 4 bestehende + 1 Privacy-Live-Klasse BLOCKED/SKIP; keine AWS-Verbindung/Mutation/Invocation, kein Secret/IAM/Terraform, kein Push; B2 `READY FOR LIVE CONFIGURATION`; RC4-Gesamtfreigabe NOT READY)
+- MO-RC4-B2-LIVE-CONFIG-AND-EXECUTION-01 (Phase A) → docs/reports/MO-RC4-B2-LIVE-CONFIG-AND-EXECUTION-01.md (read-only AWS-Verifikation Account/Region/Stack/CodeSha/Env/Queues/GSI3/Cognito/Policy/Pipeline; temporäre Konfiguration definiert: Env `PRIVACY_INTERNAL_SECRET`, IAM-Rolle `mays-orders-rc4-test-b2-invoker` mit Invoke/Config/Table-get-put-delete/Queue-read/STS, zwei synthetische Cognito-User, run-scoped Fixtures; Secret-/Cleanup-/Rollback-/Abbruchplan; **keine AWS-Mutation**, keine Secret-Erstellung/gelesen, keine Invocation, kein Terraform/Push; Status `B2 LIVE CONFIGURATION — READY FOR APPROVAL`)
+- MO-RC4-B2-LIVE-EXECUTION-02 → docs/reports/MO-RC4-B2-LIVE-EXECUTION-02.md (Phase B autorisiert und ausgeführt: temporäre IAM-Rolle assumiert, Secret temporär in Handler-Env, zwei synthetische Cognito-User, integrierte Suite `tests.test_privacy_e2e`; Run `b2livec61b2c8f28`/E2E `031b217823d7`; 15 Tests, 14 PASS, X13 SKIP, 0 FAIL; X01/X05/X06/X12 Consumer-Isolation, X07/X08 keine Mutation, X09 idempotent, X10 RETAIN, X11 ANONYMIZE; Cleanup Tabelle/GSI3/Queues/Cognito 0, Rolle/Secret/Profil entfernt, CodeSha `FYTu…`; keine Fremddatenänderung, kein Purge/Terraform/Push; Status `B2 LIVE VERIFIED — CLEANUP VERIFIED`)
+- MO-RC4-RELEASE-GATE-01 → docs/reports/MO-RC4-RELEASE-GATE-01.md (read-only Release-Gate: lokale 1.174 PASS, Teststack GO, Owner/B1/B2 live belegt; P00-Scope, RC4-Label Q-12, SEC-06, Legacy-Grenze, Terraform-Drift, RIS-Pin/CI-Gates offen; separate Entscheidungen A `CONDITIONAL GO`, B `GO`, C `NO-GO`, D `NO-GO`; Gesamtstatus `RC4 MODULE RELEASE CONDITIONALLY READY`; keine AWS-/Terraform-/RIS-/Release-Mutation, kein Push)
+- MO-RC4-RELEASE-CANDIDATE-01 → docs/reports/MO-RC4-RELEASE-CANDIDATE-01.md + docs/release/RC4-MODULE-RELEASE-CANDIDATE.md + docs/RELEASE_NOTES.md (Kandidaten-Dossier; Version Q-12 offen, Empfehlung `v0.6.0-rc.1` nur bei P00-Feature-Generation, sonst `v0.5.0-rc.4`; Scope/P00 nicht autoritativ reduziert; generic only, Legacy-404, HTTP-Idempotency-Key nicht RC4-pflichtig; Terraform 0/2 source_hash nur Teststack; RIS `1dbb0cb` NO-GO; A `CONDITIONAL GO`, B `GO`, C `NO-GO`, D `NO-GO`; keine AWS-/Produkt-/Terraform-/RIS-Änderung, kein Tag/Push)
+- MO-RC4-RELEASE-OWNER-DECISION-01 → docs/reports/MO-RC4-RELEASE-OWNER-DECISION-01.md + Dossier/Release Notes (Release-Owner-Vorlage: vorgeschlagene Version `v0.5.0-rc.4`, begrenzter Order-Core-Scope, P00 nicht als erfüllt, Produktionspflichten bleiben; RIS/Produktion/Veröffentlichung nicht freigegeben; Status `RC4 RELEASE OWNER APPROVAL PENDING`; keine AWS-/Terraform-/RIS-/Produktänderung, kein Tag/Push)
+- MO-RC4-P00-DUAL-MODE-FORENSIC-AUDIT-01 → docs/reports/MO-RC4-P00-DUAL-MODE-FORENSIC-AUDIT-01.md (read-only Forensic Audit über alle Branches/Worktrees: AWS_MANAGED/KMS und APP_MANAGED nur als P00/P01-Design/Plan vorhanden; kein `secret_provider.py`, kein `rotation_handler.py`, keine KMS-/Secrets-/Retention-IaC, keine P00-Tests/AWS-Nachweise; bestehende Env-Secret-/AWS-owned-Baseline ausdrücklich nicht als P00-Variante gewertet; CI-`kms_key_arn` nur Pipeline-Artefakt, keine Produktimplementierung; Status `RC4 DUAL-MODE AUDIT COMPLETE`, beide Varianten MISSING; keine Mutation/Push)
+- MO-RC4-P00-TMP-WORKTREE-FORENSIC-02 → docs/reports/MO-RC4-P00-TMP-WORKTREE-FORENSIC-02.md (Full-local read-only inventory über 14 Mays-Orders-Git-Repos/Worktrees, Home-/Downloads-/`.ris`-Kopien, `/tmp`-Source-Trees, Branches/Reflogs/Stashes/527 unerreichbare Commits/Untracked: keine vollständige AWS_MANAGED-/APP_MANAGED-Implementierung; einziger Code-Fund ist uncommitted `aws_kms_key "dynamodb_backup"`-Backup-Stash (nicht P00, keine Policy/Provider); Status `MO-RC4-P00 — PARTIAL IMPLEMENTATION FOUND / GAP ANALYSIS REQUIRED`; keine Mutation/Push)
+- MO-RC4-RELEASE-CONSOLIDATION-01 → docs/reports/MO-RC4-RELEASE-CONSOLIDATION-01.md (Baseline-/Post-RC3-Konsolidierungsprüfung: `v0.5.0-rc.3` lokal und remote nicht vorhanden; Packaging-Commit `086a8be` hat keinen Tag; keine `release/rc4-integration` angelegt, keine Integration/Tests/P00-Übernahme, kein Push/Tag; Status `C — RC4 INTEGRATION BLOCKED / RC3 RELEASE TAG MISSING`)
+- MO-RC4-RELEASE-CONSOLIDATION-02 → docs/reports/MO-RC4-RELEASE-CONSOLIDATION-02.md + docs/release/RC4-INTEGRATION-MANIFEST.md (autorisierte Baseline `086a8be`; neuer Worktree `/home/dci-student/projects/Mays-Orders-AWS-rc4-integration`, Branch `release/rc4-integration`; kontrollierter `--no-ff`-Merge von `test/...` @ `b49c59f` als `bb8edce`; 143 Commits; 669/128/345/32 = 1.174 PASS + 28 Seed, Terraform fmt/init/validate PASS; P00 offen, KMS-Stash unverändert; kein Push/Main-Merge/Tag/Deploy)
+- MO-RC4-P00-A → docs/reports/MO-RC4-P00-A-SECURITY-ARCHITECTURE-DECISION.md + docs/contracts/MO-RC4-P00-IMPLEMENTATION-CONTRACT.md + docs/release/MO-RC4-P00-IMPLEMENTATION-BACKLOG.md (Q-01–Q-14 zugeordnet; ENV/AWS_MANAGED/APP_MANAGED, SecretProvider, getrennte KMS/SSE-Ebenen, Rotation und Retention-Vertrag; ADR-008 bleibt PROPOSED; P00-Implementierung offen; Status `MO-RC4-P00-A — CONTRACT DRAFTED / OWNER DECISIONS PENDING`; keine Produkt-/AWS-/Terraform-Änderung, kein Push)
+- MO-RC4-P00-ORCHESTRATION-01 → docs/reports/MO-RC4-P00-ORCHESTRATION-01.md + docs/release/MO-RC4-P00-DECISION-REGISTER.md + docs/release/MO-RC4-P00-DEPENDENCY-GRAPH.md + docs/release/MO-RC4-P00-EXECUTION-PLAN.md (Multi-Agent-Konsolidierung: Q-02…Q-14 priorisiert, Abhängigkeiten/Parallelisierung, P00-B…I-Implementierungsaufträge, SG-01…08; Q-01 nur Baseline; Q-02/Q-08/Q-10 als Foundation-Bundle, Q-04/Q-09, Retention-Bundle und spätere Gates; Status `EXECUTION PLAN READY / OWNER APPROVAL PENDING`; keine Produkt-/AWS-/Terraform-/RIS-Änderung, kein Push)
+- MO-RC4-P00-OWNER-DECISION-02 → docs/reports/MO-RC4-P00-OWNER-DECISION-02.md + docs/release/MO-RC4-P00-DECISION-REGISTER.md + docs/release/MO-RC4-P00-ADR-008-CONTRACT-COMPARISON.md + Contract/P00-A/Orchestrierung/Backlog/Execution-Plan/Project-Status (Owner-Entscheidungen Q-02 Secrets Manager und Q-08 ARN/Name-Referenz + Laufzeit-Fetch APPROVED; Q-10 ADR-008 PENDING; konkreter ADR/Contract-Abgleich: keine harten Konflikte, 7 Klarstellungen C-01…C-07 und 2 Governance-Punkte; ADR-008 bleibt PROPOSED; keine P00-Implementierung, keine AWS-/Terraform-/RIS-Änderung, kein Push)
+- MO-RC4-P00-Q10 → docs/reports/MO-RC4-P00-Q10-APPROVAL.md + architecture/architecture-decisions.md + Decision-Register/Contract/P00-A/Orchestrierung/Comparison/Backlog/Execution-Plan/Manifest/Project-Status (C-01…C-07 vollständig in ADR-008 eingearbeitet: P01→P00-Mapping, optionale PRIVACY_KMS_KEY_ARN-Referenz, Least-Privilege-IAM, manuelle Rotation ohne Auto-Rotator, unveränderter orders-service-Vertrag, ADR-006 bleibt ACCEPTED, Orphan-Detection P00-G; ADR-008 ACCEPTED; Q-10 APPROVED; P00-B READY FOR AUTHORIZATION, nicht gestartet; keine Produkt-/AWS-/Terraform-/RIS-Änderung, kein Push)
+- MO-RC4-P00-B → docs/reports/MO-RC4-P00-B-SECRET-PROVIDER-FOUNDATION.md + lambda/src/secret_provider.py + lambda/src/order_service.py + lambda/tests/test_secret_provider.py + lambda/dist/lambda.zip (P00-B SecretProvider Foundation: ENV-Default gekapselt, AWS_MANAGED-/APP_MANAGED-Konfigurationsverträge, Runtime-Fetch-Adapter mit injiziertem Fetcher, Cache, Fail-closed-Fehlerklassen, Redaction, keine Request-Provider-Auswahl; Lambda 379, Installer 669, Builder 128, E2E lokal 32 = 1.208 PASS + 28 Seed; Gate-Commits c2708ba/cb93cc2/c2bdab7/2f405be/c53f7f7; Feature-Branch nicht gemerged; keine AWS-/Terraform-/RIS-Änderung, kein Push/Tag/Deploy)
+
+
+## 2026-11-13 — MO-RC4-P00-B-INTEGRATION-REVIEW-01
+
+**Status:** `MO-RC4-P00-B — REVIEW PASS / MERGE AUTHORIZATION PENDING`
+
+- Read-only review of feature `f0ea3b8` against integration `8ddc050`;
+  ancestry and conflict-free merge-tree verified. No product code, merge,
+  push, AWS/Terraform or deployment action.
+- 34 new provider tests plus full local suites verified: Lambda 379, Installer
+  669, Builder 128, E2E 32 = 1,208 PASS; Seed 28 separately. Lambda ZIP
+  `c35e6c8b…` contains `secret_provider.py` and rebuilds deterministically.
+- Security/compatibility PASS; no CRITICAL/HIGH finding. **Correction after
+  multi-agent review:** M-01 MEDIUM — effective cache scope is one invocation,
+  not one execution environment (`index.py:252` creates a new `OrderService`);
+  P00-C must-fix, not a P00-B merge blocker. LOW findings: non-ASCII compare
+  can return 500, missing provider observability, decorative KMS ARN until
+  P00-C, weak test assertions, stale execution-plan base, undocumented rollout
+  sequence. See report for all evidence and INFO observations.
+- Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-REVIEW-01.md`.
+- Review branch: `review/mo-rc4-p00-b-integration-01`; report update committed
+  separately; no feature/integration branch changed.
+
+## 2026-11-13 — MO-RC4-P00-B-INTEGRATION-02
+
+**Status:** `MO-RC4-P00-B — INTEGRATED / POST-MERGE VERIFIED / P00-C-M01 OPEN`
+
+- Pre-merge: G1 review evidence (M-01, L-01…L-06) verified; P00-C-M01 documented
+  as mandatory P00-C cache-lifetime criterion; L-05 base corrected to `8ddc050`.
+- Merge `e71f3edcb146fb7b3943b4c23fa65e771cf4611e` (`--no-ff`; parents
+  `56c56b2` + `f0ea3b8`). One docs-only execution-plan conflict from the base
+  correction was resolved without product code changes.
+- Review docs integrated via docs-only cherry-picks `6c7d294`/`b4b6b1a`; no
+  duplicate product commits.
+- Post-merge: Lambda 379, Installer 669, Builder 128, E2E local 32 = **1.208
+  PASS**; Seed 28; ZIP `c35e6c8b…` (12 modules, reproducible).
+- M-01 remains OPEN; L-01…L-04/L-06 OPEN; L-05 FIXED. No P00-C/D, Terraform,
+  AWS, RIS, Jobsearch, push, main merge, tag or deployment action.
+- Report: `docs/reports/MO-RC4-P00-B-INTEGRATION-02.md`.
+
+## 2026-11-13 — MO-RC4-P00-C-AUTHORIZATION-01
+
+**Status:** `MO-RC4-P00-C — Q-04/Q-09 APPROVED / IMPLEMENTATION AUTHORIZATION PENDING`
+
+- Owner approved Q-04: AWS-managed default, existing CMK only by explicit ARN,
+  new CMK only by explicit opt-in, never implicit; no change to existing
+  encryption by provider activation. DDB/SQS CMK remains P00-E.
+- Owner approved Q-09: explicit Policy-Gate allowlist, default deny, least
+  privilege, exact Secret references, `kms:Decrypt` only for actual customer
+  CMK, no wildcard without separate Owner decision.
+- Contract/ADR/register/backlog/manifest checked: no contract conflict.
+  P00-C is ready for implementation authorization, not started.
+- P00-C acceptance criteria remain open: M-01 cache lifetime, L-01 non-ASCII,
+  L-02 observability, L-03 KMS-ARN effect, L-04 test hardening, L-06 atomic
+  provider switch. L-05 remains fixed.
+- Report: `docs/reports/MO-RC4-P00-C-AUTHORIZATION-01.md`.
+- No product implementation, Terraform/AWS mutation, RIS/Jobsearch change,
+  push, main merge, tag or deployment.
+
+## 2026-11-13 — MO-RC4-P00-C-IMPLEMENTATION-02
+
+**Status:** `MO-RC4-P00-C — IMPLEMENTATION COMPLETE / SECURITY REVIEW READY`
+
+- Feature branch `feature/mo-rc4-p00-c-aws-managed` from `4d4db3b`; no merge,
+  push, deployment, Terraform/AWS mutation or RIS/Jobsearch change.
+- C1 boto3 Secrets Manager fetcher; C2 module-wide provider/cache with
+  cross-invocation/identity tests; C3 KMS `DescribeSecret` binding check;
+  C4 non-ASCII fail-closed guard; C5 structured `secret_provider_failure`
+  observability; C6 negative-test hardening; C7 documented atomic rollout.
+- Findings: M-01, L-01/L-02/L-03/L-04 implemented/tested; L-06 documented/local
+  tested; L-05 fixed. Independent security review remains.
+- Tests: Lambda 400, Installer 669, Builder 128, E2E local 32 = **1.229 PASS**;
+  Seed 28. ZIP `05bc3f65…` (42.081 bytes, 12 modules, reproducible).
+- Report: `docs/reports/MO-RC4-P00-C-IMPLEMENTATION-02.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-SECURITY-REVIEW-03
+
+**Status:** `MO-RC4-P00-C — SECURITY REVIEW FAILED / CORRECTIONS REQUIRED`
+
+- Read-only Multi-Agent Review of feature `08fde23` against integration
+  `4d4db3b`; ancestry PASS, merge-tree conflict-free, no product code changed,
+  no merge/push/deploy. Review branch `review/mo-rc4-p00-c-security-03`.
+- Evidence: Lambda 400 PASS, Installer 669 PASS, Builder 128 PASS, E2E lokal 32
+  PASS = 1.229 PASS; Seed 28; ZIP `05bc3f65…` (42.081 B, 12 modules,
+  source-identical, reproducible).
+- No CRITICAL/HIGH. Corrections required: F-01 `DescribeSecret` is absent from
+  ADR-008 D-5/C-03, Contract §6, Q-09 and Policy Gate; F-03 no real
+  `index.handler` test with `PRIVACY_SECRET_PROVIDER=secretsmanager` (M-01
+  mutation undetected); F-02 cache survives rotation without production
+  invalidation; F-04 payload/length contract unclear; F-05 rollback
+  contradictory. LOW: timeouts, non-string token coercion, missing AWS error
+  code, Policy-Gate inline-policy gap, cache lock, `id()` key, status scope.
+- Review probes independently confirmed fail-closed behavior and provider-level
+  cache, but no AWS-live verification. Process deviation: one accidental
+  read-only `GetSecretValue` attempt by a reviewer against a dummy ARN was
+  denied; no mutation, no secret retrieved, not used as evidence.
+- Report: `docs/reports/MO-RC4-P00-C-SECURITY-REVIEW-03.md`.
+- No merge authorization; P00-C remains on feature branch. No Terraform/AWS
+  mutation, RIS/Jobsearch change, push, main merge or deployment.
+
+## 2026-11-14 — MO-RC4-P00-C-CORRECTION-04
+
+**Status:** `MO-RC4-P00-C — F-03 VERIFIED / F-01 OWNER DECISION PENDING`
+
+- Correction branch `feature/mo-rc4-p00-c-correction-04` based on review HEAD
+  `41b8612`; feature `08fde23` and integration `4d4db3b` unchanged.
+- F-03: new `lambda/tests/test_index_aws_managed.py` exercises real
+  `index.handler` twice with fake boto3; proves module-provider reuse, one
+  fetch, reference isolation, invalidation, negative config and redaction.
+  Mutation with per-invocation provider fails the test.
+- F-01: Q-09 amendment proposal prepared in
+  `docs/release/MO-RC4-P00-C-F01-Q09-AMENDMENT-PROPOSAL.md`; NOT approved.
+- F-02/F-04/F-05: cache/rotation, exact SecretString payload, and two safe
+  rollback paths documented in `docs/security/AWS-MANAGED-PROVIDER-ROLLOUT.md`.
+- F-06/F-07/F-08/F-09/F-10/F-11 remain open (P00-E/INFO); F-12 documented.
+- Tests: Lambda 405, Installer 669, Builder 128, E2E 32 = **1.234 PASS**;
+  Seed 28. ZIP unchanged `05bc3f65…` (42.081 B).
+- Report: `docs/reports/MO-RC4-P00-C-CORRECTION-04.md`; no merge/push/deploy,
+  no Terraform/AWS mutation, no RIS/Jobsearch change. Independent re-review
+  remains required.
+
+## 2026-11-14 — MO-RC4-P00-C-F01-AUTHORIZATION-05
+
+**Status:** `MO-RC4-P00-C — F-01 CONTRACT AMENDED / F-03 VERIFIED / RE-REVIEW READY`
+
+- Owner approved Q-09 limited amendment: `secretsmanager:DescribeSecret` for
+  the same exact approved secret ARN(s), only for customer-CMK metadata
+  verification; no wildcard, no implicit CMK, no DDB/SQS CMK extension.
+- Updated ADR-008 D-5/C-03, Decision Register Q-09, Contract §6/§8, Policy-Gate
+  specification and P00-C backlog. Policy-Gate code/allowlist remains P00-E and
+  is not implemented.
+- F-01 status: **CONTRACT AMENDED / RE-REVIEW PENDING**, not `VERIFIED FIXED`.
+- F-03 evidence remains valid: real `index.handler` tests (5), cross-invocation
+  cache, one `GetSecretValue`, identity isolation, invalidation, negative
+  config and mutation failure. Targeted tests: 60 PASS.
+- F-02/F-04/F-05 remain deployment gates; F-06/F-08/F-09/F-10/F-11 remain low
+  follow-ups.
+- Branch `feature/mo-rc4-p00-c-f01-authorization-05` from correction `d3ce237`;
+  feature `08fde23` and integration `4d4db3b` unchanged. No merge, push,
+  deploy, Terraform/AWS mutation or RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-C-F01-AUTHORIZATION-05.md`.
+- Independent re-review required before F-01 can become VERIFIED FIXED.
+
+## 2026-11-14 — MO-RC4-P00-C-SECURITY-RE-REVIEW-06
+
+**Status:** `MO-RC4-P00-C — F-01/F-03 VERIFIED FIXED / INTEGRATION REVIEW READY`
+
+- Read-only re-review of F01-HEAD `4342163` against integration `4d4db3b`;
+  review branch `review/mo-rc4-p00-c-security-06`.
+- F-01 verified fixed: ADR-008 D-5/C-03, Q-09 limited amendment, Contract
+  §6/§8, Policy-Gate specification and runtime all agree; `DescribeSecret`
+  only with `PRIVACY_KMS_KEY_ARN`, exact Secret ARN, no wildcard, no implicit
+  CMK, no DDB/SQS CMK.
+- F-03 verified fixed: real `index.handler` tests, two invocations, one
+  `GetSecretValue`, shared module provider, reference rebuild, invalidation,
+  negative config and redaction; mutation with per-invocation provider fails.
+- Targeted tests 60 PASS; Lambda 405 PASS; prior full regression 1.234 PASS;
+  Seed 28; ZIP `05bc3f65…` unchanged. No AWS-live calls.
+- Branch graph actual: integration `4d4db3b` → feature `08fde23` → review
+  `41b8612` → correction `d3ce237` → F01 `4342163`; no duplicate product
+  commits. Proposed integration: feature merge, then F01 merge; no review-branch
+  merge.
+- Deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open; no
+  deployment authorization. No merge/push/deploy, Terraform/AWS mutation or
+  RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-C-SECURITY-RE-REVIEW-06.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-INTEGRATION-07
+
+**Status:** `MO-RC4-P00-C — INTEGRATION PARTIAL / VERIFICATION PENDING`
+
+- Merge 1 `e7431708dbe634371606be788d5082e1aad04ee7` (`4d4db3b` +
+  `08fde23`): P00-C runtime.
+- Merge 2 `442d296e7040279c19fe6e004900ff2616a03e87` (`e743170` + `4342163`):
+  contract amendment, correction docs and handler test.
+- Review-06 docs cherry-picked as docs-only `8e3d835e1a7df75b44c1866a0c65a2a8dc6d32bc`.
+- No duplicate product commits; no unexpected product code; no Terraform/AWS/
+  RIS/Jobsearch changes.
+- Post-merge: Lambda 405 PASS, Installer 668 PASS + 1 live-profile test
+  `BLOCKED` by no-AWS boundary, Builder 128 PASS, E2E 32 PASS = 1.233 local
+  PASS + 1 BLOCKED; Seed 28 PASS. No live AWS calls.
+- ZIP `05bc3f65b4b2c385ab4bfc1d74eb0364b2b9041663c3b3beaa438aaa7810a554`
+  (42.081 B, 12 modules, source-identical, reproducible).
+- F-01/F-03 verified fixed; M-01 handler evidence present. Deployment gates
+  F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open. No production
+  AWS_MANAGED authorization.
+- Report: `docs/reports/MO-RC4-P00-C-INTEGRATION-07.md`.
+
+## 2026-11-14 — MO-RC4-P00-C-CLOSEOUT-08
+
+**Status:** `MO-RC4-P00-C — LOCALLY INTEGRATED / CODE VERIFIED / AWS LIVE TEST DEFERRED`
+
+- Closeout of local P00-C integration. Test counts confirmed: Lambda 405 PASS,
+  Installer 668 PASS, Module Builder 128 PASS, local E2E 32 PASS = 1.233 local
+  PASS; Seed 28 PASS.
+- `TestAWSProfileContextLive.test_profile_mayaws_identity` classified
+  `DEFERRED — AWS READ-ONLY AUTHORIZATION REQUIRED`; requires real mayaws
+  profile/STS, tests no P00-C code, not counted as PASS.
+- Deployment gates F-02/F-04/F-05/F-06/F-08/F-09/F-10/F-11 remain open. No
+  AWS_MANAGED production/deployment authorization.
+- P00-D readiness reviewed: external 32-byte key material, HMAC-SHA256,
+  keyId/keyVersion, no custom cipher, no key logging, secure provider selection,
+  ENV/AWS_MANAGED compatibility. P00-D is planning-only, not implemented;
+  Q-11 and implementation/key-custody decisions remain open.
+- No AWS-live call, Terraform/AWS mutation, merge/push/deploy, RIS/Jobsearch
+  change. Report: `docs/reports/MO-RC4-P00-C-CLOSEOUT-08.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-AUTHORIZATION-01
+
+**Status:** `MO-RC4-P00-D — CONTRACT PREPARED / OWNER DECISIONS PENDING`
+
+- P00-D contract preparation only; no APP_MANAGED implementation.
+- Q-11 proposal: unique `keyId`/`keyVersion`, at most one active + one previous
+  inside an explicit window, no automatic rotation, no silent switch, no
+  unknown-version fallback, P00-F owns rotation/transition.
+- Key custody: Owner/Operator generates/stores/delivers/revokes/deletes;
+  MO consumes injected material only; no new AWS dependency, no key in Git or
+  logs. Exact transport remains an Owner decision.
+- Key material: 32-byte Base64, HMAC-SHA256, fail-closed on invalid/length/
+  version/format; no custom cipher.
+- Open: Q-11 window/version policy, external key custody/transport, P00-D
+  implementation authorization.
+- No product code, AWS/Terraform mutation, push/main merge/tag/deploy or
+  RIS/Jobsearch change. Report:
+  `docs/reports/MO-RC4-P00-D-AUTHORIZATION-01.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-Q11-DECISION-02
+
+**Status:** `MO-RC4-P00-D — Q11 DECISION PACKAGE READY / OWNER APPROVAL PENDING`
+
+- Q11 proposal: one active + max one previous version, max 24h explicit
+  transition window, explicit activation timestamp, no automatic rotation, no
+  silent switch, unknown version fail-closed, immediate revocation via forced
+  recycle, HMAC-SHA256/32-byte Base64.
+- Contract check: consistent with ADR-008 D-6/D-7/D-8 and P00-D Contract §7;
+  no hard conflict. Open owner questions: exact canonical HMAC payload,
+  revocation in warm Lambda, existing signatures, downgrade pinning,
+  key transport/custody and deletion.
+- Key custody proposal: Owner/Operator owns generation/storage/delivery/
+  rotation/revocation/deletion; no key in Git/state/reports/audit/logs; no new
+  AWS dependency; runtime transport remains a protected config injection.
+- No product implementation, AWS/Terraform mutation, push/merge/deploy or
+  RIS/Jobsearch change. Q11 remains NOT APPROVED.
+- Report: `docs/reports/MO-RC4-P00-D-Q11-DECISION-02.md`.
+- Note: concurrent docs commit `545a82c` was present when this entry was
+  committed; its Q11 owner questions are preserved in the report appendix.
+
+## 2026-11-14 — MO-RC4-P00-D-HMAC-CONTRACT-03
+
+**Status:** `MO-RC4-P00-D — HMAC CONTRACT PREPARED / OWNER APPROVAL PENDING`
+
+- Verified existing state: no APP_MANAGED HMAC implementation, no signatures,
+  no canonical payload; existing privacy auth is an `internal_token` comparison.
+- Proposed byte-exact length-prefixed envelope: `MOAPP` + protocol/algorithm +
+  keyId/keyVersion/messageType/payload; HMAC-SHA256 over exact bytes.
+- Binds keyId/keyVersion, protocol and algorithm; unknown/expired version,
+  protocol change, malformed Base64/length and trailing fields fail closed;
+  no cross-provider fallback.
+- Synthetic test vector provided (public key, no real secret): HMAC
+  `9793052f…e79c`; negative/rejection vectors enumerated.
+- Q-11 T1–T6 remain PROPOSED; no owner approval. Signature wire format,
+  revocation/existing signatures, key transport and deletion remain open.
+- No product code, AWS/Terraform mutation, push/merge/deploy or RIS/Jobsearch
+  change. Contract: `docs/contracts/MO-RC4-P00-D-HMAC-PAYLOAD-CONTRACT.md`;
+  Report: `docs/reports/MO-RC4-P00-D-HMAC-CONTRACT-03.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-IMPLEMENTATION-04
+
+**Status:** `MO-RC4-P00-D — LOCAL IMPLEMENTATION COMPLETE / SECURITY REVIEW PENDING`
+
+- Feature branch `feature/mo-rc4-p00-d-app-managed` from `8a19d5a`.
+- D1/D2: `hmac_contract.py` implements the approved byte-exact `MOAPP`
+  envelope, HMAC-SHA256, Base64url-no-padding signatures, strict 32-byte
+  Base64 key validation, constant-time verification and fail-closed parsing.
+- D3/D4: additive local `AppManagedProvider.resolve_key()/verifier()` with
+  injected material/loader; `resolve()` remains fail-closed; no bearer-token
+  activation, no ENV/AWS_MANAGED change, no production transport.
+- Generated test vector reproduced exactly; 23 HMAC tests pass.
+- Lambda 428 PASS; Installer 667 PASS with 1 live-profile test deferred and
+  1 environment-dependent primary-worktree detector failure; Builder 128, E2E
+  32, Seed 28. No test exception counted as PASS.
+- ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, reproducible).
+- P00-F rotation/revocation, production key transport and existing-signature
+  handling remain open. No merge/push/deploy, AWS/Terraform mutation or
+  RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-P00-D-IMPLEMENTATION-04.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-SECURITY-REVIEW-05
+
+**Status:** `MO-RC4-P00-D — SECURITY REVIEW PASSED / MERGE REVIEW READY`
+
+- Read-only review of feature `18cf541` against integration `8a19d5a`;
+  ancestry PASS, no product changes, no merge/push/deploy.
+- R1 HMAC-SHA256/32-byte strict Base64/constant-time: PASS; published vector
+  reproduced independently (`9793052f…e79c`, signature `l5MFL…55w`).
+- R2 envelope format/lengths/ASCII/1 MiB/no trailing/field binding: PASS.
+- R3 ENV/AWS_MANAGED unchanged, APP_MANAGED default-off, no request selection,
+  no fallback, `AppManagedProvider.resolve()` fail-closed, `verifier()` not
+  wired into OrderService: PASS.
+- R4 local key custody, no key in Git/reports/logs/state, no AWS dependency:
+  PASS; production transport still open.
+- R5 23/23 HMAC tests, Lambda 428/428: PASS. LOW R5-L01: no direct wrong-key
+  material test. R6 dependency detector classified **TEST HARNESS DEFECT /
+  ENVIRONMENT DEPENDENCY**: hardcoded primary worktree clean vs expected
+  changes; not a P00-D regression.
+- R7 ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, source-identical/reproducible).
+- No CRITICAL/HIGH/MEDIUM. Merge review ready; deployment remains blocked by
+  P00-F rotation/revocation, production transport and installer environment
+  tests.
+- Report: `docs/reports/MO-RC4-P00-D-SECURITY-REVIEW-05.md`.
+
+## 2026-11-14 — MO-RC4-P00-D-INTEGRATION-06
+
+**Status:** `MO-RC4-P00-D — LOCALLY INTEGRATED / POST-MERGE VERIFIED / DEPLOYMENT GATES OPEN`
+
+- Additional wrong-key regression test `73bd07c` (key A signs, key B verifies →
+  false; same keyId/keyVersion/envelope). No HMAC product change.
+- Merge 1 `3d3273803b66b6c3ed592084e552fa3319c929cf` (`8a19d5a` + `18cf541`):
+  P00-D HMAC foundation.
+- Merge 2 `21ff5d301a416ff59bacb01bc4ec9409c9f6b19b` (`3d32738` + `73bd07c`):
+  wrong-key regression test.
+- Review-05 docs cherry-picked as docs-only `c0d8d719`.
+- Post-merge: Lambda 429 PASS, Installer 667 PASS + 1 live-profile deferred +
+  1 dependency-test harness failure, Builder 128, E2E 32; Seed 28. Exceptions
+  not counted as PASS.
+- ZIP `b70e5c945f917545d9ac9174dc6823a4d5473ebb069b88f449f420c0e62aa4ff`
+  (45.676 B, 13 modules, source-identical/reproducible).
+- R5-L01 fixed; R6-L01 remains test harness defect. P00-F rotation/revocation,
+  production key transport and existing-signature handling remain open.
+- No production activation, merge/push/deploy, AWS/Terraform mutation or
+  RIS/Jobsearch change. Report:
+  `docs/reports/MO-RC4-P00-D-INTEGRATION-06.md`.
+
+## 2026-11-14 — MO-RC4-P00-E-SIMPLE-01
+
+**Status:** `RESULT B — P00-E LOCAL IMPLEMENTED / INTEGRATION APPROVAL REQUIRED`
+
+- Feature branch `feature/mo-rc4-p00-e-simple` from integration
+  `2dbbd3f`; implementation commit `a6667ec`. The existing P00-E analysis
+  branch (`46c6e61`, docs-only) was not modified.
+- Q-01: no privacy secret exists at baseline; opt-in uses the AWS-managed
+  Secrets Manager key by default, or an explicitly supplied existing CMK ARN.
+  No KMS key is created.
+- Q-02: handler role had no Secrets/KMS permissions. Added count-gated
+  `secretsmanager:GetSecretValue` on the exact secret ARN;
+  `secretsmanager:DescribeSecret` and `kms:Decrypt` only for an explicit CMK.
+  No wildcards; no permissions when disabled.
+- Q-03: Policy Gate now allows `aws_secretsmanager_secret`, enforces project
+  namespace/exact KMS ARN, and rejects wildcard Actions/Resources in inline
+  `aws_iam_role_policy` for sensitive Secrets/KMS actions. DDB/SQS CMK and
+  KMS key creation remain excluded.
+- No secret value/version is managed by Terraform; the value is provisioned
+  out-of-band. APP_MANAGED remains unchanged/default-off. No DDB/SQS/API/
+  Cognito/CloudFront changes.
+- Local evidence: Terraform `fmt -check` and `validate` PASS; Lambda 429/429,
+  Module Builder 128/128, Policy Gate 23/23 PASS. No Terraform plan/apply,
+  AWS live call, deployment, push or merge.
+- Remaining gates: integration approval, Terraform plan, apply/AWS-live,
+  out-of-band secret value, optional CMK key policy, DDB/SQS CMK decision and
+  P00-F rotation/revocation.
+- Report: `docs/reports/MO-RC4-P00-E-SIMPLE-01.md`.
+
+## 2026-11-14 — MO-RC4-P00-E-INTEGRATION-02
+
+**Status:** `RESULT C — P00-E LOCALLY INTEGRATED / VERIFICATION INCOMPLETE`
+
+- All existing worktrees were clean; no foreign changes were touched and no
+  subagents were used in this task.
+- Feature `feature/mo-rc4-p00-e-simple` @ `44c3900` merged `--no-ff` into
+  `release/rc4-integration` as `3b0de2f`; parents are `2dbbd3f` + `44c3900`.
+- Integration check passed: opt-in secret, no default Secret/IAM resources,
+  no secret value/version, no KMS key creation, optional exact CMK ARN,
+  exact Secret ARN IAM, no wildcard, ENV default unchanged, APP_MANAGED
+  default-off, no DDB/SQS/Cognito/CloudFront changes.
+- Post-merge: Lambda 429 PASS; Installer local 673 tests with 2 known
+  dependency-detector harness failures and 1 live-profile test deferred;
+  Builder 128, Policy Gate 23, E2E 36 (5 skipped), Seed 28 PASS; Terraform
+  fmt/init/validate and `git diff --check` PASS. No plan/apply/deployment.
+- **Deviation:** the first full installer invocation used a wrong test-ID
+  filter and therefore executed the live profile test once. It performed a
+  read-only STS identity check and passed; no mutation or deployment occurred.
+  The corrected local suite excludes the test. This is why the result is
+  **C**, not A.
+- No new product failures beyond the known dependency-detector harness defect.
+- Report: `docs/reports/MO-RC4-P00-E-INTEGRATION-02.md`.
+
+## 2026-11-14 — MO-RC4-FINAL-01
+
+**Status:** `RESULT B — RC4 READY WITH DEPLOYMENT GATES`
+
+- All worktrees were clean before the task; no foreign changes were touched.
+  No subagents were used; all writes/commits were serialized.
+- Installer stabilized: hardcoded primary-worktree paths removed, detector
+  takes an explicit repo root, deterministic tests use an offline fixture,
+  and the AWS live profile test is skipped unless `MO_AWS_LIVE_PROFILE_TEST=1`.
+- P00-F APP_MANAGED rotation/revocation implemented default-off: one previous
+  key in a validated <=24h window, injected local material, no KMS/hot reload,
+  and fail-closed `revoke()`.
+- P00-G safely disabled: Q-05/Q-06/Q-07/Q-14 remain open; no retention fields,
+  TTL, automatic deletion or backfill were added.
+- P00-H: complete builder preset includes `privacy_secret`; two builds are
+  byte-identical (excluding manifest) and generated Terraform validates.
+- P00-I: 440 Lambda, 674 Installer (1 skipped), 129 Builder, 23 Policy,
+  36 E2E (5 skipped), 28 Seed; Terraform fmt/init/validate PASS.
+- Lambda ZIP 46.929 B, SHA-256
+  `20f4bab5766529e3340273cfde3b35c601a389122759051f2aef801337b76377`;
+  two builds byte-identical. No plan/apply/AWS mutation/deployment/push.
+- Integration merge `0620044`; details in
+  `docs/reports/MO-RC4-FINAL-01.md`.
+
+## 2026-11-14 — MO-RC4-AWS-LIFECYCLE-FINAL-01
+
+**Status:** `COMPLETE — AWS DEV LIFECYCLE VERIFIED / STACK DESTROYED`
+
+- Explicit owner request received for validate/plan/deploy/destroy plus full
+  post-deploy testing. Target: profile `mayaws`, account `240571105849`,
+  region `eu-central-1`, project/workspace `mays-orders-rc4`, version `0.2.0`.
+- Validate: 12 PASS, 1 WARN, 0 FAIL. The warning covered 7 pre-existing
+  `mays-orders-rc4-test-*` resources in the separate `mays-orders-rc4-test`
+  workspace; they were left untouched.
+- Deploy plan: 58 add / 0 change / 0 destroy; Policy Gate PASS; plan SHA-256
+  `7e029abe8a8aa0ea77ff09aa51e0110a9801e5f9252b933ebb738969c71f840d`.
+- Deploy: 58/58 created; Terraform state and AWS identity verification PASS.
+- Post-deploy: Lambda 440, Installer 674 (1 skipped), Builder 129, Policy 23,
+  local E2E 36 (5 skipped), Seed 28, Terraform fmt/validate PASS.
+- Live E2E: 4/4 PASS; full E2E discovery 36 OK with 1 privacy-live skip.
+  Temporary Cognito test user created, used and deleted; no token/password
+  stored in Git or reports.
+- Destroy plan: 58 delete; Policy Gate PASS; SHA-256
+  `4372d15426ae666c989f03f2522c6f45aea78fc078e7a2de6f12ebbff02807d9`.
+- Destroy: 58/58 deleted; post-destroy state 0; Terraform validate PASS.
+- No target `mays-orders-rc4` resources remain. The pre-existing
+  `mays-orders-rc4-test` workspace/resources remain untouched.
+- No push, main merge, production activation or RIS/Jobsearch change.
+- Report: `docs/reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md`.
+
+## 2026-11-14 — MO-GIT-CONSOLIDATION-01
+
+**Status:** `INVENTORY COMPLETE / SAFE CHECKS ONLY / NO DESTRUCTIVE ACTION`
+
+- All 15 Git worktrees under `/home/dci-student/projects/` were clean; no
+  uncommitted or untracked files were found. No subagents were used.
+- The canonical Git common directory is
+  `/home/dci-student/projects/Mays-Orders-AWS/.git`. There is one non-Git
+  snapshot, `Mays-Orders-AWS02092026`; the other Mays-Orders-AWS folders are
+  linked worktrees, not independent clones.
+- RC4 candidate `720e458` is reachable via
+  `refs/heads/release/rc4-integration`; it is not in `main`, is 97 commits
+  ahead of all remote refs, and 188 commits ahead of `main` (0 behind).
+- Shared refs: 55 local branches, 12 remote branches, 20 tags; 44 branches
+  without upstream and 22 branches with unpushed commits. No missing branch
+  refs were found; no refs were created.
+- Local state inventory: `ci/iam` 14 resources, `ci/pipeline` 7 resources,
+  root `terraform.tfstate` 0; no state was moved or deleted. RC4 workspace
+  state was already empty after the controlled destroy.
+- Recommended target: canonical `Mays-Orders-AWS` plus the RC4 integration
+  worktree; remove the remaining feature/review/analysis and `/tmp` worktrees
+  only after explicit approval. The non-Git snapshot and ZIP archives require
+  separate archive/removal approval.
+- No deletion, worktree removal, reset, clean, branch deletion, state move,
+  push or main merge was performed.
+- Report: `docs/reports/MO-GIT-CONSOLIDATION-01.md`.
+
+## 2026-11-14 — MO-GIT-CONSOLIDATION-02
+
+**Status:** `RESULT A — CLEAN / TWO WORKTREES REMAIN`
+
+- Rechecked all 20 worktrees: clean, unlocked, no process using a removable
+  worktree. RC4 `720e458` remained reachable via `release/rc4-integration`.
+- Removed exactly 18 worktrees with regular `git worktree remove` and no
+  `--force`: 13 under `/home/dci-student/projects/` and five `/tmp/opencode`
+  worktrees. Their branches/HEADs remain unchanged.
+- Gitignored `.mays-installer` test artifacts were copied to
+  `/tmp/opencode/mo-git-consolidation-02-ignored/` (56 files, ca. 1.7 MB)
+  before removal. No product data or Terraform state was moved.
+- Remaining worktrees: `Mays-Orders-AWS` (`0756563`) and
+  `Mays-Orders-AWS-rc4-integration` (`2319b04`); both clean.
+- 55 local branches, 12 remote branches and 20 tags remain; no branch/tag
+  deletion, reset, clean, push or main merge. `git fsck --connectivity-only`
+  reports no missing objects.
+- Non-Git snapshot, ZIP archives and Terraform states remain untouched.
+- Report: `docs/reports/MO-GIT-CONSOLIDATION-02.md`.
+
+## 2026-11-14 — MO-RC4-PUBLISH-01
+
+**Status:** `COMPLETE — RC4 BRANCH PUBLISHED / MAIN UNTOUCHED`
+
+- Pre-push count verified: **99 unpushed commits** on
+  `release/rc4-integration`; no upstream and no remote branch existed.
+- Pushed the branch without force:
+  `git push -u origin release/rc4-integration:release/rc4-integration`.
+- Remote and local tip were verified as
+  `e73cd8abf3f4aa098bd5ffeda402a03b162575cc`; unpushed count is now 0.
+- `main` remains unchanged and 190 commits behind the RC4 branch; no main
+  merge or push to `main`. No tags were pushed. No AWS calls.
+- Report: `docs/reports/MO-RC4-PUBLISH-01.md`.
+
+## 2026-11-14 — MO-RC4-RELEASE-01
+
+**Status:** `RESULT A — RELEASE v0.6.0-rc.1 PUBLISHED / MAIN MERGE PREPARED`
+
+- Q-12 approved: `v0.6.0-rc.1`; component versions remain Installer `0.1.0`,
+  Module Builder `0.1.0`, Deployment/Teststack `0.2.0`.
+- Release documentation updated; release commit
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`.
+- Annotated tag `v0.6.0-rc.1` created on that commit (`tag object
+  79628819717e4609d828581dff53055f2b32f8ec`), branch and tag pushed without
+  force. Remote branch and peeled tag target were verified.
+- Merge preparation: `main` `f597d14`, 192 commits ahead, 0 behind, merge-base
+  `f597d14`; `git merge-tree` and `git diff --check` clean. No main merge.
+- No AWS calls, Terraform apply, deployment, or production activation.
+- P00-G retention remains disabled; APP_MANAGED default-off.
+- Report: `docs/reports/MO-RC4-RELEASE-01.md`.
+
+## 2026-11-15 — O-README-PROFESSIONAL-01
+
+**Status:** `COMPLETE — LOCAL README REFRESH`
+
+- Rewrote `README.md` in English with the Module Builder as the primary theme,
+  plus Installer, architecture, security/privacy, testing, release/versioning,
+  documentation and GPL-3.0 license sections.
+- Added the owner-provided RC4 hero image at
+  `docs/assets/mays-orders-aws-rc4-hero.png` (1536×1024, SHA-256
+  `ab2a2e4ed3ed20e533187b17c99d228fb1c17a6e8c370f30dd9766f567c4dc06`).
+- Verified README relative links, image path, version table, Mermaid block and
+  current release tag `v0.6.0-rc.1`.
+- No product code, AWS infrastructure, Terraform state or worktree changes.
+  No push, main merge or deployment.
+- Report: `docs/reports/O-README-PROFESSIONAL-01.md`.
+
+## 2026-11-15 — MO-RC4-RELEASE-PACKAGE-FINAL-01
+
+**Status:** `RESULT A — README, NOTES, PDF AND GITHUB RELEASE PUBLISHED`
+
+- Added the hero image to the release notes and linked the release PDF from
+  README and release notes.
+- Generated `docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf` (A4, 7 pages,
+  3,668,656 bytes, SHA-256
+  `968a9276617f681e1534f60855de19c6a51889a3346c02907392df2a945438da`).
+- Published branch commit `a007c20` without force. README, raw hero image and
+  PDF asset were verified remotely.
+- Created GitHub pre-release
+  `https://github.com/maynowak/mays-order-aws/releases/tag/v0.6.0-rc.1`
+  using the consolidated release notes and the PDF asset.
+- Existing annotated tag `v0.6.0-rc.1` remains unchanged at
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`; release body explicitly marks
+  README/PDF and later docs as post-tag documentation.
+- No AWS calls, Terraform apply, deployment or main merge. `main` remains
+  `f597d14`.
+- Report: `docs/reports/MO-RC4-RELEASE-PACKAGE-FINAL-01.md`.

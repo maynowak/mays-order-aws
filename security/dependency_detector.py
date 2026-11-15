@@ -285,14 +285,19 @@ def check_terraform_providers(tf_file: Path) -> list[Dependency]:
     return deps
 
 
-def detect_all_changes() -> DetectionResult:
-    """Run all dependency checks and return consolidated result."""
+def detect_all_changes(repo_root: Optional[Path] = None) -> DetectionResult:
+    """Run all dependency checks and return consolidated result.
+
+    ``repo_root`` removes the former dependency on the caller's working
+    directory.  It defaults to this repository (parent of ``security/``).
+    """
+    root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
     run = run_id()
     timestamp = datetime.now(timezone.utc).isoformat() + "Z"
     all_deps = []
 
     # Check Terraform providers
-    tf_file = Path("terraform/main.tf")
+    tf_file = root / "terraform/main.tf"
     if tf_file.exists():
         tf_deps = check_terraform_providers(tf_file)
         all_deps.extend(tf_deps)
