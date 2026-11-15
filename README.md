@@ -256,8 +256,10 @@ intentionally destroyed after verification.
 | Installer | 0.1.0 |
 | Deployment / Test Stack | 0.2.0 |
 
-The annotated Git tag **`v0.6.0-rc.1`** exists on the published release commit. The
-release branch is `release/rc4-integration`; the main merge is prepared but not executed.
+The annotated Git tag **`v0.6.0-rc.1`** points to commit
+`5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`. This README and the PDF package are
+post-tag documentation on `release/rc4-integration`; they are not part of the
+tagged source tree. The main merge is prepared but not executed.
 
 The release label is independent from component versions. Production activation, secret
 provisioning, optional CMK policy, P00-F operational rotation and retention decisions
@@ -266,6 +268,7 @@ remain separate owner gates.
 ## Documentation
 
 - [Release Notes](docs/RELEASE_NOTES.md)
+- [Release PDF](docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf)
 - [RC4 Module Release Candidate](docs/release/RC4-MODULE-RELEASE-CANDIDATE.md)
 - [Architecture](docs/architecture/MAYS-ORDERS-ARCHITECTURE.md)
 - [Installer Guide](docs/INSTALLER_GUIDE.md)

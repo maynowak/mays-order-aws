@@ -1,13 +1,24 @@
 # Release Notes — Mays Orders
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/maynowak/mays-order-aws/release/rc4-integration/docs/assets/mays-orders-aws-rc4-hero.png" alt="Mays-Orders-AWS RC4 — modular AWS infrastructure engineering" width="100%">
+</p>
+
 ## RC4 v0.6.0-rc.1 — APPROVED RELEASE CANDIDATE
 
-STATUS: `RELEASE CANDIDATE — APPROVED / TAG TARGET = THIS RELEASE COMMIT`
+> **Release-tag boundary:** The annotated tag `v0.6.0-rc.1` points to commit
+> `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`. This release-notes file, the
+> README, the PDF package and later documentation commits on
+> `release/rc4-integration` are post-tag documentation. They do not change the
+> tagged source tree and are not presented as part of that commit.
+
+STATUS: `RELEASE CANDIDATE — APPROVED / TAG PUBLISHED`
 OWNER STATUS: `Q-12 APPROVED — v0.6.0-rc.1`
 RELEASE VERSION: `v0.6.0-rc.1`
 DEPLOYMENT VERSION (Teststack): `0.2.0`
-BASE: `release/rc4-integration` (annotated tag target = release commit)
-TAG: annotated `v0.6.0-rc.1` (created and published after this commit)
+BASE: `release/rc4-integration`
+TAG: annotated `v0.6.0-rc.1` → `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`
+PDF: `docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf`
 
 SCOPE:
 - Order-API, Owner-/Consumer-Isolation, Statusmodell, SQS-Worker, DLQ,
