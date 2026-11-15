@@ -1,6 +1,6 @@
 # MO-RELEASE-DIRECTORY-CONSOLIDATION-01 — Release Directory Inventory
 
-**Status:** `RESULT B — PARTIAL / SAFE PRESERVATION`
+**Status:** `RESULT A — CONSOLIDATED BY SAFE PRESERVATION`
 **Datum:** 2026-11-15
 **Branch:** `docs/mo-release-directory-consolidation-01`
 **Base main:** `c291d4a35130b6fdb1bf00f05ad6d67d44de2141`
@@ -17,7 +17,22 @@
 - Neuer Arbeitsbranch von `main`: `docs/mo-release-directory-consolidation-01`
 - Keine neuen Worktrees oder Klone
 
-## 2. Inventar `docs/release/`
+## 2. Owner-Entscheidungen
+
+Die sichere Bestandserhaltung ist die endgültige Entscheidung:
+
+- `RELEASE-v*.md/.pdf` bleiben unverändert in `docs/release/`.
+- `MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf` bleibt technisches Detailpaket.
+- Decision Register und P00-Planungsdokumente bleiben als historische
+  Release-Unterlagen.
+- Integration Manifest, Release-Dossier und historische Release-Gates bleiben
+  im Release-Verzeichnis.
+- Die fünf fehlenden v0.4.0-Assets bleiben als bekannte historische
+  Dokumentationslücke dokumentiert.
+- Das GitHub-Release-Asset bleibt unverändert.
+- Es werden **keine Dateien verschoben, gelöscht, dupliziert oder umbenannt**.
+
+## 3. Inventar `docs/release/`
 
 Legende: `Refs` = Treffer mit dem vollständigen Pfad inklusive der Datei selbst.
 Entscheidung bezieht sich auf **diesen** Branch.
@@ -61,7 +76,7 @@ sind:
 Diese Lücke ist vorbestehend und wurde nicht durch diese Aufgabe verursacht.
 Es wurde keine Ersatzgrafik erzeugt.
 
-## 3. Tatsächlich verschobene Dateien
+## 4. Tatsächlich verschobene Dateien
 
 **Keine.** Es wurden keine Dateien verschoben, umbenannt oder gelöscht.
 
@@ -71,7 +86,7 @@ referenziert. Nach der Vorgabe „historische Auditlogs und Reports nicht
 umschreiben“ und „bei historischem Pfadbedarf am bisherigen Ort belassen“ wurde
 keine Pfadänderung erzwungen.
 
-## 4. Referenzprüfung
+## 5. Referenzprüfung
 
 - README-Links: **gültig**
 - Neue/aktuelle Release-Referenzen: **gültig**
@@ -85,7 +100,19 @@ keine Pfadänderung erzwungen.
 - GitHub-Release-Asset und Release-Body: **unverändert**
 - Release-Tag: **unverändert**
 
-## 5. Offene Zuordnungsfragen
+## 6. Entschiedene Zuordnungsfragen
+
+Die zuvor offenen Fragen sind durch die Owner-Entscheidung geschlossen:
+
+1. Decision Register und P00-Planungsdokumente bleiben am bestehenden Ort.
+2. Technische Release-Dossiers bleiben im Release-Verzeichnis.
+3. Fehlende v0.4.0-Assets werden nicht ersetzt; sie bleiben dokumentierte
+   historische Lücken.
+4. Das GitHub-Release-Asset bleibt unverändert; eine spätere Ersetzung wäre ein
+   separater Auftrag.
+5. Es werden keine neuen Unterverzeichnisse angelegt.
+
+## 7. Offene Zuordnungsfragen (historisch)
 
 1. Soll das Decision Register nach `docs/adr/` oder `docs/reports/` wandern?
 2. Sollen die P00-Planungsdokumente nach `docs/roadmap/` wandern, obwohl
@@ -97,16 +124,17 @@ keine Pfadänderung erzwungen.
 5. Soll das GitHub-Release-Asset später gegen das kanonische Release-PDF
    ausgetauscht werden? Dafür ist eine separate Freigabe erforderlich.
 
-## 6. Ergebnis
+## 8. Ergebnis
 
-**B — PARTIAL:** Das Inventar, die Klassifizierung und die Referenzprüfung sind
-vollständig. Sichere Dateiverschiebungen wurden nicht erzwungen, weil alle
-Kandidaten historische Pfadreferenzen besitzen. Das Release-Verzeichnis bleibt
-funktional und nachvollziehbar; keine Daten wurden verändert.
+**A — CONSOLIDATED BY SAFE PRESERVATION:** Das Inventar, die Klassifizierung
+und die Referenzprüfung sind vollständig. Es waren **0 Verschiebungen**
+notwendig. Alle historischen Referenzen bleiben intakt; das Release-Verzeichnis
+ist dokumentiert und bewusst in seiner bestehenden Struktur erhalten.
 
-## 7. Git
+## 9. Git
 
 - Arbeitsbranch: `docs/mo-release-directory-consolidation-01`
 - Keine Produktcode-/Terraform-/AWS-/CI-Änderung
-- Kein Tag, kein GitHub-Release, kein Main-Merge
-- Branch wird regulär gepusht; Main-Merge separat freizugeben
+- Kein Tag, kein GitHub-Release
+- Feature-Branch wird regulär gepusht
+- Main-Integration nach erfolgreicher Prüfung gemäß Closeout-Freigabe
