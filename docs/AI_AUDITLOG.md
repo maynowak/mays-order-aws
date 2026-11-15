@@ -935,3 +935,24 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No product code, AWS infrastructure, Terraform state or worktree changes.
   No push, main merge or deployment.
 - Report: `docs/reports/O-README-PROFESSIONAL-01.md`.
+
+## 2026-11-15 — MO-RC4-RELEASE-PACKAGE-FINAL-01
+
+**Status:** `RESULT A — README, NOTES, PDF AND GITHUB RELEASE PUBLISHED`
+
+- Added the hero image to the release notes and linked the release PDF from
+  README and release notes.
+- Generated `docs/release/MAYS-ORDERS-AWS-v0.6.0-rc.1.pdf` (A4, 7 pages,
+  3,668,656 bytes, SHA-256
+  `968a9276617f681e1534f60855de19c6a51889a3346c02907392df2a945438da`).
+- Published branch commit `a007c20` without force. README, raw hero image and
+  PDF asset were verified remotely.
+- Created GitHub pre-release
+  `https://github.com/maynowak/mays-order-aws/releases/tag/v0.6.0-rc.1`
+  using the consolidated release notes and the PDF asset.
+- Existing annotated tag `v0.6.0-rc.1` remains unchanged at
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`; release body explicitly marks
+  README/PDF and later docs as post-tag documentation.
+- No AWS calls, Terraform apply, deployment or main merge. `main` remains
+  `f597d14`.
+- Report: `docs/reports/MO-RC4-RELEASE-PACKAGE-FINAL-01.md`.
