@@ -919,3 +919,19 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - No AWS calls, Terraform apply, deployment, or production activation.
 - P00-G retention remains disabled; APP_MANAGED default-off.
 - Report: `docs/reports/MO-RC4-RELEASE-01.md`.
+
+## 2026-11-15 — O-README-PROFESSIONAL-01
+
+**Status:** `COMPLETE — LOCAL README REFRESH`
+
+- Rewrote `README.md` in English with the Module Builder as the primary theme,
+  plus Installer, architecture, security/privacy, testing, release/versioning,
+  documentation and GPL-3.0 license sections.
+- Added the owner-provided RC4 hero image at
+  `docs/assets/mays-orders-aws-rc4-hero.png` (1536×1024, SHA-256
+  `ab2a2e4ed3ed20e533187b17c99d228fb1c17a6e8c370f30dd9766f567c4dc06`).
+- Verified README relative links, image path, version table, Mermaid block and
+  current release tag `v0.6.0-rc.1`.
+- No product code, AWS infrastructure, Terraform state or worktree changes.
+  No push, main merge or deployment.
+- Report: `docs/reports/O-README-PROFESSIONAL-01.md`.
