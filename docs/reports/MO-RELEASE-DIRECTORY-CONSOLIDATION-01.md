@@ -2,6 +2,14 @@
 
 **Status:** `RESULT A — CONSOLIDATED BY SAFE PRESERVATION`
 **Datum:** 2026-11-15
+
+> **Korrekturvermerk 2026-11-15 — MO-RELEASE-DIRECTORY-FIX-02:**
+> Die frühere Bestandserhaltung erfüllte die ursprüngliche Anforderung nicht,
+> interne Entwicklungsdokumente aus `docs/release/` zu entfernen. Im
+> Folgeauftrag FIX-02 wurden sechs Dokumente nach `docs/adr/`, `docs/reports/`
+> und `docs/roadmap/` verschoben. Dieser ursprüngliche Prüfbericht bleibt als
+> historischer Nachweis erhalten; die aktuelle Zuordnung und Altpfad-Tabelle
+> stehen in `docs/reports/MO-RELEASE-DIRECTORY-FIX-02.md`.
 **Branch:** `docs/mo-release-directory-consolidation-01`
 **Base main:** `c291d4a35130b6fdb1bf00f05ad6d67d44de2141`
 **Release:** `v0.6.0-rc.1`

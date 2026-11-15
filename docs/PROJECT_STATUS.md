@@ -62,8 +62,8 @@ main baseline 7724c43 — RC4 v0.6.0-rc.1 released and integrated; post-merge do
   wird in Release Notes und PROJECT_STATUS geführt
 → Kein Produktivdeployment, keine Retention-Aktivierung, kein RIS-Rollout
 → Kanonische Roadmap: docs/roadmap/ROADMAP.md; Future-Extensions historisch
-→ MO-RELEASE-DIRECTORY-CONSOLIDATION-01: A — safe preservation;
-  23 Bestandsdateien inventarisiert, 0 Verschiebungen, historische Pfade erhalten
+→ MO-RELEASE-DIRECTORY-FIX-02: sechs interne Dokumente nach docs/adr/,
+  docs/reports/ und docs/roadmap/ verschoben; historische Altpfade dokumentiert
 → AWS dev lifecycle: mays-orders-rc4 @ 0.2.0; 58 create, live E2E PASS, 58 destroy,
   Terraform state 0; pre-existing mays-orders-rc4-test stack untouched
 → Git consolidation inventory: canonical `.git` in Mays-Orders-AWS; 15 clean

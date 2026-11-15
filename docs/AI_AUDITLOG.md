@@ -1041,3 +1041,21 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Feature branch committed and pushed; regular main integration follows after
   preflight and conflict-free merge verification.
 - Report: `docs/reports/MO-RELEASE-DIRECTORY-CONSOLIDATION-01.md`.
+
+## 2026-11-15 — MO-RELEASE-DIRECTORY-FIX-02
+
+**Status:** `A — SIX FILES RELOCATED · REFERENCES VERIFIED · MAIN INTEGRATION PENDING`
+
+- Moved six internal RC4 documents with `git mv` out of `docs/release/`:
+  two to `docs/adr/`, one to `docs/reports/`, three to `docs/roadmap/`.
+  No target collisions; no file remains at the old release paths.
+- Updated current references in architecture, release README, roadmap and
+  project status. Historical reports/audit entries were not rewritten; the
+  old-to-new mapping is documented in the FIX-02 report and release README.
+- Added a dated correction note to the original consolidation report rather
+  than rewriting its historical conclusion.
+- Validated file locations, current links, unchanged release PDFs, unchanged
+  tag `5bc154e`, and no product/Terraform/AWS changes.
+- Feature branch `docs/mo-release-directory-fix-02` pushed; Pull Request #1
+  created. Main integration follows after successful PR checks.
+- Report: `docs/reports/MO-RELEASE-DIRECTORY-FIX-02.md`.
