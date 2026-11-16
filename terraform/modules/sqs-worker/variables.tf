@@ -30,9 +30,9 @@ variable "dynamodb_table_arn" {
 }
 
 variable "lambda_execution_boundary" {
-  description = "IAM permissions boundary"
+  description = "Optionales IAM permissions boundary; leer = kein Boundary (kontospezifisch)."
   type        = string
-  default     = "arn:aws:iam::240571105849:policy/Mays-Orders-Lambda-Execution-Boundary"
+  default     = ""
 }
 
 variable "filename" {

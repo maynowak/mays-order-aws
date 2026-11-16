@@ -149,3 +149,9 @@ variable "ris_result_producer_role_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "lambda_execution_boundary" {
+  description = "Optionales IAM-Permissions-Boundary fuer Orders-Lambda-Rollen. Leer = kein Boundary; das Boundary ist kontospezifisch."
+  type        = string
+  default     = "arn:aws:iam::240571105849:policy/Mays-Orders-Lambda-Execution-Boundary"
+}

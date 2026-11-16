@@ -103,6 +103,7 @@ ORDERS_SERVICE_VARIABLES: List[str] = [
     "log_retention_days",
     "enable_agent_transport",
     "ris_result_producer_role_arns",
+    "lambda_execution_boundary",
 ]
 
 # Seed tooling (opt-in via var.seed_example_data, default false).

@@ -907,9 +907,20 @@ class TestOrdersServiceModule(unittest.TestCase):
                                      "monitoring_enabled", "log_retention_days",
                                      "external_cognito",
                                      "enable_agent_transport",
-                                     "ris_result_producer_role_arns"})
+                                     "ris_result_producer_role_arns",
+                                     "lambda_execution_boundary"})
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
+
+    def test_lambda_boundary_default_is_neutralised(self):
+        """Generated modules must not inherit an account-specific boundary."""
+        variables = (self.target / "variables.tf").read_text()
+        self.assertIn('variable "lambda_execution_boundary"', variables)
+        self.assertIn('default     = ""', variables)
+        main_tf = (self.target / "main.tf").read_text()
+        self.assertIn(
+            "lambda_execution_boundary = var.lambda_execution_boundary", main_tf
+        )
 
     def test_outputs_contract(self):
         """WP5 + GAP-02: 19 Bestands-Outputs + sqs_queue_name = 20."""
@@ -985,7 +996,8 @@ class TestOrdersServiceModule(unittest.TestCase):
                                      "monitoring_enabled", "log_retention_days",
                                      "external_cognito",
                                      "enable_agent_transport",
-                                     "ris_result_producer_role_arns"})
+                                     "ris_result_producer_role_arns",
+                                     "lambda_execution_boundary"})
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()

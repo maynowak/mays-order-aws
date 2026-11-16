@@ -961,6 +961,15 @@ def build_module(
         )
     )
     variables_text = substitute_project_name(variables_text, project_name)
+    # MO-RIS-ORDERS-MODULE-REBUILD-02: never ship an account-specific
+    # permissions boundary in a reusable module. The consumer can pass one.
+    boundary_pattern = re.compile(
+        r'(variable\s+"lambda_execution_boundary"\s*\{.*?default\s*=\s*)"[^"]*"',
+        re.S,
+    )
+    variables_text, boundary_count = boundary_pattern.subn(r'\1""', variables_text, count=1)
+    if boundary_count != 1:
+        _fail("lambda_execution_boundary-Default konnte nicht neutralisiert werden.")
     # EXTERNAL-Cognito-Vertragsvariable (generiert, nicht Stamm-Bestand):
     # null = MANAGED (Standard), Objekt = EXTERNAL; fail-closed-Validierung.
     variables_text = variables_text.rstrip("\n") + "\n" + EXTERNAL_COGNITO_VARIABLE

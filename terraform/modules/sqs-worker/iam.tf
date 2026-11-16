@@ -50,7 +50,7 @@ data "aws_region" "current" {}
 resource "aws_iam_role" "worker" {
   name                 = "${var.project_name}-sqs-worker-role"
   assume_role_policy   = data.aws_iam_policy_document.worker_trust.json
-  permissions_boundary = var.lambda_execution_boundary
+  permissions_boundary = var.lambda_execution_boundary != "" ? var.lambda_execution_boundary : null
 
   tags = merge({ "Project" = var.project_name }, var.tags)
 }
