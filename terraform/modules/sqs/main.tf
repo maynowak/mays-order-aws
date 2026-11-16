@@ -23,6 +23,8 @@ resource "aws_sqs_queue" "orders" {
   tags = merge({ "Project" = var.project_name }, var.tags)
 }
 
+data "aws_caller_identity" "current" {}
+
 resource "aws_sqs_queue_policy" "orders" {
   queue_url = aws_sqs_queue.orders.id
 
@@ -32,7 +34,7 @@ resource "aws_sqs_queue_policy" "orders" {
       {
         Sid       = "AllowAccessFromAccount"
         Effect    = "Allow"
-        Principal = "*"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
         Action    = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
         Resource  = aws_sqs_queue.orders.arn
       }
