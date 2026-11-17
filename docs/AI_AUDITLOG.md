@@ -373,6 +373,7 @@ Date: 2026-11-17
 - parse_secret strips whitespace, rejects blank raw values and blank rotation keys, and never treats an empty key as usable.
 - Secret read failures other than SecretUnavailable (AccessDenied, throttling, network) are caught and reported as batch failures instead of escaping as a whole-batch retry.
 - Non-ASCII/non-comparable signature input returns False from verify_signature instead of raising TypeError; it is a permanent reject, not an invocation failure.
-- Tests: 222 lambda tests pass (unittest discover); targeted consumer/handoff suites 48 pass. New cover: envelope-id vs SQS-id basis, signature over SQS id rejected, empty secret batch failure, missing secret batch failure, partial infrastructure failure retries only the failed record, blank secret parsing.
-- Artifact: lambda/dist/lambda.zip rebuilt, sha256 f212f5e49282b9ede4272b16223062abb08a64803a8340d43ac01d4495e63645, 13 files; bundled result_handler verifies the body messageId and emits batchItemFailures.
+- A record without an SQS messageId is an invocation failure (RuntimeError), never a silent acknowledgement.
+- Tests: 225 lambda tests pass (unittest discover); targeted consumer/handoff suites 48 pass. New cover: envelope-id vs SQS-id basis, signature over SQS id rejected, empty secret batch failure, missing secret batch failure, partial infrastructure failure retries only the failed record, blank secret parsing.
+- Artifact: lambda/dist/lambda.zip rebuilt, sha256 48ddd5e52d07b40fc333b67e5e34fb1b67701cf823536e20c7b2816a78a05f94, 13 files; bundled result_handler verifies the body messageId and emits batchItemFailures.
 - No AWS mutation, no secret access, no user change.
