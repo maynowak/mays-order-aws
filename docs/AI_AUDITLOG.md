@@ -362,3 +362,17 @@ Date: 2026-11-14
 - Module inventory: modules/agent_transport defines 11 resources, of which the KMS policy is count = 0 unless result_secret_kms_key_arn is set, giving 10 active resources; the module is gated by enable_agent_transport (default false).
 - Artifact: lambda/dist/lambda.zip exists (29531 B, sha256 010feb64...) and contains 13 modules including result_consumer.py and result_envelope.py; handler result_consumer.handler, runtime python3.14.
 - No plan, no apply, no secret access, no state mutation. Full cross-repository findings are recorded in the RIS report docs/reports/MO-RIS-AWS-PLAN-REVIEW-01-R1.md.
+
+[ORDER-RESULT-SIGNATURE-DOMAIN-01]
+Status: IMPLEMENTED / TESTED locally. No AWS apply, no push, no main merge.
+Date: 2026-11-17
+- Root cause: the consumer verified HMAC(secret, messageId + "\n" + body) against the SQS-assigned record.messageId (UUID), while the RIS producer signs the envelope messageId from the body (msg_<workId>_order_result). Every correctly signed result was rejected and, because no batchItemFailures were returned, deleted.
+- result_handler.process_records now parses the body first, requires a non-empty string envelope messageId, verifies the signature over that envelope id, and only then validates/applies the envelope. A signature over the SQS record id is rejected; tampered ids invalidate the signature.
+- Missing/unreadable/empty secret no longer returns HTTP 200 success. result_consumer.handler and the legacy result_handler.handler return batchItemFailures for every affected record, so SQS retries and the DLQ engages.
+- Infrastructure failures inside a batch are collected per record (itemIdentifier = SQS record messageId) and returned as batchItemFailures; successful records are acknowledged. Permanent rejections remain consumed by design.
+- parse_secret strips whitespace, rejects blank raw values and blank rotation keys, and never treats an empty key as usable.
+- Secret read failures other than SecretUnavailable (AccessDenied, throttling, network) are caught and reported as batch failures instead of escaping as a whole-batch retry.
+- Non-ASCII/non-comparable signature input returns False from verify_signature instead of raising TypeError; it is a permanent reject, not an invocation failure.
+- Tests: 222 lambda tests pass (unittest discover); targeted consumer/handoff suites 48 pass. New cover: envelope-id vs SQS-id basis, signature over SQS id rejected, empty secret batch failure, missing secret batch failure, partial infrastructure failure retries only the failed record, blank secret parsing.
+- Artifact: lambda/dist/lambda.zip rebuilt, sha256 f212f5e49282b9ede4272b16223062abb08a64803a8340d43ac01d4495e63645, 13 files; bundled result_handler verifies the body messageId and emits batchItemFailures.
+- No AWS mutation, no secret access, no user change.

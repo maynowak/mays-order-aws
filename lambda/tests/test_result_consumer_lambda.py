@@ -110,11 +110,11 @@ class ConsumerHarness(unittest.TestCase):
         self.env.stop()
         result_consumer.reset_cache()
 
-    def record(self, envelope, secret=CURRENT, message_id="m1"):
+    def record(self, envelope, secret=CURRENT, sqs_id="sqs-uuid-1"):
         body = json.dumps(envelope)
-        return {"messageId": message_id, "body": body,
+        return {"messageId": sqs_id, "body": body,
                 "messageAttributes": {"serviceSignature": {
-                    "stringValue": sign(secret, message_id, body)}}}
+                    "stringValue": sign(secret, envelope["messageId"], body)}}}
 
     def run_handler(self, *records):
         return result_consumer.handler({"Records": list(records)}, None)
@@ -134,24 +134,23 @@ class TestSecretHandling(ConsumerHarness):
                                      secret=PREVIOUS))
         self.assertIn("processing", self.table.items[self.order_id])
 
-    def test_missing_secret_reference_fails_closed(self):
+    def test_missing_secret_reference_is_a_batch_failure(self):
         with patch.dict(os.environ, {"ORDER_RESULT_SECRET_ARN": ""}):
             response = self.run_handler(self.record(result_envelope(
                 orderId=self.order_id)))
-        body = json.loads(response["body"])
-        self.assertEqual(0, body["processed"])
-        self.assertEqual("secret_reference_missing", body["reason"])
+        self.assertEqual([{"itemIdentifier": "sqs-uuid-1"}],
+                         response["batchItemFailures"])
         self.assertNotIn("processing", self.table.items[self.order_id])
 
-    def test_unavailable_secret_fails_closed(self):
+    def test_unavailable_secret_is_a_batch_failure(self):
         result_consumer.reset_cache()
         with patch.object(result_consumer, "_fetch_secret",
                           side_effect=result_consumer.SecretUnavailable("x")):
             response = self.run_handler(self.record(result_envelope(
                 orderId=self.order_id)))
-        body = json.loads(response["body"])
-        self.assertEqual(0, body["processed"])
-        self.assertEqual("secret_unavailable", body["reason"])
+        self.assertEqual([{"itemIdentifier": "sqs-uuid-1"}],
+                         response["batchItemFailures"])
+        self.assertNotIn("processing", self.table.items[self.order_id])
 
     def test_secret_value_is_never_returned(self):
         response = self.run_handler(self.record(result_envelope(
@@ -195,11 +194,92 @@ class TestRejections(ConsumerHarness):
         self.assertNotIn("processing", self.table.items[self.order_id])
 
     def test_partial_batch(self):
-        good = self.record(result_envelope(orderId=self.order_id), message_id="a")
+        good = self.record(result_envelope(orderId=self.order_id), sqs_id="a")
         bad = self.record(result_envelope(orderId=self.order_id,
-                                          schemaVersion="2"), message_id="b")
+                                          schemaVersion="2"), sqs_id="b")
         body = json.loads(self.run_handler(bad, good)["body"])
         self.assertEqual({"processed": 1, "rejected": 1}, body)
+
+    def test_signature_is_over_the_envelope_id_not_the_sqs_id(self):
+        envelope = result_envelope(orderId=self.order_id)
+        response = self.run_handler(self.record(envelope, sqs_id="11111111-2222-3333-4444-555555555555"))
+        self.assertEqual({"processed": 1, "rejected": 0},
+                         json.loads(response["body"]))
+        self.assertNotIn("batchItemFailures", response)
+
+    def test_signature_over_the_sqs_id_is_rejected(self):
+        envelope = result_envelope(orderId=self.order_id)
+        body = json.dumps(envelope)
+        record = {"messageId": "11111111-2222-3333-4444-555555555555",
+                  "body": body,
+                  "messageAttributes": {"serviceSignature": {
+                      "stringValue": sign(CURRENT, "11111111-2222-3333-4444-555555555555", body)}}}
+        response = self.run_handler(record)
+        self.assertEqual(1, json.loads(response["body"])["rejected"])
+        self.assertNotIn("processing", self.table.items[self.order_id])
+
+    def test_empty_secret_value_is_a_batch_failure(self):
+        result_consumer.reset_cache()
+        with patch.object(result_consumer, "_fetch_secret",
+                          side_effect=result_consumer.SecretUnavailable("empty")):
+            response = self.run_handler(self.record(result_envelope(
+                orderId=self.order_id)))
+        self.assertEqual([{"itemIdentifier": "sqs-uuid-1"}],
+                         response["batchItemFailures"])
+
+    def test_partial_infrastructure_failure_retries_only_that_record(self):
+        class FlakyService:
+            def __init__(self):
+                self.calls = 0
+
+            def apply_result(self, envelope):
+                self.calls += 1
+                if self.calls == 2:
+                    raise RuntimeError("temporary dynamodb failure")
+                return envelope
+
+        flaky = FlakyService()
+        with patch.object(result_handler, "create_order_service",
+                          return_value=flaky):
+            response = self.run_handler(
+                self.record(result_envelope(orderId=self.order_id), sqs_id="sqs-1"),
+                self.record(result_envelope(orderId=self.order_id), sqs_id="sqs-2"))
+        body = json.loads(response["body"])
+        self.assertEqual(1, body["processed"])
+        self.assertEqual([{"itemIdentifier": "sqs-2"}],
+                         response["batchItemFailures"])
+
+    def test_parse_secret_rejects_blank_and_whitespace(self):
+        self.assertEqual([], result_consumer.parse_secret(""))
+        self.assertEqual([], result_consumer.parse_secret("   "))
+        self.assertEqual([], result_consumer.parse_secret('{"current": " ", "previous": ""}'))
+        self.assertEqual([CURRENT], result_consumer.parse_secret("  current-key  "))
+
+    def test_secret_read_error_is_a_batch_failure(self):
+        result_consumer.reset_cache()
+        with patch.object(result_consumer, "_fetch_secret",
+                          side_effect=RuntimeError("access denied")):
+            response = self.run_handler(self.record(result_envelope(
+                orderId=self.order_id)))
+        self.assertEqual([{"itemIdentifier": "sqs-uuid-1"}],
+                         response["batchItemFailures"])
+        self.assertNotIn("processing", self.table.items[self.order_id])
+
+    def test_non_ascii_signature_is_rejected_not_raised(self):
+        envelope = result_envelope(orderId=self.order_id)
+        body = json.dumps(envelope)
+        record = {"messageId": "sqs-uuid-1", "body": body,
+                  "messageAttributes": {"serviceSignature": {
+                      "stringValue": "s\u00e9cret"}}}
+        response = self.run_handler(record)
+        self.assertEqual(1, json.loads(response["body"])["rejected"])
+        self.assertNotIn("processing", self.table.items[self.order_id])
+
+    def test_record_without_sqs_id_is_not_silently_acked(self):
+        with patch.dict(os.environ, {"ORDER_RESULT_SECRET_ARN": ""}):
+            with self.assertRaises(RuntimeError):
+                result_consumer.handler(
+                    {"Records": [{"body": "{}"}]}, None)
 
 
 if __name__ == "__main__":

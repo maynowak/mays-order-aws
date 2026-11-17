@@ -28,7 +28,12 @@ class SecretUnavailable(RuntimeError):
 
 
 def parse_secret(raw: str) -> List[str]:
-    """Return the accepted keys from a raw secret string."""
+    """Return the accepted keys from a raw secret string.
+
+    Blank/whitespace-only values are rejected: an empty key would make every
+    signature fail and must never be treated as a usable secret.
+    """
+    raw = (raw or "").strip()
     if not raw:
         return []
     try:
@@ -37,10 +42,12 @@ def parse_secret(raw: str) -> List[str]:
         return [raw]
     if isinstance(parsed, dict):
         keys = [parsed.get("current"), parsed.get("previous")]
-        return [k for k in keys if isinstance(k, str) and k]
-    if isinstance(parsed, str) and parsed:
-        return [parsed]
-    return []
+    elif isinstance(parsed, str):
+        keys = [parsed]
+    else:
+        keys = []
+    return [key.strip() for key in keys
+            if isinstance(key, str) and key.strip()]
 
 
 def _fetch_secret(secret_arn: str) -> List[str]:
@@ -68,25 +75,45 @@ def reset_cache() -> None:
     _cached_secrets = None
 
 
+def _batch_failures(records: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """Report every record for retry (used when no verification key exists).
+
+    An ``itemIdentifier`` is mandatory; a record without the SQS message id is
+    an invocation failure, never a silent acknowledgement.
+    """
+    failures: List[Dict[str, str]] = []
+    for record in records:
+        message_id = record.get("messageId")
+        if not message_id:
+            raise RuntimeError("SQS record without messageId")
+        failures.append({"itemIdentifier": message_id})
+    return failures
+
+
 def handler(event: Dict[str, Any], context: Any = None) -> Dict[str, Any]:
+    records = event.get("Records", [])
     secret_arn = os.environ.get("ORDER_RESULT_SECRET_ARN")
     if not secret_arn:
-        logger.error("result consumer rejected all messages: "
+        logger.error("result consumer cannot verify messages: "
                      "ORDER_RESULT_SECRET_ARN is not configured")
-        return {"statusCode": 200,
-                "body": json.dumps({"processed": 0,
-                                    "rejected": len(event.get("Records", [])),
-                                    "reason": "secret_reference_missing"})}
+        return {"batchItemFailures": _batch_failures(records)}
     try:
         secrets = _secrets(secret_arn)
     except SecretUnavailable:
-        logger.error("result consumer rejected all messages: "
+        logger.error("result consumer cannot verify messages: "
                      "secret unavailable")
-        return {"statusCode": 200,
-                "body": json.dumps({"processed": 0,
-                                    "rejected": len(event.get("Records", [])),
-                                    "reason": "secret_unavailable"})}
+        return {"batchItemFailures": _batch_failures(records)}
+    except Exception as exc:  # noqa: BLE001 - never ack on an unreadable secret
+        logger.error("result consumer cannot verify messages: "
+                     "secret read failed (%s)", type(exc).__name__)
+        return {"batchItemFailures": _batch_failures(records)}
+    if not secrets:
+        logger.error("result consumer cannot verify messages: "
+                     "secret has no usable key")
+        return {"batchItemFailures": _batch_failures(records)}
 
     import result_handler
 
-    return result_handler.process_records(event.get("Records", []), secrets)
+    # The response carries statusCode/body for observability and
+    # batchItemFailures for the ESM; Lambda ignores the extra keys.
+    return result_handler.process_records(records, secrets)

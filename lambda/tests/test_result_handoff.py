@@ -259,15 +259,15 @@ class TestConsumerBoundary(Harness):
         self.patch.stop()
         self.env_vars.stop()
 
-    def _record(self, envelope, *, signature=None, message_id="msg-1"):
+    def _record(self, envelope, *, signature=None, sqs_id="sqs-uuid-1"):
         body = json.dumps(envelope)
         return {
-            "messageId": message_id,
+            "messageId": sqs_id,
             "body": body,
             "messageAttributes": {
                 "serviceSignature": {
                     "stringValue": signature if signature is not None
-                    else sign(SERVICE_SECRET, message_id, body)}},
+                    else sign(SERVICE_SECRET, envelope["messageId"], body)}},
         }
 
     def test_valid_signed_message_is_processed(self):
@@ -291,11 +291,12 @@ class TestConsumerBoundary(Harness):
         self.assertEqual(1, json.loads(response["body"])["rejected"])
         self.assertNotIn("processing", self.table.items[self.order_id])
 
-    def test_missing_service_secret_rejects_everything(self):
+    def test_missing_service_secret_returns_a_batch_failure(self):
         with patch.dict(os.environ, {"ORDER_RESULT_SERVICE_SECRET": ""}):
             response = result_handler.handler(
                 {"Records": [self._record(self.env())]}, None)
-        self.assertEqual(0, json.loads(response["body"])["processed"])
+        self.assertEqual([{"itemIdentifier": "sqs-uuid-1"}],
+                         response["batchItemFailures"])
         self.assertNotIn("processing", self.table.items[self.order_id])
 
     def test_rejected_message_does_not_leak_secrets(self):

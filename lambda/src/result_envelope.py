@@ -120,7 +120,12 @@ def verify_signature(secret: str, message_id: str, body: str,
     if not secret or not signature:
         return False
     expected = sign(secret, message_id, body)
-    return hmac.compare_digest(expected, str(signature))
+    try:
+        return hmac.compare_digest(expected, str(signature))
+    except (TypeError, ValueError):
+        # Non-ASCII or otherwise non-comparable input is a permanent reject,
+        # not an invocation failure.
+        return False
 
 
 def validate_result_envelope(raw: Any) -> Dict[str, Any]:
