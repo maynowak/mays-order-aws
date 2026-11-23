@@ -373,6 +373,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-SECURITY-APPROVAL-CONTRACT-12A → docs/reports/MO-RC4-SECURITY-APPROVAL-CONTRACT-12A.md + docs/adr/ADR-RC4-APPROVAL-CONTEXT-BINDING.md (SEC-06 read-only analysiert: bestehende CLI bindet Plan/Workspace vor Approval, aber ApprovalContext ist nicht CLI-integriert, keine Approval-ID/Ablauf/Plan-Fingerprint-Bindung; ApprovalEvidence V2 PROPOSED, `--yes` nur Prompt-Unterdrückung; Bedrohungsmodell T01–T08, Invarianten INV-01–10, Migrationsvarianten A/B/C, Testmatrix SEC06-01–12; keine Implementierung, keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC4-SECURITY-APPROVAL-DECISION-12A-1 → docs/reports/MO-RC4-SECURITY-APPROVAL-DECISION-12A-1.md + ADR-Nachtrag (Trust-Modelle A/B/C, V2-Datenvertrag, `--yes`-Matrix, CI-Workflows `deploy.yml`/`destroy.yml`, TOCTOU-/Planpfad-Befund, Ablauf/Replay, Legacy/Destroy, Evidence/Keys, 16 Testfälle V2-01–16, 10 Entscheidungen mit Freigabevorbehalt; ADR bleibt PROPOSED; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC4-TESTSUITE-CONSOLIDATION-13A → docs/reports/MO-RC4-TESTSUITE-CONSOLIDATION-13A.md (Testinventur 1.150 PASS + 28 Seed-Tests separat + 4 Live-E2E BLOCKED; Coverage Lambda 90,15 %/82,22 %, Builder 91,22 %/84,93 %, Installer 74,08 %/64,04 %, E2E-Harness separat 91,58 %/88,46 %; Order-Traceability, P00-Scope-Abweichung KMS/Secrets/Retention, Dokumentationsdrift, P0/P1/P2-Lücken und 10 Folgepakete; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
+- MO-ORDER-DESCRIPTION-02 → docs/reports/MO-ORDER-DESCRIPTION-02-EXECUTION_LOG.md (Controlled Merge Review des Feature-Branches `feature/mo-order-description-01` @ `12d8963`: Merge konfliktfrei/Fast-Forward, Diff ohne Terraform/CI/RIS, ZIP byte-identisch (13 Module, `117299c9…`), Lambda 456 + fokussiert 16 + Installer 81 + Builder 129 + Seed 28 PASS; GitHub ohne Test-CI/PR, `main` ungeschützt; AWS read-only: D8-Pipeline mit ManualApproval, aktuell Source-Fail wegen fehlendem Artefakt-Bucket, Legacy-`directAWSGit` `DetectChanges=false`; Entscheidung READY FOR CONTROLLED MERGE mit Bedingungen; keine Produkt-/AWS-/Terraform-/RIS-Änderung, kein Merge)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1060,3 +1061,26 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   merged via GitHub merge commit `cd3f5fd56e45065aceff5cfe184b866622ebf5bd`.
 - Remote `main` verified at `cd3f5fd`; tag remains `5bc154e`.
 - Report: `docs/reports/MO-RELEASE-DIRECTORY-FIX-02.md`.
+
+## 2026-11-23 — MO-ORDER-DESCRIPTION-02 — CONTROLLED MERGE REVIEW
+
+**Status:** `REVIEW COMPLETE — READY FOR CONTROLLED MERGE (Bedingungen)`
+
+- Reviewed `feature/mo-order-description-01` @ `12d8963` against `main`/`origin/main`
+  `1eaa14e`; main is an ancestor, `git merge-tree` conflict-free (fast-forward possible).
+- Diff: 17 files (Lambda, tests, tracked ZIP, docs); no `terraform/`, `ci/`,
+  `installer/`, `scripts/` or RIS changes. API change is additive and optional;
+  `GET /orders` projection, errors, auth and pricing unchanged.
+- Lambda source vs. tracked ZIP: byte-identical rebuild (`sha256 117299c9…`,
+  47.552 B, 13 modules); artifact gate PASS.
+- Tests at reviewed HEAD: Lambda 456/456, focused 16/16, Installer 81/81,
+  Module Builder 129/129, Seed 28/28 PASS.
+- GitHub: no runs/statuses for the commits, no PR; workflows only on main/PR and
+  contain no test CI; `main` is not branch-protected.
+- AWS (read-only): `mays-orders-development-ci-cd` triggers on main, has a
+  ManualApproval before Deploy, but currently fails at Source because
+  `mays-orders-ci-artifacts-dev` does not exist (404) → no build/plan/deploy.
+  Legacy `directAWSGit-Mays-Order-AWS` has `DetectChanges=false`; a merge does
+  not trigger it.
+- No merge, push to main, deployment, Terraform apply, AWS mutation or RIS change.
+- Report: `docs/reports/MO-ORDER-DESCRIPTION-02-EXECUTION_LOG.md`.
