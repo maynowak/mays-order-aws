@@ -1106,3 +1106,26 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   not trigger it.
 - No merge, push to main, deployment, Terraform apply, AWS mutation or RIS change.
 - Report: `docs/reports/MO-ORDER-DESCRIPTION-02-EXECUTION_LOG.md`.
+
+## 2026-11-23 — MO-ORDER-DESCRIPTION-03 — CONTROLLED MAIN INTEGRATION
+
+**Status:** `MAIN INTEGRATED — NO DEPLOYMENT`
+
+- Fast-Forward `1eaa14e` → `12d8963` (17 Dateien, +750/−13), keine Squash-/Rebase-
+  oder Vertragsänderung; `923f2b7`, `80a84ca`, `12d8963` sind Ancestors von `main`.
+- Kontrollierter Cherry-Pick `f311ed9` → `0ef73db`; Konflikt ausschließlich in
+  `docs/AI_AUDITLOG.md`, gelöst durch Erhalt **beider** Einträge (01 und 02);
+  02-Report-Blob `60e7438c…` identisch zu `f311ed9`.
+- Push `1eaa14e..0ef73db`; Remote-`main` verifiziert. Evidence-Commit `5da7303`
+  (dieser Report + Index) anschließend gepusht; finaler `main`-HEAD `5da7303`.
+- Verifikation: ZIP byte-identisch (`117299c9…`, 47.552 B, 13 Module), Artefakt-Gate
+  PASS, Lambda 456/456, fokussiert 16/16, Installer 81/81, Builder 129/129,
+  Seed 28/28; Worktree clean; 19 geänderte Pfade, keine Terraform-/CI-/RIS-Datei.
+- AWS read-only: D8-Executions `05088da1…` und `d6bda765…` jeweils **nur Source**
+  (S3-Bucket 404), kein Build/Plan/Approval/Deploy; kein CodeBuild-Build am
+  2026-11-23 (Deploy letzter Build 2026-09-25); `directAWSGit` ohne neue Execution;
+  GitHub Actions (CodeQL/Dependency/Security Gate) erfolgreich; CloudTrail im
+  Zeitfenster ohne Ressourcen-Mutationen.
+- Die D8-Source-Störung bleibt als operativer Befund offen und wurde nicht behoben.
+- Kein AWS-Deployment, kein Terraform-Apply, keine RIS-Änderung.
+- Report: `docs/reports/MO-ORDER-DESCRIPTION-03-EXECUTION_LOG.md`.
