@@ -65,6 +65,9 @@ einer Restore-/Testtabelle diagnostizieren.
 
 - `customer.name`/`customer.email` sind personenbezogen; `subjectId`, `ownerId`,
   `actorId` sind pseudonym, aber personenbeziehbar.
+- `orderDescription` ist Freitext mit **PII-Potenzial** (z. B. Bewerber-/Stellenbezug):
+  Inspect nennt die Kategorie, Export enthält den Wert, `ANONYMIZE` entfernt das
+  Attribut, `ERASE` löscht das Item (MO-ORDER-DESCRIPTION-01).
 - Nur benötigte Attribute projizieren; `SELECT *` vermeiden.
 - Keine Exporte, Screenshots oder Tickets mit PII; Ergebnisse nicht in Logs
   kopieren.

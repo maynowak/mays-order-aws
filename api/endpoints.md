@@ -27,7 +27,8 @@
     { "sku": "SKU-1001", "quantity": 2, "unitPrice": 20 }
   ],
   "currency": "EUR",
-  "orderType": "generic"
+  "orderType": "generic",
+  "orderDescription": "ATS-Matching einer Stellenausschreibung mit einem Lebenslauf"
 }
 ```
 
@@ -37,6 +38,14 @@ namespace-fähig (`ris.document.analyze`, `jobsearch.match`), ausschließlich Kl
 Ziffern, Bindestrich und Punkt als Segmenttrenner, jedes Segment beginnt mit einem Buchstaben,
 max. 128 Zeichen. Unbekannte Typen werden vom Worker abgelehnt (DLQ), nicht als `generic`
 verarbeitet. (MO-RC4-P02E)
+
+`orderDescription` ist ein optionaler, menschlich lesbarer Bestelltext (1–1.024 Zeichen
+nach Trimmen; Zeilenumbruch LF, Wagenrücklauf CR und Tabulator sind erlaubt). Er
+beeinflusst weder Routing noch Preis-/Statusberechnung, ist **kein** Indexfeld und
+**nicht** Teil der kompakten Listenprojektion (`GET /orders`). Nicht angegebene
+Beschreibungen bleiben bei bestehenden Orders abwesend (kein Default, keine
+Migration). Freitext kann personenbezogene Daten enthalten und wird in
+Privacy-Inspect/-Export sowie Anonymisierung berücksichtigt. (MO-ORDER-DESCRIPTION-01)
 
 **Validierung (400 VALIDATION_ERROR):**
 
@@ -48,6 +57,9 @@ verarbeitet. (MO-RC4-P02E)
 - `items[].unitPrice`: Ganzzahl ≥ 1 (Integer, keine Nachkommastellen)
 - `currency`: Pflicht, 3 Zeichen (ISO-4217)
 - `orderType`: optional, Default `generic`; Namensschema s. o.
+- `orderDescription`: optional, nicht leer, String, max. 1.024 Zeichen nach Trimmen;
+  TAB/LF/CR erlaubt; alle übrigen C0-/C1-/DEL-Steuerzeichen, Unicode-Zeilentrenner
+  (U+2028/U+2029) und Surrogates werden abgelehnt
 - Unbekannte Felder → 400 (strikte Validierung)
 
 **Antwort 201:**
@@ -57,6 +69,7 @@ verarbeitet. (MO-RC4-P02E)
   "orderId": "ord_2f4b1c9e...",
   "status": "PENDING",
   "orderType": "generic",
+  "orderDescription": "ATS-Matching einer Stellenausschreibung mit einem Lebenslauf",
   "customer": { "name": "Max Mustermann", "email": "max@example.com" },
   "items": [ { "sku": "SKU-1001", "quantity": 2, "unitPrice": 20, "lineTotal": 40 } ],
   "currency": "EUR",
@@ -84,7 +97,7 @@ fehlt er, wird der Aufruf mit 401 abgelehnt (MO-RC4-P02A).
 
 **Pfad:** `orderId` (String, Format `ord_` + Alphanumerisch)
 
-**Antwort 200:** Order-Objekt wie oben.
+**Antwort 200:** Order-Objekt wie oben (einschließlich `orderDescription`, falls vorhanden).
 
 **Fehler:**
 - 404 `ORDER_NOT_FOUND` — Order existiert nicht **oder** gehört einem anderen Owner/Consumer

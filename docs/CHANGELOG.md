@@ -2,6 +2,34 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-11-23 — MO-ORDER-DESCRIPTION-01 (F012)
+
+### Feature
+- Optionales Top-Level-Feld `orderDescription` für `POST /orders` (String,
+  nach Trimmen 1–1.024 Zeichen; TAB/LF/CR erlaubt, übrige C0-/C1-/DEL-Zeichen,
+  Unicode-Zeilentrenner und Surrogates abgelehnt)
+- Persistenz als additives, nicht indexiertes DynamoDB-Attribut; keine Migration,
+  kein Default — bestehende Orders bleiben unverändert
+- Rückgabe über `POST /orders` und `GET /orders/{orderId}`; bewusst **nicht** in
+  der kompakten `GET /orders`-Projektion
+- Keine Änderung an `items`, `orderType`, Routing oder Preisberechnung
+
+### Privacy
+- Inspect nennt die Datenkategorie nur bei vorhandenem Feld
+- Export nimmt den Wert auf, ANONYMIZE entfernt das Attribut (auch als No-op,
+  wenn es fehlt); ERASE unverändert
+
+### Tests
+- Lambda 456/456 PASS (Baseline `1eaa14e`: 440/440 ⇒ +16 neue Tests)
+- Installer 81/81, Module Builder 129/129, Seed 28/28 PASS
+- Lambda-ZIP zweimal byte-identisch: sha256
+  `117299c97c775038fa2ccdedf3ecc2515a3d2c2e6a537bf9ede3fff1a5b425af`
+
+### Boundaries
+- Kein Merge nach `main`, kein Deployment, keine AWS-/Terraform-Mutation,
+  keine RIS-Änderung
+- Merge Review ausstehend
+
 ## 2026-11-15 — Post-Merge Documentation Sync
 
 ### Documentation

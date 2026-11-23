@@ -32,12 +32,18 @@ IAM-Permissions erzeugen. **Entscheidung: Single-Table.**
 | `customer` | Map | `{ name, email }` |
 | `items` | List of Maps | `[{ sku, quantity, unitPrice, lineTotal }]` |
 | `currency` | String | ISO-4217 |
+| `orderDescription` | String (optional) | Menschlich lesbarer Bestelltext, 1–1.024 Zeichen nach Trimmen; nicht indexiert, kein Routing-/Preisfeld (MO-ORDER-DESCRIPTION-01) |
 | `totalAmount` | Number | Server-berechnet (Σ quantity × unitPrice) |
 | `createdAt` | String | ISO-8601 UTC |
 | `updatedAt` | String | ISO-8601 UTC |
 | `version` | Number | Optimistic-Locking-Feld (Reserve für Woche 3); wird bei AP1 auf `1` initialisiert und bei AP4 inkrementiert |
 | `gsi1pk` | String (GSI1 PK) | `LIST` (konstant) |
 | `gsi1sk` | String (GSI1 SK) | `createdAt` (ISO-8601) |
+
+> Hinweis: Diese Tabelle ist der Woche-1-Baseline-Stand. Die im Code zusätzlich
+> vorhandenen RC4-Felder (`orderType`, `subjectId`/GSI2, Zustell-/Verarbeitungsfelder,
+> Produktionsschlüssel `ord_ord_<hex>`) sind in
+> `docs/diagnostics/dynamodb/schema-reference.md` code-verifiziert dokumentiert.
 
 ### Testdaten-Marker (nur Seed-Items)
 

@@ -26,6 +26,8 @@
 {
   "orderId": "ord_<id>",
   "status": "PENDING",
+  "orderType": "generic",
+  "orderDescription": "Optionaler Bestelltext",
   "customer": { "name": "string", "email": "string" },
   "items": [ { "sku": "string", "quantity": 1, "unitPrice": 1999, "lineTotal": 3998 } ],
   "currency": "EUR",
@@ -42,6 +44,8 @@
 ## 5. Konsistenz-Regeln
 
 - Server berechnet `totalAmount` (nie der Client).
+- `orderDescription` ist optional (max. 1.024 Zeichen nach Trimmen); fehlt das Feld im
+  Request, bleibt es auch im gespeicherten Item und in der Antwort abwesend.
 - Statusübergänge: nur gemäß Transition Matrix (`order-lifecycle/transition-rules.md`).
 - Alle Datumsangaben in UTC (ISO-8601).
 - Response bei Listen: kompakte Order-Darstellung + `nextToken`.

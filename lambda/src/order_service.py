@@ -280,6 +280,8 @@ class OrderService:
             # Zustellung ist von der fachlichen Verarbeitung getrennt.
             "deliveryState": DELIVERY_PENDING,
         }
+        if "orderDescription" in input_data:
+            item["orderDescription"] = input_data["orderDescription"]
 
         # Ownership ist ab MO-RC4-P02 garantiert (siehe oben) und wird dauerhaft
         # gespeichert; GSI2 macht die Bestellung fuer Privacy-Lookups auffindbar.
@@ -523,6 +525,8 @@ class OrderService:
                 order_refs.append(oid)
 
         data_categories = []
+        if any("orderDescription" in entry for entry in items):
+            data_categories.append("orderDescription")
         if items:
             # Determine which personal data fields exist in first item
             cust = items[0].get("customer", {})
@@ -599,6 +603,8 @@ class OrderService:
                         export_item["totalAmount"] = item["totalAmount"]
                     if "currency" in item:
                         export_item["currency"] = item["currency"]
+                    if "orderDescription" in item:
+                        export_item["orderDescription"] = item["orderDescription"]
                     # MO-RC4-P02G-A: Ergebnis-/Verarbeitungsfelder vollstaendig
                     # in die Auskunft aufnehmen (nur vorhandene Felder).
                     for field in (
@@ -801,11 +807,12 @@ class OrderService:
                         UpdateExpression=(
                             "SET #c.#n = :anon, #c.#e = :anon_email "
                             "REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt, "
-                            "gsi3pk, gsi3sk"
+                            "gsi3pk, gsi3sk, #desc"
                         ),
                         ConditionExpression=cond_expr,
                         ExpressionAttributeNames={
                             "#c": "customer", "#n": "name", "#e": "email",
+                            "#desc": "orderDescription",
                             # MO-RC4-P02G-A: Ergebnisse werden NICHT selektiv
                             # bereinigt, sondern vollstaendig entfernt.
                             "#result": "result",

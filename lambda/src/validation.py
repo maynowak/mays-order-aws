@@ -16,6 +16,7 @@ STATUS_SET = set(ORDER_STATUSES)
 # Punkt als Trenner; jedes Segment beginnt mit einem Buchstaben.
 ORDER_TYPE_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31})*$")
 MAX_ORDER_TYPE_LENGTH = 128
+MAX_ORDER_DESCRIPTION_LENGTH = 1024
 
 
 def is_plain_object(value: Any) -> bool:
@@ -64,11 +65,52 @@ def validate_order_type(value: Any) -> str:
     return candidate
 
 
+def _has_forbidden_character(text: str) -> bool:
+    """C0/C1/DEL, Unicode-Zeilentrenner und Surrogates sind kein Bestelltext.
+
+    TAB/LF/CR bleiben erlaubt (mehrzeilige Beschreibungen, CRLF-Clients).
+    Zero-Width-/Bidi-Zeichen werden bewusst nicht gefiltert: Sie sind gueltiger
+    Unicode-Text und es gibt keinen HTML-/Log-Sink, der sie interpretiert.
+    """
+    for ch in text:
+        code = ord(ch)
+        if code < 0x20 and ch not in "\t\n\r":
+            return True
+        if 0x7F <= code <= 0x9F:
+            return True
+        if 0xD800 <= code <= 0xDFFF:
+            return True
+        if code in (0x2028, 0x2029):
+            return True
+    return False
+
+
+def validate_order_description(value: Any) -> str:
+    """Optionaler menschlich lesbarer Bestelltext; keine Routing-Anweisung."""
+    path = "orderDescription"
+    if not isinstance(value, str):
+        raise validation_error(f"Field '{path}' must be a string", {"path": path})
+    candidate = value.strip()
+    if not candidate:
+        raise validation_error(f"Field '{path}' must not be empty", {"path": path})
+    if len(candidate) > MAX_ORDER_DESCRIPTION_LENGTH:
+        raise validation_error(
+            f"Field '{path}' must be at most {MAX_ORDER_DESCRIPTION_LENGTH} characters",
+            {"path": path},
+        )
+    if _has_forbidden_character(candidate):
+        raise validation_error(
+            f"Field '{path}' contains unsupported control or separator characters",
+            {"path": path},
+        )
+    return candidate
+
+
 def validate_create_order(body: Any) -> Dict[str, Any]:
     if not is_plain_object(body):
         raise validation_error("Request body must be a JSON object")
 
-    reject_unknown_keys(body, ["customer", "items", "currency", "orderType"], "body")
+    reject_unknown_keys(body, ["customer", "items", "currency", "orderType", "orderDescription"], "body")
 
     customer = body.get("customer")
     if not is_plain_object(customer):
@@ -109,12 +151,15 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
     if "orderType" in body:
         order_type = validate_order_type(body.get("orderType"))
 
-    return {
+    validated = {
         "customer": {"name": name, "email": email},
         "items": validated_items,
         "currency": currency,
         "orderType": order_type,
     }
+    if "orderDescription" in body:
+        validated["orderDescription"] = validate_order_description(body["orderDescription"])
+    return validated
 
 
 def validate_order_id(order_id: Any) -> str:

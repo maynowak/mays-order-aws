@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-14)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-23)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -14,11 +14,12 @@ Current Phase:
 RC4 v0.6.0-rc.1 — released, main merged and pushed; post-merge docs synchronized
 
 Current Feature:
-MO-RC4-POST-MERGE-DOC-SYNC-01 — canonical docs and development roadmap
+MO-ORDER-DESCRIPTION-01 (F012) — additives optionales `orderDescription`
 
 Current Task:
-MO-RC4-POST-MERGE-DOC-SYNC-01 — release status, canonical references and
-roadmap synced; main baseline 7724c43
+MO-ORDER-DESCRIPTION-01 — lokal implementiert/getestet/verifiziert;
+Feature-Branch `feature/mo-order-description-01` im Checkpoint (Commit/Push);
+Merge Review offen
 
 Hinweis Release:
 v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
@@ -52,7 +53,15 @@ RC4 v0.6.0-rc.1 Status:
 [!] Produktivdeployment: NICHT durchgeführt
 
 Current Checkpoint:
-main baseline 7724c43 — RC4 v0.6.0-rc.1 released and integrated; post-merge docs sync commit follows
+main baseline 1eaa14e — RC4 v0.6.0-rc.1 released and integrated; feature branch
+`feature/mo-order-description-01` (MO-ORDER-DESCRIPTION-01 / F012) locally
+verified; Checkpoint-Commit und Push werden in diesem Checkpoint ausgeführt
+→ MO-ORDER-DESCRIPTION-01: additives optionales `orderDescription` (max. 1.024
+  Zeichen nach Trim) in Modell/Validierung/Persistenz/POST/GET; Privacy-Inspect,
+  -Export und ANONYMIZE berücksichtigen das Feld; Altbestand unverändert;
+  nicht in der kompakten GET /orders-Projektion
+→ Regression: Lambda 456/456 (Baseline 440), Installer 81, Builder 129,
+  Seed 28 PASS; ZIP reproduzierbar (sha256 117299c9…); kein AWS/Terraform/Merge
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen

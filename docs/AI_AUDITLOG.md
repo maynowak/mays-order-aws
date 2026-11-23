@@ -373,6 +373,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-SECURITY-APPROVAL-CONTRACT-12A → docs/reports/MO-RC4-SECURITY-APPROVAL-CONTRACT-12A.md + docs/adr/ADR-RC4-APPROVAL-CONTEXT-BINDING.md (SEC-06 read-only analysiert: bestehende CLI bindet Plan/Workspace vor Approval, aber ApprovalContext ist nicht CLI-integriert, keine Approval-ID/Ablauf/Plan-Fingerprint-Bindung; ApprovalEvidence V2 PROPOSED, `--yes` nur Prompt-Unterdrückung; Bedrohungsmodell T01–T08, Invarianten INV-01–10, Migrationsvarianten A/B/C, Testmatrix SEC06-01–12; keine Implementierung, keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC4-SECURITY-APPROVAL-DECISION-12A-1 → docs/reports/MO-RC4-SECURITY-APPROVAL-DECISION-12A-1.md + ADR-Nachtrag (Trust-Modelle A/B/C, V2-Datenvertrag, `--yes`-Matrix, CI-Workflows `deploy.yml`/`destroy.yml`, TOCTOU-/Planpfad-Befund, Ablauf/Replay, Legacy/Destroy, Evidence/Keys, 16 Testfälle V2-01–16, 10 Entscheidungen mit Freigabevorbehalt; ADR bleibt PROPOSED; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC4-TESTSUITE-CONSOLIDATION-13A → docs/reports/MO-RC4-TESTSUITE-CONSOLIDATION-13A.md (Testinventur 1.150 PASS + 28 Seed-Tests separat + 4 Live-E2E BLOCKED; Coverage Lambda 90,15 %/82,22 %, Builder 91,22 %/84,93 %, Installer 74,08 %/64,04 %, E2E-Harness separat 91,58 %/88,46 %; Order-Traceability, P00-Scope-Abweichung KMS/Secrets/Retention, Dokumentationsdrift, P0/P1/P2-Lücken und 10 Folgepakete; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
+- MO-ORDER-DESCRIPTION-01 → docs/reports/MO-ORDER-DESCRIPTION-01-EXECUTION_LOG.md (VERIFIED lokal: optionales `orderDescription` additiv in Modell/Validierung/Persistenz/POST/GET, Privacy-Inspect/-Export/-Anonymize inkl. No-op ohne Feld; Lambda 456/456 (Baseline 440), Installer 81, Builder 129, Seed 28 PASS; ZIP reproduzierbar; Doku + F012; kein AWS/Terraform/Merge)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1060,3 +1061,20 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   merged via GitHub merge commit `cd3f5fd56e45065aceff5cfe184b866622ebf5bd`.
 - Remote `main` verified at `cd3f5fd`; tag remains `5bc154e`.
 - Report: `docs/reports/MO-RELEASE-DIRECTORY-FIX-02.md`.
+
+## 2026-11-23 — MO-ORDER-DESCRIPTION-01 — IMPLEMENTED / VERIFIED (LOKAL)
+
+- Additives optionales `orderDescription` angewendet (Patch war vorbereitet, aber
+  nicht im Repository; Integration auf `feature/mo-order-description-01` ab
+  Baseline `1eaa14e`).
+- Vertrag: optionales Top-Level-Feld, String, nach Trim 1–1.024 Zeichen, keine
+  Steuerzeichen außer TAB/LF/CR; Persistenz nur bei Angabe; Rückgabe über POST
+  und GET; nicht in der kompakten `GET /orders`-Projektion; Altbestand unverändert.
+- Privacy: Inspect-Kategorie, Export-Wert, ANONYMIZE entfernt das Attribut
+  (auch wenn es fehlt), ERASE unverändert.
+- Tests (tatsächlich): Lambda 456/456 PASS (Baseline 440/440 ⇒ +16),
+  Installer 81/81, Builder 129/129, Seed 28/28, `compileall` PASS,
+  ZIP zweimal byte-identisch. Harness-Fix: `test_build_zip` importiert
+  `build_zip` ortsunabhängig (vorbestehender Fehler bei Aufruf aus Repo-Root).
+- Keine AWS-/Terraform-Mutation, kein Deployment, kein Merge nach `main`.
+- Report: `docs/reports/MO-ORDER-DESCRIPTION-01-EXECUTION_LOG.md`.

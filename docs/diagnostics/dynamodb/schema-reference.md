@@ -50,6 +50,7 @@ tatsächlich vorhandenen Schlüssel; bei unbekannten Mustern `UNKNOWN` dokumenti
 | `orderId` | S | `ord_` + 24 Hex | nein |
 | `status` | S | siehe §4 | nein |
 | `orderType` | S | Routing-Typ (Default `generic`) | nein |
+| `orderDescription` | S (optional) | Menschlich lesbarer Bestelltext, max. 1.024 Zeichen | **POTENZIELL** (Freitext) |
 | `customer` | M | `{name, email}` | **JA** |
 | `items` | L | `[{sku, quantity, unitPrice, lineTotal}]` | nein |
 | `currency`, `totalAmount` | S/N | Betrag/Währung | nein |
@@ -110,7 +111,7 @@ Quellen: `order_service.py:219,248-249`; `sqs_handler.py:350-353,419-434`.
 - `ERASE` löscht das Item (`DeleteItem`, Conditional auf `subjectId`/`version`).
 - `ANONYMIZE` setzt `customer.name/email` auf `ANONYMIZED` und entfernt
   `subjectId`, `gsi2pk`, `gsi2sk`, `result`, `processingError`, `processingAttemptId`,
-  `gsi3pk`, `gsi3sk` (`order_service.py:730-755`).
+  `gsi3pk`, `gsi3sk` sowie `orderDescription` (Freitext mit PII-Potenzial).
 - Nach `ANONYMIZE` ist die Order **nicht mehr über GSI2** auffindbar; ein leeres
   GSI2-Ergebnis bedeutet daher nicht zwingend „Order existiert nicht“.
 - **Kein Erasure-Ledger** vorhanden → Restore kann gelöschte PII wiederbringen (P3E).

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, NotRequired, TypedDict
 
 ORDER_STATUSES = [
     "PENDING",
@@ -45,6 +45,7 @@ class Order(TypedDict):
     orderId: str
     status: OrderStatus
     orderType: str
+    orderDescription: NotRequired[str]
     customer: Customer
     items: List[OrderItem]
     currency: str
