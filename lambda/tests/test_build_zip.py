@@ -8,7 +8,12 @@ import unittest
 import zipfile
 from pathlib import Path
 
-import build_zip
+# Test discovery may run from the repository root (`discover -s lambda/tests`)
+# or from `lambda/`; `build_zip` lives in `lambda/`, so resolve it relative to
+# this file instead of relying on the current working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import build_zip  # noqa: E402  (path bootstrap must precede the import)
 
 SRC_DIR = Path(__file__).resolve().parents[1] / "src"
 
