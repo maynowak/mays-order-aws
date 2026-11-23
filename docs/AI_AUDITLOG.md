@@ -1117,7 +1117,8 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   `docs/AI_AUDITLOG.md`, gelöst durch Erhalt **beider** Einträge (01 und 02);
   02-Report-Blob `60e7438c…` identisch zu `f311ed9`.
 - Push `1eaa14e..0ef73db`; Remote-`main` verifiziert. Evidence-Commit `5da7303`
-  (dieser Report + Index) anschließend gepusht; finaler `main`-HEAD `5da7303`.
+  (Report + Index) anschließend gepusht; Auditlog-Vervollständigung `9f4c07e`.
+  Der jeweils aktuelle `main`-HEAD ist über `git log -1` verifiziert.
 - Verifikation: ZIP byte-identisch (`117299c9…`, 47.552 B, 13 Module), Artefakt-Gate
   PASS, Lambda 456/456, fokussiert 16/16, Installer 81/81, Builder 129/129,
   Seed 28/28; Worktree clean; 19 geänderte Pfade, keine Terraform-/CI-/RIS-Datei.
