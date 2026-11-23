@@ -19,7 +19,7 @@
 | [F009](F009-iam-security.md) | IAM / Security | 2–3 | 🟡 DESIGNED |
 | [F010](F010-cloudwatch-monitoring.md) | CloudWatch Monitoring | 3–4 | ⏳ PLANNED |
 | [F011](F011-terraform-infrastructure.md) | Terraform Infrastructure | 2 | ✅ COMPLETE |
-| [F012](F012-order-description.md) | Optional Order Description (`orderDescription`) | RC4 | 🔄 IN PROGRESS |
+| [F012](F012-order-description.md) | Optional Order Description (`orderDescription`) | RC4 | ✅ COMPLETE |
 
 ## Abhängigkeiten
 

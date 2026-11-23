@@ -1067,14 +1067,17 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Additives optionales `orderDescription` angewendet (Patch war vorbereitet, aber
   nicht im Repository; Integration auf `feature/mo-order-description-01` ab
   Baseline `1eaa14e`).
-- Vertrag: optionales Top-Level-Feld, String, nach Trim 1–1.024 Zeichen, keine
-  Steuerzeichen außer TAB/LF/CR; Persistenz nur bei Angabe; Rückgabe über POST
-  und GET; nicht in der kompakten `GET /orders`-Projektion; Altbestand unverändert.
+- Vertrag: optionales Top-Level-Feld, String, nach Trim 1–1.024 Zeichen; TAB/LF/CR
+  erlaubt, übrige C0-/C1-/DEL-Zeichen, U+2028/U+2029 und Surrogates abgelehnt;
+  Persistenz nur bei Angabe; Rückgabe über POST und GET; nicht in der kompakten
+  `GET /orders`-Projektion; Altbestand unverändert.
 - Privacy: Inspect-Kategorie, Export-Wert, ANONYMIZE entfernt das Attribut
   (auch wenn es fehlt), ERASE unverändert.
 - Tests (tatsächlich): Lambda 456/456 PASS (Baseline 440/440 ⇒ +16),
   Installer 81/81, Builder 129/129, Seed 28/28, `compileall` PASS,
   ZIP zweimal byte-identisch. Harness-Fix: `test_build_zip` importiert
   `build_zip` ortsunabhängig (vorbestehender Fehler bei Aufruf aus Repo-Root).
+- Checkpoint: Harness-Commit `923f2b7`, Feature-Commit `80a84ca`; Branch
+  `feature/mo-order-description-01` gepusht; Merge Review offen.
 - Keine AWS-/Terraform-Mutation, kein Deployment, kein Merge nach `main`.
 - Report: `docs/reports/MO-ORDER-DESCRIPTION-01-EXECUTION_LOG.md`.

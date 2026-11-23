@@ -10,10 +10,10 @@ Feature:
 F012 — Optional Order Description
 
 Status:
-🔄 IN PROGRESS
+✅ COMPLETE (lokal verifiziert, Branch gepusht; Merge Review offen)
 
 Current Task:
-MO-ORDER-DESCRIPTION-01 — patch integration, contract verification, docs, checkpoint
+MO-ORDER-DESCRIPTION-01 — abgeschlossen bis Merge Review
 
 Completed Tasks:
 - Patch-Prüfung und -Anwendung (`git apply --check` / `git apply`)   ✅
@@ -23,13 +23,14 @@ Completed Tasks:
 - Privacy-Inspect/-Export/-Anonymisierung (mit und ohne Feld)          ✅
 - Test-Harness: `test_build_zip` ortsunabhängig importierbar           ✅
 - Fokussierte Tests erweitert (16 Tests)                               ✅
+- Dokumentation, Execution Log, Auditlog                               ✅
+- Checkpoint: Commit `923f2b7` (Harness) + `80a84ca` (Feature), Push    ✅
 
 In Progress:
-- Dokumentation, Execution Log, Auditlog abgeschlossen; Checkpoint (Commit/Push) 🔄
+- Nichts (Arbeitsstand abgeschlossen)
 
 Pending Tasks:
-- Push des Feature-Branches
-- Merge nach `main` (NICHT Teil dieses Auftrags)
+- Merge nach `main` nach menschlichem Merge Review (NICHT Teil dieses Auftrags)
 
 Changes Made:
 - lambda/src/order_types.py: `orderDescription: NotRequired[str]` im Order-Typ
@@ -40,7 +41,8 @@ Changes Made:
 - lambda/tests/test_order_description.py: 16 Vertrags-/Privacy-Tests
 - lambda/tests/test_build_zip.py: `sys.path`-Bootstrap für Aufruf aus Repo-Root
 - Doku: `api/endpoints.md`, `api/api-documentation.md`,
-  `database/dynamodb-design.md`, `docs/diagnostics/dynamodb/schema-reference.md`
+  `database/dynamodb-design.md`, `docs/diagnostics/dynamodb/schema-reference.md`,
+  `docs/diagnostics/dynamodb/security-and-iam.md`
 
 Tests:
 - Lambda: 456/456 PASS (Baseline `1eaa14e`: 440/440 PASS ⇒ +16)
@@ -63,11 +65,11 @@ Blockers:
 - Keine (Freigabe nur bis Merge Review, kein Merge/Deployment).
 
 Current Checkpoint:
-- Lokaler Arbeitsstand auf `feature/mo-order-description-01`, noch nicht committet.
+- Branch `feature/mo-order-description-01`, Feature-Commit `80a84ca`,
+  Harness-Commit `923f2b7`; Remote-Branch gepusht; Evidence-Commit folgt.
 
 Next Step:
-- Checkpoint (Report → Tests → Build → git status → git diff --check →
-  Secret-Audit → Commit → Push) ausführen.
+- Menschliches Merge Review; danach optionaler Merge nach `main`.
 ```
 
 ## Vertrag (Kurzfassung)

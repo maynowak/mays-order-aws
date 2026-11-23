@@ -142,12 +142,16 @@ Nicht behoben (bewusst, außerhalb des Auftrags):
 - `api/test-cases.md` (Woche-1-Spec) wurde nicht erweitert; `orderType` fehlt dort
   ebenfalls.
 
-## 9. Checkpoint-Nachweis
+## 9. Checkpoint-Nachweis (verifiziert)
 
-- Harness-Commit und Feature-Commit auf `feature/mo-order-description-01`
-  (SHAs siehe `git log`; werden im Evidence-Commit eingetragen).
-- Push: `origin/feature/mo-order-description-01` (nach dem Feature-Commit).
-- Merge nach `main`: **nicht** durchgeführt (nicht autorisiert).
+| Element | Wert |
+|---|---|
+| Harness-Commit | `923f2b7` — `test: make build_zip import independent of working directory` |
+| Feature-Commit | `80a84ca` — `feat(orders): add optional orderDescription field` |
+| Branch | `feature/mo-order-description-01` |
+| Push | `origin/feature/mo-order-description-01` → `80a84ca` (per `git ls-remote` verifiziert) |
+| Evidence-Commit | dieser Commit (Doku-Nachtrag mit SHAs/Ergebnissen; wird mit demselben Branch gepusht) |
+| Merge nach `main` | **nicht** durchgeführt (nicht autorisiert) |
 
 ## 10. Risiken und offene Punkte
 

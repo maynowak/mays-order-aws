@@ -28,7 +28,8 @@
 ### Boundaries
 - Kein Merge nach `main`, kein Deployment, keine AWS-/Terraform-Mutation,
   keine RIS-Änderung
-- Merge Review ausstehend
+- Feature-Commit `80a84ca`, Harness-Commit `923f2b7`; Branch
+  `feature/mo-order-description-01` gepusht; Merge Review ausstehend
 
 ## 2026-11-15 — Post-Merge Documentation Sync
 
