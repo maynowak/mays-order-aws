@@ -249,7 +249,7 @@ class OrderService:
         now = now_iso()
         order_id = generate_order_id()
 
-        if input_data.get("orderType") == ORDER_TYPE_AGENT:
+        if "agentOrder" in input_data:
             return self._create_agent_order(input_data, order_id, now, identity)
 
         items = [
@@ -276,6 +276,8 @@ class OrderService:
             "gsi3pk": identity.owner_key,
             "gsi3sk": f"{now}#{order_id}",
         }
+        if "orderType" in input_data:
+            item["orderType"] = input_data["orderType"]
         if "orderDescription" in input_data:
             item["orderDescription"] = input_data["orderDescription"]
 

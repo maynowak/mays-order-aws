@@ -96,6 +96,53 @@ class TestOrderDescriptionValidation(unittest.TestCase):
             validate_create_order(dict(RETAIL, extra="x"))
 
 
+class TestGenericOrderType(unittest.TestCase):
+    """orderType without agentOrder is a generic order (opaque metadata)."""
+
+    def test_agent_execution_type_without_agent_order_is_generic(self):
+        body = dict(RETAIL, orderType="agent.execution",
+                    orderDescription='{"any":"payload"}')
+        out = validate_create_order(body)
+        self.assertEqual("agent.execution", out["orderType"])
+        self.assertNotIn("agentOrder", out)
+        self.assertEqual('{"any":"payload"}', out["orderDescription"])
+
+    def test_generic_order_type_is_persisted(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service(
+            table_name="mays-orders", client=FakeTable({"put_item": on_put}))
+        order = service.create_order(
+            dict(RETAIL, orderType="agent.execution",
+                 orderDescription='{"x":1}'), IDENTITY)
+        self.assertEqual("agent.execution", stored["orderType"])
+        self.assertEqual('{"x":1}', stored["orderDescription"])
+        self.assertNotIn("agentOrder", stored)
+        self.assertNotIn("agentOrderFingerprint", stored)
+        self.assertEqual("agent.execution", order["orderType"])
+
+    def test_agent_order_still_routes_to_agent_branch(self):
+        stored = {}
+
+        def on_put(**kwargs):
+            stored.update(kwargs["Item"])
+            return {}
+
+        service = create_order_service(
+            table_name="mays-orders", client=FakeTable({"put_item": on_put}))
+        service.create_order(agent_body(), IDENTITY)
+        self.assertIn("agentOrder", stored)
+        self.assertIn("agentOrderFingerprint", stored)
+
+    def test_invalid_order_type_still_rejected(self):
+        with self.assertRaises(OrderError):
+            validate_create_order(dict(RETAIL, orderType="Bad/Type"))
+
+
 class TestOrderDescriptionPersistence(unittest.TestCase):
     def test_retail_persists_description(self):
         stored = {}

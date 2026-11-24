@@ -89,11 +89,15 @@ def validate_order_description(value: Any) -> str:
 
 
 def _validate_agent_branch(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Validate the optional agent-order variant, or return None for retail.
+    """Validate the optional agent-order variant, or return None otherwise.
 
-    The two variants are mutually exclusive on purpose: an agent order must not
-    be disguised as retail items, and a retail order must not carry an agent
-    order. Anything ambiguous is rejected instead of guessed.
+    Two shapes are supported:
+
+    * Legacy agent order: ``orderType`` + root ``agentOrder``. The two variants
+      stay mutually exclusive (no retail fields next to ``agentOrder``).
+    * Generic order: ``orderType`` without ``agentOrder`` is a normal order
+      envelope; Mays-Orders stores the type as opaque routing metadata and
+      never parses ``orderDescription``.
     """
     has_agent_order = "agentOrder" in body
     has_order_type = "orderType" in body
@@ -106,17 +110,20 @@ def _validate_agent_branch(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             {"path": "orderType"},
         )
 
-    order_type = validate_order_type(body.get("orderType"))
+    try:
+        order_type = validate_order_type(body.get("orderType"))
+    except AgentOrderValidationError as exc:
+        raise validation_error(
+            exc.message, {"path": "orderType", "code": exc.code}
+        ) from exc
+    if not has_agent_order:
+        # Generic order: validated by the retail envelope below.
+        return None
+
     if order_type not in SUPPORTED_AGENT_ORDER_TYPES:
         raise validation_error(
             f"Field 'orderType' value {order_type!r} is not supported",
             {"path": "orderType"},
-        )
-
-    if not has_agent_order:
-        raise validation_error(
-            "Field 'agentOrder' is required for orderType 'agent.execution'",
-            {"path": "agentOrder"},
         )
 
     for forbidden in ("customer", "items", "currency"):
@@ -195,6 +202,8 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
         "items": validated_items,
         "currency": currency,
     }
+    if "orderType" in body:
+        result["orderType"] = validate_order_type(body["orderType"])
     if "orderDescription" in body:
         result["orderDescription"] = validate_order_description(
             body["orderDescription"])
