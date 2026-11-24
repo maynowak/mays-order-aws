@@ -44,6 +44,11 @@ IAM-Permissions erzeugen. **Entscheidung: Single-Table.**
 > vorhandenen RC4-Felder (`orderType`, `subjectId`/GSI2, Zustell-/Verarbeitungsfelder,
 > Produktionsschlüssel `ord_ord_<hex>`) sind in
 > `docs/diagnostics/dynamodb/schema-reference.md` code-verifiziert dokumentiert.
+>
+> `items[].sku` ist ein freier, nicht kataloggeprüfter String. Eigene SKU-Konventionen
+> (z. B. als informative Order-Art-Markierung für interne Consumer) sind
+> Consumer-Verträge und kein Routing-Ersatz für `orderType`; siehe
+> `api/endpoints.md` §2.1.1.
 
 ### Testdaten-Marker (nur Seed-Items)
 

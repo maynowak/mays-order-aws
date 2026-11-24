@@ -46,6 +46,9 @@
 - Server berechnet `totalAmount` (nie der Client).
 - `orderDescription` ist optional (max. 1.024 Zeichen nach Trimmen); fehlt das Feld im
   Request, bleibt es auch im gespeicherten Item und in der Antwort abwesend.
+- `items[].sku` ist ein freier, nicht kataloggeprüfter String. Eigene SKU-Konventionen
+  (z. B. als informative Order-Art-Markierung) sind Consumer-Verträge und kein
+  Routing-Ersatz für `orderType` (siehe `endpoints.md` §2.1.1).
 - Statusübergänge: nur gemäß Transition Matrix (`order-lifecycle/transition-rules.md`).
 - Alle Datumsangaben in UTC (ISO-8601).
 - Response bei Listen: kompakte Order-Darstellung + `nextToken`.

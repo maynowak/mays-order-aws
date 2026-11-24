@@ -62,6 +62,52 @@ Privacy-Inspect/-Export sowie Anonymisierung berücksichtigt. (MO-ORDER-DESCRIPT
   (U+2028/U+2029) und Surrogates werden abgelehnt
 - Unbekannte Felder → 400 (strikte Validierung)
 
+### 2.1.1 Eigene SKU-Konventionen (Empfehlung, nicht normativ)
+
+`items[].sku` ist ein **freier String** und wird nicht gegen einen Produktkatalog
+geprüft. Das Feld `orderType` bleibt das Feld für Routing/Verarbeitung; `sku` ist
+standardmäßig eine Positionskennung. Interne Consumer dürfen `sku` zusätzlich als
+**informative Order-Art-Markierung** verwenden, wenn sie die Bedeutung selbst
+definieren und dokumentieren.
+
+Empfohlene Regeln für eigene Definitionen:
+
+- Stabile, dokumentierte Konvention (z. B. Präfix/Namespace: `RIS-ATS-MATCHING`,
+  `BASKET-X`); Bedeutung und Version in der Consumer-Integrationsdoku festhalten.
+- Kurzer, druckbarer Text; keine Secrets, Tokens oder personenbezogenen Daten.
+- Unbekannte/ältere SKUs fail-safe behandeln (kein Absturz, keine stille
+  Fehlinterpretation); `sku` niemals für Autorisierung oder als Ersatz für
+  `orderType` verwenden.
+- Die API erzwingt nur „nicht leer“ (Whitespace-only → 400); sie trimmt den Wert
+  nicht, und es gibt keine Katalog- oder Längenprüfung. Konventionen deshalb
+  konservativ halten.
+- Preis bleibt Pflicht: Auch eine reine Marker-Position braucht `quantity >= 1`
+  und `unitPrice >= 1`; ein interner Platzhalterpreis muss dokumentiert sein.
+- `items` ist nach dem Anlegen über die öffentliche API unveränderlich
+  (`PATCH /orders/{id}/status` ändert nur den Status). Direkte Tabellenschreiber
+  (z. B. RIS) müssen den dokumentierten Tabellenvertrag einhalten.
+
+**Beispiel (informativ, kein Vertrag):** Ein interner Consumer A verwendet beim
+Anlegen (oder als autorisierter direkter Tabellenschreiber) den SKU-Wert
+`Benutze Bestellung auf Korb X` als Order-Art-Hinweis, führt seine Verarbeitung
+aus und meldet seinen eigenen Zustand „wartet“ in seinem Verarbeitungsstatus —
+nicht durch ein Umschreiben von `items` über die öffentliche API.
+
+```json
+"items": [
+  {
+    "sku": "Benutze Bestellung auf Korb X",
+    "quantity": 1,
+    "unitPrice": 199
+  }
+]
+```
+
+A liest den Wert, verarbeitet die Order und dokumentiert „wartet“ in seinem
+eigenen Ergebnis/Status. Der Wert ist ein Beispiel für eine freie Konvention;
+für maschinelle Verarbeitung ist ein kurzer, stabiler Token (z. B. `BASKET-X`)
+statt eines Satzes empfehlenswert. (SKU-Empfehlung, 2026-11-24)
+
 **Antwort 201:**
 
 ```json
