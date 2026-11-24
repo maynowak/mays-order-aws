@@ -18,12 +18,52 @@ import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
 from module_builder import __version__
 from module_builder.catalog import MODULE_REF_RE
 from module_builder.spec import get_preset
+
+#: Directories/suffixes that never belong to the builder-managed file set
+#: (same protection rules as module_builder.upgrade).
+_MANIFEST_SKIP_PARTS = {".git", ".terraform", ".mays-builder", "__pycache__"}
+_MANIFEST_SKIP_SUFFIXES = (".tfstate", ".tfstate.backup", ".tfplan",
+                           ".tfvars", ".auto.tfvars")
+
+
+def _stamp_manifest_v2(target_dir: Path) -> None:
+    """Write manifest_version=2 with a sha256 fingerprint per managed file.
+
+    The v1 list (``files_written``) is kept for backward readability. Files are
+    hashed only after generation/formatting so an upgrade diff cannot report a
+    false USER_MODIFIED. User-owned configs and state artifacts are excluded.
+    """
+    manifest_path = Path(target_dir) / "module-builder.manifest.json"
+    if not manifest_path.is_file():
+        return
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    files: Dict[str, str] = {}
+    for path in sorted(Path(target_dir).rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(target_dir).as_posix()
+        if rel == "module-builder.manifest.json":
+            continue
+        parts = PurePosixPath(rel).parts
+        if any(part in _MANIFEST_SKIP_PARTS for part in parts):
+            continue
+        if path.name.endswith(_MANIFEST_SKIP_SUFFIXES):
+            continue
+        files[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+    data["manifest_version"] = 2
+    data["files"] = files
+    manifest_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 # Terraform-side project_name validation (mirrors terraform/variables.tf).
 PROJECT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -654,6 +694,9 @@ def build(
     manifest_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    # P2: v2-Fingerprints direkt nach dem Schreiben stempeln (build() formatiert
+    # die Quelle nicht nach).
+    _stamp_manifest_v2(target_dir)
 
     return BuildResult(target=target_dir, files=written, artifacts=artifact_hashes)
 
@@ -1077,5 +1120,10 @@ def build_module(
             ["terraform", "fmt", str(target_dir)],
             capture_output=True, text=True, timeout=120,
         )
+
+    # P2: Manifest v2 mit Datei-Fingerprints erst NACH der Formatierung stempeln,
+    # sonst sind die Hashes sofort veraltet (Upgrade-Gate wuerde faelschlich
+    # USER_MODIFIED melden).
+    _stamp_manifest_v2(target_dir)
 
     return BuildResult(target=target_dir, files=written, artifacts=artifact_hashes)

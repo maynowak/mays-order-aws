@@ -53,6 +53,9 @@ ALWAYS_VARIABLES = {"project_name", "aws_region", "tags"}
 VARIABLE_MODULES: Dict[str, List[str]] = {
     "seed_example_data": ["dynamodb"],
     "seed_file_path": ["dynamodb"],
+    "enable_agent_transport": ["agent_transport"],
+    "ris_result_producer_role_arns": ["agent_transport"],
+    "lambda_execution_boundary": ["sqs_worker"],
     "monitoring_enabled": ["lambda", "sqs_worker", "monitoring"],
     "log_retention_days": ["lambda", "sqs_worker", "monitoring"],
     "dashboard_enabled": ["monitoring"],
