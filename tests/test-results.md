@@ -2,6 +2,25 @@
 
 > Zentrale Ergebnis-Datei. **Stand Woche 2:** Lambda-Unit-Tests (Python 3.14)
 > ausgeführt. Keine erfundenen Ergebnisse; Live-Tests erst nach Deployment.
+> **Aktueller Stand:** MO-ORDER-DESCRIPTION-01 (2026-11-23, `main` `0fc8972`),
+> siehe erster Abschnitt; die folgenden Woche-1/2-Abschnitte bleiben historisch.
+
+## 2026-11-23 — MO-ORDER-DESCRIPTION-01 (main `0fc8972`)
+
+| Ebene | Status | Datum | Hinweis |
+|-------|--------|-------|---------|
+| Lambda-Unit-Tests | ✅ PASS (456/456) | 2026-11-23 | `PYTHONPATH=lambda/src python3 -m unittest discover -s lambda/tests`; Baseline `1eaa14e` 440/440 ⇒ +16 |
+| Fokussierte Order-Description-Tests | ✅ PASS (16/16) | 2026-11-23 | `lambda/tests/test_order_description.py` |
+| Python-Syntax (`compileall`) | ✅ PASS | 2026-11-23 | `python3 -m compileall -q lambda/src lambda/tests` |
+| Installer Tests | ✅ PASS (81/81) | 2026-11-23 | `python3 -m unittest installer.tests.test_installer` |
+| Module Builder Tests | ✅ PASS (129/129) | 2026-11-23 | `python3 -m unittest discover -s module_builder/tests` |
+| Seed Tests | ✅ PASS (28/28) | 2026-11-23 | `cd scripts && python3 -m unittest discover -s tests` |
+| Lambda-ZIP + Artefakt-Gate | ✅ PASS | 2026-11-23 | 13 Module, 47.552 B, sha256 `117299c9…`; zwei Builds byte-identisch; `verify_lambda_zip` = True |
+| Live-API/HTTP-E2E | NOT RUN | – | Kein Deployment; Unit-/Service-Ebene verifiziert, kein Live-Nachweis |
+| AWS/Terraform | NOT APPLICABLE | – | Keine Infrastrukturänderung, kein Apply/Deploy |
+
+Die Abschnitte ab „Phase 2" sind historische Woche-1/2-Nachweise und werden nicht
+rückwirkend verändert.
 
 ## Phase 2 — Async Order Processing Tests
 

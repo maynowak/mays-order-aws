@@ -25,11 +25,17 @@
 - Lambda-ZIP zweimal byte-identisch: sha256
   `117299c97c775038fa2ccdedf3ecc2515a3d2c2e6a537bf9ede3fff1a5b425af`
 
+### Integration
+- Fast-Forward nach `main` (`1eaa14e..12d8963`), Review-Cherry-Pick
+  `f311ed9` → `0ef73db`, Evidence-Commits `5da7303`/`9f4c07e`/`0fc8972`
+- `main` und `origin/main` bei `0fc8972`; Worktree clean
+
 ### Boundaries
-- Kein Merge nach `main`, kein Deployment, keine AWS-/Terraform-Mutation,
-  keine RIS-Änderung
+- Kein Deployment, keine AWS-/Terraform-Mutation, keine RIS-Änderung
+- D8-Pipeline weiterhin nur Source-Fail (Artefakt-Bucket fehlt); kein
+  Build/Plan/Deploy; `directAWSGit` nicht getriggert
 - Feature-Commit `80a84ca`, Harness-Commit `923f2b7`; Branch
-  `feature/mo-order-description-01` gepusht; Merge Review ausstehend
+  `feature/mo-order-description-01` bleibt erhalten
 
 ## 2026-11-15 — Post-Merge Documentation Sync
 

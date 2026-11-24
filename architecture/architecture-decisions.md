@@ -153,6 +153,13 @@ Ja. Es werden **keine** neuen Pflichtfelder eingeführt. Genutzt wird der vorhan
 `subjectId`-Mechanismus (Feld, GSI2) sowie der JWT-Claim `sub`. Der API-Body bleibt
 unverändert (`customer`, `items`, `currency`).
 
+*Nachtrag MO-ORDER-DESCRIPTION-01 (2026-11-23, implementiert, additiv):* Der API-Body
+wird um das **optionale** Feld `orderDescription` erweitert (String, 1–1.024 Zeichen
+nach Trimmen; keine Steuerzeichen außer TAB/LF/CR, keine Unicode-Zeilentrenner/
+Surrogates). Es werden **keine** neuen Pflichtfelder eingeführt; Identität, Routing,
+Preisberechnung und `items` bleiben unverändert. Nicht angegebene Beschreibungen
+bleiben abwesend (kein Default, keine Migration). Details: `api/endpoints.md`.
+
 *Nachtrag P02A (2026-11-01, implementiert, additiv):* Consumer, Owner und Actor sind
 getrennt (`consumerId`, `ownerType`, `ownerId`, `actorType`, `actorId`,
 `identityVersion`). Consumer = `cognito:<issuer>#<client>`, Owner/Actor = `sub`.

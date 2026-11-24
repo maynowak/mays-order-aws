@@ -10,10 +10,10 @@ Feature:
 F012 — Optional Order Description
 
 Status:
-✅ COMPLETE (lokal verifiziert, Branch gepusht; Merge Review offen)
+✅ COMPLETE (in `main` integriert; kein Deployment)
 
 Current Task:
-MO-ORDER-DESCRIPTION-01 — abgeschlossen bis Merge Review
+MO-ORDER-DESCRIPTION-01 — abgeschlossen und in `main` integriert
 
 Completed Tasks:
 - Patch-Prüfung und -Anwendung (`git apply --check` / `git apply`)   ✅
@@ -25,12 +25,15 @@ Completed Tasks:
 - Fokussierte Tests erweitert (16 Tests)                               ✅
 - Dokumentation, Execution Log, Auditlog                               ✅
 - Checkpoint: Commit `923f2b7` (Harness) + `80a84ca` (Feature), Push    ✅
+- Merge Review (MO-ORDER-DESCRIPTION-02): READY, konfliktfrei           ✅
+- Main-Integration (MO-ORDER-DESCRIPTION-03): Fast-Forward `12d8963`,
+  Review-Cherry-Pick `0ef73db`, Evidence `0fc8972`, Push                ✅
 
 In Progress:
 - Nichts (Arbeitsstand abgeschlossen)
 
 Pending Tasks:
-- Merge nach `main` nach menschlichem Merge Review (NICHT Teil dieses Auftrags)
+- Deployment (separat und ausdrücklich freizugeben; Lambda zuerst)
 
 Changes Made:
 - lambda/src/order_types.py: `orderDescription: NotRequired[str]` im Order-Typ
@@ -62,14 +65,16 @@ Known Issues:
   Code-verifizierter Stand bleibt `docs/diagnostics/dynamodb/schema-reference.md`.
 
 Blockers:
-- Keine (Freigabe nur bis Merge Review, kein Merge/Deployment).
+- Keine. Merge Review und Main-Integration abgeschlossen; Deployment ist
+  separat und ausdrücklich freizugeben.
 
 Current Checkpoint:
-- Branch `feature/mo-order-description-01`, Feature-Commit `80a84ca`,
-  Harness-Commit `923f2b7`; Remote-Branch gepusht; Evidence-Commit folgt.
+- `main` = `0fc8972` (Fast-Forward `12d8963`, Review-Cherry-Pick `0ef73db`,
+  Evidence `0fc8972`); Worktree clean, kein Deployment.
 
 Next Step:
-- Menschliches Merge Review; danach optionaler Merge nach `main`.
+- Separates, freigegebenes Deployment (Lambda zuerst, danach Clients mit
+  `orderDescription`); kein automatisches Deployment aus diesem Feature.
 ```
 
 ## Vertrag (Kurzfassung)

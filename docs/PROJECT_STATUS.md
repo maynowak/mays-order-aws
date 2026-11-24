@@ -11,15 +11,16 @@ May's Orders — AWS Serverless Order Management System
 ──────────────────────────────────────────────────────
 
 Current Phase:
-RC4 v0.6.0-rc.1 — released, main merged and pushed; post-merge docs synchronized
+RC4 v0.6.0-rc.1 — released; post-release feature MO-ORDER-DESCRIPTION-01
+integrated into `main` (no deployment)
 
 Current Feature:
 MO-ORDER-DESCRIPTION-01 (F012) — additives optionales `orderDescription`
 
 Current Task:
-MO-ORDER-DESCRIPTION-01 — lokal implementiert/getestet/verifiziert;
-Feature-Branch `feature/mo-order-description-01` gepusht (Feature-Commit
-80a84ca); Merge Review offen
+MO-ORDER-DESCRIPTION-01 — implementiert/getestet/verifiziert und in `main`
+integriert (Fast-Forward 12d8963, Review-Cherry-Pick 0ef73db, Evidence 0fc8972);
+kein Deployment
 
 Hinweis Release:
 v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
@@ -53,15 +54,23 @@ RC4 v0.6.0-rc.1 Status:
 [!] Produktivdeployment: NICHT durchgeführt
 
 Current Checkpoint:
-main baseline 1eaa14e — RC4 v0.6.0-rc.1 released and integrated; feature branch
-`feature/mo-order-description-01` (MO-ORDER-DESCRIPTION-01 / F012) locally
-verified and pushed (Feature-Commit 80a84ca) for merge review
+main 0fc8972 — RC4 v0.6.0-rc.1 released; feature `MO-ORDER-DESCRIPTION-01`
+(F012) integrated into `main` (Fast-Forward 12d8963, review cherry-pick 0ef73db,
+evidence 0fc8972); no deployment
 → MO-ORDER-DESCRIPTION-01: additives optionales `orderDescription` (max. 1.024
   Zeichen nach Trim) in Modell/Validierung/Persistenz/POST/GET; Privacy-Inspect,
   -Export und ANONYMIZE berücksichtigen das Feld; Altbestand unverändert;
   nicht in der kompakten GET /orders-Projektion
 → Regression: Lambda 456/456 (Baseline 440), Installer 81, Builder 129,
-  Seed 28 PASS; ZIP reproduzierbar (sha256 117299c9…); kein AWS/Terraform/Merge
+  Seed 28 PASS; ZIP reproduzierbar (sha256 117299c9…)
+→ MO-ORDER-DESCRIPTION-02: Controlled Merge Review READY (konfliktfreier
+  Fast-Forward, keine Terraform-/CI-/RIS-Änderung, ZIP byte-identisch)
+→ MO-ORDER-DESCRIPTION-03: in `main` integriert; D8-Pipeline weiterhin nur
+  Source-Fail (Bucket fehlt), kein Build/Plan/Deploy; `directAWSGit` nicht
+  getriggert; keine AWS/Terraform/RIS-Mutation
+→ Dokumentations-Konsistenzabgleich 2026-11-24: PROJECT_STATUS, F012, Changelog,
+  ADR-Nachtrag, Phase-1-Modell, Schema-Datum, Test-Results, API-Testfälle,
+  Roadmap und Auditlog nachgezogen
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen
@@ -126,7 +135,8 @@ AWS Resources:
 NONE
 
 Application Code:
-IMPLEMENTED (Lambda-Handler Python 3.14, `lambda/src/*.py`) — NICHT deployed (kein apply)
+IMPLEMENTED und in `main` integriert (Lambda-Handler Python 3.14, `lambda/src/*.py`)
+— NICHT deployed (kein apply)
 Node.js/TypeScript T011-04: historische Baseline, aus aktivem Repo entfernt (Cleanup T011-04-CLEANUP; via Git `449cdd7` nachvollziehbar)
 
 Terraform:

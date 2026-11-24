@@ -24,6 +24,19 @@
 | T-15 | PATCH /orders/{id}/status | ungültiger Status-String | 400 VALIDATION_ERROR |
 | T-16 | PATCH /orders/{id}/status | nicht vorhandene ID | 404 ORDER_NOT_FOUND |
 
+### 1a. Ergänzung MO-ORDER-DESCRIPTION-01 (post-RC4)
+
+> Additives optionales Feld; die Fälle sind als **Unit-/Service-Tests** in
+> `lambda/tests/test_order_description.py` ausgeführt (16/16 PASS, 2026-11-23).
+> HTTP-/Live-E2E ist mangels Deployment **nicht ausgeführt**.
+
+| ID | Operation | Input | Erwartung |
+|----|-----------|-------|-----------|
+| T-17 | POST /orders | gültige `orderDescription` | 201; Wert getrimmt persistiert und in POST/GET zurückgegeben |
+| T-18 | POST /orders | ohne `orderDescription` | 201; Feld bleibt im Item und in der Antwort abwesend |
+| T-19 | POST /orders | leere/whitespace-only Beschreibung | 400 VALIDATION_ERROR (`path=orderDescription`) |
+| T-20 | POST /orders | >1.024 Zeichen oder C0/C1/DEL/Surrogat | 400 VALIDATION_ERROR (`path=orderDescription`) |
+
 ## 2. Auth-Testfälle
 
 | ID | Szenario | Erwartung |

@@ -1,6 +1,6 @@
 # DynamoDB Schema-Referenz (Orders)
 
-**Stand:** 2026-11-03 · **Quelle:** tatsächlicher Code, nicht Design-Dokumente.
+**Stand:** 2026-11-24 (MO-ORDER-DESCRIPTION-01 integriert) · **Quelle:** tatsächlicher Code, nicht Design-Dokumente.
 Legende: **VERIFIED** (Code) · **TESTED** (Unit-Tests) · **DOCUMENTED ONLY** ·
 **UNKNOWN**
 

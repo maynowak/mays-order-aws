@@ -1,8 +1,8 @@
 # Mays-Orders-AWS — Development Roadmap
 
 **Status:** canonical roadmap
-**Updated:** 2026-11-15
-**Current main:** `7724c43`
+**Updated:** 2026-11-24
+**Current main:** `0fc8972`
 **Current release:** `v0.6.0-rc.1`
 
 > This is the single canonical development roadmap. The older
@@ -23,6 +23,7 @@
 | ID | Area | Description | Status | Evidence | Dependencies / open decisions | Next concrete step |
 |---|---|---|---|---|---|---|
 | RC4-01 | RC4 | Release `v0.6.0-rc.1`, tag, GitHub pre-release, main merge and push | `DONE` | `docs/release/RELEASE-v0.6.0-rc.1.md/.pdf`; tag `5bc154e`; merge `82f7ae1`; main `7724c43` | Production not included | Keep release history immutable; decide next release separately |
+| ORD-01 | Orders | Optional `orderDescription` (1–1.024 chars after trim, privacy-aware, additive) | `DONE` | `docs/reports/MO-ORDER-DESCRIPTION-01…03`; Lambda 456/456; ZIP `117299c9…`; `main` `0fc8972` | Client rollout after Lambda deployment | Deploy Lambda before clients use the field; no deployment yet |
 | MB-01 | Module Builder | Presets `complete` and `orders-service`; explicit module selection | `DONE` | `module_builder/spec.py`; 129 builder tests | Existing module contract | Add only modules with a concrete consumer need |
 | MB-02 | Module Builder | Deterministic Terraform/Lambda artifact generation | `DONE` | Two-build identity; Lambda ZIP SHA-256 `20f4bab5…` | Artifact freshness gate | Re-run after future module changes |
 | MB-03 | Module Builder | Safe upgrade, fingerprints and user-file protection | `DONE` | `module_builder/upgrade.py`; upgrade tests/reports | None for current scope | Validate upgrades against real consumer projects |

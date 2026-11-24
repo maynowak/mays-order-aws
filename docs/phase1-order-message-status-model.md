@@ -26,10 +26,16 @@
 
 ### Order Fields (Public API)
 
+> **Nachtrag 2026-11-24:** Dies ist ein Phase-1-Snapshot. Der aktuelle API-Vertrag
+> steht in `api/endpoints.md`. `orderType` (RC4/P02E) und `orderDescription`
+> (MO-ORDER-DESCRIPTION-01) sind additiv ergänzt.
+
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
 | `orderId` | string | Yes | `ord_[A-Za-z0-9]+` |
 | `status` | string | Yes | See [Current Status Model](#current-status-model) |
+| `orderType` | string | No | Default `generic`; namespace pattern (post-RC4) |
+| `orderDescription` | string | No | 1–1.024 chars after trim; TAB/LF/CR only controls (post-RC4) |
 | `customer.name` | string | Yes | Non-empty string |
 | `customer.email` | string | Yes | Valid email regex |
 | `items[].sku` | string | Yes | Non-empty string |

@@ -375,7 +375,8 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-RC4-TESTSUITE-CONSOLIDATION-13A → docs/reports/MO-RC4-TESTSUITE-CONSOLIDATION-13A.md (Testinventur 1.150 PASS + 28 Seed-Tests separat + 4 Live-E2E BLOCKED; Coverage Lambda 90,15 %/82,22 %, Builder 91,22 %/84,93 %, Installer 74,08 %/64,04 %, E2E-Harness separat 91,58 %/88,46 %; Order-Traceability, P00-Scope-Abweichung KMS/Secrets/Retention, Dokumentationsdrift, P0/P1/P2-Lücken und 10 Folgepakete; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-ORDER-DESCRIPTION-01 → docs/reports/MO-ORDER-DESCRIPTION-01-EXECUTION_LOG.md (VERIFIED lokal: optionales `orderDescription` additiv in Modell/Validierung/Persistenz/POST/GET, Privacy-Inspect/-Export/-Anonymize inkl. No-op ohne Feld; Lambda 456/456 (Baseline 440), Installer 81, Builder 129, Seed 28 PASS; ZIP reproduzierbar; Doku + F012; kein AWS/Terraform/Merge)
 - MO-ORDER-DESCRIPTION-02 → docs/reports/MO-ORDER-DESCRIPTION-02-EXECUTION_LOG.md (Controlled Merge Review des Feature-Branches `feature/mo-order-description-01` @ `12d8963`: Merge konfliktfrei/Fast-Forward, Diff ohne Terraform/CI/RIS, ZIP byte-identisch (13 Module, `117299c9…`), Lambda 456 + fokussiert 16 + Installer 81 + Builder 129 + Seed 28 PASS; GitHub ohne Test-CI/PR, `main` ungeschützt; AWS read-only: D8-Pipeline mit ManualApproval, aktuell Source-Fail wegen fehlendem Artefakt-Bucket, Legacy-`directAWSGit` `DetectChanges=false`; Entscheidung READY FOR CONTROLLED MERGE mit Bedingungen; keine Produkt-/AWS-/Terraform-/RIS-Änderung, kein Merge)
-- MO-ORDER-DESCRIPTION-03 → docs/reports/MO-ORDER-DESCRIPTION-03-EXECUTION_LOG.md (Controlled Main Integration: Fast-Forward `1eaa14e`→`12d8963`, kontrollierter Cherry-Pick `f311ed9`→`0ef73db` mit Auditlog-Konfliktlösung „beide Einträge erhalten“, Push `origin/main`=`0ef73db`; ZIP byte-identisch `117299c9…`; Lambda 456, fokussiert 16, Installer 81, Builder 129, Seed 28 PASS; D8-Pipeline nur Source-Fail (Bucket 404), kein Build/Plan/Deploy, Legacy-Pipeline nicht getriggert; kein AWS-/Terraform-/RIS-Deployment)
+- MO-ORDER-DESCRIPTION-03 → docs/reports/MO-ORDER-DESCRIPTION-03-EXECUTION_LOG.md (Controlled Main Integration: Fast-Forward `1eaa14e`→`12d8963`, kontrollierter Cherry-Pick `f311ed9`→`0ef73db` mit Auditlog-Konfliktlösung „beide Einträge erhalten", Push `origin/main`=`0ef73db`; ZIP byte-identisch `117299c9…`; Lambda 456, fokussiert 16, Installer 81, Builder 129, Seed 28 PASS; D8-Pipeline nur Source-Fail (Bucket 404), kein Build/Plan/Deploy, Legacy-Pipeline nicht getriggert; kein AWS-/Terraform-/RIS-Deployment)
+- MO-ORDER-DESCRIPTION-04 → docs/reports/MO-ORDER-DESCRIPTION-04-DOC-SYNC.md (Doku-Konsistenz nach Integration: PROJECT_STATUS, F012, Changelog, ADR-Nachtrag, Phase-1-Modell, Schema-Datum, Test-Results, API-Testfälle T-17…T-20, Roadmap aktualisiert; historische Nachweise unverändert; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1130,3 +1131,19 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Die D8-Source-Störung bleibt als operativer Befund offen und wurde nicht behoben.
 - Kein AWS-Deployment, kein Terraform-Apply, keine RIS-Änderung.
 - Report: `docs/reports/MO-ORDER-DESCRIPTION-03-EXECUTION_LOG.md`.
+
+## 2026-11-24 — MO-ORDER-DESCRIPTION-04 — DOCUMENTATION CONSISTENCY SYNC
+
+**Status:** `IMPLEMENTED / VERIFIED (DOKUMENTATION)`
+
+- Nach der Main-Integration (`0fc8972`) wurden alle aktuellen Doku-Quellen gegen
+  den neuen Vertrag und den Integrationsstand abgeglichen.
+- Nachgezogen: `docs/PROJECT_STATUS.md` (Integration statt Merge-Review-offen),
+  `docs/features/F012-order-description.md` (COMPLETE/in `main`), `docs/CHANGELOG.md`
+  (Integration/Boundaries), ADR-Nachtrag in `architecture/architecture-decisions.md`,
+  Phase-1-Modell (`orderType`/`orderDescription`), Schema-Stand,
+  `tests/test-results.md` (456/456 usw.), `api/test-cases.md` (T-17…T-20),
+  `docs/roadmap/ROADMAP.md` (ORD-01, `main` `0fc8972`).
+- Historische Reports/Release-/Wochen-Dokus bleiben unverändert.
+- Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
+- Report: `docs/reports/MO-ORDER-DESCRIPTION-04-DOC-SYNC.md`.
