@@ -377,3 +377,16 @@ Date: 2026-11-17
 - Tests: 225 lambda tests pass (unittest discover); targeted consumer/handoff suites 48 pass. New cover: envelope-id vs SQS-id basis, signature over SQS id rejected, empty secret batch failure, missing secret batch failure, partial infrastructure failure retries only the failed record, blank secret parsing.
 - Artifact: lambda/dist/lambda.zip rebuilt, sha256 48ddd5e52d07b40fc333b67e5e34fb1b67701cf823536e20c7b2816a78a05f94, 13 files; bundled result_handler verifies the body messageId and emits batchItemFailures.
 - No AWS mutation, no secret access, no user change.
+
+
+[MO-RIS-ORDER-DESCRIPTION-COMPAT-01]
+Date: 2026-11-24
+Scope: additive generic orderDescription on the 016cdfd integration baseline
+- validation.py: optional orderDescription (string, non-empty, <= 1024 chars, no C0/C1/surrogates/U+2028-2029). Allowed for retail orders and next to the existing agentOrder branch; the value is opaque and never parsed by Mays-Orders.
+- order_service.py: persists orderDescription verbatim on retail and agent orders; privacy inspect reports the data category, export includes it, ANONYMIZE removes it. Existing agentOrder fields, fingerprint and internal projection are unchanged.
+- Legacy compatibility: orders without orderDescription and orders with the root agentOrder layout behave exactly as before.
+- Tests: 11 new case in lambda/tests/test_order_description.py; full lambda suite 236 tests OK (unittest discover, PYTHONPATH=src).
+- Artifact: lambda/dist/lambda.zip rebuilt (sha256 a008f16bac46258fedb43d4afddabcacc569264126c4b69fe685cb592feaf45c).
+- Resource neutrality: isolated orders-service build + RIS transport/dispatch patches yields byte-identical .tf files and identical resource addresses (36/36, no module-call diff) versus the installed 016cdfd module.
+- No RIS-specific parsing added to Mays-Orders; no resource, IAM, Cognito, SQS or secret changes.
+- Existing builder-upgrade tooling blocks this module (manifest v1 legacy; orders-service has no upgrade regeneration path) — reported to RIS; no parallel upgrade implementation added here.

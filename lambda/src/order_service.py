@@ -276,6 +276,8 @@ class OrderService:
             "gsi3pk": identity.owner_key,
             "gsi3sk": f"{now}#{order_id}",
         }
+        if "orderDescription" in input_data:
+            item["orderDescription"] = input_data["orderDescription"]
 
         self._table.put_item(Item=item)
 
@@ -309,6 +311,8 @@ class OrderService:
             "gsi3pk": identity.owner_key,
             "gsi3sk": f"{now}#{order_id}",
         }
+        if "orderDescription" in input_data:
+            item["orderDescription"] = input_data["orderDescription"]
 
         self._table.put_item(Item=item)
         return to_public_order(item)
@@ -674,6 +678,8 @@ class OrderService:
                     data_categories.append("customer.name")
                 if "email" in cust:
                     data_categories.append("customer.email")
+            if any("orderDescription" in entry for entry in items):
+                data_categories.append("orderDescription")
 
         return {
             "subjectId": subject_id,
@@ -701,7 +707,7 @@ class OrderService:
                     "IndexName": GSI2_NAME,
                     "KeyConditionExpression": "gsi2pk = :pk",
                     "ExpressionAttributeValues": {":pk": f"{GSI2_PK_PREFIX}{subject_id}"},
-                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency",
+                    "ProjectionExpression": "orderId,#status,createdAt,updatedAt,customer,totalAmount,currency,orderDescription",
                     "ExpressionAttributeNames": {"#status": "status"},
                 }
                 if last_evaluated_key:
@@ -724,6 +730,8 @@ class OrderService:
                         export_item["totalAmount"] = item["totalAmount"]
                     if "currency" in item:
                         export_item["currency"] = item["currency"]
+                    if "orderDescription" in item:
+                        export_item["orderDescription"] = item["orderDescription"]
                     orders.append(export_item)
                 last_evaluated_key = result.get("LastEvaluatedKey")
                 if not last_evaluated_key:
@@ -885,7 +893,7 @@ class OrderService:
                         cond_expr += " AND version = :ver"
                     self._table.update_item(
                         Key={"pk": pk, "sk": sk},
-                        UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk",
+                        UpdateExpression="SET #c.#n = :anon, #c.#e = :anon_email REMOVE subjectId, gsi2pk, gsi2sk, orderDescription",
                         ConditionExpression=cond_expr,
                         ExpressionAttributeNames={"#c": "customer", "#n": "name", "#e": "email"},
                         ExpressionAttributeValues={":anon": "ANONYMIZED", ":anon_email": "anonymized@example.com", **cond_values},

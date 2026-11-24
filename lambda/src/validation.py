@@ -17,6 +17,11 @@ ORDER_ID_RE = re.compile(r"^ord_[A-Za-z0-9]+$")
 CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 STATUS_SET = set(ORDER_STATUSES)
 
+#: Optional generic order text (MO orderDescription). Additive field: existing
+#: orders without it stay valid; the value is stored verbatim, never parsed by
+#: Mays-Orders. Mirrors the upstream limit and control-character rule.
+MAX_ORDER_DESCRIPTION_LENGTH = 1024
+
 
 def is_plain_object(value: Any) -> bool:
     return isinstance(value, dict)
@@ -41,6 +46,46 @@ def assert_integer(value: Any, path: str, minimum: int) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
         raise validation_error(f"Field '{path}' must be an integer >= {minimum}", {"path": path})
     return value
+
+
+def _has_forbidden_description_char(text: str) -> bool:
+    """C0 (ausser TAB/LF/CR), C1/DEL, Surrogates und Unicode-Zeilentrenner."""
+    for ch in text:
+        code = ord(ch)
+        if code < 0x20 and ch not in "\t\n\r":
+            return True
+        if 0x7F <= code <= 0x9F:
+            return True
+        if 0xD800 <= code <= 0xDFFF:
+            return True
+        if code in (0x2028, 0x2029):
+            return True
+    return False
+
+
+def validate_order_description(value: Any) -> str:
+    """Validate the optional generic ``orderDescription`` (<= 1024 chars).
+
+    Mays-Orders stores the value as opaque text; it is not interpreted and no
+    RIS-specific structure is parsed here.
+    """
+    path = "orderDescription"
+    if not isinstance(value, str):
+        raise validation_error(f"Field '{path}' must be a string", {"path": path})
+    candidate = value.strip()
+    if not candidate:
+        raise validation_error(f"Field '{path}' must not be empty", {"path": path})
+    if len(candidate) > MAX_ORDER_DESCRIPTION_LENGTH:
+        raise validation_error(
+            f"Field '{path}' must be at most {MAX_ORDER_DESCRIPTION_LENGTH} characters",
+            {"path": path},
+        )
+    if _has_forbidden_description_char(candidate):
+        raise validation_error(
+            f"Field '{path}' contains unsupported control or separator characters",
+            {"path": path},
+        )
+    return candidate
 
 
 def _validate_agent_branch(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -88,7 +133,11 @@ def _validate_agent_branch(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             exc.message, {"path": "agentOrder", "code": exc.code}
         ) from exc
 
-    return {"orderType": order_type, "agentOrder": normalized}
+    result = {"orderType": order_type, "agentOrder": normalized}
+    if "orderDescription" in body:
+        result["orderDescription"] = validate_order_description(
+            body["orderDescription"])
+    return result
 
 
 def validate_create_order(body: Any) -> Dict[str, Any]:
@@ -97,7 +146,8 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
 
     reject_unknown_keys(
         body,
-        ["customer", "items", "currency", "orderType", "agentOrder"],
+        ["customer", "items", "currency", "orderType", "agentOrder",
+         "orderDescription"],
         "body",
     )
 
@@ -140,7 +190,15 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
             {"path": "currency"},
         )
 
-    return {"customer": {"name": name, "email": email}, "items": validated_items, "currency": currency}
+    result = {
+        "customer": {"name": name, "email": email},
+        "items": validated_items,
+        "currency": currency,
+    }
+    if "orderDescription" in body:
+        result["orderDescription"] = validate_order_description(
+            body["orderDescription"])
+    return result
 
 
 def validate_order_id(order_id: Any) -> str:
