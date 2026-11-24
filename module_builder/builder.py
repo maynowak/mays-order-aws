@@ -974,16 +974,55 @@ def build_module(
     (target_dir / "main.tf").write_text(_render_blocks(kept_blocks), encoding="utf-8")
     written.append(target_dir / "main.tf")
 
-    # variables.tf: auditierte 4 Vertrags-Eingaben + Projektnamen-Substitution
+    # outputs.tf: referenzgefilterte Quell-Outputs (die 3 result-transport-
+    # Outputs werden NICHT hier exportiert; der RIS-Builder injiziert sie
+    # additiv und fail-closed).
+    # EXTERNAL-Modus-Sicherheit: alle module.cognito-Werte werden auf
+    # auswertungssichere Formen umgestellt (one(splat) / locals).
+    outputs_text = _render_blocks(
+        _filter_named_blocks(
+            _split_blocks(
+                (source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")
+            ),
+            core,
+            "output",
+        )
+    )
+    for old, new in EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS:
+        if old not in outputs_text:
+            _fail(f"Erwarteter Output-Ausdruck fehlt in der Quelle: {old!r}")
+        outputs_text = outputs_text.replace(old, new)
+    (target_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
+    written.append(target_dir / "outputs.tf")
+
+    # variables.tf: nicht mehr aus einer handgepflegten Liste ableiten, sondern
+    # aus den TATSÄCHLICH übernommenen Blöcken. Jede var.-Referenz in main.tf
+    # oder outputs.tf muss deklariert sein, sonst ist das Modul ungültig
+    # (frühere Drift: deployment_version, sqs_* fehlten).
+    main_text = (target_dir / "main.tf").read_text(encoding="utf-8")
+    referenced_vars = set(
+        re.findall(r"\bvar\.([A-Za-z0-9_]+)", main_text + "\n" + outputs_text)
+    )
+    required_vars = set(ORDERS_SERVICE_VARIABLES) | referenced_vars
     variables_text = _render_blocks(
         _filter_named_blocks(
             _split_blocks(
                 (source_root / "terraform" / "variables.tf").read_text(encoding="utf-8")
             ),
-            set(ORDERS_SERVICE_VARIABLES),
+            required_vars,
             "variable",
         )
     )
+    missing_declarations = sorted(
+        name for name in referenced_vars
+        if f'variable "{name}"' not in variables_text
+        and name != "external_cognito"
+    )
+    if missing_declarations:
+        _fail(
+            "Referenzierte Variablen ohne Quell-Deklaration: "
+            + ", ".join(missing_declarations)
+        )
     variables_text = substitute_project_name(variables_text, project_name)
     # IAM Portabilität (MAYS-ORDERS-MODULE-IAM-PORTABILITY-FIX-01):
     # Im generierten Orders-Service-Modul darf keine konto-spezifische
@@ -1002,27 +1041,6 @@ def build_module(
     variables_text = variables_text.rstrip("\n") + "\n" + EXTERNAL_COGNITO_VARIABLE
     (target_dir / "variables.tf").write_text(variables_text, encoding="utf-8")
     written.append(target_dir / "variables.tf")
-
-    # outputs.tf: referenzgefilterte Quell-Outputs (die 3 neuen Vertrag-Outputs
-    # sind in der Quelle enthalten und werden über den Filter automatisch
-    # übernommen — refs: module.sqs / module.sqs_worker ∈ Kern).
-    # EXTERNAL-Modus-Sicherheit: alle module.cognito-Werte werden auf
-    # auswertungssichere Formen umgestellt (one(splat) / locals).
-    outputs_text = _render_blocks(
-        _filter_named_blocks(
-            _split_blocks(
-                (source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")
-            ),
-            core,
-            "output",
-        )
-    )
-    for old, new in EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS:
-        if old not in outputs_text:
-            _fail(f"Erwarteter Output-Ausdruck fehlt in der Quelle: {old!r}")
-        outputs_text = outputs_text.replace(old, new)
-    (target_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
-    written.append(target_dir / "outputs.tf")
 
     # README (Vertrag + Nutzung + vollständige Variablen-/Output-Listen)
     readme = target_dir / "README.md"

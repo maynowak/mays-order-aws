@@ -35,6 +35,11 @@ MODULE_CATALOG: Dict[str, Dict] = {
     "iam": {"dir": "iam", "deps": ["dynamodb"], "optional_deps": ["sqs"]},
     "lambda": {"dir": "lambda", "deps": ["dynamodb", "iam"], "optional_deps": ["sqs"]},
     "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"], "optional_deps": []},
+    # Generischer Agent-Ergebnis-Transport (Ergebnis-Queue+DLQ, HMAC-Container,
+    # Result-Consumer). Besitzer bleibt Mays-Orders; RIS erhält nur Sende-/
+    # Lese-Rechte über explizit übergebene Rollen-ARNs.
+    "agent_transport": {"dir": "agent_transport", "deps": ["dynamodb"],
+                        "optional_deps": []},
     "api": {"dir": "api", "deps": ["cognito", "lambda"], "optional_deps": []},
     "monitoring": {"dir": "monitoring", "deps": ["api", "dynamodb", "lambda"], "optional_deps": []},
     # MO-RC4-P02F: Recovery-Scheduler ruft den bestehenden Handler (lambda).
@@ -52,6 +57,9 @@ ALWAYS_VARIABLES = {"project_name", "aws_region", "tags", "deployment_version"}
 VARIABLE_MODULES: Dict[str, List[str]] = {
     "seed_example_data": ["dynamodb"],
     "seed_file_path": ["dynamodb"],
+    # Generischer Agent-Result-Transport (unter Vorbehalt der Auswahl).
+    "enable_agent_transport": ["agent_transport"],
+    "ris_result_producer_role_arns": ["agent_transport"],
     "monitoring_enabled": ["lambda", "sqs_worker", "monitoring"],
     "log_retention_days": ["lambda", "sqs_worker", "monitoring"],
     # MO-RC4-P02C: SQS-Zuverlaessigkeit (DLQ, Retention, Visibility, Redrive)

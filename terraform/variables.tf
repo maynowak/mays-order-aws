@@ -270,3 +270,16 @@ variable "privacy_kms_key_arn" {
     error_message = "privacy_kms_key_arn must be empty or an exact KMS key ARN. No KMS key is created by this module."
   }
 }
+
+
+variable "enable_agent_transport" {
+  description = "Erzeugt die Ergebnis-Queue der Agent-Transport-Grenze (Default aus)."
+  type        = bool
+  default     = false
+}
+
+variable "ris_result_producer_role_arns" {
+  description = "Rollen-ARNs, die Agent-Ergebnisse einstellen und das HMAC-Secret lesen duerfen. Leer = keine fremden Grants."
+  type        = list(string)
+  default     = []
+}

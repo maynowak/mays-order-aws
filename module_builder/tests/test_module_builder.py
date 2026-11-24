@@ -919,6 +919,10 @@ class TestOrdersServiceModule(unittest.TestCase):
             "modules/dynamodb/main.tf", "modules/sqs/main.tf", "modules/iam/main.tf",
             "modules/lambda/main.tf", "modules/cognito/main.tf", "modules/api/main.tf",
             "modules/sqs-worker/main.tf",
+            # Generischer Result-Transport (Queue/DLQ + HMAC-Container + Consumer)
+            "modules/agent_transport/main.tf", "modules/agent_transport/lambda.tf",
+            # Opt-in Privacy-Secret-Container (Referenz durch iam/lambda)
+            "modules/privacy_secret/main.tf",
             "lambda/dist/lambda.zip", "lambda/build_zip.py", "lambda/src/index.py",
             "module-builder.manifest.json",
         ]:
@@ -936,36 +940,46 @@ class TestOrdersServiceModule(unittest.TestCase):
 
     def test_main_composition(self):
         main_tf = (self.target / "main.tf").read_text()
-        # Genau die 7 Vertragsmodule
+        expected_modules = {"agent_transport", "api", "cognito", "dynamodb",
+                            "iam", "lambda", "privacy_secret", "sqs",
+                            "sqs_worker"}
         modules = set(re.findall(r'^module\s+"([a-z_]+)"', main_tf, re.M))
-        self.assertEqual(modules, {"api", "cognito", "dynamodb", "iam",
-                                  "lambda", "sqs", "sqs_worker"})
+        self.assertEqual(modules, expected_modules)
         # Kindmodul-Vertrag: kein Provider-/terraform-Block im Modul-main
         self.assertNotRegex(main_tf, r'^provider\s', "Provider-Block im Modul verboten")
         self.assertNotRegex(main_tf, r'^terraform\s', "terraform-Block gehört in versions.tf")
         # Kein Seed (kein Bestandteil des Orders-Service-Vertrags)
         self.assertNotIn("terraform_data", main_tf)
         self.assertNotIn("seed", main_tf)
-        # Artefakte modulrelativ (path.module statt path.root)
-        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 2)
+        # Artefakte modulrelativ (path.module statt path.root): lambda +
+        # sqs_worker + result-consumer = 3 Referenzen.
+        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 3)
         self.assertNotIn("path.root", main_tf)
-        # Tag-Parität: alle 7 Modulblöcke nutzen local.default_tags (Maker/Environment)
-        self.assertEqual(main_tf.count("tags         = local.default_tags")
-                         + len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)) >= 1
-                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 7)
+        # Tag-Parität: jeder Modulblock nutzt local.default_tags.
+        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)),
+                         len(expected_modules))
 
     def test_variables_contract(self):
-        variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
-                          (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
-        text = (self.target / "variables.tf").read_text()
-        self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
+        variables_text = (self.target / "variables.tf").read_text()
+        variables = set(re.findall(r'^variable\s+"([a-z_]+)"', variables_text, re.M))
+        # Deklariert sein muss, was tatsächlich referenziert wird — genau diese
+        # Drift (deployment_version, sqs_*) hat das Modul zuvor ungültig gemacht.
+        referenced = set(re.findall(
+            r"\bvar\.([a-z_]+)",
+            (self.target / "main.tf").read_text()
+            + (self.target / "outputs.tf").read_text()))
+        self.assertTrue(referenced.issubset(variables),
+                        f"Nicht deklariert: {sorted(referenced - variables)}")
+        for required in ("project_name", "tags", "deployment_version",
+                         "sqs_max_receive_count", "enable_agent_transport",
+                         "ris_result_producer_role_arns",
+                         "monitoring_enabled", "log_retention_days",
+                         "lambda_execution_boundary", "external_cognito"):
+            self.assertIn(required, variables, f"Variable fehlt: {required}")
+        self.assertIn('"contract-orders"', variables_text)  # project_name substituiert
 
     def test_outputs_contract(self):
-        """WP5 + GAP-02: 19 Bestands-Outputs + sqs_queue_name = 20."""
+        """20 Bestands-Outputs + sqs_queue_name + mo_version + privacy_secret_arn."""
         outputs_text = (self.target / "outputs.tf").read_text()
         outputs = set(re.findall(r'^output\s+"([a-z_]+)"', outputs_text, re.M))
         for required in [
@@ -979,9 +993,15 @@ class TestOrdersServiceModule(unittest.TestCase):
             "cognito_user_pool_id", "cognito_user_pool_arn",
             "cognito_user_pool_endpoint", "cognito_user_pool_client_id",
             "cognito_user_pool_group_name", "mo_version",
+            "privacy_secret_arn",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
-        self.assertEqual(len(outputs), 21)
+        # Die drei result-transport-Outputs werden vom RIS-Builder additiv
+        # injiziert und dürfen NICHT upstream exportiert werden.
+        for not_exported in ("results_queue_url", "results_queue_arn",
+                             "result_hmac_secret_arn"):
+            self.assertNotIn(not_exported, outputs)
+        self.assertEqual(len(outputs), 22)
         # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
         # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
         block = re.search(
@@ -994,7 +1014,8 @@ class TestOrdersServiceModule(unittest.TestCase):
         # Alle Referenzen bleiben im Vertragsbestand
         refs = set(re.findall(r"module\.([a-z_]+)", outputs_text))
         self.assertTrue(refs.issubset({"api", "cognito", "dynamodb", "iam",
-                                       "lambda", "sqs", "sqs_worker"}))
+                                       "lambda", "privacy_secret", "sqs",
+                                       "sqs_worker"}))
 
     def test_iam_sqs_gate_contract(self):
         """GAP-06: beide counts hängen NUR am booleschen Gate; der ARN bleibt
@@ -1030,14 +1051,14 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
         self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", iam_block)
         self.assertNotIn("sqs_enabled = module.", iam_block)
-        # Genau 6 öffentliche Inputs (kein zusätzlicher Gate-Input):
-        variables = set(re.findall(
-            r'^variable\s+"([a-z_]+)"',
-            (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
+        # Jede referenzierte Variable ist deklariert (kein Drift-Vertrag mehr).
+        variables_text = (self.target / "variables.tf").read_text()
+        variables = set(re.findall(r'^variable\s+"([a-z_]+)"', variables_text, re.M))
+        referenced = set(re.findall(
+            r"\bvar\.([a-z_]+)",
+            main_tf + (self.target / "outputs.tf").read_text()))
+        self.assertTrue(referenced.issubset(variables),
+                        f"Nicht deklariert: {sorted(referenced - variables)}")
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()
@@ -1052,8 +1073,9 @@ class TestOrdersServiceModule(unittest.TestCase):
         )
         self.assertEqual(manifest["preset"], "orders-service")
         self.assertEqual(manifest["modules"],
-                         ["api", "cognito", "dynamodb", "iam", "lambda",
-                          "sqs", "sqs_worker"])
+                         ["agent_transport", "api", "cognito", "dynamodb",
+                          "iam", "lambda", "privacy_secret", "sqs",
+                          "sqs_worker"])
         self.assertEqual(manifest["project_name"], "contract-orders")
         self.assertIn("lambda/dist/lambda.zip", manifest["artifacts_sha256"])
 
@@ -1216,13 +1238,17 @@ class TestExternalCognitoIntegration(unittest.TestCase):
 
     def test_tags_preserved(self):
         """11) Bestehende Tags bleiben erhalten (local.default_tags)."""
-        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 7)
+        main = self._main()
+        module_blocks = len(re.findall(r'^module\s+"[a-z_]+"', main, re.M))
+        self.assertEqual(
+            len(re.findall(r"tags\s*=\s*local\.default_tags", main)),
+            module_blocks)
 
     def test_output_names_and_external_safe_values(self):
-        """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
+        """12) 20 Bestand + sqs_queue_name + mo_version + privacy_secret_arn."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 21)
+        self.assertEqual(len(names), 22)
         self.assertIn("sqs_queue_name", names)
         self.assertIn("mo_version", names)
         # Modus-sichere Wertformen:

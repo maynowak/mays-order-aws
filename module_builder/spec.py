@@ -26,6 +26,7 @@ from typing import Dict, List
 
 # All child modules of the complete stack (directory names under terraform/modules).
 COMPLETE_MODULES: List[str] = [
+    "agent_transport",
     "api",
     "cloudtrail",
     "cognito",
@@ -79,27 +80,42 @@ COMPLETE_POLICY_FILES: List[str] = [
 
 # Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): unveränderliche
 # Zusammensetzung des wiederverwendbaren Mays-Orders-AWS-Terraform-Moduls.
-# Diese 7 Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
+# Diese Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
 # Orders-Tabelle, Orders-IAM) — api benötigt die vom Modul verwaltete
-# Cognito-Ressource (JWT-Authorizer). Monitoring/CloudTrail/Cognito-Backups
-# und Seed sind NICHT Teil des Orders-Service-Vertrags (Root-Projekt-Extras).
+# Cognito-Ressource (JWT-Authorizer).
+# agent_transport (MAYS-ORDERS-RESULT-TRANSPORT-01): generischer
+# Ergebnis-Transport (Ergebnis-Queue + DLQ, HMAC-Secret-Container,
+# Result-Consumer). Kein RIS-spezifischer Ausführungscode; die Queue-/Secret-
+# Besitzer bleiben bei Mays-Orders, RIS erhält ausschließlich Sende-/Lese-
+# Rechte über explizit übergebene Rollen-ARNs.
+# Monitoring/CloudTrail/Cognito-Backups und Seed sind NICHT Teil des
+# Orders-Service-Vertrags (Root-Projekt-Extras).
 ORDERS_SERVICE_MODULES: List[str] = [
+    "agent_transport",
     "api",
     "cognito",
     "dynamodb",
     "iam",
     "lambda",
+    "privacy_secret",
     "sqs",
     "sqs_worker",
 ]
 
-# Modul-Eingaben des Orders-Service-Vertrags (auditiert, WP4): die 7 Module
+# Modul-Eingaben des Orders-Service-Vertrags (auditiert, WP4): die Module
 # verbrauchen genau diese Root-Variablen (aws_region entfällt — Region liefert
 # der Provider des aufrufenden Projekts; Seed-/Backup-/Alarm-Variablen entfallen,
 # da die zugehörigen Bestandteile nicht Vertragsbestandteil sind).
+# deployment_version/mo_version und sqs_max_receive_count werden von
+# outputs.tf bzw. dem SQS-Modulblock referenziert und MÜSSEN deshalb deklariert
+# sein (sonst ist das generierte Modul ungültig).
 ORDERS_SERVICE_VARIABLES: List[str] = [
     "project_name",
     "tags",
+    "deployment_version",
+    "sqs_max_receive_count",
+    "enable_agent_transport",
+    "ris_result_producer_role_arns",
     "monitoring_enabled",
     "log_retention_days",
     "lambda_execution_boundary",

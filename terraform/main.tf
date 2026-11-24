@@ -292,3 +292,22 @@ moved {
   from = module.cognito_backup_automation
   to   = module.cognito_backup_automation[0]
 }
+
+
+# Result-Transport (generisch): Ergebnis-Queue + DLQ, HMAC-Secret-Container und
+# Result-Consumer. Default-off. Mays-Orders bleibt Eigentuemer der Ressourcen;
+# RIS erhaelt ausschliesslich Sende-/Lese-Rechte ueber explizit uebergebene
+# Rollen-ARNs. Kein RIS-spezifischer Ausfuehrungscode.
+module "agent_transport" {
+  count  = var.enable_agent_transport ? 1 : 0
+  source = "./modules/agent_transport"
+
+  project_name = var.project_name
+  tags         = var.tags
+
+  ris_result_producer_role_arns = var.ris_result_producer_role_arns
+
+  lambda_zip_path   = "${path.root}/../lambda/dist/lambda.zip"
+  orders_table_name = module.dynamodb.table_name
+  orders_table_arn  = module.dynamodb.table_arn
+}
