@@ -58,6 +58,7 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "lambda_execution_boundary": ["sqs_worker"],
     "monitoring_enabled": ["lambda", "sqs_worker", "monitoring"],
     "log_retention_days": ["lambda", "sqs_worker", "monitoring"],
+    "additional_environment": ["lambda"],
     "dashboard_enabled": ["monitoring"],
     "alarm_period_seconds": ["monitoring"],
     "alarm_evaluation_periods": ["monitoring"],

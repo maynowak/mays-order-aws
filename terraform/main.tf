@@ -80,18 +80,19 @@ module "iam" {
 # API-GW→Lambda Invoke-Permission folgt in T011-06 (HTTP API + Routen + Authorizer).
 
 module "lambda" {
-  source              = "./modules/lambda"
-  project_name        = var.project_name
-  tags                = var.tags
-  iam_role_arn        = module.iam.role_arn
-  dynamodb_table_name = module.dynamodb.table_name
-  queue_url           = module.sqs.queue_url
-  cognito_issuer      = "https://${module.cognito.user_pool_endpoint}"
-  cognito_client_id   = module.cognito.user_pool_client_id
-  monitoring_enabled  = var.monitoring_enabled
-  log_retention_days  = var.log_retention_days
-  filename            = "${path.root}/../lambda/dist/lambda.zip"
-  runtime             = "python3.14"
+  source                 = "./modules/lambda"
+  project_name           = var.project_name
+  tags                   = var.tags
+  iam_role_arn           = module.iam.role_arn
+  dynamodb_table_name    = module.dynamodb.table_name
+  queue_url              = module.sqs.queue_url
+  additional_environment = var.additional_environment
+  cognito_issuer         = "https://${module.cognito.user_pool_endpoint}"
+  cognito_client_id      = module.cognito.user_pool_client_id
+  monitoring_enabled     = var.monitoring_enabled
+  log_retention_days     = var.log_retention_days
+  filename               = "${path.root}/../lambda/dist/lambda.zip"
+  runtime                = "python3.14"
 }
 
 # T011-05 — Cognito: User Pool + App Client + Gruppe `staff`

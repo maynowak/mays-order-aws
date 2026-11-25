@@ -14,13 +14,13 @@ resource "aws_lambda_function" "handler" {
   source_code_hash = filebase64sha256(var.filename)
 
   environment {
-    variables = {
+    variables = merge({
       ORDERS_TABLE             = var.dynamodb_table_name
       SQS_QUEUE_URL            = var.queue_url
       ORDERS_PROJECT_NAME      = var.project_name
       ORDERS_COGNITO_ISSUER    = var.cognito_issuer
       ORDERS_COGNITO_CLIENT_ID = var.cognito_client_id
-    }
+    }, var.additional_environment)
   }
 
   tags = merge({ "Project" = var.project_name }, var.tags)

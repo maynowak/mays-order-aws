@@ -157,12 +157,18 @@ def _adopt_legacy(project_dir: Path, manifest: dict, source: Path, tmp: Path,
         else:
             deviations.append((rel, "modified"))
 
-    print(f"Status: {'ADOPTED' if not deviations else 'REVIEW_REQUIRED'} "
-          f"(BUILDER_LEGACY_ADOPTION)")
-    print(f"  Uebernommen: {len(adopted)} Datei(en)")
-    for rel, why in deviations:
-        print(f"  Abweichung ({why}): {rel} — NICHT uebernommen")
+    # All-or-nothing: never write a v2 manifest from a partial v1 adoption.
+    if len(set(listed)) != len(listed):
+        deviations.append(("files_written", "duplicate_entries"))
+    if deviations:
+        print("Status: BLOCKED (BUILDER_LEGACY_ADOPTION_INCOMPLETE)")
+        for rel, why in deviations:
+            print(f"  Abweichung ({why}): {rel} — NICHT uebernommen")
+        print("  Manifest unveraendert.")
+        return 1
 
+    print("Status: ADOPTED (BUILDER_LEGACY_ADOPTION)")
+    print(f"  Uebernommen: {len(adopted)} Datei(en)")
     if not apply:
         print("  Dry-Run: Manifest unveraendert.")
         return 0 if not deviations else 1

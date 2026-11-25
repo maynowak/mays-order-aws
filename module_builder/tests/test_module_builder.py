@@ -907,6 +907,7 @@ class TestOrdersServiceModule(unittest.TestCase):
                                      "monitoring_enabled", "log_retention_days",
                                      "external_cognito",
                                      "enable_agent_transport",
+                                     "additional_environment",
                                      "ris_result_producer_role_arns",
                                      "lambda_execution_boundary"})
         text = (self.target / "variables.tf").read_text()
@@ -937,9 +938,10 @@ class TestOrdersServiceModule(unittest.TestCase):
             "cognito_user_pool_id", "cognito_user_pool_arn",
             "cognito_user_pool_endpoint", "cognito_user_pool_client_id",
             "cognito_user_pool_group_name",
+            "results_queue_url", "results_queue_arn", "result_hmac_secret_arn",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
-        self.assertEqual(len(outputs), 20)
+        self.assertEqual(len(outputs), 23)
         # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
         # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
         block = re.search(
@@ -951,8 +953,9 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertNotIn("project_name", block.group(1))
         # Alle Referenzen bleiben im Vertragsbestand
         refs = set(re.findall(r"module\.([a-z_]+)", outputs_text))
-        self.assertTrue(refs.issubset({"api", "cognito", "dynamodb", "iam",
-                                       "lambda", "sqs", "sqs_worker"}))
+        self.assertTrue(refs.issubset({"agent_transport", "api", "cognito",
+                                       "dynamodb", "iam", "lambda", "sqs",
+                                       "sqs_worker"}))
 
     def test_iam_sqs_gate_contract(self):
         """GAP-06: beide counts hängen NUR am booleschen Gate; der ARN bleibt
@@ -996,6 +999,7 @@ class TestOrdersServiceModule(unittest.TestCase):
                                      "monitoring_enabled", "log_retention_days",
                                      "external_cognito",
                                      "enable_agent_transport",
+                                     "additional_environment",
                                      "ris_result_producer_role_arns",
                                      "lambda_execution_boundary"})
 
@@ -1182,7 +1186,7 @@ class TestExternalCognitoIntegration(unittest.TestCase):
         """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 20)
+        self.assertEqual(len(names), 23)
         self.assertIn("sqs_queue_name", names)
         # Modus-sichere Wertformen:
         self.assertIn("value       = local.cognito_endpoint", outputs)

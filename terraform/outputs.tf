@@ -120,3 +120,16 @@ output "sqs_worker_lambda_arn" {
   description = "ARN der Orders-Worker-Lambda (SQS-Consumer)."
   value       = module.sqs_worker.function_arn
 }
+
+# Read-only references; the resources remain owned by agent_transport.
+output "results_queue_url" {
+  value = try(module.agent_transport[0].results_queue_url, "")
+}
+
+output "results_queue_arn" {
+  value = try(module.agent_transport[0].results_queue_arn, "")
+}
+
+output "result_hmac_secret_arn" {
+  value = try(module.agent_transport[0].result_hmac_secret_arn, "")
+}
