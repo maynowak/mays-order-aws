@@ -85,6 +85,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | [`MO-ORDER-DESCRIPTION-04-DOC-SYNC.md`](../reports/MO-ORDER-DESCRIPTION-04-DOC-SYNC.md) | Doku-Konsistenz nach F012 |
 | [`MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md`](../reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md) | SKU-Konventionen als Order-Art-Hinweis |
 | [`WIKI-CONSISTENCY-01-EXECUTION_LOG.md`](../reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md) | Prüfung/Ergänzung dieser Wiki |
+| [`CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`](../reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md) | CodeQL/SARIF-Upload und Dependency-Scanner-Befund |
 
 ## Pflege
 

@@ -76,6 +76,9 @@ evidence 0fc8972); no deployment
   Dokumentationsportal (11), FAQ (12), Glossar, Kurz-Erklärungen, Release-Bilder,
   Privacy-Grenzen und CI/CD-Lage ergänzt; Wiki-Pflege in AGENTS verankert; keine
   Code-/AWS-/Terraform-/RIS-Mutation
+→ CI-Audit 2026-11-25: Re-Runs nach GitHub-Incident grün (CodeQL 143/143 +
+  SARIF-Upload complete; Dependency/Security Gate success); separater
+  Dependency-Scanner-Fehlalarm `time ~> 0.11`/Lock 0.14.2 dokumentiert (Fix offen)
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen

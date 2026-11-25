@@ -49,6 +49,7 @@
 | W9 | D8-Source-Fail/CI-Lage nicht in der Wiki | Betriebstransparenz | Abschnitt in 07 mit Datum, Ursache, „kein Build/Plan/Deploy“ und Report-Links |
 | W10 | Keine Wiki-Pflege-Regel für Agenten | Nachhaltigkeit | `AGENTS.md`, `docs/AGENTS.md`, Playbook ergänzt; QUELLEN-Pflegecheckliste |
 | W11 | GitHub-Checks auf dem Doku-Commit rot | Externer Incident | Als GitHub-Incident (`qn8mfv6q5hlx`) dokumentiert; CodeQL-Analyse lief, SARIF-Upload/Rerun scheiterten (HTTP 500); kein Code-/Wiki-Defekt |
+| W12 | Dependency-Scanner meldet `hashicorp/time ~> 0.11` als unsatisfied | Scanner-Fehlalarm | Reproduziert: `~>` wird als `<0.12` statt `<1.0` geparst; Lock 0.14.2 ist gültig. AWS-Vergleich nutzt Constraint statt Lock. Separater CI-Audit-Report; Fix offen |
 
 ## 4. Faktenprüfung (tatsächlich ausgeführt)
 
@@ -125,18 +126,26 @@
 - Basis: `main`/`origin/main` `543ef75`; Worktree vor dem Task clean.
 - `git diff --check`: PASS.
 - Secret-Audit: keine Credentials/Secrets in Wiki, Bildern oder Reports.
-- Doku-Commit `52bdbb0` (Wiki) und Nachtrag `cb15429` (CI-Incident-Status)
-  gepusht; `main` = `origin/main` = `cb15429`.
+- Doku-Commits `52bdbb0` (Wiki), `cb15429` und `2ef1fd6` (CI-Status)
+  gepusht; `main` = `origin/main` = `2ef1fd6` (Basis dieses Reports).
 - Der Push löst erwartungsgemäß nur den bekannten D8-Source-Fail aus
   (kein Build/Plan/Deploy).
 - **GitHub Actions auf `52bdbb0`/`cb15429` waren rot** (CodeQL, Dependency,
-  Security Gate): Ursache ist ein **GitHub-weiter Incident** (Status API am
+  Security Gate): Ursache war ein **GitHub-weiter Incident** (Status API am
   25.11.2026: „Partial System Outage", Actions `partial_outage`, Git Operations
-  `partial_outage`, Incident „Investigating degraded experiences across GitHub
-  products", `qn8mfv6q5hlx`, seit 15:55Z). Die CodeQL-Analyse selbst lief durch
-  (143/143 Python-Dateien, SARIF exportiert), der **SARIF-Upload** brach ab;
-  ein Rerun der Jobs scheiterte mit HTTP 500. Das ist kein Wiki-/Code-Defekt.
-  Nach Behebung des Incidents sind die Checks erneut auszuführen.
+  `partial_outage`, Incident `qn8mfv6q5hlx`, seit 15:55Z). Die CodeQL-Analyse
+  selbst lief durch (143/143 Python-Dateien), der **SARIF-Upload** brach ab;
+  ein Rerun scheiterte zunächst mit HTTP 500.
+- **Nach Incident-Ende (16:37Z) wurden die Jobs auf `2ef1fd6` erneut
+  ausgeführt und sind grün:** CodeQL 143/143 + „Analysis upload status is
+  complete", Dependency-SARIF-Upload complete, Security Gate success. Die
+  frühere rote Phase ist damit als externer Incident erklärt.
+- **Unabhängig davon** meldet der repository-eigene Dependency-Scanner
+  `hashicorp/time` (`~> 0.11`, Lock `0.14.2`) fälschlich als
+  `CONSTRAINT_UNSATISFIED`; der Scanner parst `~>` zu eng und vergleicht gegen
+  den Constraint-String statt gegen die Lock-Datei. Das ist ein
+  **Scanner-Fehlalarm**, kein Wiki-/Code-Defekt. Details:
+  `CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.
 
 ## 10. Offene Fragen / Risiken
 

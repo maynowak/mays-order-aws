@@ -379,6 +379,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-ORDER-DESCRIPTION-04 → docs/reports/MO-ORDER-DESCRIPTION-04-DOC-SYNC.md (Doku-Konsistenz nach Integration: PROJECT_STATUS, F012, Changelog, ADR-Nachtrag, Phase-1-Modell, Schema-Datum, Test-Results, API-Testfälle T-17…T-20, Roadmap aktualisiert; historische Nachweise unverändert; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-ORDER-DESCRIPTION-05 → docs/reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md (Doku-Empfehlung für eigene SKU-Konventionen als informative Order-Art-Markierung; `orderType` bleibt Routing; Beispiel Consumer A „Benutze Bestellung auf Korb X"/„wartet"; nicht normativ, keine Code-/AWS-/Terraform-/RIS-Änderung)
 - WIKI-CONSISTENCY-01 → docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md (docs/wiki/** gegen Code/Tests/Reports geprüft; 12 Seiten inkl. Dokumentationsportal/FAQ, Glossar, Kurz-Erklärungen, Release-Bilder, Privacy-/CI-Grenzen; 0 fehlende Links; Wiki-Pflege in AGENTS/Playbook; keine Code-/AWS-/Terraform-/RIS-Änderung)
+- CI-CODQL-SARIF-DEPENDENCY-AUDIT-01 → docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md (CodeQL 143/143 + SARIF-Upload complete; Dependency-SARIF complete; Security Gate success; GitHub-Incident behoben; Scanner-Fehlalarm `hashicorp/time ~> 0.11`/Lock 0.14.2 und AWS-Constraint-vs-Lock dokumentiert; Fix offen)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1185,11 +1186,36 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Testzahlen-Kontext, Release-/Architektur-Bilder mit Stand-Caveats.
 - Link-/Bildprüfung: 0 fehlende Ziele; Wiki-Pflege in `AGENTS.md`,
   `docs/AGENTS.md` und Playbook verankert.
-- Doku-Commit `52bdbb0`, Nachtrag `cb15429`; `main` = `origin/main`. D8-Pipeline
-  weiterhin nur Source-Fail (kein Build/Plan/Deploy). GitHub Actions auf
-  `52bdbb0`/`cb15429` rot wegen GitHub-Incident `qn8mfv6q5hlx` (am 25.11.2026
-  „Partial System Outage", Actions `partial_outage`, SARIF-Upload-Fehler,
-  Rerun HTTP 500; CodeQL-Analyse selbst 143/143 Dateien durchgelaufen) —
-  kein Wiki-/Code-Defekt; Checks nach Incident-Ende erneut ausführen.
+- Doku-Commits `52bdbb0`, `cb15429`, `2ef1fd6`; `main` = `origin/main`
+  (`2ef1fd6`). D8-Pipeline weiterhin nur Source-Fail (kein Build/Plan/Deploy).
+- **CI-Nachtrag 16:37Z:** Nach Ende des GitHub-Incidents `qn8mfv6q5hlx` wurden
+  die Jobs auf `2ef1fd6` erneut ausgeführt: CodeQL **143/143 Dateien +
+  SARIF-Upload complete**, Dependency **success** (SARIF complete), Security
+  Gate **success**. Die frühere rote Phase war der Incident, kein Wiki-Defekt.
+- **Separater Scanner-Befund:** `hashicorp/time` (`~> 0.11`, Lock `0.14.2`) wird
+  vom repository-eigenen Dependency-Scanner fälschlich als
+  `CONSTRAINT_UNSATISFIED` gemeldet; `~>` wird zu eng geparst, die Lock-Datei
+  nicht verglichen. YELLOW/OPEN, Details im CI-Audit-Report.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md`.
+
+## 2026-11-25 — CI-CODQL-SARIF-DEPENDENCY-AUDIT-01
+
+**Status:** `REVIEW COMPLETE` · **CI GREEN nach Re-Run** · **Scanner-Fehlalarm OPEN**
+
+- GitHub-Incident `qn8mfv6q5hlx` (25.11.2026, „Partial System Outage", Actions
+  `partial_outage`) erklärt die ersten roten SARIF-Uploads/Rerun-HTTP-500.
+  Nach Incident-Ende wurden die Jobs auf `2ef1fd6` erneut ausgeführt:
+  CodeQL **success** (143/143 Python-Dateien, „Analysis upload status is
+  complete"), Dependency **success** (SARIF complete), Security Gate **success**.
+- Unabhängig davon: Dependency-Scanner meldet `hashicorp/time` (`~> 0.11`,
+  Lock `0.14.2`) fälschlich als `CONSTRAINT_UNSATISFIED`. Ursache:
+  `~>`-Semantik im Scanner zu eng (`~> 0.11` wird als `<0.12` statt `<1.0`
+  behandelt); die Lock-Datei wird nicht verglichen. Die Unit-Tests kodieren die
+  falsche Semantik mit. AWS (`>= 6.0`, Lock `6.65.0`) wird gegen den
+  Constraint-String statt gegen den Lock verglichen; aktueller Scanner-Output
+  `6.54.0` (die extern genannte `5.39.0` war nicht reproduzierbar).
+- Security Gate ist echo-only und wertet SARIF-Findings nicht aus; ein grüner
+  Gate ist kein Nachweis „keine Findings“.
+- Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
+- Report: `docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.

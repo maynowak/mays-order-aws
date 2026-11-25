@@ -74,6 +74,15 @@ lokalen Ergebnisse ändern die unveränderliche Identität des RC4-Tags nicht.
 > Deployment aus. Ein echter Deploy braucht weiterhin einen Menschen mit
 > Freigabe und eine funktionierende Pipeline.
 
+> **Bekannter CI-Befund (25.11.2026):** Die GitHub-Checks waren zunächst durch
+> einen GitHub-Incident rot; nach dem Re-Run sind CodeQL (143/143 Dateien,
+> SARIF-Upload complete) und Dependency-Check grün. Unabhängig davon meldet der
+> repository-eigene Dependency-Scanner `hashicorp/time` (`~> 0.11`, Lock
+> `0.14.2`) fälschlich als `CONSTRAINT_UNSATISFIED` — `~>` wird im Scanner zu
+> eng geparst und die Lock-Datei nicht verglichen. Das ist ein
+> **Scanner-Fehlalarm**, kein Wiki-/Produktdefekt; Details im
+> [`CI-Audit-Report`](../reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md).
+
 ## Installation und Rückbau
 
 Die konkrete Befehlsfolge steht in [Installer](05-installer.md) und
