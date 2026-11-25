@@ -73,7 +73,7 @@
 | Module Builder | Presets `complete`/`orders-service`; `orders-service` = 7 Module; `build --validate` read-only |
 | Installer-CLI | `validate`, `plan`, `plan-destroy`, `deploy`, `destroy`, `backup`, `state`, `output`, `identity`, `gui`; `--guide` |
 | D8/`directAWSGit` | D8: ManualApproval, aktuell Source-Fail (Bucket 404); Legacy `DetectChanges=false` |
-| GitHub Actions auf `52bdbb0` | **rot** wegen GitHub-Incident (`qn8mfv6q5hlx`): Actions degraded, SARIF-Upload-Fehler, Rerun HTTP 500; CodeQL-Analyse selbst 143/143 Dateien durchgelaufen |
+| GitHub Actions auf `52bdbb0`/`cb15429` | **rot** wegen GitHub-Incident (`qn8mfv6q5hlx`): am 25.11.2026 „Partial System Outage", Actions `partial_outage`, SARIF-Upload-Fehler, Rerun HTTP 500; CodeQL-Analyse selbst 143/143 Dateien durchgelaufen |
 | Link-/Bildprüfung | **0 fehlende Ziele** nach Erstellung dieses Reports |
 
 ## 5. Geänderte Dateien
@@ -125,13 +125,15 @@
 - Basis: `main`/`origin/main` `543ef75`; Worktree vor dem Task clean.
 - `git diff --check`: PASS.
 - Secret-Audit: keine Credentials/Secrets in Wiki, Bildern oder Reports.
-- Doku-Commit `52bdbb0` gepusht; `main` = `origin/main` = `52bdbb0`.
+- Doku-Commit `52bdbb0` (Wiki) und Nachtrag `cb15429` (CI-Incident-Status)
+  gepusht; `main` = `origin/main` = `cb15429`.
 - Der Push löst erwartungsgemäß nur den bekannten D8-Source-Fail aus
   (kein Build/Plan/Deploy).
-- **GitHub Actions auf `52bdbb0` waren rot** (CodeQL, Dependency, Security Gate):
-  Ursache ist ein **GitHub-weiter Incident** (Status API: Actions
-  `degraded_performance`, Git Operations `partial_outage`, Incident
-  `qn8mfv6q5hlx`, 2026-11-25T15:55Z). Die CodeQL-Analyse selbst lief durch
+- **GitHub Actions auf `52bdbb0`/`cb15429` waren rot** (CodeQL, Dependency,
+  Security Gate): Ursache ist ein **GitHub-weiter Incident** (Status API am
+  25.11.2026: „Partial System Outage", Actions `partial_outage`, Git Operations
+  `partial_outage`, Incident „Investigating degraded experiences across GitHub
+  products", `qn8mfv6q5hlx`, seit 15:55Z). Die CodeQL-Analyse selbst lief durch
   (143/143 Python-Dateien, SARIF exportiert), der **SARIF-Upload** brach ab;
   ein Rerun der Jobs scheiterte mit HTTP 500. Das ist kein Wiki-/Code-Defekt.
   Nach Behebung des Incidents sind die Checks erneut auszuführen.

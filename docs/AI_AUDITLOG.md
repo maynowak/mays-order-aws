@@ -1185,9 +1185,10 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Testzahlen-Kontext, Release-/Architektur-Bilder mit Stand-Caveats.
 - Link-/Bildprüfung: 0 fehlende Ziele; Wiki-Pflege in `AGENTS.md`,
   `docs/AGENTS.md` und Playbook verankert.
-- Doku-Commit `52bdbb0`; `main` = `origin/main`. D8-Pipeline weiterhin nur
-  Source-Fail (kein Build/Plan/Deploy). GitHub Actions auf `52bdbb0` rot wegen
-  GitHub-Incident `qn8mfv6q5hlx` (Actions degraded, SARIF-Upload-Fehler,
+- Doku-Commit `52bdbb0`, Nachtrag `cb15429`; `main` = `origin/main`. D8-Pipeline
+  weiterhin nur Source-Fail (kein Build/Plan/Deploy). GitHub Actions auf
+  `52bdbb0`/`cb15429` rot wegen GitHub-Incident `qn8mfv6q5hlx` (am 25.11.2026
+  „Partial System Outage", Actions `partial_outage`, SARIF-Upload-Fehler,
   Rerun HTTP 500; CodeQL-Analyse selbst 143/143 Dateien durchgelaufen) —
   kein Wiki-/Code-Defekt; Checks nach Incident-Ende erneut ausführen.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
