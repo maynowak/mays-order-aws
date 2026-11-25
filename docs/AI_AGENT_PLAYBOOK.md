@@ -273,6 +273,9 @@ Hinzufügen wesentlicher neuer AWS-Services
 
 - Statuskonvention: ✅ COMPLETE / ⏳ PLANNED / 🔵 IN PROGRESS / 🟡 DESIGNED / 🚧 BLOCKED / ⚪ NOT VERIFIED.
 - Fachquellen sind Single Source of Truth; nie widersprüchliche Zweitquellen erzeugen.
-- Nach jedem Feature: `docs/reports/WEEK-NN.md` + `docs/PROJECT_STATUS.md` + `docs/CHANGELOG.md` aktualisieren.
+- **Nach jedem Feature:** `docs/reports/WEEK-NN.md` + `docs/PROJECT_STATUS.md` +
+  `docs/CHANGELOG.md` aktualisieren und die menschenlesbare Wiki pflegen
+  (`docs/wiki/`: betroffene Seite, `README.md`, `QUELLEN.md`,
+  `11-dokumentationsportal.md`; neue Begriffe ins Glossar).
 
 Dieses Dokument ist der wiederverwendbare AI-Engineering-Playbook für das Repository.

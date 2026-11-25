@@ -44,8 +44,9 @@ mays-orders/
 ├── installer/        Deployment-Lifecycle-CLI (Core)
 ├── scripts/          Seed-/Cleanup-Tools + Tests
 ├── tests/            E2E-Tests + Test-Ergebnisse
-├── docs/             Projektakte (Status, Portfolio, Features, Reports)
-└── docs/features/    Feature-Dokumentation F001–F011
+├── docs/             Projektakte (Status, Portfolio, Features, Reports, Wiki)
+├── docs/features/    Feature-Dokumentation F001–F012
+└── docs/wiki/        menschenlesbare Wiki (Einstieg, FAQ, Dokumentationsportal)
 ```
 
 ## Fachliche Single Source of Truth
@@ -75,6 +76,14 @@ mays-orders/
   Validation, Doku, bekannte Probleme, Git-Checkpoint und Push abgeschlossen sind.
   Der Chatverlauf ist keine Recovery-Quelle; der semantische Stand steht in der Feature-Doku
   (siehe `docs/features/_progress-template.md`).
+- **Wiki-Pflege:** `docs/wiki/` ist die menschenlesbare Einstiegsebene (Produkt, Architektur,
+  API, Builder, Installer, Security, Betrieb, Entwicklung, Glossar, FAQ, Dokumentationsportal).
+  Bei Änderungen an API, Architektur, Status, Release, Tests, Installer/Module Builder oder
+  Privacy die betroffenen Wiki-Seiten, `docs/wiki/README.md`, `docs/wiki/QUELLEN.md` und
+  `docs/wiki/11-dokumentationsportal.md` aktualisieren; neue Begriffe ins Glossar, Links und
+  Bilder prüfen. Die Wiki ist für Menschen geschrieben: kurze Erklärungen, Beispiele und
+  Verweise in die Tiefe statt reiner Agenten-/Audit-Sprache. Wiki-Pflege gehört zum
+  Dokumentations-Checkpoint; keine Pass-/Verified-Aussage ohne Evidence-Pfad.
 
 ## Git Workflow
 

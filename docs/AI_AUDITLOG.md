@@ -378,6 +378,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-ORDER-DESCRIPTION-03 → docs/reports/MO-ORDER-DESCRIPTION-03-EXECUTION_LOG.md (Controlled Main Integration: Fast-Forward `1eaa14e`→`12d8963`, kontrollierter Cherry-Pick `f311ed9`→`0ef73db` mit Auditlog-Konfliktlösung „beide Einträge erhalten", Push `origin/main`=`0ef73db`; ZIP byte-identisch `117299c9…`; Lambda 456, fokussiert 16, Installer 81, Builder 129, Seed 28 PASS; D8-Pipeline nur Source-Fail (Bucket 404), kein Build/Plan/Deploy, Legacy-Pipeline nicht getriggert; kein AWS-/Terraform-/RIS-Deployment)
 - MO-ORDER-DESCRIPTION-04 → docs/reports/MO-ORDER-DESCRIPTION-04-DOC-SYNC.md (Doku-Konsistenz nach Integration: PROJECT_STATUS, F012, Changelog, ADR-Nachtrag, Phase-1-Modell, Schema-Datum, Test-Results, API-Testfälle T-17…T-20, Roadmap aktualisiert; historische Nachweise unverändert; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-ORDER-DESCRIPTION-05 → docs/reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md (Doku-Empfehlung für eigene SKU-Konventionen als informative Order-Art-Markierung; `orderType` bleibt Routing; Beispiel Consumer A „Benutze Bestellung auf Korb X"/„wartet"; nicht normativ, keine Code-/AWS-/Terraform-/RIS-Änderung)
+- WIKI-CONSISTENCY-01 → docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md (docs/wiki/** gegen Code/Tests/Reports geprüft; 12 Seiten inkl. Dokumentationsportal/FAQ, Glossar, Kurz-Erklärungen, Release-Bilder, Privacy-/CI-Grenzen; 0 fehlende Links; Wiki-Pflege in AGENTS/Playbook; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1165,3 +1166,24 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   `database/dynamodb-design.md`; Details im Report.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md`.
+
+## 2026-11-25 — WIKI-CONSISTENCY-01 — DOKU-/WIKI-PRÜFUNG UND ERWEITERUNG
+
+**Status:** `IMPLEMENTED / VERIFIED (DOKUMENTATION)` · **GREEN** (Inhalt/Links),
+**YELLOW** (dokumentierter CI/CD-Befund)
+
+- `docs/wiki/**` (initial 12 Dateien, untracked) inventarisiert und gegen
+  `docs/PROJECT_STATUS.md`, `docs/RELEASE_NOTES.md`, `docs/roadmap/ROADMAP.md`,
+  `docs/release/`, `api/`, `database/`, `order-lifecycle/`, `terraform/`,
+  `installer/`, `module_builder/` und `docs/reports/` geprüft.
+- Verifiziert: 4 API-Routen, Statusmaschine, Items/SKU-Regeln, `orderDescription`,
+  SKU-Leitlinie, Installer-/Builder-CLI, Testzahlen (456 Lambda, 674/81 Installer,
+  23 Policy, 36 E2E, 129 Builder, 28 Seed), Release-Tag `5bc154e`, RIS-Pin
+  `1dbb0cb`, D8-Source-Fail und `directAWSGit`-DetectChanges=false.
+- Erweitert: Dokumentationsportal (11), FAQ (12), starkes Glossar,
+  „Kurz erklärt"-Kästen, Item-/Fehler-/Privacy-Tabellen, CLI-Beispiele,
+  Testzahlen-Kontext, Release-/Architektur-Bilder mit Stand-Caveats.
+- Link-/Bildprüfung: 0 fehlende Ziele; Wiki-Pflege in `AGENTS.md`,
+  `docs/AGENTS.md` und Playbook verankert.
+- Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
+- Report: `docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md`.

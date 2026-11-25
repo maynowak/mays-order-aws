@@ -2,6 +2,21 @@
 
 > Nur tatsächliche Änderungen. Jeder Eintrag referenziert einen echten Checkpoint.
 
+## 2026-11-25 — WIKI-CONSISTENCY-01
+
+### Documentation
+- `docs/wiki/**` gegen Code, Tests, `docs/**` und `docs/reports/**` geprüft und
+  erweitert: Dokumentationsportal (11), FAQ (12), Glossar, „Kurz erklärt"-Kästen,
+  Item-/Fehler-/Privacy-Tabellen, CLI-Beispiele, Testzahlen-Kontext
+- Release-Bilder eingebunden: RC4-Hero (README/07), Architektur-SVG (02),
+  historische v0.4.0-Grafik mit Datums-/Status-Caveat (09)
+- Wiki-Pflege verbindlich in `AGENTS.md`, `docs/AGENTS.md` und Playbook verankert
+- D8-Source-Fail und `directAWSGit`-Lage in der Betriebsseite dokumentiert
+
+### Boundaries
+- Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment
+- Historische Reports/Release-Dokus bleiben unverändert
+
 ## 2026-11-23 — MO-ORDER-DESCRIPTION-01 (F012)
 
 ### Feature

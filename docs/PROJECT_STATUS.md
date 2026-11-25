@@ -20,7 +20,8 @@ MO-ORDER-DESCRIPTION-01 (F012) — additives optionales `orderDescription`
 Current Task:
 MO-ORDER-DESCRIPTION-01 — implementiert/getestet/verifiziert und in `main`
 integriert (Fast-Forward 12d8963, Review-Cherry-Pick 0ef73db, Evidence 0fc8972);
-kein Deployment
+kein Deployment. Zusätzlich WIKI-CONSISTENCY-01: `docs/wiki/` geprüft und
+menschenlesbar erweitert.
 
 Hinweis Release:
 v0.6.0-rc.1 ist als RC4-Release-Label freigegeben. Deployment-/Teststack-Version
@@ -71,6 +72,10 @@ evidence 0fc8972); no deployment
 → Dokumentations-Konsistenzabgleich 2026-11-24: PROJECT_STATUS, F012, Changelog,
   ADR-Nachtrag, Phase-1-Modell, Schema-Datum, Test-Results, API-Testfälle,
   Roadmap und Auditlog nachgezogen
+→ Wiki-Konsistenz 2026-11-25: `docs/wiki/**` gegen Code/Tests/Reports geprüft;
+  Dokumentationsportal (11), FAQ (12), Glossar, Kurz-Erklärungen, Release-Bilder,
+  Privacy-Grenzen und CI/CD-Lage ergänzt; Wiki-Pflege in AGENTS verankert; keine
+  Code-/AWS-/Terraform-/RIS-Mutation
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen

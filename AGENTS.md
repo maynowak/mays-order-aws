@@ -47,6 +47,11 @@ Run artifacts land in `.mays-installer/runs/` (gitignored).
   IAM = service-to-service only; never use IAM access keys as user login.
 - **Evidence-based claims only.** Never state Build/Test/Deploy PASS without having run it.
   Use states: PLANNED / IMPLEMENTED / TESTED / VERIFIED / COMPLETE / BLOCKED / NOT TESTED.
+- **Wiki pflegen:** `docs/wiki/` ist die menschenlesbare Einstiegsebene. Bei Änderungen an
+  API, Architektur, Status, Release, Tests, Installer/Module Builder oder Privacy die
+  betroffenen Wiki-Seiten (01–12), `docs/wiki/README.md`, `QUELLEN.md` und
+  `11-dokumentationsportal.md` aktualisieren; Links/Glossar prüfen. Wiki-Pflege gehört
+  zum Dokumentations-Checkpoint, keine Pass-/Verified-Aussage ohne Evidence-Pfad.
 - **Checkpoint after each released task:** Report → Tests → Build → `git status` →
   `git diff --check` → Secret-Audit → Commit → Push; keep `docs/PROJECT_STATUS.md` and the
   active `docs/features/F0XX-*.md` continuously updated (not just at the end).
