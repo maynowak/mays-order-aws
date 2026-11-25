@@ -390,3 +390,14 @@ Scope: additive generic orderDescription on the 016cdfd integration baseline
 - Resource neutrality: isolated orders-service build + RIS transport/dispatch patches yields byte-identical .tf files and identical resource addresses (36/36, no module-call diff) versus the installed 016cdfd module.
 - No RIS-specific parsing added to Mays-Orders; no resource, IAM, Cognito, SQS or secret changes.
 - Existing builder-upgrade tooling blocks this module (manifest v1 legacy; orders-service has no upgrade regeneration path) — reported to RIS; no parallel upgrade implementation added here.
+
+
+[MO-RIS-UPDATER-03B]
+Date: 2026-11-25
+Scope: patch-free integration contract (additional_environment + direct transport outputs)
+- additional_environment: root variable and lambda submodule variable (map(string), default {}), merged into the real Lambda environment block after the five existing keys. Reserved prefixes/keys (AWS_, ORDERS_, PRIVACY_, COGNITO_, ORDER_RESULT_, SQS_QUEUE_URL, runtime paths) are rejected by Terraform validation.
+- The three result-transport outputs are exported by the generated module as pure references (try(module.agent_transport[0].…, "")); no resource added or changed.
+- Legacy adoption is all-or-nothing: duplicate or deviating files block the adoption and the manifest is not written (BUILDER_LEGACY_ADOPTION_INCOMPLETE).
+- Tests: module_builder/tests/test_ris_updater_03b.py (4 cases incl. offline terraform plan for allowed/reserved keys) PASS; test_module_builder contract assertions updated to the 23-output set and the new variable.
+- Verification: isolated build + terraform fmt -check / init -backend=false / validate PASS; 23 outputs, no duplicates; resource addresses 36/36 identical to the installed module; builder suite 88 passed / 12 failed (all Windows-only baseline failures, no new ones); lambda suite OK.
+- No RIS change, no pin change, no AWS plan/apply, no main merge.

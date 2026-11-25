@@ -164,3 +164,9 @@ docs/reports/recovery-checkpoint-strategy.md
 
 > Der semantische Arbeitsstand eines aktiven Features steht in der Feature-Dokumentation —
 > nicht im Chatverlauf. Template: `docs/features/_progress-template.md`.
+
+## MO-RIS-UPDATER-03B (2026-11-25)
+
+- orders-service generated module: `additional_environment` (safe merge) and the three result-transport outputs are part of the contract.
+- Legacy adoption is atomic (no partial v2 manifest).
+- Verified: 23 outputs, 36/36 resource addresses unchanged, fmt/init/validate PASS; builder 88 passed (12 Windows-only baseline failures), lambda suite OK.
