@@ -1219,3 +1219,29 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Gate ist kein Nachweis „keine Findings“.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.
+
+## 2026-11-26 — MO-ORDERS-SERVICE-TERRAFORM-FIX-07B — GENERIERTES MODUL VALIDIERBAR
+
+**Status:** `IMPLEMENTED / VERIFIED LOCAL` · **GREEN** (lokal) · kein Merge/Deploy
+
+- Reproduziert auf `main` `8830da2`: `build --preset orders-service --validate`
+  scheiterte bei `terraform validate` mit `Reference to undeclared input
+  variable` (`var.deployment_version` in `outputs.tf`, SQS-Parameter in
+  `main.tf`) sowie Referenzen auf das nicht zum Vertrag gehörende
+  `module.privacy_secret`.
+- Ursache: `build_module()` filterte Variablen/Modulblöcke über statische
+  Listen, ohne das tatsächliche Root-Wiring zu prüfen; spätere Root-Änderungen
+  (P00-E Privacy, MO-P0B `deployment_version`, MO-RC4-P02C SQS) drifteten aus
+  dem Vertrag. `complete` war nicht betroffen.
+- Fix in der Quelle: `ORDERS_SERVICE_VARIABLES` um `deployment_version` + vier
+  SQS-Parameter ergänzt (Defaults unverändert); neuer fail-closed Helper
+  entfernt ausschließlich die allowlistete Privacy-Wiring; Vertrags-Audit vor
+  jedem Schreiben (Referenzmenge == Vertragsmenge); Modul-README/Manifest
+  dokumentieren Inputs und entfernte Fremd-Wiring.
+- Evidenz: orders-service-Build mit `--validate` **PASS**; `complete --validate`
+  **PASS**; Builder **134 PASS** (Baseline 129, +5 Regression inkl. echtem
+  `fmt -check`/`init -backend=false`/`validate`), Installer **81 PASS**, Lambda
+  **456 PASS**; `compileall` PASS.
+- Keine Änderung an Presets, Security-Defaults, 7-Modul-Wiring, Root-Terraform,
+  Lambda, Installer, RIS, Pin-Dateien oder AWS/Terraform-State.
+- Report: `docs/reports/MO-ORDERS-SERVICE-TERRAFORM-FIX-07B.md`.
