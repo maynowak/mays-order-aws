@@ -67,6 +67,16 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "notification_email": ["cognito_backup_automation"],
     "enable_cognito_backup": ["cognito_backup", "cognito_backup_automation"],
     "enable_cognito_backup_automation": ["cognito_backup_automation"],
+    # Agent-Transport-Grenze (MO-RIS-ORDERS-MODULE-REBUILD-01): ausschließlich
+    # der agent_transport-Block verdrahtet Gate-Variable und RIS-Producer-Rollen.
+    # Defaults (false / []) bleiben erhalten — ohne Auswahl entfallen die
+    # Variablen, ohne dass sich das Bestandsverhalten ändert.
+    "enable_agent_transport": ["agent_transport"],
+    "ris_result_producer_role_arns": ["agent_transport"],
+    # Permissions-Boundary: nur der sqs_worker-Block übergibt sie an das
+    # Kindmodul. Der Root-Default bleibt unverändert (Parität zum Preset
+    # `complete`) — der Builder neutralisiert ihn NICHT.
+    "lambda_execution_boundary": ["sqs_worker"],
 }
 
 # Ressourcen-Bedarf je Auswahl (Lambda-Artefakte/-Quellen nur bei Bedarf):

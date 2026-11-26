@@ -2,7 +2,7 @@
 
 The 'complete' preset mirrors the full existing Mays-Orders-Stack:
 
-    terraform root wiring (main/variables/outputs) + 11 child modules
+    terraform root wiring (main/variables/outputs) + 12 child modules
     + Lambda artifacts (order handler zip, cognito backup zip)
     + Lambda source + build script (artifact reproducibility)
     + seed tooling (scripts/seed_orders.py + seed files, opt-in via variable)
@@ -25,7 +25,12 @@ from __future__ import annotations
 from typing import Dict, List
 
 # All child modules of the complete stack (directory names under terraform/modules).
+# MO-RIS-ORDERS-MODULE-REBUILD-01: agent_transport gehört zum Root-Wiring
+# (module "agent_transport" in main.tf, count-gated per var.enable_agent_transport)
+# und muss deshalb mitkopiert werden — ohne das Verzeichnis wäre das generierte
+# Projekt nicht init-/validierbar.
 COMPLETE_MODULES: List[str] = [
+    "agent_transport",
     "api",
     "cloudtrail",
     "cognito",
