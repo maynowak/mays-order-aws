@@ -1,3 +1,20 @@
+[MO-RIS-MODULE-BASELINE-RECOVERY-07]
+Current status: BLOCKED — MODULE / IAM / TERRAFORM CONTRACT
+Audit date/time: 2026-11-26
+Current Git branch and HEAD: integration/mo-ris-module-contract-07c b161b18 (code), report commit follows; Mays-Orders main 8830da2 unchanged; RIS D cce4cf5/e237b45; no main merge
+Audit scope: four-agent cross-repository module recovery; original Mays-Orders tests, builder presets, orders-service preset, RIS builder portability, generated module contract and IAM/SQS analysis. No plan/apply/AWS mutation/deployment/live data change.
+Findings:
+  - A fixed module-builder preset/full-custom contract at 386d741 (016cdfd base): 94 module-builder PASS; complete/custom generated and terraform validate PASS.
+  - B fixed main orders-service missing vars at 570bbe7: 134 module-builder PASS; orders-service/complete validate PASS; lambda 456/installer 81/seed 28/policy 30.
+  - C limited integration at b161b18 (main + B + transferable A): module-builder 136 PASS, lambda 456, installer 81; complete/custom/orders-service validate PASS.
+  - Full consolidation blocked: main lacks agent_transport and lambda cognito wiring; RIS injection fails 3x undeclared module.agent_transport; RIS env patch marker mismatch/non-atomic. SQS F-03 main (no queue policy) vs 016cdfd account-root vs live wildcard; gsi3/gsi4 PII, apply_result guard, HMAC allowlist and empty principal decisions remain.
+  - 1dbb0cb is an ancestor of main 8830da2 (correction to Gate-06); main vs 016cdfd divergence is 21 commits.
+  - D made RIS builder portable at cce4cf5 (16 new tests, real 016cdfd build/validate PASS); RIS full 3417 PASS/129 skipped/10 known failures.
+  - Original 016cdfd module_builder has 1 reproducible failure (A fixes on its branch); 1dbb0cb generated module lacks agent_transport for RIS.
+No plan, apply, AWS mutation, deployment or main merge.
+Report: docs/reports/MO-RIS-MODULE-BASELINE-RECOVERY-07-REPORT.md
+Current resume point: separate authorized agent-transport consolidation + SQS/policy decisions before pin change.
+
 ==================================================
 EXECUTION LOG / CRASH RECOVERY — MANDATORY
 ==================================================
