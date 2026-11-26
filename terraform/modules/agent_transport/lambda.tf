@@ -49,6 +49,11 @@ resource "aws_cloudwatch_log_group" "result_consumer" {
 resource "aws_iam_role" "result_consumer" {
   name = local.consumer_name
 
+  # Leer/null -> kein Boundary (kontospezifische Policy). Die Boundary des
+  # Aufrufers wird damit mindestens für alle vom Root verdrahteten Rollen
+  # (Worker + Result-Consumer) respektiert; kein konto-spezifischer Default.
+  permissions_boundary = var.lambda_execution_boundary != "" ? var.lambda_execution_boundary : null
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

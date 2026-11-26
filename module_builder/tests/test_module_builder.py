@@ -691,6 +691,33 @@ class TestModuleSelectionB1(unittest.TestCase):
                 r'arn:aws:iam::\d{12}:policy/',
             )
 
+    def test_agent_transport_keeps_execution_boundary_variable(self):
+        """IAM-Portabilität: der agent_transport-Block übergibt die optionale
+        Boundary an die Result-Consumer-Rolle (Boundary-Parität zur Worker-
+        Rolle). Ohne diese Bindung wäre die Boundary-Variable in einer Auswahl
+        ohne sqs_worker referenziert, aber nicht deklariert (validate-Fehler).
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            target = self._build(Path(tmp) / "agent-only",
+                                 ["dynamodb", "agent_transport"]).target
+            variables_tf = (target / "terraform" / "variables.tf").read_text()
+            self.assertIn('variable "lambda_execution_boundary"', variables_tf)
+            main_tf = (target / "terraform" / "main.tf").read_text()
+            agent_block = main_tf.split('module "agent_transport" {')[1].split("\n}")[0]
+            self.assertRegex(
+                agent_block,
+                r"lambda_execution_boundary\s*=\s*var\.lambda_execution_boundary",
+            )
+            # Das Kindmodul darf keine konto-spezifische ARN als Default tragen.
+            module_tf = "\n".join(
+                p.read_text()
+                for p in sorted((target / "terraform" / "modules"
+                                 / "agent_transport").glob("*.tf"))
+            )
+            self.assertIn('variable "lambda_execution_boundary"', module_tf)
+            self.assertRegex(module_tf, r'default\s*=\s*""')
+            self.assertNotRegex(module_tf, r"arn:aws:iam::\d{12}:policy/")
+
     def test_custom_manifest_contains_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "manifest-check"
@@ -1012,6 +1039,30 @@ class TestOrdersServiceModule(unittest.TestCase):
         main_tf = (self.target / "main.tf").read_text()
         self.assertIn(
             "lambda_execution_boundary = var.lambda_execution_boundary", main_tf
+        )
+
+    def test_agent_transport_consumer_role_honours_boundary(self):
+        """IAM-Portabilität: die Result-Consumer-Rolle erhält dieselbe optionale
+        Boundary wie die Worker-Rolle. Das Modul hatte dafür bisher keinen
+        Input; in einem Boundary-pflichtigen Konto wäre die Rolle mit
+        CreateRole fail-closed abgelehnt worden. Kein konto-spezifischer
+        Default im Kindmodul.
+        """
+        module_dir = self.target / "modules" / "agent_transport"
+        module_tf = "\n".join(p.read_text() for p in sorted(module_dir.glob("*.tf")))
+        self.assertIn('variable "lambda_execution_boundary"', module_tf)
+        self.assertRegex(module_tf, r'default\s*=\s*""')
+        self.assertIn(
+            "permissions_boundary = var.lambda_execution_boundary != \"\" "
+            "? var.lambda_execution_boundary : null",
+            module_tf,
+        )
+        self.assertNotRegex(module_tf, r"arn:aws:iam::\d{12}:policy/")
+        agent_block = (self.target / "main.tf").read_text().split(
+            'module "agent_transport" {')[1].split("\n}")[0]
+        self.assertRegex(
+            agent_block,
+            r"lambda_execution_boundary\s*=\s*var\.lambda_execution_boundary",
         )
 
     def test_outputs_contract(self):

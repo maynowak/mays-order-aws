@@ -73,10 +73,12 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     # Variablen, ohne dass sich das Bestandsverhalten ändert.
     "enable_agent_transport": ["agent_transport"],
     "ris_result_producer_role_arns": ["agent_transport"],
-    # Permissions-Boundary: nur der sqs_worker-Block übergibt sie an das
-    # Kindmodul. Der Root-Default bleibt unverändert (Parität zum Preset
-    # `complete`) — der Builder neutralisiert ihn NICHT.
-    "lambda_execution_boundary": ["sqs_worker"],
+    # Permissions-Boundary: der sqs_worker-Block und die Result-Consumer-Rolle
+    # im agent_transport-Block übergeben sie an das Kindmodul (Boundary-Parität
+    # aller Orders-Lambda-Rollen). Der Root-Default bleibt in der freien Auswahl
+    # unverändert (Parität zum Preset `complete`); nur der Orders-Service-Preset
+    # neutralisiert ihn auf "" (konto-spezifische ARN wird nie verschifft).
+    "lambda_execution_boundary": ["sqs_worker", "agent_transport"],
 }
 
 # Ressourcen-Bedarf je Auswahl (Lambda-Artefakte/-Quellen nur bei Bedarf):

@@ -18,6 +18,15 @@ variable "ris_result_producer_role_arns" {
   default     = []
 }
 
+# Optional IAM permissions boundary for the result-consumer role. Empty means
+# no boundary: the policy object is account-specific and must never be
+# hardcoded here (portability). Mirrors terraform/modules/sqs-worker.
+variable "lambda_execution_boundary" {
+  description = "Optionales IAM permissions boundary; leer = kein Boundary (kontospezifisch)."
+  type        = string
+  default     = ""
+}
+
 variable "visibility_timeout_seconds" {
   type    = number
   default = 60

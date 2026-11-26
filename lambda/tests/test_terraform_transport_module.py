@@ -74,6 +74,27 @@ class TestResultConsumerWiring(unittest.TestCase):
         self.assertNotIn("AdministratorAccess", self.source)
 
 
+class TestIamPortability(unittest.TestCase):
+    """IAM-Portabilität: die Boundary ist optional und nie konto-spezifisch."""
+
+    def setUp(self):
+        self.source = module_source()
+
+    def test_no_hardcoded_boundary_arn(self):
+        self.assertNotRegex(self.source, r"arn:aws:iam::\d{12}:policy/")
+
+    def test_consumer_role_uses_the_optional_boundary(self):
+        self.assertRegex(
+            self.source,
+            r'variable "lambda_execution_boundary" \{[\s\S]*?default\s*=\s*""',
+        )
+        self.assertIn(
+            'permissions_boundary = var.lambda_execution_boundary != "" '
+            "? var.lambda_execution_boundary : null",
+            self.source,
+        )
+
+
 class TestDefaultOff(unittest.TestCase):
     def test_flag_defaults_to_false(self):
         variables = read("variables.tf")

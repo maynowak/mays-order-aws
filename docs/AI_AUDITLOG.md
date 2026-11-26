@@ -377,3 +377,14 @@ Date: 2026-11-17
 - Tests: 225 lambda tests pass (unittest discover); targeted consumer/handoff suites 48 pass. New cover: envelope-id vs SQS-id basis, signature over SQS id rejected, empty secret batch failure, missing secret batch failure, partial infrastructure failure retries only the failed record, blank secret parsing.
 - Artifact: lambda/dist/lambda.zip rebuilt, sha256 48ddd5e52d07b40fc333b67e5e34fb1b67701cf823536e20c7b2816a78a05f94, 13 files; bundled result_handler verifies the body messageId and emits batchItemFailures.
 - No AWS mutation, no secret access, no user change.
+
+[RIS-MO-PIN-COMPATIBILITY-08A]
+Status: IMPLEMENTED / TESTED locally - one minimal IAM portability correction, no main merge, no AWS/Terraform apply.
+Date: 2026-11-26
+- Scope: RIS-relevant contract comparison of 386d741 (tested module version), 1dbb0cb (reviewed live baseline, ancestor of main), 570bbe7 (main + orders-service fix 07B) and main 8830da2. Evidence: git diff/rev-list and the matrix in docs/reports/RIS-MO-PIN-COMPATIBILITY-08A.md.
+- Data flow / privacy impact: none. No new resource, no new permission, no secret, no PII field, no log content, no SQS-policy, GSI, HMAC or apply_result change. The only new attribute is an optional IAM permissions_boundary on an existing role; empty input keeps the previous behaviour (null).
+- IAM correction: modules/agent_transport had no input for the permissions boundary, so aws_iam_role.result_consumer could not receive the operator's boundary (the root passed it only to module.sqs_worker). In a boundary-enforcing account CreateRole for the result consumer - and therefore the whole RIS result path - would fail. Added the optional input (default "", no account-specific ARN), applied it with the same "" -> null convention as modules/sqs-worker, wired it from the root, and bound the variable to agent_transport in module_builder/catalog.py so a free selection without sqs_worker keeps the variable declared.
+- Deliberately unchanged: root lambda_execution_boundary default (the orders-service preset neutralises it to ""), orders queue policy/resource semantics (live F-03 wildcard vs main DELETE vs pin account-root UPDATE), queue DLQ/retention delta, module outputs, identity.py, GSI/HMAC/apply_result, main-line 07B builder fixes.
+- Tests: module_builder 96 OK (baseline 94), lambda 227 OK, installer 81 OK; terraform fmt -check / init -backend=false / validate PASS on the root; generated orders-service, complete and agent_transport-only selections PASS --validate.
+- No AWS call, no plan, no apply, no deployment, no consent or RIS change.
+Report: docs/reports/RIS-MO-PIN-COMPATIBILITY-08A.md

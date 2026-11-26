@@ -250,6 +250,7 @@ module "agent_transport" {
   tags         = var.tags
 
   ris_result_producer_role_arns = var.ris_result_producer_role_arns
+  lambda_execution_boundary     = var.lambda_execution_boundary
 
   lambda_zip_path   = "${path.root}/../lambda/dist/lambda.zip"
   orders_table_name = module.dynamodb.table_name
