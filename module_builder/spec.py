@@ -2,7 +2,7 @@
 
 The 'complete' preset mirrors the full existing Mays-Orders-Stack:
 
-    terraform root wiring (main/variables/outputs) + 12 child modules
+    terraform root wiring (main/variables/outputs) + 13 child modules
     + Lambda artifacts (order handler zip, cognito backup zip)
     + Lambda source + build script (artifact reproducibility)
     + seed tooling (scripts/seed_orders.py + seed files, opt-in via variable)
@@ -25,6 +25,9 @@ from __future__ import annotations
 from typing import Dict, List
 
 # All child modules of the complete stack (directory names under terraform/modules).
+# Hinweis (MO-MODULE-CONTRACT-RECOVERY-07C): Ein `agent_transport`-Modul ist auf
+# `main` nicht vorhanden. Der Agent-Transport-Vertrag (Preset-Parität,
+# Gate-/Producer-Variablen) wird erst zusammen mit dem Modul selbst integriert.
 COMPLETE_MODULES: List[str] = [
     "api",
     "cloudtrail",

@@ -399,7 +399,7 @@ Eigenständige Terraform-Bereitstellung — **keine Abhängigkeit zum Quell-Repo
 
 ```text
 {project_name}/
-├── terraform/            # Root-Wiring + 11 Kindmodule (main, variables, outputs, versions)
+├── terraform/            # Root-Wiring + 13 Kindmodule (main, variables, outputs, versions)
 ├── lambda/
 │   ├── src/              # Python-Quelle (Reproduzierbarkeit)
 │   ├── dist/             # Lambda-Artefakte (lambda.zip, cognito_backup.zip)

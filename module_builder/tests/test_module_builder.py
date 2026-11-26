@@ -634,7 +634,14 @@ class TestModuleSelectionB1(unittest.TestCase):
             self.assertEqual(mod_dirs, {"cognito", "cloudtrail"})
 
     def test_full_custom_selection_equivalent_to_complete(self):
-        """Alle 11 Module via --modules ≈ Preset complete (Modul-/Variablen-/Output-Mengen)."""
+        """Alle Module via --modules == Preset complete (Module/Variablen/Outputs).
+
+        Regression MO-MODULE-BUILDER-PRESET-FIX-07A: der Katalog (Builder-
+        Vertrag) und das Preset `complete` liefen auseinander — die freie
+        Auswahl ließ Variablen fehlen und das Preset kopierte ein
+        Modulverzeichnis, das die Auswahl nicht kannte. Beide Sichten müssen
+        deckungsgleich bleiben.
+        """
         all_modules = sorted(MODULE_CATALOG)
         with tempfile.TemporaryDirectory() as tmp:
             custom = self._build(Path(tmp) / "custom", all_modules)
@@ -647,7 +654,7 @@ class TestModuleSelectionB1(unittest.TestCase):
                 return set(re.findall(pattern, (root / "terraform" / filename).read_text(), re.M))
             for filename, pattern in [
                 ("main.tf", r'^module\s+"([a-z_]+)"'),
-                ("variables.tf", r'^variable\s+"([a-z_]+)"'),
+                ("variables.tf", r'^variable\s+"([a-z0-9_]+)"'),
                 ("outputs.tf", r'^output\s+"([a-z_]+)"'),
             ]:
                 self.assertEqual(
@@ -655,6 +662,80 @@ class TestModuleSelectionB1(unittest.TestCase):
                     names_in(complete.target, filename, pattern),
                     f"Mengen weichen ab: {filename}",
                 )
+            # ... und die kopierten Kindmodul-Verzeichnisse sind identisch.
+            def module_dirs(root: Path) -> set:
+                return {p.name for p in (root / "terraform" / "modules").iterdir() if p.is_dir()}
+            self.assertEqual(module_dirs(custom.target), module_dirs(complete.target))
+
+    def test_generated_wiring_is_self_contained(self):
+        """Invariante: jede Modulquelle existiert, jede var.-Referenz ist deklariert.
+
+        Gilt für das Preset `complete` UND die volle Modulauswahl — verhindert
+        künftige Vertragsdrift zwischen Root-Wiring, Katalog und Preset.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            complete = build(
+                target_dir=Path(tmp) / "complete",
+                project_name="sel-test",
+                source_root=REPO_ROOT,
+            )
+            custom = self._build(Path(tmp) / "custom", sorted(MODULE_CATALOG))
+            for root in (complete.target, custom.target):
+                tf_dir = root / "terraform"
+                main_tf = (tf_dir / "main.tf").read_text()
+                sources = set(re.findall(r'source\s*=\s*"\./modules/([A-Za-z0-9_-]+)"', main_tf))
+                present = {p.name for p in (tf_dir / "modules").iterdir() if p.is_dir()}
+                self.assertEqual(
+                    sources - present, set(),
+                    f"Modulquelle ohne Verzeichnis in {root.name}",
+                )
+                declared = set(re.findall(r'^variable\s+"([a-z0-9_]+)"',
+                                          (tf_dir / "variables.tf").read_text(), re.M))
+                referenced = set(re.findall(r"\bvar\.([A-Za-z0-9_]+)", main_tf))
+                self.assertEqual(
+                    referenced - declared, set(),
+                    f"var.-Referenz ohne Deklaration in {root.name}",
+                )
+                module_names = set(re.findall(r'^module\s+"([a-z_]+)"', main_tf, re.M))
+                output_refs = set(re.findall(
+                    r"module\.([A-Za-z0-9_]+)",
+                    (tf_dir / "outputs.tf").read_text(),
+                ))
+                self.assertEqual(
+                    output_refs - module_names, set(),
+                    f"Output referenziert nicht gewähltes Modul in {root.name}",
+                )
+
+    def test_sqs_worker_keeps_execution_boundary_variable(self):
+        """lambda_execution_boundary folgt dem sqs_worker-Block (Default unverändert)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with_worker = self._build(Path(tmp) / "worker",
+                                      ["dynamodb", "sqs", "sqs_worker"])
+            without_worker = self._build(Path(tmp) / "no-worker",
+                                         ["dynamodb", "iam", "lambda"])
+            def variables(root: Path) -> set:
+                return set(re.findall(r'^variable\s+"([a-z0-9_]+)"',
+                                      (root / "terraform" / "variables.tf").read_text(), re.M))
+            self.assertIn("lambda_execution_boundary", variables(with_worker.target))
+            self.assertNotIn("lambda_execution_boundary", variables(without_worker.target))
+            main_tf = (with_worker.target / "terraform" / "main.tf").read_text()
+            self.assertIn("lambda_execution_boundary = var.lambda_execution_boundary", main_tf)
+            # Portabilitäts-Default bleibt unverändert (keine Neutralisierung im
+            # Builder): kein kontospezifischer ARN, sondern `null` + ARN-Validierung.
+            variables_tf = (with_worker.target / "terraform" / "variables.tf").read_text()
+            self.assertRegex(
+                variables_tf,
+                r'variable\s+"lambda_execution_boundary"\s*\{[\s\S]*?default\s*=\s*null',
+            )
+            self.assertRegex(
+                variables_tf,
+                r'variable\s+"lambda_execution_boundary"\s*\{[\s\S]*?'
+                r'can\(regex\("\^arn:aws:iam::\[0-9\]\{12\}:policy/"',
+            )
+            self.assertNotRegex(
+                variables_tf,
+                r'default\s*=\s*"arn:aws:iam::\d{12}:policy/',
+            )
 
     def test_custom_manifest_contains_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
