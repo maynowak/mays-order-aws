@@ -1,3 +1,18 @@
+[MO-RIS-MODULE-VERSION-07]
+Current status: BUILD / INTEGRATION PROVEN — PIN DECISION OPEN
+Audit date/time: 2026-11-26
+Current Git branch and HEAD: integration/mo-ris-module-version-07, code 386d741 (base 016cdfd), evidence report commit follows
+Audit scope: consolidate the proven Mays-Orders build/integration version; no main merge/plan/apply/AWS mutation/deployment.
+Findings:
+  - 386d741 is the 016cdfd agent-transport line plus Agent A preset/custom contract fix.
+  - Proven: module_builder 94 PASS; complete/custom/orders-service presets fmt/init/validate PASS; RIS transport injection PASS; generated module + injection + terraform validate PASS; 8 inputs/23 outputs; no wildcard SQS document.
+  - Direct A+B merge was tested and rejected: B's five main-line variables are unused on 016cdfd and the exact-contract audit fails. Trial reset to 386d741; no half-merge kept.
+  - B 570bbe7 remains main-line fix; C b161b18 main+B+transferable A has no agent transport; D cce4cf5 is RIS portability.
+  - Not a final pin: 016cdfd lacks main IAM-portability/SQS F-03 changes; live wildcard queue policy decision open; RIS root rebuild/validate pending; full main agent-transport merge and Privacy/Legal/deployment approvals open.
+No plan/apply/deploy/main merge.
+Report: docs/reports/MO-RIS-MODULE-VERSION-07-CONSOLIDATED.md
+Current resume point: use 386d741 as build-proven RIS-line candidate; no pin change until policy/reconciliation.
+
 ==================================================
 EXECUTION LOG / CRASH RECOVERY — MANDATORY
 ==================================================
