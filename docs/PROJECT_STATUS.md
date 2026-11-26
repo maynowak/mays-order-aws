@@ -190,6 +190,20 @@ Seed-Data-Schema-Prüfung PASS (1.000 Zeilen);
 Node-Baseline: entfernt (Cleanup T011-04-CLEANUP; historisch via Git `449cdd7`)
 ```
 
+**Nachtrag 2026-11-26 — MO-ORDERS-SERVICE-TERRAFORM-FIX-07B:**
+Das generierte `orders-service`-Modul war seit den Root-Änderungen P00-E
+(Privacy-Secret-Wiring), MO-P0B (`deployment_version`) und MO-RC4-P02C
+(SQS-Parameter) nicht mehr validierbar (`Reference to undeclared input
+variable`). Der Builder gleicht jetzt die `var.`-Referenzen der generierten
+`main.tf`/`outputs.tf` fail-closed mit dem Variable-Vertrag ab, deklariert die
+fünf tatsächlich verwendeten Root-Variablen (Defaults unverändert) und entfernt
+ausschließlich die allowlistete, nicht vertragsgemäße `privacy_secret`-Wiring
+(7-Modul-Vertrag unverändert, Privacy-Gates der Kindmodule bleiben `false`).
+Evidenz lokal: orders-service- und complete-Build mit `--validate` PASS,
+Builder 134 PASS (inkl. neuer Terraform-Regression), Installer 81, Lambda 456.
+Kein Merge/Deploy, keine AWS-/Terraform-Plan-/Apply-Aktion, keine RIS-Änderung.
+Report: `docs/reports/MO-ORDERS-SERVICE-TERRAFORM-FIX-07B.md`.
+
 ## Verlauf der Checkpoints
 
 | Checkpoint | Commit | Inhalt | Push | Status |

@@ -10,6 +10,7 @@ import contextlib
 import io
 import json
 import re
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -957,10 +958,19 @@ class TestOrdersServiceModule(unittest.TestCase):
     def test_variables_contract(self):
         variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
                           (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
+        self.assertEqual(variables, {
+            "project_name", "tags",
+            "monitoring_enabled", "log_retention_days",
+            "lambda_execution_boundary",
+            "external_cognito",
+            # MO-ORDERS-SERVICE-TERRAFORM-FIX-07B: vom Vertrags-Wiring
+            # tatsächlich referenzierte Root-Variablen.
+            "deployment_version",
+            "sqs_visibility_timeout_seconds",
+            "sqs_message_retention_seconds",
+            "sqs_dlq_message_retention_seconds",
+            "sqs_max_receive_count",
+        })
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
 
@@ -1030,14 +1040,22 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
         self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", iam_block)
         self.assertNotIn("sqs_enabled = module.", iam_block)
-        # Genau 6 öffentliche Inputs (kein zusätzlicher Gate-Input):
+        # Öffentliche Inputs: die 6 Vertrags-Inputs plus die 5 Root-Variablen,
+        # die das Vertrags-Wiring tatsächlich referenziert (Fix 07B).
         variables = set(re.findall(
             r'^variable\s+"([a-z_]+)"',
             (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
+        self.assertEqual(variables, {
+            "project_name", "tags",
+            "monitoring_enabled", "log_retention_days",
+            "lambda_execution_boundary",
+            "external_cognito",
+            "deployment_version",
+            "sqs_visibility_timeout_seconds",
+            "sqs_message_retention_seconds",
+            "sqs_dlq_message_retention_seconds",
+            "sqs_max_receive_count",
+        })
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()
@@ -1128,6 +1146,119 @@ class TestOrdersServiceModule(unittest.TestCase):
             main(["build", "--preset", "orders-service", "--target", "/tmp/opencode/x",
                   "--project-name", "abc", "--modules", "dynamodb"])
         self.assertEqual(ctx.exception.code, 2)  # Mutual-Exclusion (argparse)
+
+
+class TestOrdersServiceGeneratedTerraform(unittest.TestCase):
+    """MO-ORDERS-SERVICE-TERRAFORM-FIX-07B — Regression.
+
+    Auf main 8830da2 brach
+    `build --preset orders-service --validate` mit
+    `Reference to undeclared input variable` ab (var.deployment_version,
+    var.sqs_* und die Privacy-Secret-Wiring ohne Vertragsmodul). Diese Tests
+    prüfen die Referenzkonsistenz der generierten Dateien und führen die
+    echten Terraform-Schritte aus (fmt -check / init -backend=false / validate,
+    ausschließlich read-only, kein AWS-Kontakt).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from module_builder.builder import build_module
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.target = Path(cls._tmp.name) / "Mays-Order-AWS"
+        cls.result = build_module(
+            target_dir=cls.target,
+            project_name="regression-orders",
+            source_root=REPO_ROOT,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _root_tf(self) -> str:
+        return "\n".join(
+            (self.target / name).read_text()
+            for name in ("main.tf", "outputs.tf")
+        )
+
+    def test_every_variable_reference_is_declared(self):
+        declared = set(re.findall(
+            r'^variable\s+"([a-z_]+)"',
+            (self.target / "variables.tf").read_text(), re.M))
+        referenced = set(re.findall(r"\bvar\.([A-Za-z_][A-Za-z0-9_]*)",
+                                    self._root_tf()))
+        self.assertEqual(referenced - declared, set(),
+                         "Undeclared var.-Referenzen im generierten Modul")
+
+    def test_referenced_variables_match_audited_contract(self):
+        from module_builder.spec import ORDERS_SERVICE_VARIABLES
+        referenced = set(re.findall(r"\bvar\.([A-Za-z_][A-Za-z0-9_]*)",
+                                    self._root_tf()))
+        referenced.discard("external_cognito")
+        self.assertEqual(referenced, set(ORDERS_SERVICE_VARIABLES))
+
+    def test_out_of_contract_privacy_wiring_removed(self):
+        main_tf = (self.target / "main.tf").read_text()
+        variables = (self.target / "variables.tf").read_text()
+        self.assertNotIn("module.privacy_secret", main_tf)
+        self.assertNotIn("privacy_secret_enabled", main_tf)
+        self.assertNotIn("privacy_kms_key_arn", main_tf)
+        self.assertNotIn("privacy_secret_enabled", variables)
+        # Kindmodule behalten ihr sicheres Default-Gate (false) — kein
+        # Privacy-/KMS-Verhalten ohne explizites Root-Wiring.
+        iam_vars = (self.target / "modules" / "iam" / "variables.tf").read_text()
+        self.assertRegex(
+            iam_vars,
+            r'variable "privacy_secret_enabled" \{[\s\S]*?default\s*=\s*false',
+        )
+        # Das übrige Sicherheits-Gate (SQS) bleibt unverändert verdrahtet.
+        iam_block = main_tf.split('module "iam" {')[1].split("\n}")[0]
+        self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
+
+    def test_unknown_out_of_contract_module_reference_fails_closed(self):
+        from module_builder.builder import _strip_out_of_contract_wiring
+        block = {
+            "kind": "module",
+            "name": "iam",
+            "header": "",
+            "text": 'module "iam" {\n  source       = "./modules/iam"\n'
+                    "  foreign_arn  = module.monitoring.alarm_arn\n}",
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            _strip_out_of_contract_wiring(
+                block,
+                {"iam"},
+                {"privacy_secret"},
+                {"privacy_secret_enabled", "privacy_kms_key_arn"},
+            )
+        self.assertIn("außerhalb des Modul-Vertrags", str(ctx.exception))
+        self.assertIn("monitoring", str(ctx.exception))
+
+    @unittest.skipUnless(shutil.which("terraform"),
+                         "terraform CLI nicht im PATH")
+    def test_generated_module_passes_terraform_fmt_init_validate(self):
+        from module_builder.validation import (
+            ValidationError,
+            validate_generated_project,
+        )
+        try:
+            validate_generated_project(self.target)
+        except ValidationError as exc:
+            message = str(exc)
+            offline_markers = (
+                "Failed to query available provider packages",
+                "Could not retrieve the list of available versions",
+                "no such host",
+                "dial tcp",
+                "connection refused",
+            )
+            if any(marker in message for marker in offline_markers):
+                self.skipTest(
+                    "Provider-Registry nicht erreichbar (offline) — "
+                    "referenzkonsistente Tests bleiben aktiv: "
+                    + message[-200:]
+                )
+            raise
 
 
 class TestExternalCognitoIntegration(unittest.TestCase):

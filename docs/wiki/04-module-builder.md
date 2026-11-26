@@ -29,6 +29,24 @@ Der Preset `orders-service` besteht aus genau sieben Modulen:
 `api`, `cognito`, `dynamodb`, `iam`, `lambda`, `sqs`, `sqs_worker`. Er ist als
 lokales Terraform-Modul gedacht; die Composition ist fest, keine freie Auswahl.
 
+### Modul-Eingaben des `orders-service`-Presets
+
+Das generierte Modul deklariert genau die Variablen, die seine eigene
+Verdrahtung tatsächlich verwendet (Abgleich fail-closed im Builder):
+`project_name`, `tags`, `monitoring_enabled`, `log_retention_days`,
+`lambda_execution_boundary`, `deployment_version`,
+`sqs_visibility_timeout_seconds`, `sqs_message_retention_seconds`,
+`sqs_dlq_message_retention_seconds`, `sqs_max_receive_count` und
+`external_cognito`. Alle Defaults entsprechen der Stamm-Konfiguration.
+
+Der opt-in Privacy-Secret-Container (`module.privacy_secret`) ist **nicht**
+Vertragsbestandteil. Die zugehörigen Root-Wiring-Zeilen werden beim Generieren
+entfernt; die Kindmodule `iam`/`lambda` behalten ihre Privacy-Gates auf
+Default `false`. Eine unbekannte Referenz auf ein Nicht-Vertragsmodul bricht
+den Build ab (fail-closed), statt still entfernt zu werden. Änderungen am
+Root-Wiring, die eine neue Variable einführen, lassen den Build bewusst
+scheitern, bis der Variable-Vertrag in `module_builder/spec.py` ergänzt ist.
+
 ### Verifizierte CLI-Beispiele
 
 ```bash
@@ -116,5 +134,6 @@ Version.
 - `docs/reports/MAYS-ORDERS-MODULE-BUILDER-HARDENING-01.md`
 - `docs/reports/MAYS-ORDERS-MODULE-BUILDER-OPTIONS-01.md`
 - `docs/reports/MAYS-ORDERS-MODULE-CONTRACT-01.md`
+- `docs/reports/MO-ORDERS-SERVICE-TERRAFORM-FIX-07B.md`
 - `docs/MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md`
 - [Dokumentationsportal](11-dokumentationsportal.md)
