@@ -96,16 +96,17 @@ module "iam" {
 # API-GW→Lambda Invoke-Permission folgt in T011-06 (HTTP API + Routen + Authorizer).
 
 module "lambda" {
-  source              = "./modules/lambda"
-  project_name        = var.project_name
-  tags                = var.tags
-  iam_role_arn        = module.iam.role_arn
-  dynamodb_table_name = module.dynamodb.table_name
-  queue_url           = module.sqs.queue_url
-  monitoring_enabled  = var.monitoring_enabled
-  log_retention_days  = var.log_retention_days
-  filename            = "${path.root}/../lambda/dist/lambda.zip"
-  runtime             = "python3.14"
+  source                 = "./modules/lambda"
+  project_name           = var.project_name
+  tags                   = var.tags
+  iam_role_arn           = module.iam.role_arn
+  dynamodb_table_name    = module.dynamodb.table_name
+  queue_url              = module.sqs.queue_url
+  additional_environment = var.additional_environment
+  monitoring_enabled     = var.monitoring_enabled
+  log_retention_days     = var.log_retention_days
+  filename               = "${path.root}/../lambda/dist/lambda.zip"
+  runtime                = "python3.14"
 
   # P00-E: only references, never a secret value.
   privacy_secret_enabled = var.privacy_secret_enabled
@@ -291,4 +292,17 @@ module "cognito_backup_automation" {
 moved {
   from = module.cognito_backup_automation
   to   = module.cognito_backup_automation[0]
+}
+
+module "agent_transport" {
+  count  = var.enable_agent_transport ? 1 : 0
+  source = "./modules/agent_transport"
+
+  project_name                  = var.project_name
+  tags                          = var.tags
+  ris_result_producer_role_arns = var.ris_result_producer_role_arns
+  lambda_execution_boundary     = var.lambda_execution_boundary == null ? "" : var.lambda_execution_boundary
+  lambda_zip_path               = "${path.root}/../lambda/dist/lambda.zip"
+  orders_table_name             = module.dynamodb.table_name
+  orders_table_arn              = module.dynamodb.table_arn
 }

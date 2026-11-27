@@ -17,7 +17,7 @@ Lambda-Build-Artefakte. Das Ergebnis ist ein überprüfbarer Projektordner;
 | Auswahl | Wofür sie gedacht ist |
 |---|---|
 | `complete` | vollständiger Stack mit Order-API, Authentifizierung, Datenbank, Lambda, Queue/Worker und optionalen Ergänzungen gemäß Projektkonfiguration |
-| `orders-service` | festgelegte, wiederverwendbare Sieben-Modul-Komposition |
+| `orders-service` | festgelegte Orders-Service-Komposition einschließlich optionalem Agent-Result-Transport |
 | `--modules` | explizite Auswahl; erforderliche Abhängigkeiten werden fail-closed geprüft |
 | `--with-deps` | fügt benötigte transitive Abhängigkeiten deterministisch hinzu |
 
@@ -25,9 +25,17 @@ Der Modul-Katalog und die vom ausgecheckten Stand unterstützte CLI-Syntax sind
 maßgeblich. Verwende vor einem Build `python3 -m module_builder --help` sowie
 `python3 -m module_builder presets`.
 
-Der Preset `orders-service` besteht aus genau sieben Modulen:
-`api`, `cognito`, `dynamodb`, `iam`, `lambda`, `sqs`, `sqs_worker`. Er ist als
-lokales Terraform-Modul gedacht; die Composition ist fest, keine freie Auswahl.
+Der Preset `orders-service` umfasst `api`, `cognito`, `dynamodb`, `iam`,
+`lambda`, `sqs`, `sqs_worker` und `agent_transport`. Der Result-Transport ist
+standardmäßig deaktiviert (`enable_agent_transport = false`) und wird erst nach
+bewusster Konfiguration bereitgestellt. Das Preset ist als lokales Terraform-
+Modul gedacht; die Composition ist fest, keine freie Auswahl. Zusätzliche
+Lambda-Umgebungswerte können über `additional_environment` gesetzt werden;
+reservierte AWS-/Orders-/Privacy-/Runtime-Namen werden abgewiesen.
+
+Das Manifest bindet den Build an den vollständigen 40-stelligen Source-Commit
+und enthält Datei-/Artefakt-Hashes. Die generierte Quelle muss trotzdem
+separat geprüft und backend-frei validiert werden.
 
 ### Verifizierte CLI-Beispiele
 

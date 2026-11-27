@@ -159,6 +159,37 @@ variable "lambda_execution_boundary" {
     error_message = "lambda_execution_boundary must be null or a valid IAM policy ARN (arn:aws:iam::<12-digit-account-id>:policy/<name>)."
   }
 }
+
+variable "additional_environment" {
+  description = "Non-secret, non-reserved environment values for integrations such as RIS dispatch."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition = alltrue([
+      for key in keys(var.additional_environment) :
+      can(regex("^[A-Za-z][A-Za-z0-9_]+$", key)) &&
+      !startswith(upper(key), "AWS_") &&
+      !startswith(upper(key), "ORDERS_") &&
+      !startswith(upper(key), "PRIVACY_") &&
+      !startswith(upper(key), "COGNITO_") &&
+      !startswith(upper(key), "ORDER_RESULT_") &&
+      !contains(["SQS_QUEUE_URL", "LAMBDA_TASK_ROOT", "LAMBDA_RUNTIME_DIR", "PATH", "TZ", "LANG", "PYTHONPATH", "PYTHONHOME"], upper(key))
+    ])
+    error_message = "additional_environment must not override reserved AWS, Orders, Privacy, Cognito, Result, or runtime variables."
+  }
+}
+
+variable "enable_agent_transport" {
+  description = "Creates the optional Orders-owned signed result queue and consumer."
+  type        = bool
+  default     = false
+}
+
+variable "ris_result_producer_role_arns" {
+  description = "RIS IAM role ARNs allowed to send signed result messages."
+  type        = list(string)
+  default     = []
+}
 # MO-RC4-P02C: SQS-Zuverlaessigkeit. Fehlgeschlagene Auftraege landen in einer DLQ
 # statt stillschweigend zu verschwinden; Ablaufzeiten sind konfigurierbar.
 variable "sqs_message_retention_seconds" {

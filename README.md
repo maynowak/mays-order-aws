@@ -57,7 +57,7 @@ project does **not** source code from this repository at runtime.
 | Preset | Purpose |
 |---|---|
 | `complete` | Full stack: API, Cognito, DynamoDB, Lambda, SQS + worker, recovery, monitoring, CloudTrail, optional Cognito backup and opt-in seed. |
-| `orders-service` | Reusable seven-module Terraform contract: API, Cognito, DynamoDB, IAM, Lambda, SQS and worker. |
+| `orders-service` | Reusable Orders-Service contract with optional, default-off agent result transport. |
 | `--modules ...` | Explicit module selection with fail-closed dependency checks; `--with-deps` adds required transitive modules. |
 
 ### Build a Standalone Stack
@@ -194,8 +194,18 @@ flowchart TD
 
 The root Terraform stack currently composes modules for API, Cognito, DynamoDB, IAM,
 Lambda, SQS, worker, recovery, monitoring, CloudTrail, optional Cognito backup and
-optional privacy-secret wiring. The `orders-service` preset is the smaller reusable
-contract.
+optional privacy-secret and agent-result transport wiring. The `orders-service`
+preset is the smaller reusable contract; `enable_agent_transport` remains false by
+default. Agent dispatch uses additive `additional_environment` configuration and
+the result consumer accepts only HMAC-verified messages.
+
+### RC4/RIS compatibility candidate
+
+The feature branch currently carries an in-progress Mays-Orders-only candidate for
+Agent Order V1, owner-bound dispatch/results, privacy projection, and generated-module
+compatibility. This is **not** an RC4 release or deployment. Track implementation,
+local evidence, open RIS cross-repository gates, and the final candidate handoff in
+[`docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`](docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md).
 
 ## Security & Privacy
 

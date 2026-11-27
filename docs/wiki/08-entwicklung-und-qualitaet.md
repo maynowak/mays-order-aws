@@ -44,6 +44,15 @@ Cleanup und Consumer-Verhalten. Siehe insbesondere
 Nachweis. Historische Testberichte nicht als gerade eben erneut ausgeführte
 Tests beschreiben.
 
+### MO-RC4-RIS-COMPATIBILITY-FIX-01 (laufender Kandidat)
+
+Die aktuelle Kandidaten-QA und ihre Grenzen stehen in
+[`docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md).
+Sie umfasst Agent-Order-, Dispatch-, HMAC-Result- und Transport-Verträge sowie
+Installer-/Builder-Prüfungen. Lokale Tests und backend-freies `terraform validate`
+sind kein RIS-Live- oder AWS-Nachweis; bis zum finalen Handoff bleibt der Status
+`IN PROGRESS`.
+
 ## Lokale Prüfbefehle
 
 Beispiele anhand der Repository-Anweisungen; Voraussetzungen und exakte

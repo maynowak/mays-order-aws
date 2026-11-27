@@ -77,3 +77,22 @@ variable "privacy_kms_key_arn" {
   type        = string
   default     = ""
 }
+
+variable "additional_environment" {
+  description = "Non-secret, non-reserved Lambda environment variables for integrations."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition = alltrue([
+      for key in keys(var.additional_environment) :
+      can(regex("^[A-Za-z][A-Za-z0-9_]+$", key)) &&
+      !startswith(upper(key), "AWS_") &&
+      !startswith(upper(key), "ORDERS_") &&
+      !startswith(upper(key), "PRIVACY_") &&
+      !startswith(upper(key), "COGNITO_") &&
+      !startswith(upper(key), "ORDER_RESULT_") &&
+      !contains(["SQS_QUEUE_URL", "LAMBDA_TASK_ROOT", "LAMBDA_RUNTIME_DIR", "PATH", "TZ", "LANG", "PYTHONPATH", "PYTHONHOME"], upper(key))
+    ])
+    error_message = "additional_environment must not override reserved runtime variables."
+  }
+}

@@ -62,6 +62,52 @@ Privacy-Inspect/-Export sowie Anonymisierung berücksichtigt. (MO-ORDER-DESCRIPT
   (U+2028/U+2029) und Surrogates werden abgelehnt
 - Unbekannte Felder → 400 (strikte Validierung)
 
+### 2.1.2 Agent-Ausführungsauftrag (A04–A06)
+
+Eine native Agent-Order verwendet `orderType: "agent.execution"` und genau ein
+nested `agentOrder`-Objekt gemäß Schema V1. In dieser Form sind Retail-Felder
+(`customer`, `items`, `currency` und `orderDescription`) ausgeschlossen:
+
+```json
+{
+  "orderType": "agent.execution",
+  "agentOrder": {
+    "schemaVersion": "1.0",
+    "target": { "agentId": "addition_agent", "capability": "math.add" },
+    "input": { "data": { "left": 17, "right": 25 } },
+    "metadata": {
+      "source": "ris-agent-ecosystem",
+      "apiProfileRef": "profile-ref",
+      "requestId": "request-123",
+      "idempotencyKey": "request-123"
+    }
+  }
+}
+```
+
+Für RIS OrderV1-Kompatibilität wird derselbe validierte Agent-Body stattdessen
+als JSON in `orderDescription` getragen, zusammen mit dem bestehenden
+`customer`, `items`- (genau eine Position im RIS-Vertrag) und `currency`-
+Envelope. Mays prüft `orderDescription` auf Länge/Zeichen und validiert das
+dekodierte Objekt erneut nach Agent-Order V1; beliebiger Freitext wird nicht als
+Agent-Auftrag akzeptiert. Beide Formen erzeugen eine serverseitig persistierte
+Agent-Order, die der Result-Consumer an Work-ID und Korrelations-ID bindet.
+
+Der Agent-Body wird streng validiert und mit der verifizierten JWT-Owner-Identität
+gespeichert. Client-Metadaten sind keine Autorisierung. Die optionale
+`ORDER_DISPATCH_QUEUE_URL` ermöglicht den separaten Dispatch an RIS; Retail-
+Orders bleiben auf ihrem vorhandenen SQS-Worker-Pfad. Dispatch bindet eine
+serverseitige Work-ID an die gespeicherte Order. Resultate werden ausschließlich
+über den internen, HMAC-signierten Consumer angenommen. Die öffentliche API hat
+keine Result-Schreibroute. In der Detailantwort erscheint `agentOrder` nur für
+den verifizierten Owner und in bereinigter Projektion; `processing` enthält nur
+freigegebene Ergebnisfelder. Die kompakte Listenprojektion bleibt minimal.
+
+Die optionale Order-Form wird in Privacy-Export als sichere Owner-Projektion
+ausgegeben; `ANONYMIZE` entfernt Agent-Input, Ergebnisdaten, Dispatch-Bindung
+und Identitätsattribute. Ein fehlendes Dispatch-Ziel oder ein Transportfehler
+ändert nicht die Owner-Prüfung und begründet keine öffentliche Schreibbefugnis.
+
 ### 2.1.1 Eigene SKU-Konventionen (Empfehlung, nicht normativ)
 
 `items[].sku` ist ein **freier String** und wird nicht gegen einen Produktkatalog

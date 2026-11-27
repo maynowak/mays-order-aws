@@ -7,6 +7,7 @@ Technische Tiefe steht in den verlinkten Fachdokumenten.
 |---|---|---|
 | API Gateway HTTP API | Der „Empfang“ im Internet, der Anfragen an die Lambda weiterreicht | Prüft das JWT, bevor Code läuft |
 | AWS | Amazon Cloud; hier laufen die optionalen Ressourcen | Kosten, Rechte und Region müssen bewusst gewählt werden |
+| Agent-Order | Order-Form für eine validierte Agent-Ausführung (`agent.execution`) | Owner bleibt JWT-gebunden; Body-Metadaten erteilen keine Berechtigung |
 | Backend / State | Terraform merkt sich im „State“, welche Ressourcen es verwaltet | Falscher State kann fremde Ressourcen treffen |
 | Cognito / JWT | Anmeldedienst und signiertes Token („Ausweis“) | Identität, nicht AWS-Berechtigung |
 | Consumer | Ein aufrufendes System (z. B. eine App), nicht der Endnutzer | Bestimmt, welche Orders sichtbar sind |
@@ -22,7 +23,7 @@ Technische Tiefe steht in den verlinkten Fachdokumenten.
 | KMS | AWS-Schlüsseldienst | Optionale Verschlüsselung; Produktion separat freizugeben |
 | Lambda | AWS-Funktion für API und Worker | Kein dauerhaft laufender Server |
 | Module Builder | Erzeugt aus Modulen ein eigenständiges Terraform-Projekt | Wiederverwendung ohne Laufzeitabhängigkeit |
-| `orders-service` | Fester Builder-Preset aus 7 Modulen | Wiederverwendbares Orders-Service-Modul |
+| `orders-service` | Fester Builder-Preset einschließlich optionalem Result-Transport | Wiederverwendbares Orders-Service-Modul; Transport startet deaktiviert |
 | Owner / `subjectId` | Der Benutzer, dem eine Order gehört | Zugriff und Datenschutz |
 | `orderType` | Routing-/Verarbeitungstyp (z. B. `generic`) | Steuert den Handler; **keine** Berechtigung |
 | `orderDescription` | Optionaler Freitext (max. 1.024 Zeichen) | Kann PII enthalten; Privacy beachten |
@@ -37,6 +38,7 @@ Technische Tiefe steht in den verlinkten Fachdokumenten.
 | SQS | AWS-Warteschlange für asynchrone Arbeit | Entkopplung und Wiederholungen |
 | Terraform Workspace | Logische State-Auswahl im Backend | Keine Zugriffsgrenze und kein Ersatz für Konten |
 | TTL | Time-to-live, automatisches Ablaufen | Siehe Retention |
+| Work-ID | Serverseitig gebundene Kennung eines Agent-Arbeitslaufs | Verknüpft Dispatch und Resultat mit derselben Order |
 
 ## Abkürzungen
 

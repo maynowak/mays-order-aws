@@ -7,6 +7,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import sys
 import tempfile
 import unittest
 from contextlib import ExitStack, redirect_stdout
@@ -1451,7 +1452,7 @@ class TestDependencyDetector(unittest.TestCase):
         import json
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1479,7 +1480,7 @@ class TestDependencyDetector(unittest.TestCase):
         import subprocess
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1517,7 +1518,7 @@ class TestDependencyDetector(unittest.TestCase):
         import json
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1552,7 +1553,7 @@ class TestSarifAdapter(unittest.TestCase):
 
         # Run detector
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1561,7 +1562,7 @@ class TestSarifAdapter(unittest.TestCase):
 
         # Convert to SARIF
         result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1593,7 +1594,7 @@ class TestSarifAdapter(unittest.TestCase):
         import json
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1601,7 +1602,7 @@ class TestSarifAdapter(unittest.TestCase):
         native_result = json.loads(result.stdout)
 
         result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1623,7 +1624,7 @@ class TestSarifAdapter(unittest.TestCase):
         import json
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1631,7 +1632,7 @@ class TestSarifAdapter(unittest.TestCase):
         native_result = json.loads(result.stdout)
 
         result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1667,7 +1668,7 @@ class TestSarifAdapter(unittest.TestCase):
         import json
 
         result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
+            [sys.executable, "security/dependency_detector.py"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1675,7 +1676,7 @@ class TestSarifAdapter(unittest.TestCase):
         native_result = json.loads(result.stdout)
 
         result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1701,13 +1702,13 @@ class TestSarifAdapter(unittest.TestCase):
         import json
 
         result1 = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result1.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result1.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
         )
         result2 = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result2.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result2.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
@@ -1731,7 +1732,7 @@ class TestSarifAdapter(unittest.TestCase):
         import subprocess
 
         result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
+            [sys.executable, "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)

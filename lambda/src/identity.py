@@ -207,6 +207,63 @@ class OrderIdentity:
         }
 
 
+@dataclass(frozen=True)
+class OwnerIdentity:
+    """Compatibility value object used by internal cross-repository harnesses.
+
+    HTTP handlers must continue to call ``resolve_order_identity_from_event``;
+    this constructor is not an authentication mechanism or an API input.
+    """
+
+    issuer: str
+    subject: str
+    client_id: str
+
+    def __post_init__(self) -> None:
+        claims = {"iss": self.issuer, "sub": self.subject, "client_id": self.client_id}
+        identity = resolve_order_identity(claims)
+        object.__setattr__(self, "issuer", _normalize_issuer(self.issuer))
+        object.__setattr__(self, "subject", identity.owner_id)
+        object.__setattr__(self, "client_id", _auth_component(self.client_id, "consumer client"))
+
+    @property
+    def consumer_id(self) -> str:
+        return derive_consumer_id({"iss": self.issuer, "client_id": self.client_id})
+
+    @property
+    def owner_type(self) -> str:
+        return OWNER_TYPE_USER
+
+    @property
+    def owner_id(self) -> str:
+        return self.subject
+
+    @property
+    def actor_type(self) -> str:
+        return OWNER_TYPE_USER
+
+    @property
+    def actor_id(self) -> str:
+        return self.subject
+
+    @property
+    def identity_version(self) -> int:
+        return IDENTITY_VERSION
+
+    @property
+    def verification_context(self) -> str:
+        return VERIFICATION_JWT
+
+    def to_item_fields(self) -> Dict[str, Any]:
+        return OrderIdentity(
+            consumer_id=self.consumer_id,
+            owner_type=self.owner_type,
+            owner_id=self.owner_id,
+            actor_type=self.actor_type,
+            actor_id=self.actor_id,
+        ).to_item_fields()
+
+
 def resolve_order_identity(
     claims: Mapping[str, Any],
     *,

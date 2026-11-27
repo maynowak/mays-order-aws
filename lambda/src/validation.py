@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, List, Optional
 
 from errors import validation_error
 from order_types import DEFAULT_ORDER_TYPE, ORDER_STATUSES
+from agent_order import (
+    AgentOrderValidationError,
+    ORDER_TYPE_AGENT,
+    validate_agent_order,
+)
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ORDER_ID_RE = re.compile(r"^ord_[A-Za-z0-9]+$")
@@ -110,7 +116,55 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
     if not is_plain_object(body):
         raise validation_error("Request body must be a JSON object")
 
-    reject_unknown_keys(body, ["customer", "items", "currency", "orderType", "orderDescription"], "body")
+    reject_unknown_keys(
+        body,
+        ["customer", "items", "currency", "orderType", "orderDescription", "agentOrder"],
+        "body",
+    )
+
+    has_agent_order = "agentOrder" in body
+    order_type = validate_order_type(body["orderType"]) if "orderType" in body else DEFAULT_ORDER_TYPE
+    if has_agent_order or order_type == ORDER_TYPE_AGENT:
+        if order_type != ORDER_TYPE_AGENT:
+            raise validation_error(
+                "Field 'orderType' must be 'agent.execution' when 'agentOrder' is present",
+                {"path": "orderType"},
+            )
+        if has_agent_order:
+            for forbidden in ("customer", "items", "currency", "orderDescription"):
+                if forbidden in body:
+                    raise validation_error(
+                        f"Field '{forbidden}' must not be combined with 'agentOrder'",
+                        {"path": forbidden},
+                    )
+            try:
+                normalized_agent_order = validate_agent_order(body["agentOrder"])
+            except AgentOrderValidationError as exc:
+                raise validation_error(
+                    exc.message, {"path": "agentOrder", "code": exc.code}
+                ) from exc
+            return {"orderType": order_type, "agentOrder": normalized_agent_order}
+
+        # RIS OrderV1 representation: retail envelope plus the validated Agent
+        # Order V1 JSON carried in orderDescription. Keep strict validation and
+        # never infer the agent body from unrelated free text.
+        if "orderDescription" not in body:
+            raise validation_error(
+                "Field 'orderDescription' with serialized Agent Order V1 is required",
+                {"path": "orderDescription"},
+            )
+        description = validate_order_description(body["orderDescription"])
+        try:
+            decoded_agent_order = json.loads(description)
+            normalized_agent_order = validate_agent_order(decoded_agent_order)
+        except (ValueError, AgentOrderValidationError) as exc:
+            message = exc.message if isinstance(exc, AgentOrderValidationError) else (
+                "Field 'orderDescription' must contain serialized Agent Order V1 JSON"
+            )
+            raise validation_error(
+                message, {"path": "orderDescription", "code": "invalid_agent_order"}
+            ) from exc
+        agent_description = description
 
     customer = body.get("customer")
     if not is_plain_object(customer):
@@ -147,16 +201,15 @@ def validate_create_order(body: Any) -> Dict[str, Any]:
             {"path": "currency"},
         )
 
-    order_type = DEFAULT_ORDER_TYPE
-    if "orderType" in body:
-        order_type = validate_order_type(body.get("orderType"))
-
     validated = {
         "customer": {"name": name, "email": email},
         "items": validated_items,
         "currency": currency,
         "orderType": order_type,
     }
+    if order_type == ORDER_TYPE_AGENT:
+        validated["agentOrder"] = normalized_agent_order
+        validated["orderDescription"] = agent_description
     if "orderDescription" in body:
         validated["orderDescription"] = validate_order_description(body["orderDescription"])
     return validated

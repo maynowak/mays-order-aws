@@ -121,6 +121,19 @@ output "sqs_worker_lambda_arn" {
   value       = module.sqs_worker.function_arn
 }
 
+# Read-only references; result transport resources remain opt-in and Mays-owned.
+output "results_queue_url" {
+  value = try(module.agent_transport[0].results_queue_url, "")
+}
+
+output "results_queue_arn" {
+  value = try(module.agent_transport[0].results_queue_arn, "")
+}
+
+output "result_hmac_secret_arn" {
+  value = try(module.agent_transport[0].result_hmac_secret_arn, "")
+}
+
 # MO-P0B: Versionskennung im State (nur fuer neue Apply-Laeufe; bestehende
 # Staende erhalten den Output beim naechsten Apply). Kein unabhaengiger
 # Nachweis des tatsaechlich laufenden Codes — dokumentierte Grenze.

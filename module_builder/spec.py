@@ -26,6 +26,7 @@ from typing import Dict, List
 
 # All child modules of the complete stack (directory names under terraform/modules).
 COMPLETE_MODULES: List[str] = [
+    "agent_transport",
     "api",
     "cloudtrail",
     "cognito",
@@ -79,11 +80,13 @@ COMPLETE_POLICY_FILES: List[str] = [
 
 # Orders-Service-Vertrag (MAYS-ORDERS-MODULE-CONTRACT-01): unveränderliche
 # Zusammensetzung des wiederverwendbaren Mays-Orders-AWS-Terraform-Moduls.
-# Diese 7 Module sind Pflichtbestandteile (API/Handler, Worker, SQS, eigene
+# Diese Module sind Pflichtbestandteile (API/Handler, Worker, SQS, Results-Transport,
+# eigene
 # Orders-Tabelle, Orders-IAM) — api benötigt die vom Modul verwaltete
 # Cognito-Ressource (JWT-Authorizer). Monitoring/CloudTrail/Cognito-Backups
 # und Seed sind NICHT Teil des Orders-Service-Vertrags (Root-Projekt-Extras).
 ORDERS_SERVICE_MODULES: List[str] = [
+    "agent_transport",
     "api",
     "cognito",
     "dynamodb",
@@ -97,12 +100,44 @@ ORDERS_SERVICE_MODULES: List[str] = [
 # verbrauchen genau diese Root-Variablen (aws_region entfällt — Region liefert
 # der Provider des aufrufenden Projekts; Seed-/Backup-/Alarm-Variablen entfallen,
 # da die zugehörigen Bestandteile nicht Vertragsbestandteil sind).
+# MO-ORDERS-SERVICE-TERRAFORM-FIX-07B: Die Liste ist die geprüfte Soll-Menge —
+# der Builder vergleicht sie fail-closed mit den tatsächlichen `var.`-Referenzen
+# der generierten main.tf/outputs.tf. Fehlten hier Einträge (z. B. durch spätere
+# Root-Wiring-Änderungen), wäre das generierte Modul nicht validierbar
+# (`Reference to undeclared input variable`).
 ORDERS_SERVICE_VARIABLES: List[str] = [
     "project_name",
     "tags",
     "monitoring_enabled",
     "log_retention_days",
     "lambda_execution_boundary",
+    # MO-P0B: dokumentierte Bereitstellungsversion (Output `mo_version`).
+    "deployment_version",
+    # MO-RC4-P02C: SQS-Zuverlässigkeit — vom Vertragsmodul `sqs` konsumiert
+    # (Defaults unverändert: DLQ nach dem ersten Fehlversuch, 4/14 Tage Retention).
+    "sqs_visibility_timeout_seconds",
+    "sqs_message_retention_seconds",
+    "sqs_dlq_message_retention_seconds",
+    "sqs_max_receive_count",
+    "additional_environment",
+    "enable_agent_transport",
+    "ris_result_producer_role_arns",
+]
+
+# Root-Wiring auf Module AUSSERHALB des Orders-Service-Vertrags.
+# `privacy_secret` (P00-E, opt-in Secrets-Manager-Container) ist bewusst NICHT
+# Vertragsbestandteil (ADR-008: unveränderter orders-service-Vertrag;
+# Privacy-Produktivbetrieb BLOCKED). Der Generator entfernt die zugehörigen
+# Wiring-Zeilen; jede ANDERE Referenz auf ein Nicht-Vertragsmodul ist ein
+# Fehler (fail-closed — kein stilles Entfernen unbekannter Verdrahtung).
+ORDERS_SERVICE_EXCLUDED_MODULE_REFS: List[str] = ["privacy_secret"]
+
+# Variablen, die ausschließlich der Privacy-Wiring dienen und mit ihr entfallen.
+# Die Kindmodule iam/lambda behalten ihre eigenen Defaults (Gate false, keine
+# Secret-/KMS-Referenz) — unverändertes Sicherheitsniveau, keine Privacy-Ressource.
+ORDERS_SERVICE_EXCLUDED_VARIABLES: List[str] = [
+    "privacy_secret_enabled",
+    "privacy_kms_key_arn",
 ]
 
 # Seed tooling (opt-in via var.seed_example_data, default false).

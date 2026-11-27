@@ -19,6 +19,10 @@ zusammenspielen und wo der belegte Entwicklungsstand endet.
 | Terraform | 7 Child-Module + Root + Policy Gate | `validate`/Plan-Nachweise; Produktion nicht freigegeben |
 | Module Builder | erzeugt eigenständige Terraform-Projekte | 129/129 Tests; Presets `complete` und `orders-service` |
 | Installer | Kontext-/Plan-/State-/Artefakt-Schutz um Terraform | 674 release-weite Tests, 81 fokussiert; Mutationen nur mit Freigabe |
+
+Der laufende Kandidat **MO-RC4-RIS-COMPATIBILITY-FIX-01** ergänzt Agent-Order-
+Dispatch/Result-Handoff und optionale Builder-Verdrahtung. Status und aktuelle
+QA-Evidenz: [`Feature-Fortschritt`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md).
 | Privacy | Inspect/Export/Erase/Anonymize im Code | interne Funktion; produktive Aktivierung BLOCKED |
 
 ## Neu seit dem RC4-Tag

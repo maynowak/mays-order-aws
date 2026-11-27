@@ -27,6 +27,7 @@ resource "aws_lambda_function" "handler" {
       var.privacy_secret_enabled && trimspace(var.privacy_kms_key_arn) != "" ? {
         PRIVACY_KMS_KEY_ARN = var.privacy_kms_key_arn
       } : {},
+      var.additional_environment,
     )
   }
 

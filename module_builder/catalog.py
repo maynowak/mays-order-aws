@@ -32,6 +32,7 @@ MODULE_CATALOG: Dict[str, Dict] = {
     "cognito": {"dir": "cognito", "deps": [], "optional_deps": []},
     "cloudtrail": {"dir": "cloudtrail", "deps": [], "optional_deps": []},
     "cognito_backup": {"dir": "cognito_backup", "deps": [], "optional_deps": []},
+    "agent_transport": {"dir": "agent_transport", "deps": ["dynamodb"], "optional_deps": []},
     "iam": {"dir": "iam", "deps": ["dynamodb"], "optional_deps": ["sqs"]},
     "lambda": {"dir": "lambda", "deps": ["dynamodb", "iam"], "optional_deps": ["sqs"]},
     "sqs_worker": {"dir": "sqs-worker", "deps": ["dynamodb", "sqs"], "optional_deps": []},
@@ -71,7 +72,10 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
     "processing_recovery_schedule_expression": ["recovery"],
     "processing_recovery_limit": ["recovery"],
     "processing_recovery_safety_margin_seconds": ["recovery"],
-    "lambda_execution_boundary": ["sqs_worker"],
+    "lambda_execution_boundary": ["sqs_worker", "agent_transport"],
+    "additional_environment": ["lambda"],
+    "enable_agent_transport": ["agent_transport"],
+    "ris_result_producer_role_arns": ["agent_transport"],
     "dashboard_enabled": ["monitoring"],
     "alarm_period_seconds": ["monitoring"],
     "alarm_evaluation_periods": ["monitoring"],
@@ -89,9 +93,9 @@ VARIABLE_MODULES: Dict[str, List[str]] = {
 }
 
 # Ressourcen-Bedarf je Auswahl (Lambda-Artefakte/-Quellen nur bei Bedarf):
-LAMBDA_ZIP_MODULES = {"lambda", "sqs_worker"}          # filename-Referenz in beiden Blöcken
+LAMBDA_ZIP_MODULES = {"lambda", "sqs_worker", "agent_transport"}          # filename-Referenz in Lambda-Blöcken
 BACKUP_ZIP_MODULES = {"cognito_backup_automation"}     # Handler-Zip liegt in diesem Modul
-LAMBDA_SOURCE_MODULES = {"lambda", "sqs_worker"}
+LAMBDA_SOURCE_MODULES = {"lambda", "sqs_worker", "agent_transport"}
 BACKUP_SOURCE_MODULES = {"cognito_backup_automation"}
 SEED_MODULES = {"dynamodb"}  # terraform_data.seed_orders referenziert module.dynamodb
 

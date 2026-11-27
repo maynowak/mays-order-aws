@@ -28,6 +28,9 @@ from module_builder.spec import get_preset
 # Terraform-side project_name validation (mirrors terraform/variables.tf).
 PROJECT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
+# Root-Variablen-Referenzen in generierten .tf-Blöcken (Vertrags-Audit).
+VAR_REF_RE = re.compile(r"\bvar\.([A-Za-z_][A-Za-z0-9_]*)")
+
 # Never copied — regardless of where they appear.
 FORBIDDEN_NAME_RE = re.compile(
     r"(^\.terraform)|(\.tfstate)|(\.tfplan)|(^tfplan)|(\.lock\.hcl$)|(^credentials)|(^\.env)"
@@ -38,6 +41,27 @@ TERRAFORM_BLOCK_RE = re.compile(r"^terraform\s*\{", re.MULTILINE)
 
 def _fail(message: str) -> None:
     raise SystemExit(f"module-builder: FEHLER: {message}")
+
+
+def _source_commit(source_root: Path) -> str:
+    """Return an immutable source identity; dirty trees are not provenance."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=source_root,
+            capture_output=True, text=True, timeout=10, check=True,
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=source_root, capture_output=True, text=True, timeout=10, check=True,
+        )
+    except Exception as exc:
+        _fail(f"Source-Commit nicht ermittelbar (fail-closed): {exc}")
+    commit = result.stdout.strip()
+    if status.stdout.strip():
+        _fail("Source-Checkout ist veraendert; ein Commit ist fuer Provenienz erforderlich.")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        _fail("Source-Commit ist kein vollstaendiger 40-stelliger SHA.")
+    return commit
 
 
 def _verify_lambda_artifact(source_root: Path) -> None:
@@ -205,6 +229,64 @@ def _strip_unselected_module_inputs(block: Dict, selection: set) -> Dict:
                 continue  # Wiring-Zeile auf nicht gewähltes optionales Modul entfernen
         kept_lines.append(line)
     new_block = dict(block)
+    new_block["text"] = "\n".join(kept_lines).rstrip("\n")
+    return new_block
+
+
+def _strip_out_of_contract_wiring(
+    block: Dict,
+    contract: set,
+    excluded_modules: set,
+    excluded_variables: set,
+) -> Dict:
+    """MO-ORDERS-SERVICE-TERRAFORM-FIX-07B: Verdrahtung auf Module/Variablen
+    entfernen, die NICHT Teil des Modul-Vertrags sind.
+
+    Hintergrund: das Root-Wiring enthält seit P00-E die opt-in Privacy-Secret-
+    Verdrahtung (`module.privacy_secret`). Das wiederverwendbare Orders-Service-
+    Modul enthält dieses Modul bewusst nicht (7-Modul-Vertrag). Ohne Entfernen
+    entstehen im generierten Modul Referenzen auf ein nicht existierendes Modul
+    und auf nicht deklarierte Variablen (`terraform validate` schlägt fehl).
+
+    Fail-closed: NUR die explizit erlaubten Fremd-Module werden entfernt. Jede
+    andere Referenz auf ein Modul außerhalb des Vertrags bricht den Build ab
+    (kein stilles Entfernen unbekannter Sicherheits-/Wiring-Zeilen).
+    Zugehörige Kommentarzeilen (direkt über einer entfernten Zeile) werden
+    mitentfernt, damit kein irreführender Rest stehen bleibt.
+    """
+    lines = block["text"].split("\n")
+    drop: set = set()
+    for index, line in enumerate(lines):
+        if line.strip().startswith("#"):
+            continue  # Kommentare ändern keine Referenzen
+        outside = set(MODULE_REF_RE.findall(line)) - set(contract)
+        if outside:
+            unknown = sorted(outside - set(excluded_modules))
+            if unknown:
+                _fail(
+                    f"Block '{block.get('kind', '?')} {block.get('name', '')}' "
+                    f"referenziert Modul(e) außerhalb des Modul-Vertrags: "
+                    f"{', '.join(unknown)} — fail-closed, nichts wird generiert."
+                )
+            drop.add(index)
+            continue
+        assignment = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=", line)
+        if assignment is not None and assignment.group(1) in excluded_variables:
+            drop.add(index)
+    if not drop:
+        return block
+    for index in list(drop):
+        previous = index - 1
+        while previous >= 0 and lines[previous].strip().startswith("#"):
+            drop.add(previous)
+            previous -= 1
+    new_block = dict(block)
+    kept_lines = [line for idx, line in enumerate(lines) if idx not in drop]
+    if kept_lines and kept_lines[-1].strip() == "}":
+        body = list(kept_lines[:-1])
+        while body and not body[-1].strip():
+            body.pop()
+        kept_lines = body + [kept_lines[-1]]
     new_block["text"] = "\n".join(kept_lines).rstrip("\n")
     return new_block
 
@@ -645,15 +727,9 @@ def build(
     written.append(str(readme))
 
     # Build manifest (provenance, written last)
-    try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=source_root, capture_output=True, text=True, timeout=10,
-        ).stdout.strip()
-    except Exception:
-        commit = "unknown"
+    commit = _source_commit(source_root)
     file_hashes = {
-        str(Path(path).relative_to(target_dir)): _sha256(Path(path))
+        Path(path).relative_to(target_dir).as_posix(): _sha256(Path(path))
         for path in written
         if Path(path).is_file()
     }
@@ -666,7 +742,7 @@ def build(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
         "artifacts_sha256": artifact_hashes,
-        "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
+        "files_written": sorted(Path(p).relative_to(target_dir).as_posix() for p in written),
         "files": dict(sorted(file_hashes.items())),
         "notes": {
             "backend": "not included — configure your own remote backend",
@@ -784,6 +860,14 @@ output "orders_api" {{
 | `monitoring_enabled` | bool | `true` | Log-Group/Retention-Steuerung in Lambda-/Worker-Modulen |
 | `log_retention_days` | number | `7` | CloudWatch-Log-Retention |
 | `external_cognito` | object | `null` | **MANAGED (Default/null):** eigener Pool + App Client + Gruppe `staff`. **EXTERNAL (Objekt):** vorhandener Pool des integrierenden Projekts — `user_pool_endpoint` (Format `cognito-idp.<region>.amazonaws.com/<pool-id>`, **ohne** `https://`) + `user_pool_client_id`. Fail-closed bei unvollständigen Referenzen. |
+| `deployment_version` | string | `"0.1.0"` | Dokumentierte Bereitstellungsversion (`major.minor.patch`); erscheint als Output `mo_version` (State-Output — **kein** Nachweis des tatsächlich laufenden Lambda-Codes) |
+| `sqs_visibility_timeout_seconds` | number | `60` | Visibility Timeout der Order-Queue (0..43200); sollte ≥ 6× Worker-Lambda-Timeout sein |
+| `sqs_message_retention_seconds` | number | `345600` | Aufbewahrung der Order-Queue in Sekunden (60..1209600; Default 4 Tage) |
+| `sqs_dlq_message_retention_seconds` | number | `1209600` | Aufbewahrung der Dead-Letter-Queue in Sekunden (60..1209600; Default 14 Tage) |
+| `sqs_max_receive_count` | number | `1` | Zustellversuche bis zur DLQ (1..1000); Default 1 = erster Fehlversuch geht beim nächsten Empfang in die DLQ |
+
+Alle Defaults entsprechen der Stamm-Konfiguration (`terraform/variables.tf`); das
+Modul ändert ohne explizite Konfiguration kein Verhalten.
 
 ## Cognito-Varianten (MANAGED / EXTERNAL)
 
@@ -845,7 +929,11 @@ Konfiguration. Keine automatische Umschaltung/State-Migration durch das Modul.
 - **Governance:** Policy-Gate ist Root-Sache des Aufrufers; das MO-Gate liegt
   im Quell-Repo (`terraform/policy/`).
 - **Privacy:** interne Privacy-Funktionen sind nicht produktiv aktiviert
-  (BLOCKED — Secret-Management fehlt).
+  (BLOCKED — Secret-Management fehlt). Der opt-in Secrets-Manager-Container
+  (`module.privacy_secret`) ist **nicht** Vertragsbestandteil; die zugehörigen
+  Root-Wiring-Zeilen werden beim Generieren entfernt. Die Kindmodule `iam` und
+  `lambda` behalten ihre Privacy-Gates auf Default (`false`), es entstehen
+  keine Secret-/KMS-Ressourcen.
 """
 
 
@@ -967,14 +1055,76 @@ def build_module(
                 "module.cognito.user_pool_client_id", "local.cognito_client_id"
             )
         kept_blocks.append(dict(block, text=text))
-    (target_dir / "versions.tf").write_text(
-        terraform_blocks[0]["text"] + "\n", encoding="utf-8"
+
+    # MO-ORDERS-SERVICE-TERRAFORM-FIX-07B: Root-Wiring auf Module/Variablen
+    # außerhalb des Vertrags (Privacy-Secret) entfernen — fail-closed für
+    # alles Unbekannte. Ohne diesen Schritt enthielte das Modul Referenzen
+    # auf ein nicht existierendes Modul und nicht deklarierte Variablen.
+    from module_builder.spec import (
+        ORDERS_SERVICE_EXCLUDED_MODULE_REFS,
+        ORDERS_SERVICE_EXCLUDED_VARIABLES,
     )
+
+    kept_blocks = [
+        block
+        if block["kind"] != "module"
+        else _strip_out_of_contract_wiring(
+            block,
+            core,
+            set(ORDERS_SERVICE_EXCLUDED_MODULE_REFS),
+            set(ORDERS_SERVICE_EXCLUDED_VARIABLES),
+        )
+        for block in kept_blocks
+    ]
+    main_text = _render_blocks(kept_blocks)
+    versions_text = terraform_blocks[0]["text"] + "\n"
+
+    # outputs.tf: referenzgefilterte Quell-Outputs (die 3 neuen Vertrag-Outputs
+    # sind in der Quelle enthalten und werden über den Filter automatisch
+    # übernommen — refs: module.sqs / module.sqs_worker ∈ Kern).
+    # EXTERNAL-Modus-Sicherheit: alle module.cognito-Werte werden auf
+    # auswertungssichere Formen umgestellt (one(splat) / locals).
+    outputs_text = _render_blocks(
+        _filter_named_blocks(
+            _split_blocks(
+                (source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")
+            ),
+            core,
+            "output",
+        )
+    )
+    for old, new in EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS:
+        if old not in outputs_text:
+            _fail(f"Erwarteter Output-Ausdruck fehlt in der Quelle: {old!r}")
+        outputs_text = outputs_text.replace(old, new)
+
+    # Vertrags-Audit VOR jedem Schreiben (fail-closed): jede `var.`-Referenz des
+    # generierten Moduls muss in ORDERS_SERVICE_VARIABLES deklariert sein und
+    # jede Vertragsvariable muss tatsächlich verwendet werden. Das verhindert
+    # erneut die Drift, die `terraform validate` mit "Reference to undeclared
+    # input variable" abgebrochen hat.
+    referenced = set(VAR_REF_RE.findall(main_text)) | set(VAR_REF_RE.findall(outputs_text))
+    referenced.discard("external_cognito")  # generierte Vertragsvariable
+    contract_variables = set(ORDERS_SERVICE_VARIABLES)
+    missing = sorted(referenced - contract_variables)
+    unused = sorted(contract_variables - referenced)
+    if missing or unused:
+        details = []
+        if missing:
+            details.append("nicht im Vertrag deklariert: " + ", ".join(missing))
+        if unused:
+            details.append("im Vertrag, aber nicht verwendet: " + ", ".join(unused))
+        _fail(
+            "Variable-/Wiring-Vertrag inkonsistent (fail-closed, nichts wurde "
+            "geschrieben): " + "; ".join(details)
+        )
+
+    (target_dir / "versions.tf").write_text(versions_text, encoding="utf-8")
     written.append(target_dir / "versions.tf")
-    (target_dir / "main.tf").write_text(_render_blocks(kept_blocks), encoding="utf-8")
+    (target_dir / "main.tf").write_text(main_text, encoding="utf-8")
     written.append(target_dir / "main.tf")
 
-    # variables.tf: auditierte 4 Vertrags-Eingaben + Projektnamen-Substitution
+    # variables.tf: auditierte Vertrags-Eingaben + Projektnamen-Substitution
     variables_text = _render_blocks(
         _filter_named_blocks(
             _split_blocks(
@@ -1003,24 +1153,6 @@ def build_module(
     (target_dir / "variables.tf").write_text(variables_text, encoding="utf-8")
     written.append(target_dir / "variables.tf")
 
-    # outputs.tf: referenzgefilterte Quell-Outputs (die 3 neuen Vertrag-Outputs
-    # sind in der Quelle enthalten und werden über den Filter automatisch
-    # übernommen — refs: module.sqs / module.sqs_worker ∈ Kern).
-    # EXTERNAL-Modus-Sicherheit: alle module.cognito-Werte werden auf
-    # auswertungssichere Formen umgestellt (one(splat) / locals).
-    outputs_text = _render_blocks(
-        _filter_named_blocks(
-            _split_blocks(
-                (source_root / "terraform" / "outputs.tf").read_text(encoding="utf-8")
-            ),
-            core,
-            "output",
-        )
-    )
-    for old, new in EXTERNAL_COGNITO_OUTPUT_REPLACEMENTS:
-        if old not in outputs_text:
-            _fail(f"Erwarteter Output-Ausdruck fehlt in der Quelle: {old!r}")
-        outputs_text = outputs_text.replace(old, new)
     (target_dir / "outputs.tf").write_text(outputs_text, encoding="utf-8")
     written.append(target_dir / "outputs.tf")
 
@@ -1048,13 +1180,7 @@ def build_module(
         _copy_file(py_file, target_dir / "lambda/src" / py_file.name, written)
 
     # Manifest
-    try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=source_root, capture_output=True, text=True, timeout=10,
-        ).stdout.strip()
-    except Exception:
-        commit = "unknown"
+    commit = _source_commit(source_root)
     manifest = {
         "builder_version": __version__,
         "preset": "orders-service",
@@ -1063,11 +1189,12 @@ def build_module(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": {"repo": "maynowak/mays-order-aws", "commit": commit},
         "artifacts_sha256": artifact_hashes,
-        "files_written": sorted(str(Path(p).relative_to(target_dir)) for p in written),
+        "files_written": sorted(Path(p).relative_to(target_dir).as_posix() for p in written),
         "notes": {
             "contract": "MAYS-ORDERS-MODULE-CONTRACT-01: fixed 7-module Orders-Service composition",
             "external_cognito": "runtime variable: null = MANAGED (own pool, default), object = EXTERNAL (existing pool, fail-closed validated)",
             "module_mode": "local Terraform module (no provider block, path.module artifacts)",
+            "out_of_contract_wiring_removed": list(ORDERS_SERVICE_EXCLUDED_MODULE_REFS),
             "policy_gate": "root-level responsibility of the integrating project",
             "privacy_production_activation": "BLOCKED (secret management missing)",
             "aws_mutations_by_builder": "none",

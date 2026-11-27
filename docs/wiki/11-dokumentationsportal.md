@@ -19,6 +19,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | AWS Development Lifecycle Report | 58-Create/Live-E2E/58-Destroy-Nachweis | [`MO-RC4-AWS-LIFECYCLE-FINAL-01.md`](../reports/MO-RC4-AWS-LIFECYCLE-FINAL-01.md) |
 | RC4 Release Report | Release-Paketierung und Entscheidungen | [`MO-RC4-RELEASE-01.md`](../reports/MO-RC4-RELEASE-01.md) |
 | Projektstatus | aktueller Stand, Checkpoints, Blocker | [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md) |
+| RC4/RIS-Kompatibilitätskandidat | laufender Stand, lokale QA und offene Gates | [`MO-RC4-RIS-COMPATIBILITY-FIX-01.md`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md) |
 | Roadmap | kanonische Entwicklungsplanung | [`docs/roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) |
 | Auditlog | Prüfungen, Reports, Entscheidungen | [`docs/AI_AUDITLOG.md`](../AI_AUDITLOG.md) |
 
@@ -53,7 +54,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | Installer Guide | Bedienung, Flags, Sicherheitsgates | [`docs/INSTALLER_GUIDE.md`](../INSTALLER_GUIDE.md) |
 | Installer Lifecycle | Validate → Plan → Approval → Deploy → Verify → Destroy | [`docs/INSTALLER-LIFECYCLE.md`](../INSTALLER-LIFECYCLE.md) |
 | Terraform Policy Gate | Plan-Regeln und Ressourcen-Policy | [`docs/TERRAFORM_POLICY_GATE.md`](../TERRAFORM_POLICY_GATE.md) |
-| Terraform-Root | Root-Modul und sieben Child-Module | [`terraform/`](../../terraform/) |
+| Terraform-Root | Root-Modul, Kern- und optionale Child-Module | [`terraform/`](../../terraform/) |
 | Bootstrap | State-Bucket/Lock-Infrastruktur | [`terraform/bootstrap/`](../../terraform/bootstrap/) |
 
 ## Module Builder
@@ -63,7 +64,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | Module Builder Foundation | Presets, Generator, Grenzen | [`MAYS-ORDERS-MODULE-BUILDER-FOUNDATION-01.md`](../reports/MAYS-ORDERS-MODULE-BUILDER-FOUNDATION-01.md) |
 | Module Builder Hardening | deterministische Artefakte, Policy Gate | [`MAYS-ORDERS-MODULE-BUILDER-HARDENING-01.md`](../reports/MAYS-ORDERS-MODULE-BUILDER-HARDENING-01.md) |
 | Module Builder Options | Modulauswahl, Bewertungen, Optionen | [`MAYS-ORDERS-MODULE-BUILDER-OPTIONS-01.md`](../reports/MAYS-ORDERS-MODULE-BUILDER-OPTIONS-01.md) |
-| Orders-Service Module Contract | wiederverwendbares 7-Modul-Paket | [`MAYS-ORDERS-MODULE-CONTRACT-01.md`](../reports/MAYS-ORDERS-MODULE-CONTRACT-01.md) |
+| Orders-Service Module Contract | feste Orders-Service-Komposition inkl. optionalem Result-Transport | [`MAYS-ORDERS-MODULE-CONTRACT-01.md`](../reports/MAYS-ORDERS-MODULE-CONTRACT-01.md) |
 | Module Integration & Test Guide | Test-/Integrationsleitfaden für Modulnutzer | [`MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md`](../MAYS_ORDERS_TERRAFORM_MODUL_INTEGRATION_TEST_GUIDE_2026-10-19.md) |
 | Builder-CLI | `build`, `upgrade`, `presets` | [`module_builder/`](../../module_builder/) |
 

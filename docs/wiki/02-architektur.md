@@ -27,6 +27,9 @@ flowchart TD
   Fn --> Queue["SQS: optionale asynchrone Arbeit"]
   Queue --> Worker["Worker Lambda"]
   Worker --> Db
+  Fn -. "optionaler ORDER_DISPATCH" .-> RisQueue["RIS Dispatch Queue"]
+  RisQueue -. "ORDER_RESULT / ORDER_FAILED" .-> ResultQueue["Mays Result Queue + HMAC Consumer"]
+  ResultQueue --> Db
   Fn -. "Logs / Metriken" .-> Obs["CloudWatch"]
   Aws["AWS API-Aktivität"] -.-> Trail["CloudTrail"]
 ```
@@ -44,6 +47,7 @@ Modul ist nicht automatisch bei jeder Installation eingeschaltet.
 | Order-Lambda | Validierung, Objektzugriff, Domainregeln und Datenoperationen |
 | DynamoDB | Order-Datensätze und indizierte Zugriffsmuster; kein Full-Table-Scan als reguläres Listing |
 | SQS / Worker | Entkoppelte Verarbeitung mit kontrollierten Wiederholungs- und Fehlerpfaden |
+| Agent-Transport (optional) | Eigentümergebundener Dispatch nach RIS und signierter Result-Handoff; separat opt-in |
 | IAM | Rechte zwischen AWS-Diensten nach Least Privilege; keine Benutzeranmeldung |
 | CloudWatch / CloudTrail | Laufzeitbeobachtung und AWS-Aktivitätsnachweise |
 | Terraform | Deklarative Infrastruktur und Module |
@@ -80,7 +84,9 @@ Zugriffsgrenze noch ein Ersatz für getrennte AWS-Konten.
 
 ### Terraform-Struktur
 
-Das Root-Modul orchestriert sieben Child-Module:
+Das Root-Modul orchestriert Kern- und optionale Child-Module. Für den
+wiederverwendbaren `orders-service`-Preset gilt ein festes Vertragsset; der
+RIS-Result-Transport ist darin standardmäßig deaktiviert:
 
 | Modul | Aufgabe |
 |---|---|
@@ -91,6 +97,7 @@ Das Root-Modul orchestriert sieben Child-Module:
 | `api` | HTTP API v2, Routen, JWT-Autorisierer |
 | `monitoring` | CloudWatch-Logs/-Alarme |
 | `cloudtrail` | Management-Event-Audit |
+| `agent_transport` | optionale Result-Queue, HMAC-Secret und separater Consumer |
 
 Das Backend liegt in S3 mit DynamoDB-Lock; `bootstrap/` provisioniert die
 State-Infrastruktur. Das Policy Gate (`terraform/policy/validate-plan.py`)

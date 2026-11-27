@@ -12,14 +12,19 @@
   `origin/main` = `8830da290e2960c1f319fb0a2b4a6724d00cbafd`.
 - Step 0 Reconciliation: RC4 tag/commit unverändert verifiziert. `orderDescription`
   ist bereits in main implementiert; 16 fokussierte Originaltests bestehen.
-- Verifizierte spätere Quellstände enthalten die fehlenden Transport-Komponenten
-  (`db4f9e7`), Builder-Preset-Korrekturen (`386d741`), Terraform-Contract-Fix
-  (`570bbe7`) und Result-Consumer-Boundary-Fix (`ceebc37`); Integration folgt
-  auf aktuellem main, ohne Originaltests oder spätere main-Änderungen zu entfernen.
+- Gezielte Mays-seitige Integration der Agent-Order-, Dispatch-, Result-Consumer-
+  und Transport-Komponenten; aktuelle Owner-/Privacy-Verträge bleiben maßgeblich.
+- Builder/Installer/Generated-Terraform-Verträge angepasst; vollständige
+  40-stellige Source-Commit-Provenienz wird fail-closed verlangt.
+- Lokale QA: Lambda 576, Builder 99, Installer 81, Seed 28 bestanden;
+  Root- und Generated-Orders-Service-Terraform backend-frei validiert.
+- RIS XRepo-Contract 133 + 4 Subtests und Synthetic E2E 39/39 bestanden.
+- Noch offen: Generated-Module-Gate, Ubuntu-Referenz-QA, Provenienz-/Handoff-Paket,
+  finaler Commit/Push und Gate-Bericht. WSL ist lokal nicht installiert.
 - Die ursprüngliche lokale Arbeitskopie hatte fremde Änderungen und bleibt
   unverändert; Arbeit erfolgt in separatem Worktree.
-- Status: IN PROGRESS; noch keine Produktcodeänderung in diesem Worktree,
-  keine Tests außer 16 `orderDescription`-Regressionstests.
+- Status: IN PROGRESS; Komponentenimplementierung und lokale Windows-QA liegen
+  vor, aber XRepo-/Ubuntu-QA und finaler Candidate-Handoff stehen aus.
 - Details und nächste Schritte:
   `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`.
 

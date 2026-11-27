@@ -813,7 +813,13 @@ class TestPrivacyConsistency(unittest.TestCase):
         )
 
         self.assertEqual(result["anonymizedRecords"], 1)
-        self.assertIn("REMOVE subjectId, gsi2pk, gsi2sk", captured["UpdateExpression"])
+        remove_clause = captured["UpdateExpression"].split("REMOVE ", 1)[1]
+        for private_attribute in (
+            "subjectId", "consumerId", "ownerType", "ownerId", "actorType",
+            "actorId", "identityVersion", "identityVerification", "gsi2pk",
+            "gsi2sk", "#agent", "#fingerprint", "#work", "#dispatch", "#processing",
+        ):
+            self.assertIn(private_attribute, remove_clause)
         self.assertEqual(captured["ExpressionAttributeValues"][":sid"], "user-123")
 
     def test_erase_requires_explicit_policy(self):
@@ -1289,7 +1295,9 @@ class TestProcessingResultPrivacyP02GA(unittest.TestCase):
 
         self.assertEqual(result["anonymizedRecords"], 1)
         expression = captured["UpdateExpression"]
-        self.assertIn("REMOVE subjectId, gsi2pk, gsi2sk, #result, #perr, #patt", expression)
+        self.assertIn("REMOVE subjectId, consumerId, ownerType, ownerId", expression)
+        self.assertIn("#result, #perr, #patt", expression)
+        self.assertIn("#agent, #fingerprint, #work, #dispatch", expression)
         names = captured["ExpressionAttributeNames"]
         self.assertEqual(names["#result"], "result")
         self.assertEqual(names["#perr"], "processingError")

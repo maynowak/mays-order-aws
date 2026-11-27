@@ -134,3 +134,23 @@ des RC4-Vertrags.
 - `order-lifecycle/`
 - `database/` und `docs/diagnostics/dynamodb/`
 - `docs/reports/MO-RC4-P02-*.md` sowie `MO-ORDER-DESCRIPTION-*.md`
+### Agent-Ausführung
+
+Für einen internen Agent-Auftrag verwendet der Client `orderType: "agent.execution"`.
+Nativ kann der strikt geprüfte `agentOrder`-Body exklusiv übertragen werden.
+Für RIS OrderV1-Kompatibilität kommt derselbe Agent-Body als JSON in
+`orderDescription` und zusammen mit dem bestehenden Kunden-/Positions-/Währungs-
+Envelope. Mays validiert beide Repräsentationen streng und akzeptiert in der
+Beschreibung keinen beliebigen Freitext. Die Identität des Owners kommt weiterhin
+ausschließlich aus dem verifizierten Cognito-JWT — Body-Metadaten erteilen keine
+Berechtigung.
+
+Wenn eine Dispatch-Queue konfiguriert ist, erzeugt Mays-Orders aus der
+gespeicherten Order einen Dispatch mit serverseitig gebundener Work-ID. RIS
+sendet Resultate ausschließlich über die HMAC-geschützte interne Queue zurück.
+Im Detail darf nur der Owner eine bereinigte `agentOrder`-Projektion und die
+freigegebenen `processing`-Felder sehen. Es gibt keine öffentliche Result-
+Schreibroute. Export und Anonymisierung berücksichtigen diese zusätzlichen Daten.
+
+Das vollständige Beispiel, Schema und Fehlerverhalten stehen in
+[`api/endpoints.md`](../../api/endpoints.md#2112-agent-ausführungsauftrag-a04a06).

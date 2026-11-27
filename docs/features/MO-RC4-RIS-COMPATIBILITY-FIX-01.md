@@ -35,15 +35,36 @@ or replace main's original tests.
 
 ## Progress
 
-- Step 0 complete: origin refs fetched, main advanced from local `1eaa14e` to
-  `8830da2`, RC4 tag verified, later fix branches inspected, candidate base
-  selected. No source edits yet.
-- `lambda/tests/test_order_description.py`: 16 tests PASS on baseline main
-  using Python 3.15.0. This confirms that issue is already fixed on main.
-- Steps 1–8 pending: candidate source integration, original/builder/installer
-  and generated Terraform tests, RIS XRepo QA, provenance, handoff, and reports.
+- Step 0 complete: origin refs fetched, main advanced to `8830da2`, RC4 tag
+  verified, and the candidate starts at `d400d02` on the feature branch.
+- Agent Order V1 validation/persistence (native body and RIS OrderV1
+  `orderDescription` form), owner-only detail projection, server-bound dispatch,
+  signed result consumer, Terraform result transport, builder wiring, and
+  immutable source-commit manifest identity are implemented Mays-side. RIS
+  source and pin remain untouched.
+- Privacy follow-through is implemented: result details are only owner-facing;
+  export includes the safe agent-order projection; `ANONYMIZE` removes agent
+  input, result, dispatch binding, and identity attributes.
+- Local evidence (Windows/Python 3.15): Lambda **576/576**, Module Builder
+  **99/99**, Installer **81/81**, Seed tools **28/28**; focused dispatch 18,
+  result handoff 31, consumer 20, Terraform static contract 12 all pass.
+- RIS XRepo contract tests: **133 passed, 4 subtests passed**. RIS synthetic
+  XRepo E2E: **39/39 passed**. Both were run directly against the unchanged RIS
+  test worktree with `MO_ORDERS_SRC` bound to this Mays worktree; no RIS source,
+  version map, or pin was changed.
+- Backend-free root Terraform `fmt -check` and `validate` pass. Lambda ZIP
+  builds reproducibly at SHA-256
+  `fd2deeaac417fc2378edc89449f6a6c65038b63f2ea45a4a1ade970883e38ff1`.
+- Generated `orders-service` preset `fmt/init/validate` passed before the final
+  compatibility additions; it must be rebuilt/revalidated from the immutable
+  candidate commit. RIS generated-artifact/module-build gate is still pending.
+- Ubuntu reference QA is not yet run; WSL is not installed in this environment.
+  Final source provenance, generated-module QA, evidence, commit/push, and
+  candidate handoff remain pending.
 - Safety: no AWS access or mutations, LIVE remains locked, no Terraform plan,
   no pin/install, no redrive/order/workitem/data repair; RIS repository untouched.
 
-Next: commit/push Step 0 reconciliation evidence, then integrate the already
-verified source/builder fixes onto this branch and run their existing tests.
+Next: finalize docs and regression checks, commit/push the candidate; then run
+generated-module QA and test a clean source snapshot. Publish an immutable,
+manifest-bound RIS handoff; mark Ubuntu and any incompatible external artifact
+gate explicitly rather than inferring a pass.

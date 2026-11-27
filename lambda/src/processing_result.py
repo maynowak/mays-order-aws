@@ -202,13 +202,20 @@ def processing_summary(items: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
     has_error = False
     states = set()
     for item in items:
-        if item.get(FIELD_RESULT) is not None:
+        nested = item.get("processing")
+        if item.get(FIELD_RESULT) is not None or (
+            isinstance(nested, Mapping) and nested.get("result") is not None
+        ):
             has_result = True
-        if item.get(FIELD_PROCESSING_ERROR):
+        if item.get(FIELD_PROCESSING_ERROR) or (
+            isinstance(nested, Mapping) and nested.get("error")
+        ):
             has_error = True
         state = item.get(FIELD_PROCESSING_STATE)
         if isinstance(state, str) and state:
             states.add(state)
+        if isinstance(nested, Mapping) and isinstance(nested.get("status"), str):
+            states.add(nested["status"].lower())
     return {
         "hasProcessingResult": has_result,
         "hasProcessingError": has_error,

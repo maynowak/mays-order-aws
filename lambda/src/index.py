@@ -22,6 +22,7 @@ from validation import validate_list_params, validate_order_id, validate_status_
 JSON_HEADERS = {"Content-Type": "application/json"}
 
 SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
+ORDER_DISPATCH_QUEUE_URL = os.environ.get("ORDER_DISPATCH_QUEUE_URL")
 
 # Eigentümer-Identität (MO-RC4-P02): ausschließlich aus dem verifizierten
 # JWT-Autorisator-Kontext, nie aus dem Request-Body. Cognito-`sub` ist eine
@@ -70,6 +71,24 @@ def _send_to_sqs(order_id: str) -> bool:
         return True
     except Exception as e:
         print(f"Failed to send to SQS: {e}")
+        return False
+
+
+def _send_agent_dispatch(service: Any, order_id: str, identity: Any) -> bool:
+    """Send a stored, owner-authorized agent order to the RIS transport queue."""
+    if not ORDER_DISPATCH_QUEUE_URL:
+        return False
+    try:
+        binding = service.prepare_dispatch(order_id, identity)
+        envelope = service.dispatch_envelope(order_id, binding["workId"])
+        response = _get_sqs_client().send_message(
+            QueueUrl=ORDER_DISPATCH_QUEUE_URL,
+            MessageBody=json.dumps(envelope, separators=(",", ":")),
+        )
+        service.mark_dispatch_sent(order_id, binding["workId"], response["MessageId"])
+        return True
+    except Exception as exc:
+        print(f"Agent dispatch failed for {order_id}: {type(exc).__name__}")
         return False
 
 def parse_body(event: Dict[str, Any]) -> Any:
@@ -265,7 +284,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 parse_body(event), subject_id=identity.owner_id, identity=identity
             )
             order_id = order.get("orderId")
-            if order_id:
+            if order_id and order.get("orderType") == "agent.execution":
+                _send_agent_dispatch(service, order_id, identity)
+            elif order_id:
                 if SQS_QUEUE_URL and _send_to_sqs(order_id):
                     _mark_delivery(service, order_id, DELIVERY_SENT)
                 else:

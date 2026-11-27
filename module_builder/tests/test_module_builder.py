@@ -10,6 +10,8 @@ import contextlib
 import io
 import json
 import re
+import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -159,7 +161,7 @@ class TestGeneratedProject(unittest.TestCase):
         cls._tmp.cleanup()
 
     def _tree(self) -> set:
-        return {str(p.relative_to(self.target)) for p in self.target.rglob("*") if p.is_file()}
+        return {p.relative_to(self.target).as_posix() for p in self.target.rglob("*") if p.is_file()}
 
     def test_expected_layout(self):
         tree = self._tree()
@@ -201,7 +203,7 @@ class TestGeneratedProject(unittest.TestCase):
         import subprocess
         script = self.target / "lambda" / "build_cognito_backup_zip.py"
         result = subprocess.run(
-            ["python3", str(script)], cwd=self.target / "lambda",
+            [sys.executable, str(script)], cwd=self.target / "lambda",
             capture_output=True, text=True, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stderr[-400:])
@@ -220,12 +222,12 @@ class TestGeneratedProject(unittest.TestCase):
         import tempfile
         gate = self.target / "terraform" / "policy" / "validate-plan.py"
         with tempfile.NamedTemporaryFile(
-            "w", suffix=".json", delete=False, dir="/tmp/opencode"
+            "w", suffix=".json", delete=False, dir=tempfile.gettempdir()
         ) as fh:
             json.dump(plan, fh)
             plan_path = fh.name
         result = subprocess.run(
-            ["python3", str(gate), plan_path],
+            [sys.executable, str(gate), plan_path],
             capture_output=True, text=True, timeout=60,
         )
         return result.returncode, result.stdout + result.stderr
@@ -461,7 +463,7 @@ class TestModuleSelectionB1(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "db-only"
             self._build(target, ["dynamodb"])
-            tree = {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+            tree = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
             self.assertIn("terraform/modules/dynamodb/main.tf", tree)
             self.assertEqual(len([f for f in tree if f.startswith("terraform/modules/")]), 3)
             # Keine Lambda-/Backup-Ressourcen ohne Bedarf:
@@ -489,7 +491,7 @@ class TestModuleSelectionB1(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "lambda-chain"
             self._build(target, ["dynamodb", "sqs", "iam", "lambda"])
-            tree = {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+            tree = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
             self.assertIn("lambda/dist/lambda.zip", tree)
             self.assertIn("lambda/build_zip.py", tree)
             self.assertNotIn("lambda/dist/cognito_backup.zip", tree)
@@ -628,7 +630,7 @@ class TestModuleSelectionB1(unittest.TestCase):
             main_modules = self._names(target, r'module\s+"([a-z_]+)"')
             self.assertEqual(main_modules, {"cognito", "cloudtrail"})
             mod_dirs = {f.split("/")[2] for f in
-                        {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}
+                        {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
                         if f.startswith("terraform/modules/")}
             self.assertEqual(mod_dirs, {"cognito", "cloudtrail"})
 
@@ -680,7 +682,7 @@ class TestModuleSelectionB1(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "clean"
             self._build(target, ["dynamodb"])
-            for f in {str(p.relative_to(target)) for p in target.rglob("*") if p.is_file()}:
+            for f in {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}:
                 self.assertIsNone(
                     re.search(r"\.tfstate|\.tfplan|(^|/)tfplan|(^|/)credentials|(^|/)\.env", f),
                     f"Verbotene Datei: {f}",
@@ -910,7 +912,7 @@ class TestOrdersServiceModule(unittest.TestCase):
         cls._tmp.cleanup()
 
     def _tree(self) -> set:
-        return {str(p.relative_to(self.target)) for p in self.target.rglob("*") if p.is_file()}
+        return {p.relative_to(self.target).as_posix() for p in self.target.rglob("*") if p.is_file()}
 
     def test_module_layout(self):
         tree = self._tree()
@@ -938,7 +940,7 @@ class TestOrdersServiceModule(unittest.TestCase):
         main_tf = (self.target / "main.tf").read_text()
         # Genau die 7 Vertragsmodule
         modules = set(re.findall(r'^module\s+"([a-z_]+)"', main_tf, re.M))
-        self.assertEqual(modules, {"api", "cognito", "dynamodb", "iam",
+        self.assertEqual(modules, {"agent_transport", "api", "cognito", "dynamodb", "iam",
                                   "lambda", "sqs", "sqs_worker"})
         # Kindmodul-Vertrag: kein Provider-/terraform-Block im Modul-main
         self.assertNotRegex(main_tf, r'^provider\s', "Provider-Block im Modul verboten")
@@ -947,20 +949,31 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertNotIn("terraform_data", main_tf)
         self.assertNotIn("seed", main_tf)
         # Artefakte modulrelativ (path.module statt path.root)
-        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 2)
+        self.assertEqual(main_tf.count('${path.module}/lambda/dist/lambda.zip'), 3)
         self.assertNotIn("path.root", main_tf)
         # Tag-Parität: alle 7 Modulblöcke nutzen local.default_tags (Maker/Environment)
         self.assertEqual(main_tf.count("tags         = local.default_tags")
                          + len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)) >= 1
-                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 7)
+                         and len(re.findall(r"tags\s*=\s*local\.default_tags", main_tf)), 8)
 
     def test_variables_contract(self):
         variables = set(re.findall(r'^variable\s+"([a-z_]+)"',
                           (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
+        self.assertEqual(variables, {
+            "project_name", "tags",
+            "monitoring_enabled", "log_retention_days",
+            "lambda_execution_boundary",
+            "external_cognito",
+            # MO-ORDERS-SERVICE-TERRAFORM-FIX-07B: vom Vertrags-Wiring
+            # tatsächlich referenzierte Root-Variablen.
+            "deployment_version",
+            "sqs_visibility_timeout_seconds",
+            "sqs_message_retention_seconds",
+            "sqs_dlq_message_retention_seconds",
+            "sqs_max_receive_count",
+            "additional_environment", "enable_agent_transport",
+            "ris_result_producer_role_arns",
+        })
         text = (self.target / "variables.tf").read_text()
         self.assertIn('"contract-orders"', text)  # project_name-Default substituiert
 
@@ -981,7 +994,7 @@ class TestOrdersServiceModule(unittest.TestCase):
             "cognito_user_pool_group_name", "mo_version",
         ]:
             self.assertIn(required, outputs, f"Output fehlt: {required}")
-        self.assertEqual(len(outputs), 21)
+        self.assertEqual(len(outputs), 24)
         # GAP-02: der Queue-Name stammt aus dem vorhandenen sqs-Modul-Output
         # (keine zweite Namenskonstruktion, kein hartcodierter Projektname).
         block = re.search(
@@ -994,7 +1007,7 @@ class TestOrdersServiceModule(unittest.TestCase):
         # Alle Referenzen bleiben im Vertragsbestand
         refs = set(re.findall(r"module\.([a-z_]+)", outputs_text))
         self.assertTrue(refs.issubset({"api", "cognito", "dynamodb", "iam",
-                                       "lambda", "sqs", "sqs_worker"}))
+                                       "lambda", "sqs", "sqs_worker", "agent_transport"}))
 
     def test_iam_sqs_gate_contract(self):
         """GAP-06: beide counts hängen NUR am booleschen Gate; der ARN bleibt
@@ -1030,14 +1043,24 @@ class TestOrdersServiceModule(unittest.TestCase):
         self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
         self.assertIn("sqs_queue_arn      = module.sqs.queue_arn", iam_block)
         self.assertNotIn("sqs_enabled = module.", iam_block)
-        # Genau 6 öffentliche Inputs (kein zusätzlicher Gate-Input):
+        # Öffentliche Inputs: die 6 Vertrags-Inputs plus die 5 Root-Variablen,
+        # die das Vertrags-Wiring tatsächlich referenziert (Fix 07B).
         variables = set(re.findall(
             r'^variable\s+"([a-z_]+)"',
             (self.target / "variables.tf").read_text(), re.M))
-        self.assertEqual(variables, {"project_name", "tags",
-                                     "monitoring_enabled", "log_retention_days",
-                                     "lambda_execution_boundary",
-                                     "external_cognito"})
+        self.assertEqual(variables, {
+            "project_name", "tags",
+            "monitoring_enabled", "log_retention_days",
+            "lambda_execution_boundary",
+            "external_cognito",
+            "deployment_version",
+            "sqs_visibility_timeout_seconds",
+            "sqs_message_retention_seconds",
+            "sqs_dlq_message_retention_seconds",
+            "sqs_max_receive_count",
+            "additional_environment", "enable_agent_transport",
+            "ris_result_producer_role_arns",
+        })
 
     def test_versions_tf_contains_terraform_block(self):
         versions = (self.target / "versions.tf").read_text()
@@ -1052,7 +1075,7 @@ class TestOrdersServiceModule(unittest.TestCase):
         )
         self.assertEqual(manifest["preset"], "orders-service")
         self.assertEqual(manifest["modules"],
-                         ["api", "cognito", "dynamodb", "iam", "lambda",
+                         ["agent_transport", "api", "cognito", "dynamodb", "iam", "lambda",
                           "sqs", "sqs_worker"])
         self.assertEqual(manifest["project_name"], "contract-orders")
         self.assertIn("lambda/dist/lambda.zip", manifest["artifacts_sha256"])
@@ -1128,6 +1151,119 @@ class TestOrdersServiceModule(unittest.TestCase):
             main(["build", "--preset", "orders-service", "--target", "/tmp/opencode/x",
                   "--project-name", "abc", "--modules", "dynamodb"])
         self.assertEqual(ctx.exception.code, 2)  # Mutual-Exclusion (argparse)
+
+
+class TestOrdersServiceGeneratedTerraform(unittest.TestCase):
+    """MO-ORDERS-SERVICE-TERRAFORM-FIX-07B — Regression.
+
+    Auf main 8830da2 brach
+    `build --preset orders-service --validate` mit
+    `Reference to undeclared input variable` ab (var.deployment_version,
+    var.sqs_* und die Privacy-Secret-Wiring ohne Vertragsmodul). Diese Tests
+    prüfen die Referenzkonsistenz der generierten Dateien und führen die
+    echten Terraform-Schritte aus (fmt -check / init -backend=false / validate,
+    ausschließlich read-only, kein AWS-Kontakt).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from module_builder.builder import build_module
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.target = Path(cls._tmp.name) / "Mays-Order-AWS"
+        cls.result = build_module(
+            target_dir=cls.target,
+            project_name="regression-orders",
+            source_root=REPO_ROOT,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _root_tf(self) -> str:
+        return "\n".join(
+            (self.target / name).read_text()
+            for name in ("main.tf", "outputs.tf")
+        )
+
+    def test_every_variable_reference_is_declared(self):
+        declared = set(re.findall(
+            r'^variable\s+"([a-z_]+)"',
+            (self.target / "variables.tf").read_text(), re.M))
+        referenced = set(re.findall(r"\bvar\.([A-Za-z_][A-Za-z0-9_]*)",
+                                    self._root_tf()))
+        self.assertEqual(referenced - declared, set(),
+                         "Undeclared var.-Referenzen im generierten Modul")
+
+    def test_referenced_variables_match_audited_contract(self):
+        from module_builder.spec import ORDERS_SERVICE_VARIABLES
+        referenced = set(re.findall(r"\bvar\.([A-Za-z_][A-Za-z0-9_]*)",
+                                    self._root_tf()))
+        referenced.discard("external_cognito")
+        self.assertEqual(referenced, set(ORDERS_SERVICE_VARIABLES))
+
+    def test_out_of_contract_privacy_wiring_removed(self):
+        main_tf = (self.target / "main.tf").read_text()
+        variables = (self.target / "variables.tf").read_text()
+        self.assertNotIn("module.privacy_secret", main_tf)
+        self.assertNotIn("privacy_secret_enabled", main_tf)
+        self.assertNotIn("privacy_kms_key_arn", main_tf)
+        self.assertNotIn("privacy_secret_enabled", variables)
+        # Kindmodule behalten ihr sicheres Default-Gate (false) — kein
+        # Privacy-/KMS-Verhalten ohne explizites Root-Wiring.
+        iam_vars = (self.target / "modules" / "iam" / "variables.tf").read_text()
+        self.assertRegex(
+            iam_vars,
+            r'variable "privacy_secret_enabled" \{[\s\S]*?default\s*=\s*false',
+        )
+        # Das übrige Sicherheits-Gate (SQS) bleibt unverändert verdrahtet.
+        iam_block = main_tf.split('module "iam" {')[1].split("\n}")[0]
+        self.assertRegex(iam_block, r"(?m)^\s*sqs_enabled\s*=\s*true\s*$")
+
+    def test_unknown_out_of_contract_module_reference_fails_closed(self):
+        from module_builder.builder import _strip_out_of_contract_wiring
+        block = {
+            "kind": "module",
+            "name": "iam",
+            "header": "",
+            "text": 'module "iam" {\n  source       = "./modules/iam"\n'
+                    "  foreign_arn  = module.monitoring.alarm_arn\n}",
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            _strip_out_of_contract_wiring(
+                block,
+                {"iam"},
+                {"privacy_secret"},
+                {"privacy_secret_enabled", "privacy_kms_key_arn"},
+            )
+        self.assertIn("außerhalb des Modul-Vertrags", str(ctx.exception))
+        self.assertIn("monitoring", str(ctx.exception))
+
+    @unittest.skipUnless(shutil.which("terraform"),
+                         "terraform CLI nicht im PATH")
+    def test_generated_module_passes_terraform_fmt_init_validate(self):
+        from module_builder.validation import (
+            ValidationError,
+            validate_generated_project,
+        )
+        try:
+            validate_generated_project(self.target)
+        except ValidationError as exc:
+            message = str(exc)
+            offline_markers = (
+                "Failed to query available provider packages",
+                "Could not retrieve the list of available versions",
+                "no such host",
+                "dial tcp",
+                "connection refused",
+            )
+            if any(marker in message for marker in offline_markers):
+                self.skipTest(
+                    "Provider-Registry nicht erreichbar (offline) — "
+                    "referenzkonsistente Tests bleiben aktiv: "
+                    + message[-200:]
+                )
+            raise
 
 
 class TestExternalCognitoIntegration(unittest.TestCase):
@@ -1216,13 +1352,13 @@ class TestExternalCognitoIntegration(unittest.TestCase):
 
     def test_tags_preserved(self):
         """11) Bestehende Tags bleiben erhalten (local.default_tags)."""
-        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 7)
+        self.assertEqual(len(re.findall(r"tags\s*=\s*local\.default_tags", self._main())), 8)
 
     def test_output_names_and_external_safe_values(self):
         """12) 20 Output-Namen (19 Bestand + sqs_queue_name/GAP-02) + EXTERNAL-sichere Werte."""
         outputs = self._outputs()
         names = set(re.findall(r'^output\s+"([a-z_]+)"', outputs, re.M))
-        self.assertEqual(len(names), 21)
+        self.assertEqual(len(names), 24)
         self.assertIn("sqs_queue_name", names)
         self.assertIn("mo_version", names)
         # Modus-sichere Wertformen:

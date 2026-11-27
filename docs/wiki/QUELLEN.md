@@ -7,6 +7,9 @@
 - Erstellung/Überarbeitung dieser Wiki-Fassung: 25.11.2026
 - GitHub-Pre-Release: [`v0.6.0-rc.1`](https://github.com/maynowak/mays-order-aws/releases/tag/v0.6.0-rc.1)
 - Wiki-Ort: `docs/wiki/` (Teil des Repositorys, nicht ein separates Wiki-Repo)
+- Laufender Feature-Kandidat: `feature/mo-rc4-ris-compatibility-fix-01`, Ausgang
+  `d400d02702c34671c6fa3b2ba08fc4ecbd92d72c`; dieser Kandidat ist nicht in RC4
+  integriert und noch nicht als Release freigegeben.
 
 ## Dokumentationsportal
 
@@ -27,6 +30,7 @@ Wiki-Nachweise.
 | Wie ist die Infrastruktur entworfen? | `architecture/`, `terraform/`, `docs/architecture/` |
 | Wie wird gebaut/installiert? | `docs/INSTALLER_GUIDE.md`, `docs/INSTALLER-LIFECYCLE.md`, `module_builder/`, `installer/` |
 | Welche Tests/Evidence existieren? | `docs/reports/`, `tests/`, `docs/release/` |
+| Wie ist der aktuelle RIS-Kompatibilitätskandidat bewertet? | `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md` und die darin verlinkten QA-Evidence-Dateien |
 | Was ist Datenschutz-/Security-Status? | `docs/security/`, `docs/reports/MAYS-ORDERS-DSGVO-*`, `docs/reports/MO-RC4-P00-*` |
 | Was wurde wann geprüft? | `docs/AI_AUDITLOG.md` |
 
