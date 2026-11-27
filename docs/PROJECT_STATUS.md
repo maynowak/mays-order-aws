@@ -4,7 +4,24 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-23)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-27)
+
+### Aktiver Checkpoint — MO-RC4-RIS-COMPATIBILITY-FIX-01
+
+- Branch `feature/mo-rc4-ris-compatibility-fix-01`, Baseline
+  `origin/main` = `8830da290e2960c1f319fb0a2b4a6724d00cbafd`.
+- Step 0 Reconciliation: RC4 tag/commit unverändert verifiziert. `orderDescription`
+  ist bereits in main implementiert; 16 fokussierte Originaltests bestehen.
+- Verifizierte spätere Quellstände enthalten die fehlenden Transport-Komponenten
+  (`db4f9e7`), Builder-Preset-Korrekturen (`386d741`), Terraform-Contract-Fix
+  (`570bbe7`) und Result-Consumer-Boundary-Fix (`ceebc37`); Integration folgt
+  auf aktuellem main, ohne Originaltests oder spätere main-Änderungen zu entfernen.
+- Die ursprüngliche lokale Arbeitskopie hatte fremde Änderungen und bleibt
+  unverändert; Arbeit erfolgt in separatem Worktree.
+- Status: IN PROGRESS; noch keine Produktcodeänderung in diesem Worktree,
+  keine Tests außer 16 `orderDescription`-Regressionstests.
+- Details und nächste Schritte:
+  `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`.
 
 ```text
 May's Orders — AWS Serverless Order Management System

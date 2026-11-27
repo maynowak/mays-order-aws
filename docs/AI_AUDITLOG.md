@@ -1219,3 +1219,26 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Gate ist kein Nachweis „keine Findings“.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.
+
+## MO-RC4-RIS-COMPATIBILITY-FIX-01 — Step 0 Branch/Release Reconciliation
+Date: 2026-11-27
+Status: BASELINE VERIFIED; implementation and QA pending
+
+- Current Mays origin/main: `8830da290e2960c1f319fb0a2b4a6724d00cbafd`.
+- RC4 tag object `79628819717e4609d828581dff53055f2b32f8ec` resolves to
+  `5bc154e079b4d7ee9eedbbf5b45b1ecca5c35420`; tag untouched.
+- RIS reference: `feature/ris-analysis-integration-07` at
+  `9e1cff4f392410de887ddef10e86edc9008d2bdb`; QA run `45966656833`.
+- Created separate worktree/branch `feature/mo-rc4-ris-compatibility-fix-01`
+  from current `origin/main`. Existing unrelated edits in the canonical Mays
+  worktree were left untouched.
+- Existing `orderDescription` implementation in `80a84ca` is already on main;
+  strict validation/persistence/privacy contract has 16 focused tests, 16 PASS.
+- Existing later source/builder fixes found for reuse: transport source through
+  `db4f9e7`, builder Terraform fix `570bbe7`, transport module-selection fix
+  `386d741`, result-consumer boundary fix `ceebc37`. No duplicate implementation
+  or original-test removal planned.
+- No AWS operation, LIVE test, Terraform plan/apply/state mutation, module pin
+  change/installation, release publication, or RIS edit.
+- Report/progress: `docs/reports/MO-RC4-RIS-COMPATIBILITY-FIX-01.md` and
+  `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`.
