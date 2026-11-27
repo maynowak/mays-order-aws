@@ -9,7 +9,7 @@
 | Gate | Result | Evidence / command |
 |---|---:|---|
 | Lambda originals + candidate tests | **576 passed** | From `lambda/`: `python -m compileall -q src tests`; `PYTHONPATH=src python -m unittest discover -s tests` |
-| Lambda ZIP | **PASS** | `python build_zip.py`; SHA-256 `fd2deeaac417fc2378edc89449f6a6c65038b63f2ea45a4a1ade970883e38ff1` |
+| Lambda ZIP | **PASS** | `python build_zip.py`; committed artifact SHA-256 `4b50d510dff2694008efdd89f1d2a681a6759d14bf22bc08b31f513eaef72903` |
 | Module Builder | **99 passed** | `python -m unittest module_builder.tests.test_module_builder` |
 | Installer | **81 passed** | `python -m unittest installer.tests.test_installer` |
 | Seed tools | **28 passed** | From `scripts/`: `python -m unittest discover -s tests` |

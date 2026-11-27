@@ -54,7 +54,8 @@ or replace main's original tests.
   version map, or pin was changed.
 - Backend-free root Terraform `fmt -check` and `validate` pass. Lambda ZIP
   builds reproducibly at SHA-256
-  `fd2deeaac417fc2378edc89449f6a6c65038b63f2ea45a4a1ade970883e38ff1`.
+  `4b50d510dff2694008efdd89f1d2a681a6759d14bf22bc08b31f513eaef72903` (after
+  post-commit Windows checkout line-ending normalization).
 - Generated `orders-service` preset `fmt/init/validate` passed before the final
   compatibility additions; it must be rebuilt/revalidated from the immutable
   candidate commit. RIS generated-artifact/module-build gate is still pending.
