@@ -15,8 +15,10 @@
 | Seed tools | **28 passed** | From `scripts/`: `python -m unittest discover -s tests` |
 | RIS XRepo contract | **133 passed + 4 subtests** | RIS `tests/test_mo_contract_compat.py`, `test_cross_repo_mo_contract.py`, `test_order_transport_contract.py`, `test_agent_order_body.py`, `test_agent_order_order_description.py`, `test_dispatch_ingress_env.py` |
 | RIS synthetic XRepo E2E | **39 passed** | RIS `tests/test_mo_dispatch_handoff.py`, `test_agent_order_dispatch_e2e.py`, `test_partner_e2e_real.py`, `test_lambda_bridge_e2e.py` |
+| RIS Builder contract | **57 passed** | RIS `tests/test_build_mays_orders_transport_outputs.py`, `test_orders_aws_name_limits.py` |
 | Root Terraform | **fmt + validate PASS** | `terraform fmt -check -recursive`; isolated `terraform init -backend=false -input=false`; `terraform validate` |
-| `orders-service` preset | **fmt/init/validate PASS (pre-final edits)** | Builder `--validate`; rerun required from committed clean candidate |
+| `orders-service` preset | **fmt/init/validate PASS** | Builder `--validate`; generated artifact in `%TEMP%\mo-rc4-orders-service-3cfdd654` |
+| RIS generated-artifact contract | **BLOCKED: 7 passed, 2 failed** | RIS `tests/test_generated_module_artifact.py` against the generated preset |
 
 The RIS contract and E2E profiles ran directly from the unchanged RIS worktree,
 with `MO_ORDERS_SRC` pointing to this Mays candidate. AWS credential/profile
@@ -24,16 +26,22 @@ environment variables were removed and empty AWS config/credential files were
 used. No AWS, LIVE, Terraform plan/apply, RIS installation/pin update, release,
 redrive, or data repair was run.
 
-## Gates not yet verified
+## Blocked / not-yet-verified gates
 
 - RIS Unified Runner provenance currently maps `upgrade_candidate` to the
   immutable RC4 peeled SHA, not this new candidate; it refuses a modified or
   different SHA. Direct XRepo tests above avoid changing RIS's version map.
-- RIS `MODULE_BUILD` generated-artifact contract has not yet been run against a
-  clean, manifest-bound artifact.
+- The generated-artifact contract ran against the clean-source build and failed
+  two assertions: it expects an exactly 13-file ZIP (candidate contains five
+  additional imported runtime modules: `hmac_contract.py`, `order_handlers.py`,
+  `processing_result.py`, `recovery.py`, and `secret_provider.py`), and it checks
+  the `gsi3` Terraform attribute spacing as a literal string although the
+  formatted source contains the same index with different alignment. ZIP CRC,
+  handler/import, and all other artifact assertions passed. No RIS test/source
+  was edited to hide these failures.
 - Ubuntu reference QA is **BLOCKED**: WSL is not installed in this environment.
-- Final candidate commit, push, immutable full-SHA manifest, and RIS handoff are
-  pending. The source-identity gate now fails closed on a dirty checkout.
+- Feature-branch commits exist; final push and manifest-bound handoff are
+  pending. Source identity fails closed on a dirty checkout.
 
 ## External QA contact
 

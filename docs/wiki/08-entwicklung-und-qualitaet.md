@@ -52,6 +52,8 @@ Sie umfasst Agent-Order-, Dispatch-, HMAC-Result- und Transport-Verträge sowie
 Installer-/Builder-Prüfungen. Lokale Tests und backend-freies `terraform validate`
 sind kein RIS-Live- oder AWS-Nachweis; bis zum finalen Handoff bleibt der Status
 `IN PROGRESS`.
+Der RIS-Review-Handoff mit den **zwei blockierten Generated-Artifact-Assertions**
+steht in [`MO-RC4-RIS-CANDIDATE-HANDOFF.md`](../reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md).
 
 ## Lokale Prüfbefehle
 

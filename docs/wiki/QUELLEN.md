@@ -31,6 +31,7 @@ Wiki-Nachweise.
 | Wie wird gebaut/installiert? | `docs/INSTALLER_GUIDE.md`, `docs/INSTALLER-LIFECYCLE.md`, `module_builder/`, `installer/` |
 | Welche Tests/Evidence existieren? | `docs/reports/`, `tests/`, `docs/release/` |
 | Wie ist der aktuelle RIS-Kompatibilitätskandidat bewertet? | `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md` und die darin verlinkten QA-Evidence-Dateien |
+| Was muss RIS vor einer weiteren Integration beachten? | `docs/reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md` |
 | Was ist Datenschutz-/Security-Status? | `docs/security/`, `docs/reports/MAYS-ORDERS-DSGVO-*`, `docs/reports/MO-RC4-P00-*` |
 | Was wurde wann geprüft? | `docs/AI_AUDITLOG.md` |
 

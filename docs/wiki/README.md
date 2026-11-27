@@ -21,8 +21,10 @@ zusammenspielen und wo der belegte Entwicklungsstand endet.
 | Installer | Kontext-/Plan-/State-/Artefakt-Schutz um Terraform | 674 release-weite Tests, 81 fokussiert; Mutationen nur mit Freigabe |
 
 Der laufende Kandidat **MO-RC4-RIS-COMPATIBILITY-FIX-01** ergänzt Agent-Order-
-Dispatch/Result-Handoff und optionale Builder-Verdrahtung. Status und aktuelle
-QA-Evidenz: [`Feature-Fortschritt`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md).
+Dispatch/Result-Handoff und optionale Builder-Verdrahtung. Zwei RIS-
+Generated-Artifact-Assertions sind blockiert; Kandidat ist nicht release-ready.
+Status und QA-Evidenz: [`Feature-Fortschritt`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md),
+[`RIS-Handoff`](../reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md).
 | Privacy | Inspect/Export/Erase/Anonymize im Code | interne Funktion; produktive Aktivierung BLOCKED |
 
 ## Neu seit dem RC4-Tag

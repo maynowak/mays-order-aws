@@ -20,6 +20,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | RC4 Release Report | Release-Paketierung und Entscheidungen | [`MO-RC4-RELEASE-01.md`](../reports/MO-RC4-RELEASE-01.md) |
 | Projektstatus | aktueller Stand, Checkpoints, Blocker | [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md) |
 | RC4/RIS-Kompatibilitätskandidat | laufender Stand, lokale QA und offene Gates | [`MO-RC4-RIS-COMPATIBILITY-FIX-01.md`](../features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md) |
+| RIS-Kandidaten-Handoff | QA-Ergebnis und externe Blocker für RIS-Review | [`MO-RC4-RIS-CANDIDATE-HANDOFF.md`](../reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md) |
 | Roadmap | kanonische Entwicklungsplanung | [`docs/roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) |
 | Auditlog | Prüfungen, Reports, Entscheidungen | [`docs/AI_AUDITLOG.md`](../AI_AUDITLOG.md) |
 

@@ -206,6 +206,9 @@ Agent Order V1, owner-bound dispatch/results, privacy projection, and generated-
 compatibility. This is **not** an RC4 release or deployment. Track implementation,
 local evidence, open RIS cross-repository gates, and the final candidate handoff in
 [`docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`](docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md).
+RIS QA evidence and the external acceptance blockers are in
+[`candidate QA`](docs/reports/MO-RC4-RIS-CANDIDATE-QA.md) and the
+[`RIS handoff`](docs/reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md).
 
 ## Security & Privacy
 

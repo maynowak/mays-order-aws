@@ -18,13 +18,16 @@
   40-stellige Source-Commit-Provenienz wird fail-closed verlangt.
 - Lokale QA: Lambda 576, Builder 99, Installer 81, Seed 28 bestanden;
   Root- und Generated-Orders-Service-Terraform backend-frei validiert.
-- RIS XRepo-Contract 133 + 4 Subtests und Synthetic E2E 39/39 bestanden.
-- Noch offen: Generated-Module-Gate, Ubuntu-Referenz-QA, Provenienz-/Handoff-Paket,
-  finaler Commit/Push und Gate-Bericht. WSL ist lokal nicht installiert.
+- RIS XRepo-Contract 133 + 4 Subtests, Synthetic E2E 39/39, Builder-Contract
+  57/57 bestanden. Generated-Artifact-Profil 7 pass/2 fail (Runtime-ZIP-
+  Whitelist und whitespace-sensitive `gsi3` assertion).
+- Handoff-Bericht vorhanden; finaler Manifest-Build/Push und Ubuntu-Referenz-QA
+  offen. WSL ist lokal nicht installiert.
 - Die ursprüngliche lokale Arbeitskopie hatte fremde Änderungen und bleibt
   unverändert; Arbeit erfolgt in separatem Worktree.
-- Status: IN PROGRESS; Komponentenimplementierung und lokale Windows-QA liegen
-  vor, aber XRepo-/Ubuntu-QA und finaler Candidate-Handoff stehen aus.
+- Status: IN PROGRESS; Komponentenimplementierung, lokale Windows-QA und RIS
+  Handoff liegen vor. Zwei Generated-Artifact-Assertions und Ubuntu-QA sind
+  blockiert/offen.
 - Details und nächste Schritte:
   `docs/features/MO-RC4-RIS-COMPATIBILITY-FIX-01.md`.
 

@@ -52,20 +52,24 @@ or replace main's original tests.
   XRepo E2E: **39/39 passed**. Both were run directly against the unchanged RIS
   test worktree with `MO_ORDERS_SRC` bound to this Mays worktree; no RIS source,
   version map, or pin was changed.
+- RIS builder contracts: **57/57 passed**. Generated-artifact profile: **7
+  passed, 2 failed** on an exact ZIP allowlist that excludes five runtime
+  dependencies and a whitespace-sensitive `gsi3` text assertion. The code and
+  Terraform are not changed to mask these external assertions; details and
+  evidence are in `docs/reports/MO-RC4-RIS-CANDIDATE-QA.md`.
 - Backend-free root Terraform `fmt -check` and `validate` pass. Lambda ZIP
   builds reproducibly at SHA-256
   `4b50d510dff2694008efdd89f1d2a681a6759d14bf22bc08b31f513eaef72903` (after
   post-commit Windows checkout line-ending normalization).
-- Generated `orders-service` preset `fmt/init/validate` passed before the final
-  compatibility additions; it must be rebuilt/revalidated from the immutable
-  candidate commit. RIS generated-artifact/module-build gate is still pending.
+- The `orders-service` preset passed `fmt/init/validate` from a clean source
+  commit. Full RIS generated-artifact/module-build acceptance remains blocked
+  by the two assertions above.
 - Ubuntu reference QA is not yet run; WSL is not installed in this environment.
-  Final source provenance, generated-module QA, evidence, commit/push, and
-  candidate handoff remain pending.
+  Final manifest provenance and push remain pending; a review handoff is
+  documented in `docs/reports/MO-RC4-RIS-CANDIDATE-HANDOFF.md`.
 - Safety: no AWS access or mutations, LIVE remains locked, no Terraform plan,
   no pin/install, no redrive/order/workitem/data repair; RIS repository untouched.
 
-Next: finalize docs and regression checks, commit/push the candidate; then run
-generated-module QA and test a clean source snapshot. Publish an immutable,
-manifest-bound RIS handoff; mark Ubuntu and any incompatible external artifact
-gate explicitly rather than inferring a pass.
+Next: commit/push the handoff documents and rebuild the generated module from
+that exact clean SHA. Keep the external artifact gate and Ubuntu reference QA
+explicitly blocked; do not infer an overall release pass.
