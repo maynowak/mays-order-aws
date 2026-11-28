@@ -92,8 +92,9 @@ EOF
 }
 
 # ---- Extract classification from Python output -------------------------
-CLASSIFICATION=$(echo "$PYTHON_OUTPUT" | grep -oP 'CLASSIFICATION:\K\w+' || echo "UNKNOWN")
-REPORT_PATH=$(echo "$PYTHON_OUTPUT" | grep -oP 'REPORT_PATH:\K\S+' || echo "")
+CLASSIFICATION=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*CLASSIFICATION:\(\w*\).*/\1/p' | tail -1)
+CLASSIFICATION="${CLASSIFICATION:-UNKNOWN}"
+REPORT_PATH=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*REPORT_PATH:\(\S*\).*/\1/p' | tail -1)
 
 # ---- Fail-closed: unknown classification blocks -----------------------
 case "$CLASSIFICATION" in
