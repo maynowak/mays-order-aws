@@ -221,4 +221,4 @@ jobs:
             echo "|---------|--------|"
             echo "| CodeQL | \`${{ needs.codeql.result }}\` |"
             echo "| Dependency | \`${{ needs.dependency-check.result }}\` |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"# Force workflow refresh - Sa 28. Nov 12:08:05 CET 2026
