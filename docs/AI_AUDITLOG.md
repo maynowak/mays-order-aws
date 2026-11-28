@@ -1232,3 +1232,15 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - Synthetic RIS acceptance does not grant production or real-PII privacy approval. No Terraform/AWS, build, deployment, runtime, or live-order action.
 - Execution log: `docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01-EXECUTION_LOG.md`.
 - Merge remains unauthorized; prepare a separate documentation PR and stop before merge.
+
+## 2026-11-28 — MO-PRIVACY-PROVIDER-CONTRACT-REVIEW-01
+
+**Status:** `MO PRIVACY PROVIDER CONTRACT RESPONSE READY` — STOP before implementation.
+
+- Review baseline: `716a16590673cdb649df414c08fc0bf7814caac7` (`origin/main`).
+- Consumer evidence reviewed read-only: RIS `18f2128d6d60993b2cbe2296ac2a3f190617f289`, `docs/privacy/DSGVO-02B-PROVIDER-INTEGRATION-REVIEW.md`.
+- `CR-MO-PRIVACY-RIS-SUBJECT-DELEGATION-01`: **CHANGE REQUIRED**. Existing internal privacy invoke and scoped operations are present, but trusted service-to-user delegation is explicitly blocked (`verified_internal_signed` not enabled); privacy consumer scope is optional and defaults to deployment-wide. Provider recommendation and minimal acceptance tests are in the response report.
+- `CR-MO-PRIVACY-ANONYMIZE-COVERAGE-02`: **CHANGE REQUIRED** for an AgentOrder-inclusive residual-data contract. Current anonymization removes selected customer, subject/index, result/error/attempt, GSI3 and description fields but leaves `agentOrder` and identity/consumer attributes. Provider-owned field contract and full-item tests are required; no legal sufficiency inferred.
+- Preview/Execute and conditional per-item behavior exist. Returned operation IDs are not durable status records; timeout/reconciliation is not authoritative, and skipped-only outcomes can return `COMPLETED`. Safe global completion cannot be inferred from transport success or a later empty query.
+- Added `docs/reports/MO-PRIVACY-PROVIDER-CONTRACT-REVIEW-01.md` only. No runtime/provider code, tests, AWS/Terraform, deployment, public contract, legal decision, or Main merge.
+- Tests: NOT RUN (source/report review only). `git diff --check` and documentation link/secret audit are checkpoint validations.
