@@ -7,9 +7,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly CodeQL, preserving the previous Monday 03:00 UTC cadence.
     - cron: '0 3 * * 1'
-    # Daily dependency check, preserving the previous 06:00 UTC cadence.
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -63,13 +61,12 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
-          sarif-file: "codeql-results.sarif"
 
       - name: Upload CodeQL SARIF artifact
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif
-          path: codeql-results.sarif
+          path: results/*.sarif
           retention-days: 30
 
   dependency-check:
@@ -159,27 +156,32 @@ jobs:
           echo "CodeQL result: ${{ needs.codeql.result }}"
           echo "Dependency result: ${{ needs.dependency-check.result }}"
 
-      # ---- Download SARIF artifacts from scanner jobs --------------------
+      # ---- Download CodeQL SARIF artifact --------------------------------
       - name: Download CodeQL SARIF artifact
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: codeql-sarif
           path: .github/workflow-sarif
 
-      - name: Rename CodeQL SARIF file
+      - name: Normalize CodeQL SARIF filename
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
         run: |
-          ls -la .github/workflow-sarif/
-          # CodeQL SARIF may be named results/<language>.sarif; rename for gate
+          ls -la .github/workflow-sarif/ || true
           find .github/workflow-sarif -name "*.sarif" -exec mv {} .github/workflow-sarif/codeql-results.sarif \;
 
+      # ---- Download Dependency SARIF artifact ----------------------------
       - name: Download Dependency SARIF artifact
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: dependency-sarif
           path: .github/workflow-sarif
+
+      - name: Normalize Dependency SARIF filename
+        if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
+        run: |
+          find .github/workflow-sarif -name "dependency_result.sarif" -exec mv {} .github/workflow-sarif/dependency-results.sarif \;
 
       # ---- Run Findings Gate (CodeQL) ------------------------------------
       - name: Run Findings Gate (CodeQL)
