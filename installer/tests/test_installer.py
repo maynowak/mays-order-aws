@@ -1794,111 +1794,64 @@ class TestDependencyDetector(unittest.TestCase):
 
 
 class TestSarifAdapter(unittest.TestCase):
-    """Test SECURITY-01-FIX SARIF Adapter."""
+    """Test SECURITY-01-FIX SARIF adapter with deterministic fixtures."""
+
+    def _dep(self, **overrides) -> dict:
+        dep = {
+            "name": "aws",
+            "type": "terraform_provider",
+            "source": str(REPO_ROOT / "terraform/main.tf"),
+            "current_version": "~> 6.0",
+            "locked_version": "6.65.0",
+            "latest_available": "7.0.0",
+            "latest_compatible": "6.66.0",
+            "available_version": "6.66.0",
+            "status": "UPDATE_AVAILABLE",
+            "details": "update available: 6.65.0 -> 6.66.0",
+        }
+        dep.update(overrides)
+        return dep
+
+    def _native(self, dependencies=None) -> dict:
+        return {
+            "status": "DEPENDENCY_CHANGE_DETECTED",
+            "run_id": "fixture-run",
+            "timestamp": "2026-11-28T00:00:00Z",
+            "summary": "fixture",
+            "dependencies": dependencies if dependencies is not None else [self._dep()],
+        }
+
+    def _convert(self, native=None) -> dict:
+        from security.sarif_adapter import SarifAdapter
+
+        return SarifAdapter(repo_root=REPO_ROOT).convert(native or self._native())
 
     def test_sarif_adapter_exists(self):
         """Test that SARIF adapter script exists."""
-        from pathlib import Path
-        self.assertTrue(Path("security/sarif_adapter.py").exists())
+        self.assertTrue((REPO_ROOT / "security" / "sarif_adapter.py").exists())
 
-    def test_sarif_conversion(self):
-        """Test that native dependency result converts to SARIF."""
-        import subprocess
-        import json
-
-        # Run detector
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-        native_result = json.loads(result.stdout)
-
-        # Convert to SARIF
-        result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-
-        self.assertEqual(result.returncode, 0)
-        self.assertTrue(Path("dependency_result.sarif").exists())
-
-        # Validate SARIF structure
-        with open("dependency_result.sarif") as f:
-            sarif = json.load(f)
+    def test_sarif_conversion_schema(self):
+        """Test the required SARIF 2.1.0 document and run structure."""
+        sarif = self._convert()
 
         self.assertEqual(sarif.get("version"), "2.1.0")
-        self.assertEqual(sarif.get("$schema"), "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json")
+        self.assertEqual(
+            sarif.get("$schema"),
+            "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
+        )
         self.assertIn("runs", sarif)
-        self.assertIsInstance(sarif["runs"], list)
-        self.assertGreater(len(sarif["runs"]), 0)
+        self.assertEqual(len(sarif["runs"]), 1)
 
         run = sarif["runs"][0]
         self.assertIn("tool", run)
         self.assertIn("driver", run["tool"])
+        self.assertEqual(run["tool"]["driver"]["name"], "Mays-Orders-AWS Security Dependency Detector")
+        self.assertEqual(run["tool"]["driver"]["version"], "2.0.0")
+        self.assertIn("rules", run["tool"]["driver"])
         self.assertIn("results", run)
-        self.assertIn("columnKind", run)
         self.assertEqual(run["columnKind"], "utf16CodeUnits")
-
-    def test_sarif_no_native_top_level_fields(self):
-        """Test that SARIF doesn't contain native top-level fields."""
-        import subprocess
-        import json
-
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-        native_result = json.loads(result.stdout)
-
-        result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-
-        with open("dependency_result.sarif") as f:
-            sarif = json.load(f)
-
-        # SARIF should not have native top-level fields
-        self.assertNotIn("status", sarif)
-        self.assertNotIn("run_id", sarif)
-        self.assertNotIn("timestamp", sarif)
-        self.assertNotIn("summary", sarif)
-        self.assertNotIn("dependencies", sarif)
-
-    def test_sarif_multiple_findings(self):
-        """Test SARIF with multiple dependency findings."""
-        import subprocess
-        import json
-
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-        native_result = json.loads(result.stdout)
-
-        result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-
-        with open("dependency_result.sarif") as f:
-            sarif = json.load(f)
-
-        # Should have results for each dependency
-        run = sarif["runs"][0]
-        self.assertGreaterEqual(len(run["results"]), 1)
+        self.assertEqual(run["automationDetails"]["id"], "dependency-check")
+        self.assertIn("description", run["automationDetails"])
 
         for result in run["results"]:
             self.assertIn("ruleId", result)
@@ -1906,100 +1859,196 @@ class TestSarifAdapter(unittest.TestCase):
             self.assertIn("message", result)
             self.assertIn("locations", result)
             self.assertIn("properties", result)
-
-            # Check level is valid
+            self.assertIn("partialFingerprints", result)
             self.assertIn(result["level"], ["error", "warning", "note", "none"])
 
-            # Check properties
-            props = result["properties"]
-            self.assertIn("dependency_name", props)
-            self.assertIn("dependency_type", props)
-            self.assertIn("current_version", props)
+    def test_no_native_top_level_fields(self):
+        """Test that SARIF doesn't contain native top-level fields."""
+        sarif = self._convert()
+        for field in ("status", "run_id", "timestamp", "summary", "dependencies"):
+            self.assertNotIn(field, sarif)
 
-    def test_sarif_error_conversion(self):
-        """Test SARIF conversion for error status."""
-        # Test that LOOKUP_ERROR status converts to warning level
-        import subprocess
-        import json
-
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-        native_result = json.loads(result.stdout)
-
-        result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-
-        with open("dependency_result.sarif") as f:
-            sarif = json.load(f)
-
+    def test_current_dependencies_are_omitted(self):
+        """CURRENT dependencies must not create findings or rules."""
+        native = self._native([
+            self._dep(status="CURRENT", latest_available="6.65.0", latest_compatible="6.65.0"),
+        ])
+        sarif = self._convert(native)
         run = sarif["runs"][0]
+
+        self.assertEqual(run["results"], [])
+        self.assertEqual(run["tool"]["driver"]["rules"], [])
+        self.assertNotIn("CURRENT", json.dumps(sarif))
+
+    def test_actionable_findings_and_levels(self):
+        """All actionable statuses are retained with stable severity mapping."""
+        statuses = {
+            "CHANGED": "warning",
+            "UPDATE_AVAILABLE": "note",
+            "CONSTRAINT_UNSATISFIED": "error",
+            "LOCK_MISSING": "warning",
+            "LOCK_CONSTRAINT_DRIFT": "warning",
+            "REGISTRY_INCOMPLETE": "warning",
+            "LOOKUP_ERROR": "warning",
+            "ERROR": "error",
+            "UNKNOWN": "warning",
+        }
+        native = self._native([
+            self._dep(name=f"dep-{status.lower()}", status=status)
+            for status in statuses
+        ])
+        sarif = self._convert(native)
+        results = sarif["runs"][0]["results"]
+
+        self.assertEqual(len(results), len(statuses))
+        by_rule = {result["ruleId"]: result for result in results}
+        for status, level in statuses.items():
+            rule_id = f"SEC01-TERRAFORM_PROVIDER-{status}"
+            self.assertIn(rule_id, by_rule)
+            self.assertEqual(by_rule[rule_id]["level"], level)
+
+    def test_relative_artifact_uris(self):
+        """Absolute detector sources become repository-relative SARIF URIs."""
+        native = self._native([
+            self._dep(source=str(REPO_ROOT / "terraform/main.tf")),
+            self._dep(name="time", source="/tmp/outside/terraform/main.tf", status="LOCK_MISSING"),
+        ])
+        sarif = self._convert(native)
+
+        for result in sarif["runs"][0]["results"]:
+            uri = result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+            self.assertFalse(Path(uri).is_absolute(), uri)
+            self.assertEqual(uri, "terraform/main.tf")
+
+    def test_stable_rule_ids_and_fingerprints(self):
+        """Repeated conversions of the same input are stable and deterministic."""
+        native = self._native()
+        first = self._convert(native)
+        second = self._convert(native)
+
+        self.assertEqual(first, second)
+        first_result = first["runs"][0]["results"][0]
+        second_result = second["runs"][0]["results"][0]
+        self.assertEqual(first_result["ruleId"], second_result["ruleId"])
+        self.assertEqual(
+            first_result["partialFingerprints"],
+            second_result["partialFingerprints"],
+        )
+        self.assertEqual(
+            first_result["partialFingerprints"]["dependencyIdentity/v1"],
+            second_result["partialFingerprints"]["dependencyIdentity/v1"],
+        )
+
+    def test_fingerprint_changes_with_identity(self):
+        """Different dependency identity or status changes the fingerprint."""
+        base = self._convert(self._native([self._dep()]))["runs"][0]["results"][0]
+        other_source = self._convert(self._native([
+            self._dep(source="terraform/other.tf"),
+        ]))["runs"][0]["results"][0]
+        other_status = self._convert(self._native([
+            self._dep(status="LOCK_MISSING"),
+        ]))["runs"][0]["results"][0]
+
+        self.assertNotEqual(
+            base["partialFingerprints"]["dependencyIdentity/v1"],
+            other_source["partialFingerprints"]["dependencyIdentity/v1"],
+        )
+        self.assertNotEqual(
+            base["partialFingerprints"]["dependencyIdentity/v1"],
+            other_status["partialFingerprints"]["dependencyIdentity/v1"],
+        )
+
+    def test_rule_indexes_are_valid(self):
+        """Every result points at its rule in the driver rule array."""
+        sarif = self._convert(self._native([
+            self._dep(status="UPDATE_AVAILABLE"),
+            self._dep(name="time", status="CURRENT"),
+            self._dep(name="random", status="LOCK_CONSTRAINT_DRIFT"),
+        ]))
+        run = sarif["runs"][0]
+        rules = run["tool"]["driver"]["rules"]
+
+        self.assertEqual(len(run["results"]), 2)
         for result in run["results"]:
-            if "CONSTRAINT_UNSATISFIED" in result["ruleId"]:
-                self.assertEqual(result["level"], "error")
-            elif "UPDATE_AVAILABLE" in result["ruleId"]:
-                self.assertEqual(result["level"], "note")
-            elif "LOOKUP_ERROR" in result["ruleId"]:
-                self.assertEqual(result["level"], "warning")
-            elif "CURRENT" in result["ruleId"]:
-                self.assertEqual(result["level"], "note")
+            self.assertIsInstance(result["ruleIndex"], int)
+            self.assertLess(result["ruleIndex"], len(rules))
+            self.assertEqual(rules[result["ruleIndex"]]["id"], result["ruleId"])
 
-    def test_sarif_deterministic(self):
-        """Test that SARIF generation is deterministic."""
+    def test_properties_include_version_dimensions(self):
+        """SARIF properties distinguish declared, locked, available and compatible."""
+        result = self._convert()["runs"][0]["results"][0]
+        props = result["properties"]
+
+        self.assertEqual(props["dependency_name"], "aws")
+        self.assertEqual(props["dependency_type"], "terraform_provider")
+        self.assertEqual(props["declared_constraint"], "~> 6.0")
+        self.assertEqual(props["locked_version"], "6.65.0")
+        self.assertEqual(props["latest_available"], "7.0.0")
+        self.assertEqual(props["latest_compatible"], "6.66.0")
+        self.assertEqual(props["available_version"], "6.66.0")
+        self.assertEqual(props["status"], "UPDATE_AVAILABLE")
+
+    def test_alerts_296_298_corrected_input_resolves_old_findings(self):
+        """Corrected input removes the old constraint error and CURRENT note."""
+        corrected = self._native([
+            self._dep(name="aws", status="LOCK_CONSTRAINT_DRIFT"),
+            self._dep(
+                name="time",
+                status="CURRENT",
+                current_version="~> 0.11",
+                locked_version="0.14.2",
+                latest_available="0.14.2",
+                latest_compatible="0.14.2",
+                available_version="0.14.2",
+            ),
+        ])
+        sarif = self._convert(corrected)
+        run = sarif["runs"][0]
+        rule_ids = [result["ruleId"] for result in run["results"]]
+
+        self.assertNotIn("SEC01-TERRAFORM_PROVIDER-CONSTRAINT_UNSATISFIED", rule_ids)
+        self.assertNotIn("SEC01-TERRAFORM_PROVIDER-CURRENT", rule_ids)
+        self.assertIn("SEC01-TERRAFORM_PROVIDER-LOCK_CONSTRAINT_DRIFT", rule_ids)
+        self.assertEqual(len(run["results"]), 1)
+
+    def test_cli_conversion(self):
+        """The CLI writes valid SARIF and omits CURRENT dependencies."""
         import subprocess
-        import json
+        import sys
 
-        result1 = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result1.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-        result2 = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result2.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            input_file = Path(tmp) / "dependency_result.json"
+            output_file = Path(tmp) / "dependency_result.sarif"
+            native = self._native([
+                self._dep(),
+                self._dep(name="time", status="CURRENT"),
+            ])
+            input_file.write_text(json.dumps(native))
 
-        self.assertEqual(result1.returncode, 0)
-        self.assertEqual(result2.returncode, 0)
+            result = subprocess.run(
+                [sys.executable, "-m", "security.sarif_adapter", str(input_file), str(output_file)],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO_ROOT),
+            )
 
-        with open("dependency_result1.sarif") as f:
-            sarif1 = json.load(f)
-        with open("dependency_result2.sarif") as f:
-            sarif2 = json.load(f)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(output_file.exists())
+            sarif = json.loads(output_file.read_text())
+            self.assertEqual(sarif["version"], "2.1.0")
+            self.assertEqual(len(sarif["runs"][0]["results"]), 1)
+            self.assertEqual(
+                sarif["runs"][0]["results"][0]["ruleId"],
+                "SEC01-TERRAFORM_PROVIDER-UPDATE_AVAILABLE",
+            )
 
-        # Structure should be identical
-        self.assertEqual(sarif1["version"], sarif2["version"])
-        self.assertEqual(len(sarif1["runs"]), len(sarif2["runs"]))
-        self.assertEqual(len(sarif1["runs"][0]["results"]), len(sarif2["runs"][0]["results"]))
-
-    def test_no_secret_leakage_in_sarif(self):
-        """Test that SARIF doesn't leak secrets."""
-        import subprocess
-
-        result = subprocess.run(
-            ["python3", "-m", "security.sarif_adapter", "dependency_result.json", "dependency_result.sarif"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
-
-        sarif_output = result.stdout + result.stderr
-
-        self.assertNotIn("aws_secret_access_key", sarif_output)
-        self.assertNotIn("aws_access_key_id", sarif_output)
-        self.assertNotIn("secret_access_key", sarif_output)
-        self.assertNotIn("password", sarif_output.lower())
-        self.assertNotIn("token", sarif_output.lower())
+    def test_no_secret_leakage(self):
+        """SARIF output does not contain credential material."""
+        output = json.dumps(self._convert())
+        self.assertNotIn("aws_secret_access_key", output)
+        self.assertNotIn("aws_access_key_id", output)
+        self.assertNotIn("secret_access_key", output)
+        self.assertNotIn("password", output.lower())
 
 
 if __name__ == "__main__":

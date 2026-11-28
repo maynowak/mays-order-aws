@@ -3,17 +3,22 @@
 SECURITY-01-FIX: SARIF Adapter for Dependency Detector
 
 Converts native dependency detector JSON output to SARIF 2.1.0 format.
+
+Only actionable findings are emitted.  ``CURRENT`` dependencies are omitted so
+the previous note-level alert for an up-to-date provider resolves automatically
+on the next upload.  Artifact URIs are repository-relative and every result has
+a stable partial fingerprint for alert correlation.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
-from dataclasses import dataclass, asdict, field
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -26,11 +31,18 @@ class SarifLocation:
     end_column: Optional[int] = None
 
     def to_dict(self) -> dict:
-        """Convert to SARIF 2.1.0 location format with physicalLocation.artifactLocation.uri"""
         artifact_location = {"uri": self.uri}
         physical_location = {"artifactLocation": artifact_location}
-        result = {"physicalLocation": physical_location}
-        return result
+        if self.start_line is not None:
+            region = {"startLine": self.start_line}
+            if self.start_column is not None:
+                region["startColumn"] = self.start_column
+            if self.end_line is not None:
+                region["endLine"] = self.end_line
+            if self.end_column is not None:
+                region["endColumn"] = self.end_column
+            physical_location["region"] = region
+        return {"physicalLocation": physical_location}
 
 
 @dataclass
@@ -80,7 +92,7 @@ class SarifResult:
     rule_id: str
     level: str  # "none", "note", "warning", "error"
     message: SarifMessage
-    locations: List["SarifLocation"]
+    locations: List[SarifLocation]
     rule_index: Optional[int] = None
     partial_fingerprints: Optional[dict] = None
     properties: Optional[dict] = None
@@ -118,7 +130,6 @@ class SarifRun:
         }
         if self.original_uri_base_ids:
             result["originalUriBaseIds"] = self.original_uri_base_ids
-        # Only include automationDetails if it has a valid description object
         if self.automation_details and "description" in self.automation_details:
             desc = self.automation_details["description"]
             if isinstance(desc, dict) and "text" in desc:
@@ -129,52 +140,120 @@ class SarifRun:
 class SarifAdapter:
     """Converts native dependency detector results to SARIF 2.1.0."""
 
-    # SARIF level mapping
-    SEVERITY_MAP = {
+    TOOL_NAME = "Mays-Orders-AWS Security Dependency Detector"
+    TOOL_VERSION = "2.0.0"
+    AUTOMATION_ID = "dependency-check"
+    FINGERPRINT_KEY = "dependencyIdentity/v1"
+
+    # Actionable statuses and their SARIF levels.  CURRENT is intentionally
+    # absent: up-to-date dependencies must not create findings.
+    STATUS_LEVEL = {
+        "CHANGED": "warning",
+        "UPDATE_AVAILABLE": "note",
+        "CONSTRAINT_UNSATISFIED": "error",
+        "LOCK_MISSING": "warning",
+        "LOCK_CONSTRAINT_DRIFT": "warning",
+        "REGISTRY_INCOMPLETE": "warning",
+        "LOOKUP_ERROR": "warning",
         "ERROR": "error",
-        "WARNING": "warning",
-        "NOTE": "note",
-        "NONE": "none",
+        "UNKNOWN": "warning",
     }
 
-    def __init__(self):
-        self.rule_index = 0
+    def __init__(self, repo_root: Optional[Path] = None):
+        self.repo_root = (
+            Path(repo_root).resolve() if repo_root is not None
+            else Path(__file__).resolve().parents[1]
+        )
         self.rules: Dict[str, SarifRule] = {}
 
+    def _normalize_uri(self, uri: str) -> str:
+        """Return a repository-relative POSIX URI when possible."""
+        if not uri:
+            return ""
+        raw = str(uri).replace("\\", "/")
+        if raw.startswith("file://"):
+            raw = raw[7:]
+        path = Path(raw)
+        if not path.is_absolute():
+            return path.as_posix()
+
+        try:
+            return path.resolve().relative_to(self.repo_root).as_posix()
+        except (OSError, ValueError):
+            # Defensive fallback for absolute paths outside the checkout:
+            # preserve the repository-relative suffix when recognizable.
+            parts = path.parts
+            for marker in ("terraform", "installer", "security", "lambda", "module_builder", "scripts"):
+                if marker in parts:
+                    return "/".join(parts[parts.index(marker):])
+            return path.name
+
     def _get_rule_id(self, dep_type: str, status: str) -> str:
-        """Generate a rule ID for the dependency type and status."""
         return f"SEC01-{dep_type.upper()}-{status.upper()}"
 
+    def _rule_definition(self, dep_type: str, status: str) -> tuple[str, str, str]:
+        if status == "CHANGED":
+            return (
+                "warning",
+                f"{dep_type} version change detected",
+                f"A new {dep_type} version is available but does not satisfy the declared constraint.",
+            )
+        if status == "UPDATE_AVAILABLE":
+            return (
+                "note",
+                f"{dep_type} update available",
+                f"A newer {dep_type} version satisfies the declared constraint.",
+            )
+        if status == "CONSTRAINT_UNSATISFIED":
+            return (
+                "error",
+                f"{dep_type} locked version violates constraint",
+                f"The version in .terraform.lock.hcl does not satisfy the declared {dep_type} constraint.",
+            )
+        if status == "LOCK_MISSING":
+            return (
+                "warning",
+                f"{dep_type} missing from lock file",
+                f"The {dep_type} is declared but has no entry in .terraform.lock.hcl.",
+            )
+        if status == "LOCK_CONSTRAINT_DRIFT":
+            return (
+                "warning",
+                f"{dep_type} lock constraint drift",
+                f"The constraints recorded in .terraform.lock.hcl differ from the declared constraint; updates are suppressed until reconciled.",
+            )
+        if status == "REGISTRY_INCOMPLETE":
+            return (
+                "warning",
+                f"{dep_type} registry data incomplete",
+                f"The registry response is missing usable or newer versions; no update is recommended.",
+            )
+        if status == "LOOKUP_ERROR":
+            return (
+                "warning",
+                f"{dep_type} lookup failed",
+                f"Failed to query the registry for {dep_type}.",
+            )
+        if status == "ERROR":
+            return (
+                "error",
+                f"{dep_type} check error",
+                f"The dependency check for {dep_type} failed.",
+            )
+        return (
+            "warning",
+            f"{dep_type} status unknown",
+            f"The dependency status for {dep_type} could not be classified.",
+        )
+
     def _get_rule(self, dep_type: str, status: str) -> SarifRule:
-        """Get or create a SARIF rule for the dependency type and status."""
         rule_id = self._get_rule_id(dep_type, status)
         if rule_id in self.rules:
             return self.rules[rule_id]
 
-        # Create rule based on type and status
-        if status == "CHANGED":
-            level = "warning"
-            short_desc = f"{dep_type} version change detected"
-            full_desc = f"A new version of {dep_type} is available that does not satisfy the declared constraint."
-        elif status == "CONSTRAINT_UNSATISFIED":
-            level = "error"
-            short_desc = f"{dep_type} constraint unsatisfied"
-            full_desc = f"The latest version of {dep_type} does not satisfy the declared constraint in Terraform configuration."
-        elif status == "LOOKUP_ERROR":
-            level = "warning"
-            short_desc = f"{dep_type} lookup failed"
-            full_desc = f"Failed to check for updates for {dep_type}."
-        elif status == "UPDATE_AVAILABLE":
-            level = "note"
-            short_desc = f"{dep_type} update available"
-            full_desc = f"A new version of {dep_type} is available within the declared constraint."
-        else:  # CURRENT
-            level = "note"
-            short_desc = f"{dep_type} is current"
-            full_desc = f"{dep_type} is up to date within the declared constraint."
-
+        level, short_desc, full_desc = self._rule_definition(dep_type, status)
         rule = SarifRule(
-            id=f"SEC01-{dep_type.upper()}-{status.upper()}",
+            id=rule_id,
             name=f"{dep_type} {status}",
             short_description=SarifMessage(text=short_desc),
             full_description=SarifMessage(text=full_desc),
@@ -183,93 +262,101 @@ class SarifAdapter:
         self.rules[rule_id] = rule
         return rule
 
+    def _fingerprint(self, dep_type: str, name: str, source: str, rule_id: str) -> str:
+        identity = f"{dep_type}|{name}|{source}|{rule_id}"
+        return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+    def _message(self, dep: dict, status: str, source: str) -> str:
+        name = dep.get("name", "unknown")
+        dep_type = dep.get("type", "unknown")
+        declared = dep.get("current_version", "")
+        locked = dep.get("locked_version")
+        latest_available = dep.get("latest_available")
+        latest_compatible = dep.get("latest_compatible")
+        details = dep.get("details", "")
+
+        parts = [f"{name} ({dep_type}): {status}."]
+        if declared:
+            parts.append(f"Declared constraint: {declared}.")
+        parts.append(f"Locked version: {locked or 'missing'}.")
+        parts.append(f"Latest available: {latest_available or 'unknown'}.")
+        parts.append(f"Latest compatible: {latest_compatible or 'none'}.")
+        if details:
+            parts.append(details)
+        return " ".join(parts)
+
     def convert(self, native_result: dict) -> dict:
         """Convert native dependency detector result to SARIF 2.1.0."""
+        self.rules = {}
         native_deps = native_result.get("dependencies", [])
-
-        results = []
-        rules = {}
+        results: List[SarifResult] = []
 
         for dep in native_deps:
-            dep_type = dep.get("type", "unknown")
-            status = dep.get("status", "UNKNOWN")
-            name = dep.get("name", "unknown")
-            source = dep.get("source", "")
-            current_version = dep.get("current_version", "")
-            available_version = dep.get("available_version")
-            details = dep.get("details", "")
+            dep_type = str(dep.get("type", "unknown"))
+            status = str(dep.get("status", "UNKNOWN")).upper()
+            if status == "CURRENT":
+                # Up-to-date dependencies are not findings.  This also lets a
+                # previously uploaded CURRENT alert resolve automatically.
+                continue
+            if status not in self.STATUS_LEVEL:
+                status = "UNKNOWN"
 
-            rule_id = self._get_rule_id(dep_type, status)
+            name = str(dep.get("name", "unknown"))
+            source = self._normalize_uri(str(dep.get("source", "")))
             rule = self._get_rule(dep_type, status)
-            rules[rule_id] = rule
+            rule_index = list(self.rules.keys()).index(rule.id)
+            level = self.STATUS_LEVEL[status]
 
-            # Determine SARIF level
-            if status == "CONSTRAINT_UNSATISFIED":
-                level = "error"
-            elif status in ("CHANGED", "LOOKUP_ERROR"):
-                level = "warning"
-            else:
-                level = "note"
+            locations = [SarifLocation(uri=source)] if source else []
+            properties = {
+                "dependency_name": name,
+                "dependency_type": dep_type,
+                "status": status,
+                "declared_constraint": dep.get("current_version", ""),
+                "current_version": dep.get("current_version", ""),
+                "locked_version": dep.get("locked_version"),
+                "latest_available": dep.get("latest_available"),
+                "latest_compatible": dep.get("latest_compatible"),
+                "available_version": dep.get("available_version"),
+                "source": source,
+            }
 
-            # Create location
-            locations = []
-            if source:
-                # Extract line number if possible (simplified)
-                locations.append(SarifLocation(
-                    uri=source,
-                    start_line=None,
-                    start_column=None,
-                ))
-
-            # Create message
-            message_text = f"{name} ({dep_type}): {status}"
-            if available_version:
-                message_text += f" - available: {available_version}"
-            message_text += f". Current: {dep.get('current_version', 'unknown')}. {details}"
-
-            result = SarifResult(
+            results.append(SarifResult(
                 rule_id=rule.id,
                 level=level,
-                message=SarifMessage(text=message_text),
+                message=SarifMessage(text=self._message(dep, status, source)),
                 locations=locations,
-                properties={
-                    "dependency_name": name,
-                    "dependency_type": dep_type,
-                    "current_version": dep.get("current_version", ""),
-                    "available_version": available_version,
-                    "deployment_id": dep.get("deployment_id", ""),
+                rule_index=rule_index,
+                partial_fingerprints={
+                    self.FINGERPRINT_KEY: self._fingerprint(dep_type, name, source, rule.id),
                 },
-            )
-            results.append(result)
+                properties=properties,
+            ))
 
-        # Build tool driver
         tool = {
             "driver": {
-                "name": "Mays-Orders-AWS Security Dependency Detector",
-                "version": "1.0.0",
+                "name": self.TOOL_NAME,
+                "version": self.TOOL_VERSION,
+                "semanticVersion": self.TOOL_VERSION,
                 "informationUri": "https://github.com/maynowak/mays-order-aws",
-                "rules": [r.to_dict() for r in rules.values()],
+                "rules": [rule.to_dict() for rule in self.rules.values()],
             }
         }
 
-        # Build run
         run = SarifRun(
             tool=tool,
             results=results,
             automation_details={
-                "id": "security-01-dependency-check",
-                "description": {"text": "SECURITY-01 Dependency Change Detection"}
-            }
+                "id": self.AUTOMATION_ID,
+                "description": {"text": "Dependency Change Detection (dependency-check)"},
+            },
         )
 
-        # Build SARIF document
-        sarif = {
+        return {
             "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
             "version": "2.1.0",
             "runs": [run.to_dict()],
         }
-
-        return sarif
 
 
 def main() -> int:
