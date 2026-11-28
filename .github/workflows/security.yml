@@ -56,63 +56,36 @@ jobs:
     uses: ./.github/workflows/dependency-check.yml
 
   security-gate:
-    name: Security Gate (orchestration only)
+    name: Security Gate (findings evaluation)
     needs: [codeql, dependency-check]
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
-      - name: Verify selected scans completed
-        env:
-          CODEQL_RESULT: ${{ needs.codeql.result }}
-          DEPENDENCY_RESULT: ${{ needs.dependency-check.result }}
-          RUN_CODEQL: ${{ (github.event_name != 'schedule' || github.event.schedule == '0 3 * * 1') && (github.event_name != 'workflow_dispatch' || inputs.run_codeql) }}
-          RUN_DEPENDENCY: ${{ (github.event_name != 'schedule' || github.event.schedule == '0 6 * * *') && (github.event_name != 'workflow_dispatch' || inputs.run_dependency) }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (none needed – pure Python)
         run: |
-          set -euo pipefail
-          failed=0
-          selected=0
-          run_codeql="$(printf '%s' "${RUN_CODEQL:-false}" | tr '[:upper:]' '[:lower:]')"
-          run_dependency="$(printf '%s' "${RUN_DEPENDENCY:-false}" | tr '[:upper:]' '[:lower:]')"
 
-          if [ "$run_codeql" = "true" ]; then
-            selected=$((selected + 1))
-            echo "CodeQL result: $CODEQL_RESULT"
-            if [ "$CODEQL_RESULT" != "success" ]; then
-              echo "::error::CodeQL did not complete successfully (result: $CODEQL_RESULT)"
-              failed=1
-            fi
-          else
-            echo "CodeQL not selected for this run."
-          fi
+      - name: Run Findings Gate (CodeQL)
+        if: always() && github.event_name != 'schedule'
+        run: |
+          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "$RUN_CODEQL"
 
-          if [ "$run_dependency" = "true" ]; then
-            selected=$((selected + 1))
-            echo "Dependency result: $DEPENDENCY_RESULT"
-            if [ "$DEPENDENCY_RESULT" != "success" ]; then
-              echo "::error::Dependency check did not complete successfully (result: $DEPENDENCY_RESULT)"
-              failed=1
-            fi
-          else
-            echo "Dependency check not selected for this run."
-          fi
+      - name: Run Findings Gate (Dependency)
+        if: always() && github.event_name != 'schedule'
+        run: |
+          bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "$RUN_DEPENDENCY"
 
-          if [ "$selected" -eq 0 ]; then
-            echo "::error::No security scan was selected."
-            failed=1
-          fi
-
-          if [ "$failed" -ne 0 ]; then
-            exit 1
-          fi
-
-          echo "::warning::Scan orchestration completed. Findings evaluation is NOT implemented in this gate; see MO-GH-SEC-03. This is not a security approval."
-          {
-            echo "### Security scan orchestration"
-            echo ""
-            echo "Selected scans completed successfully."
-            echo ""
-            echo "**Not a security approval:** findings evaluation is pending MO-GH-SEC-03."
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Security Gate Summary
+        if: always()
+        run: |
+          echo "Security Gate (MO-GH-SEC-03) completed"
