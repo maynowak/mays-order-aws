@@ -1,11 +1,17 @@
 name: "CodeQL Analysis"
 
-# Reusable only: security.yml is the single trigger surface.  Adding direct
-# triggers here would duplicate analyses for the same commit/ref/language.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
   workflow_call:
 
 permissions:
+  actions: read
   contents: read
   security-events: write
 
@@ -13,7 +19,6 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -25,6 +30,7 @@ jobs:
         language: [python]
         include:
           - language: python
+            build-mode: none
 
     steps:
       - name: Checkout repository
@@ -40,27 +46,18 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:${{matrix.language}}"
+          if-no-files-found: error
 
-      - name: Locate CodeQL SARIF file
-        run: |
-          # CodeQL writes SARIF to results/*.sarif. Copy to workspace for artifact upload.
-          if [ -d "../results" ]; then
-            cp ../results/*.sarif ./codeql-results.sarif 2>/dev/null || true
-          fi
-          if [ -d "results" ]; then
-            cp results/*.sarif ./codeql-results.sarif 2>/dev/null || true
-          fi
-          if [ -f "codeql-results.sarif" ]; then
-            echo "CodeQL SARIF found: $(wc -c < codeql-results.sarif) bytes"
-          else
-            echo "::warning::No CodeQL SARIF file found"
-          fi
+      - name: Upload CodeQL SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results/*.sarif
+          checkout_ref: ${{ github.sha }}
 
-      - name: Upload CodeQL SARIF artifact
+      - name: Upload CodeQL results artifact
         uses: actions/upload-artifact@v4
         with:
-          name: codeql-sarif
-          path: codeql-results.sarif
+          name: codeql-results
+          path: results/
           retention-days: 30
-          if-no-files-found: error

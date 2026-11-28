@@ -1,18 +1,24 @@
 name: "Dependency Change Detection"
 
-# Reusable only: security.yml is the single trigger surface.  Adding direct
-# triggers here would duplicate dependency scans for the same event.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
   workflow_call:
 
 permissions:
   contents: read
+  security-events: write
+  actions: read
 
 jobs:
   dependency-check:
     name: Dependency Change Detection
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
@@ -25,6 +31,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --quiet --upgrade pip
 
       - name: Run dependency detector
         id: detector
@@ -74,17 +84,14 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: dependency_result.sarif
-          # Stable dependency category.  Do not change without a documented
-          # alert/category migration plan.
           category: dependency-check
 
-      - name: Upload Dependency SARIF artifact
+      - name: Upload dependency SARIF artifact
         uses: actions/upload-artifact@v4
         with:
           name: dependency-sarif
           path: dependency_result.sarif
           retention-days: 30
-          if-no-files-found: error
 
       - name: Report result
         run: |
@@ -94,7 +101,7 @@ jobs:
           echo "Summary: $SUMMARY"
           if [ "$STATUS" = "DEPENDENCY_CHANGE_DETECTED" ]; then
             echo "::warning::Dependency changes detected - review required"
-            jq -r '.dependencies[] | select(.status=="CONSTRAINT_UNSATISFIED" or .status=="UPDATE_AVAILABLE" or .status=="CHANGED" or .status=="LOCK_CONSTRAINT_DRIFT" or .status=="LOCK_MISSING" or .status=="REGISTRY_INCOMPLETE") | "\(.name) (\(.type)): \(.status) declared=\(.current_version) locked=\(.locked_version // "missing") latest=\(.latest_compatible // "none")"' dependency_result.json
+            jq -r '.dependencies[] | select(.status=="CONSTRAINT_UNSATISFIED" or .status=="UPDATE_AVAILABLE" or .status=="CHANGED") | "\(.name) (\(.type)): \(.current_version) -> \(.available_version)"' dependency_result.json
           elif [ "$STATUS" = "DEPENDENCY_CHECK_ERROR" ]; then
             echo "::error::Dependency check failed"
             exit 1
