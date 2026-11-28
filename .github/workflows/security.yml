@@ -66,8 +66,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif
-          path: results/*.sarif
+          path: codeql-results.sarif
           retention-days: 30
+          if-no-files-found: warn
 
   dependency-check:
     name: Dependency Change Detection
@@ -221,4 +222,4 @@ jobs:
             echo "|---------|--------|"
             echo "| CodeQL | \`${{ needs.codeql.result }}\` |"
             echo "| Dependency | \`${{ needs.dependency-check.result }}\` |"
-          } >> "$GITHUB_STEP_SUMMARY"# Force workflow refresh - Sa 28. Nov 12:08:05 CET 2026
+          } >> "$GITHUB_STEP_SUMMARY"
