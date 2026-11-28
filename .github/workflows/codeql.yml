@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   analyze:
@@ -41,18 +42,16 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+          sarif-file: "codeql-results.sarif"
+          output: "codeql-results.sarif"
 
-      - name: Locate CodeQL SARIF file
+      - name: Verify CodeQL SARIF exists
         run: |
-          # CodeQL writes SARIF to results/*.sarif outside the workspace.
-          # Copy it to a known in-workspace location for artifact upload.
-          if [ -d "../results" ]; then
-            cp ../results/*.sarif ./codeql-results.sarif 2>/dev/null || true
+          if [ ! -f "codeql-results.sarif" ]; then
+            echo "::error::CodeQL SARIF file not found at codeql-results.sarif"
+            exit 1
           fi
-          if [ -d "results" ]; then
-            cp results/*.sarif ./codeql-results.sarif 2>/dev/null || true
-          fi
-          ls -la codeql-results.sarif 2>/dev/null || echo "No SARIF file found"
+          echo "CodeQL SARIF found: $(wc -c < codeql-results.sarif) bytes"
 
       - name: Upload CodeQL SARIF artifact
         uses: actions/upload-artifact@v4
@@ -60,5 +59,4 @@ jobs:
           name: codeql-sarif
           path: codeql-results.sarif
           retention-days: 30
-          if-no-files-found: warn
-# Force workflow refresh - Sa 28. Nov 12:08:12 CET 2026
+          if-no-files-found: error

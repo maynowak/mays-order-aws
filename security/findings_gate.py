@@ -4,14 +4,25 @@ Deterministic, separately testable evaluator of SARIF findings.
 Classifies findings according to the Security Gate Policy.
 
 CodeQL security-severity is extracted from SARIF rule metadata
-(`rule.properties.security-severity`) as a numeric CVSS-like value.
+(`rule.properties.security-severity` or `run.tool.driver.rules[].properties.security-severity`)
+as a numeric CVSS-like value (0.0 – 10.0).
 SARIF `level` is NOT equated with security-severity.
 
-Unknown or invalid security-severity → BLOCKED (fail-closed).
+Unknown, negative, non-finite, or out-of-range (>10) security-severity → BLOCKED (fail-closed).
+Findings without a security-severity but with a SARIF level of "warning"/"error" may be
+quality findings (e.g. CodeQL quality rules) — these are classified separately and do not
+trigger security FAIL unless they carry a security-severity.
+
+Dependency findings (ruleId prefix "dependency-") are classified separately:
+- LOCK_CONSTRAINT_DRIFT → configuration drift, NOT a security vulnerability
+- UPDATE_AVAILABLE → informational, NOT a security finding
+- CONSTRAINT_UNSATISFIED → REPORT (medium)
+- VULNERABILITY → FAIL if security-severity >= 7.0, else REPORT
 """
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional
@@ -42,6 +53,8 @@ class Finding:
     sarif_level: Optional[str] = None
     path: Optional[str] = None
     start_line: Optional[int] = None
+    is_dependency_finding: bool = False
+    is_quality_finding: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -74,15 +87,34 @@ _SEVERITY_THRESHOLDS: List[tuple[float, FindingSeverity]] = [
     (0.0, FindingSeverity.LOW),
 ]
 
+# Dependency rule statuses that are NOT security vulnerabilities
+_DEPENDENCY_NON_VULN_STATUSES = {
+    "LOCK_CONSTRAINT_DRIFT",  # configuration drift, not a vulnerability
+    "UPDATE_AVAILABLE",       # informational
+    "LOCK_MISSING",           # configuration issue
+    "REGISTRY_INCOMPLETE",    # configuration issue
+}
+
+# Dependency rule statuses that are security-relevant
+_DEPENDENCY_VULN_STATUSES = {
+    "CONSTRAINT_UNSATISFIED",  # medium severity concern
+    "VULNERABILITY",           # actual vulnerability
+}
+
 
 def _severity_from_numeric(score: Optional[float]) -> FindingSeverity:
     """Map a numeric CodeQL security-severity to FindingSeverity.
 
-    Returns UNKNOWN if the score is None or negative (unknown/invalid).
+    Returns UNKNOWN if the score is None, negative, non-finite (NaN/Inf),
+    or out of range (>10). All invalid values lead to BLOCKED (fail-closed).
     A score of exactly 0.0 means "none" — treated as LOW but flagged via
     security_severity=0.0 so callers can distinguish.
     """
-    if score is None or score < 0:
+    if not isinstance(score, (int, float)):
+        return FindingSeverity.UNKNOWN
+    if not math.isfinite(score):
+        return FindingSeverity.UNKNOWN
+    if score < 0 or score > 10.0:
         return FindingSeverity.UNKNOWN
     for threshold, severity in _SEVERITY_THRESHOLDS:
         if score >= threshold:
@@ -90,30 +122,150 @@ def _severity_from_numeric(score: Optional[float]) -> FindingSeverity:
     return FindingSeverity.LOW
 
 
-def _extract_security_severity(result: dict) -> Optional[float]:
-    """Extract numeric CodeQL security-severity from SARIF rule metadata.
+class _InvalidSeverity:
+    """Sentinel: security-severity key exists but value is invalid."""
+    pass
 
-    CodeQL SARIF stores security-severity in:
-      result.rule.properties.security-severity  (string, e.g. "9.0")
 
-    SARIF `level` (result.level) is NOT used as a substitute.
+_INVALID_SEVERITY = _InvalidSeverity()
+
+
+def _extract_security_severity_from_rule(rule: dict) -> Any:
+    """Extract numeric security-severity from a SARIF rule object.
+
+    Returns:
+        float       – valid security-severity value
+        None        – key not present (quality finding)
+        _INVALID_SEVERITY – key present but value invalid (BLOCKED)
     """
-    rule = result.get("rule", {})
     if not isinstance(rule, dict):
         return None
-
     properties = rule.get("properties", {})
     if not isinstance(properties, dict):
         return None
-
-    sev_str = properties.get("security-severity", "")
-    if not sev_str:
+    if "security-severity" not in properties:
         return None
-
+    sev_str = properties.get("security-severity", "")
+    if not isinstance(sev_str, str) or not sev_str:
+        return None
     try:
         return float(sev_str)
     except (ValueError, TypeError):
+        return _INVALID_SEVERITY
+
+
+def _resolve_rule_from_runs(
+    runs: List[dict], rule_id: str, rule_index: Optional[int]
+) -> Optional[dict]:
+    """Resolve a SARIF rule definition from run.tool.driver.rules.
+
+    CodeQL SARIF defines rules in `run.tool.driver.rules[]` and results
+    reference them via `ruleId` or `rule.index`. We look up the rule
+    definition to extract security-severity metadata.
+    """
+    for run in runs:
+        tool = run.get("tool", {})
+        if not isinstance(tool, dict):
+            continue
+        driver = tool.get("driver", {})
+        if not isinstance(driver, dict):
+            continue
+        rules = driver.get("rules", [])
+        if not isinstance(rules, list):
+            continue
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            # Match by rule id or rule index
+            if rule.get("id") == rule_id or rule.get("index") == rule_index:
+                return rule
+    return None
+
+
+def _extract_security_severity(
+    result: dict, runs: List[dict]
+) -> Any:
+    """Extract numeric CodeQL security-severity from SARIF result.
+
+    Returns:
+        float       – valid security-severity value
+        None        – key not present (quality finding)
+        _INVALID_SEVERITY – key present but value invalid (BLOCKED)
+
+    First checks `result.rule.properties.security-severity` (inline rule def),
+    then falls back to `run.tool.driver.rules[]` lookup by ruleId/index.
+    SARIF `level` is NOT used as a substitute.
+    """
+    # Try inline rule definition first
+    rule = result.get("rule", {})
+    if isinstance(rule, dict):
+        sev = _extract_security_severity_from_rule(rule)
+        if isinstance(sev, float):
+            return sev
+        if isinstance(sev, _InvalidSeverity):
+            return _INVALID_SEVERITY
+
+    # Fall back to run.tool.driver.rules lookup
+    rule_id = result.get("ruleId", "")
+    rule_index = None
+    if isinstance(result.get("rule"), dict):
+        rule_index = result["rule"].get("index")
+    resolved_rule = _resolve_rule_from_runs(runs, rule_id, rule_index)
+    if resolved_rule:
+        sev = _extract_security_severity_from_rule(resolved_rule)
+        if isinstance(sev, float):
+            return sev
+        if isinstance(sev, _InvalidSeverity):
+            return _INVALID_SEVERITY
+
+    return None
+
+
+def _is_dependency_finding(rule_id: str) -> bool:
+    """Check if a finding is a dependency scanner finding."""
+    return rule_id.startswith("dependency-") or rule_id.startswith("dep-")
+
+
+def _extract_dependency_status(result: dict) -> Optional[str]:
+    """Extract dependency status from SARIF result properties."""
+    rule = result.get("rule", {})
+    if not isinstance(rule, dict):
         return None
+    properties = rule.get("properties", {})
+    if not isinstance(properties, dict):
+        return None
+    return properties.get("dependency-status") or properties.get("status")
+
+
+def _validate_sarif_structure(data: dict) -> Optional[str]:
+    """Validate SARIF 2.1.0 structure. Returns error message or None."""
+    if not isinstance(data, dict):
+        return "SARIF root is not an object"
+    if data.get("version") != "2.1.0":
+        return f"SARIF version must be 2.1.0, got: {data.get('version')}"
+    runs = data.get("runs")
+    if not isinstance(runs, list) or len(runs) == 0:
+        return "SARIF must have at least one run in 'runs' array"
+    for i, run in enumerate(runs):
+        if not isinstance(run, dict):
+            return f"Run[{i}] is not an object"
+        tool = run.get("tool")
+        if not isinstance(tool, dict):
+            return f"Run[{i}] missing 'tool' object"
+        driver = tool.get("driver")
+        if not isinstance(driver, dict):
+            return f"Run[{i}] missing 'tool.driver' object"
+        if "results" not in run:
+            return f"Run[{i}] missing 'results' array"
+        results = run.get("results")
+        if not isinstance(results, list):
+            return f"Run[{i}] 'results' is not an array"
+    return None
+
+
+def _extract_rule_id(result: dict) -> str:
+    rule_id = result.get("ruleId", "")
+    return rule_id if rule_id else "unknown"
 
 
 def _extract_sarif_level(result: dict) -> Optional[str]:
@@ -126,43 +278,16 @@ def _extract_sarif_level(result: dict) -> Optional[str]:
     return level if level else None
 
 
-def _extract_rule_id(result: dict) -> str:
-    rule_id = result.get("ruleId", "")
-    return rule_id if rule_id else "unknown"
-
-
 def _extract_description(result: dict) -> str:
     return result.get("text", result.get("description", "")) or ""
-
-
-def _extract_results(sarif_data: dict) -> List[dict]:
-    runs = sarif_data.get("runs", [])
-    if not runs:
-        return []
-    # Collect results from all runs — CodeQL may emit multiple runs
-    all_results: List[dict] = []
-    for run in runs:
-        all_results.extend(run.get("results", []))
-    return all_results
-
-
-def _classify_severity(
-    security_severity: Optional[float], description: str
-) -> FindingSeverity:
-    """Classify severity using numeric security-severity only.
-
-    Description-based fallback is intentionally NOT used for classification
-    — if security-severity is missing, the result is UNKNOWN which leads
-    to BLOCKED (fail-closed).
-    """
-    return _severity_from_numeric(security_severity)
 
 
 def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
     """Evaluate a single SARIF file and return a ScanResult.
 
-    Fail-closed: any error (missing file, invalid JSON, unknown severity)
-    results in BLOCKED → non-zero exit code. No fallback to PASS.
+    Fail-closed: any error (missing file, invalid JSON, unknown severity,
+    invalid severity range, empty results) results in BLOCKED → non-zero exit
+    code. No fallback to PASS.
     """
     # ---- 1. Load SARIF ---------------------------------------------------
     try:
@@ -190,35 +315,156 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
             selected=selected,
         )
 
-    # ---- 2. Extract results from all runs --------------------------------
-    try:
-        results = _extract_results(data)
-    except Exception as exc:  # noqa: BLE001
+    # ---- 2. Validate SARIF structure -------------------------------------
+    struct_error = _validate_sarif_structure(data)
+    if struct_error:
         return ScanResult(
             classification=Classification.BLOCKED,
             findings=[],
-            summary=f"SARIF structure error – gate BLOCKED: {exc} (MO-GH-SEC-03)",
+            summary=f"SARIF structure error – gate BLOCKED: {struct_error} (MO-GH-SEC-03)",
             selected=selected,
         )
 
-    # ---- 3. Classify each finding ---------------------------------------
+    # ---- 3. Extract results from all runs --------------------------------
+    runs = data.get("runs", [])
+    all_results: List[dict] = []
+    for run in runs:
+        all_results.extend(run.get("results", []))
+
+    # ---- 4. Classify each finding ----------------------------------------
     findings: List[Finding] = []
     blocked_reasons: List[str] = []
 
-    for res in results:
+    for res in all_results:
         rule_id = _extract_rule_id(res)
-        security_severity = _extract_security_severity(res)
+        security_severity = _extract_security_severity(res, runs)
         sarif_level = _extract_sarif_level(res)
         desc = _extract_description(res)
+        is_dep = _is_dependency_finding(rule_id)
+        dep_status = _extract_dependency_status(res) if is_dep else None
 
-        # Fail-closed: unknown or invalid security-severity blocks
-        if security_severity is None:
+        # Dependency findings are classified separately
+        if is_dep:
+            # LOCK_CONSTRAINT_DRIFT → configuration drift, NOT a vulnerability
+            if dep_status == "LOCK_CONSTRAINT_DRIFT":
+                findings.append(
+                    Finding(
+                        rule_id=rule_id,
+                        severity=FindingSeverity.LOW,
+                        message=(
+                            "Dependency drift (not a vulnerability): "
+                            f"{desc[:200] or 'Unnamed finding'}"
+                        ),
+                        security_severity=None,
+                        sarif_level=sarif_level,
+                        path=res.get("path"),
+                        start_line=res.get("startLine"),
+                        is_dependency_finding=True,
+                        is_quality_finding=False,
+                    )
+                )
+                continue
+            # UPDATE_AVAILABLE, LOCK_MISSING, REGISTRY_INCOMPLETE → informational
+            if dep_status in _DEPENDENCY_NON_VULN_STATUSES:
+                findings.append(
+                    Finding(
+                        rule_id=rule_id,
+                        severity=FindingSeverity.LOW,
+                        message=(
+                            f"Dependency status {dep_status}: "
+                            f"{desc[:200] or 'Unnamed finding'}"
+                        ),
+                        security_severity=None,
+                        sarif_level=sarif_level,
+                        path=res.get("path"),
+                        start_line=res.get("startLine"),
+                        is_dependency_finding=True,
+                        is_quality_finding=False,
+                    )
+                )
+                continue
+            # CONSTRAINT_UNSATISFIED → REPORT (medium)
+            if dep_status == "CONSTRAINT_UNSATISFIED":
+                findings.append(
+                    Finding(
+                        rule_id=rule_id,
+                        severity=FindingSeverity.MEDIUM,
+                        message=(
+                            f"Dependency constraint unsatisfied: "
+                            f"{desc[:200] or 'Unnamed finding'}"
+                        ),
+                        security_severity=None,
+                        sarif_level=sarif_level,
+                        path=res.get("path"),
+                        start_line=res.get("startLine"),
+                        is_dependency_finding=True,
+                        is_quality_finding=False,
+                    )
+                )
+                continue
+            # VULNERABILITY → classify by security-severity
+            if dep_status == "VULNERABILITY":
+                if security_severity is None:
+                    blocked_reasons.append(
+                        f"{rule_id}: dependency VULNERABILITY missing security-severity"
+                    )
+                    severity = FindingSeverity.UNKNOWN
+                else:
+                    severity = _severity_from_numeric(security_severity)
+                findings.append(
+                    Finding(
+                        rule_id=rule_id,
+                        severity=severity,
+                        message=(
+                            f"Dependency vulnerability: "
+                            f"{desc[:200] or 'Unnamed finding'}"
+                        ),
+                        security_severity=security_severity,
+                        sarif_level=sarif_level,
+                        path=res.get("path"),
+                        start_line=res.get("startLine"),
+                        is_dependency_finding=True,
+                        is_quality_finding=False,
+                    )
+                )
+                continue
+
+        # Non-dependency findings: security-severity required
+        if isinstance(security_severity, _InvalidSeverity):
             blocked_reasons.append(
-                f"{rule_id}: missing security-severity in rule metadata"
+                f"{rule_id}: invalid security-severity value"
+            )
+            severity = FindingSeverity.UNKNOWN
+        elif security_severity is None:
+            # Quality findings (e.g. CodeQL quality rules) without security-severity
+            # are not security vulnerabilities — classify as LOW quality finding
+            findings.append(
+                Finding(
+                    rule_id=rule_id,
+                    severity=FindingSeverity.LOW,
+                    message=(
+                        f"Quality finding (no security-severity): "
+                        f"{desc[:200] or 'Unnamed finding'}"
+                    ),
+                    security_severity=None,
+                    sarif_level=sarif_level,
+                    path=res.get("path"),
+                    start_line=res.get("startLine"),
+                    is_dependency_finding=False,
+                    is_quality_finding=True,
+                )
+            )
+            continue
+
+        # Validate security-severity range
+        sev_severity = _severity_from_numeric(security_severity)
+        if sev_severity == FindingSeverity.UNKNOWN:
+            blocked_reasons.append(
+                f"{rule_id}: invalid security-severity {security_severity}"
             )
             severity = FindingSeverity.UNKNOWN
         else:
-            severity = _classify_severity(security_severity, desc)
+            severity = sev_severity
 
         findings.append(
             Finding(
@@ -229,10 +475,12 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
                 sarif_level=sarif_level,
                 path=res.get("path"),
                 start_line=res.get("startLine"),
+                is_dependency_finding=False,
+                is_quality_finding=False,
             )
         )
 
-    # If any finding has unknown severity, the whole scan is BLOCKED
+    # If any finding has unknown/invalid severity, the whole scan is BLOCKED
     if blocked_reasons:
         summary_lines = [
             "Security gate: unknown/invalid security-severity – gate BLOCKED (MO-GH-SEC-03)",
@@ -244,7 +492,7 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
             selected=selected,
         )
 
-    # ---- 4. Apply policy ------------------------------------------------
+    # ---- 5. Apply policy ------------------------------------------------
     if not selected:
         return ScanResult(
             classification=Classification.NOT_EVALUATED,
@@ -257,20 +505,19 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
             selected=False,
         )
 
-    has_critical_or_high = any(
-        f.severity in (FindingSeverity.CRITICAL, FindingSeverity.HIGH)
-        for f in findings
-    )
+    # Check for CRITICAL/HIGH security findings (non-quality, non-drift)
+    security_fail_findings = [
+        f for f in findings
+        if f.severity in (FindingSeverity.CRITICAL, FindingSeverity.HIGH)
+        and not f.is_quality_finding
+        and not (f.is_dependency_finding and f.severity == FindingSeverity.LOW)
+    ]
 
-    if has_critical_or_high:
-        fail_findings = [
-            f for f in findings
-            if f.severity in (FindingSeverity.CRITICAL, FindingSeverity.HIGH)
-        ]
+    if security_fail_findings:
         summary_lines = [
-            "Security gate: CRITICAL/HIGH findings detected – gate FAILS (MO-GH-SEC-03)",
+            "Security gate: CRITICAL/HIGH security findings detected – gate FAILS (MO-GH-SEC-03)",
         ]
-        for f in fail_findings:
+        for f in security_fail_findings:
             sev_str = (
                 f"{f.security_severity}"
                 if f.security_severity is not None
@@ -287,25 +534,25 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
             selected=True,
         )
 
-    has_medium_or_low = any(
-        f.severity in (FindingSeverity.MEDIUM, FindingSeverity.LOW)
-        for f in findings
-    )
+    # Check for MEDIUM/LOW findings (report only)
+    report_findings = [
+        f for f in findings
+        if f.severity in (FindingSeverity.MEDIUM, FindingSeverity.LOW)
+    ]
 
-    if has_medium_or_low:
+    if report_findings:
         report_lines = [
-            "Security gate: no CRITICAL/HIGH findings; MEDIUM/LOW findings reported (MO-GH-SEC-03)",
+            "Security gate: no CRITICAL/HIGH security findings; MEDIUM/LOW findings reported (MO-GH-SEC-03)",
         ]
-        for f in findings:
-            if f.severity in (FindingSeverity.MEDIUM, FindingSeverity.LOW):
-                sev_str = (
-                    f"{f.security_severity}"
-                    if f.security_severity is not None
-                    else "n/a"
-                )
-                report_lines.append(
-                    f"  – {f.rule_id}: {f.severity.name} (security-severity={sev_str}) – {f.message}"
-                )
+        for f in report_findings:
+            sev_str = (
+                f"{f.security_severity}"
+                if f.security_severity is not None
+                else "n/a"
+            )
+            report_lines.append(
+                f"  – {f.rule_id}: {f.severity.name} (security-severity={sev_str}) – {f.message}"
+            )
         summary = "\n".join(report_lines)
         return ScanResult(
             classification=Classification.REPORT,
@@ -314,7 +561,7 @@ def evaluate_scan(sarif_path: str, selected: bool = True) -> ScanResult:
             selected=True,
         )
 
-    summary = "Security gate: no findings detected – gate passes (MO-GH-SEC-03)"
+    summary = "Security gate: no security findings detected – gate passes (MO-GH-SEC-03)"
     return ScanResult(
         classification=Classification.PASS,
         findings=findings,
@@ -340,6 +587,8 @@ def write_report(result: ScanResult, report_path: str) -> None:
                 "sarif_level": f.sarif_level,
                 "path": f.path,
                 "start_line": f.start_line,
+                "is_dependency_finding": f.is_dependency_finding,
+                "is_quality_finding": f.is_quality_finding,
             }
             for f in result.findings
         ],

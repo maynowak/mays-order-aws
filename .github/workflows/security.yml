@@ -1,5 +1,7 @@
 name: "Security & Dependency Analysis"
 
+# Single trigger surface for all security scans.  codeql.yml and
+# dependency-check.yml are workflow_call-only reusable workflows.
 on:
   push:
     branches: [main]
@@ -32,95 +34,22 @@ jobs:
     if: >
       (github.event_name != 'schedule' || github.event.schedule == '0 3 * * 1') &&
       (github.event_name != 'workflow_dispatch' || inputs.run_codeql)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    uses: ./.github/workflows/codeql.yml
     permissions:
       actions: read
       contents: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python]
-        include:
-          - language: python
-            build-mode: none
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          queries: +security-and-quality
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: "/language:${{ matrix.language }}"
 
   dependency-check:
     name: Dependency Change Detection
     if: >
       (github.event_name != 'schedule' || github.event.schedule == '0 6 * * *') &&
       (github.event_name != 'workflow_dispatch' || inputs.run_dependency)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    uses: ./.github/workflows/dependency-check.yml
     permissions:
+      actions: read
       contents: read
       security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Run dependency detector
-        id: detector
-        run: |
-          set +e
-          python3 security/dependency_detector.py > dependency_result.json
-          DETECTOR_EXIT=$?
-          set -e
-          cat dependency_result.json
-          echo "detector_exit=$DETECTOR_EXIT" >> $GITHUB_OUTPUT
-          echo "result=$(cat dependency_result.json | jq -r .status)" >> $GITHUB_OUTPUT
-
-          if [ "$DETECTOR_EXIT" -eq 2 ]; then
-            echo "::error::Dependency detector failed"
-            exit 2
-          fi
-
-      - name: Convert to SARIF
-        run: |
-          python3 -m security.sarif_adapter dependency_result.json dependency_result.sarif
-
-      - name: Validate SARIF
-        run: |
-          python3 -c "
-          import json
-          with open('dependency_result.sarif') as f:
-              sarif = json.load(f)
-          assert sarif.get('version') == '2.1.0', 'SARIF version must be 2.1.0'
-          assert 'runs' in sarif, 'SARIF must have runs'
-          for run in sarif['runs']:
-              assert 'tool' in run, 'Run must have tool'
-              assert 'driver' in run['tool'], 'Tool must have driver'
-              assert 'results' in run, 'Run must have results'
-          print('SARIF validation passed')
-          "
-
-      - name: Upload Dependency SARIF artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-sarif
-          path: dependency_result.sarif
-          retention-days: 30
 
   security-gate:
     name: Security Gate (findings evaluation)
@@ -149,25 +78,50 @@ jobs:
           echo "CodeQL result: ${{ needs.codeql.result }}"
           echo "Dependency result: ${{ needs.dependency-check.result }}"
 
+      # ---- Download CodeQL SARIF artifact --------------------------------
+      - name: Download CodeQL SARIF artifact
+        if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-sarif
+          path: .github/workflow-sarif
+
+      - name: Normalize CodeQL SARIF filename
+        if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
+        run: |
+          ls -la .github/workflow-sarif/ || true
+          find .github/workflow-sarif -name "*.sarif" -exec mv {} .github/workflow-sarif/codeql-results.sarif \;
+
+      # ---- Download Dependency SARIF artifact ----------------------------
+      - name: Download Dependency SARIF artifact
+        if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-sarif
+          path: .github/workflow-sarif
+
+      - name: Normalize Dependency SARIF filename
+        if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
+        run: |
+          find .github/workflow-sarif -name "dependency_result.sarif" -exec mv {} .github/workflow-sarif/dependency-results.sarif \;
+
       # ---- Run Findings Gate (CodeQL) ------------------------------------
       - name: Run Findings Gate (CodeQL)
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
         run: |
-          # CodeQL SARIF results are published to GitHub Security via
-          # codeql-action/upload-sarif@v4.  The gate evaluates based on
-          # job status since SARIF artifact download is not available
-          # in workflow_call contexts.
-          echo "::notice::CodeQL scan completed with result: ${{ needs.codeql.result }}"
-          echo "::notice::CodeQL findings are available in GitHub Security alerts"
-          echo "Security gate: CodeQL scan completed – NOT EVALUATED via artifact (MO-GH-SEC-03)"
+          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "true" || {
+            echo "::error::CodeQL findings gate FAILED – blocking security gate"
+            exit 1
+          }
 
       # ---- Run Findings Gate (Dependency) --------------------------------
       - name: Run Findings Gate (Dependency)
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
         run: |
-          # Download dependency SARIF artifact for evaluation
-          echo "::notice::Dependency scan completed with result: ${{ needs.dependency-check.result }}"
-          echo "Security gate: Dependency scan completed – NOT EVALUATED via artifact (MO-GH-SEC-03)"
+          bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "true" || {
+            echo "::error::Dependency findings gate FAILED – blocking security gate"
+            exit 1
+          }
 
       # ---- Handle unselected scanners ------------------------------------
       - name: Report unselected scanners
@@ -179,6 +133,16 @@ jobs:
           if [ "${{ needs.dependency-check.result }}" = "skipped" ] || [ "${{ needs.dependency-check.result }}" = "" ]; then
             echo "::notice::Dependency check not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
           fi
+
+      # ---- Upload combined Findings Report -------------------------------
+      - name: Upload Findings Report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: findings-report
+          path: "*.gate-report.json"
+          retention-days: 30
+          if-no-files-found: warn
 
       # ---- Security Gate Summary -----------------------------------------
       - name: Security Gate Summary
@@ -195,6 +159,6 @@ jobs:
             echo "| CodeQL | \`${{ needs.codeql.result }}\` |"
             echo "| Dependency | \`${{ needs.dependency-check.result }}\` |"
             echo ""
-            echo "**Note:** SARIF artifacts are uploaded to GitHub Security.  Findings Gate "
-            echo "evaluation is available locally via \`security/run_findings_gate.sh\`."
+            echo "Findings Gate evaluation executed against downloaded SARIF artifacts."
+            echo "Machine-readable report uploaded as 'findings-report' artifact."
           } >> "$GITHUB_STEP_SUMMARY"
