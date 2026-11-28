@@ -75,27 +75,62 @@ jobs:
       - name: Install dependencies (none needed – pure Python)
         run: |
 
+      # ---- Determine which scanners were selected for this run -----------
       - name: Set scan selection variables
         run: |
-          # Set RUN_CODECL based on codeql job result
-          # The codeql job result is available as ${{ needs.codeql.result }}
-          RUN_CODECL="${{ needs.codeql.result || 'true' }}"
-          
-          # Set RUN_DEPENDENCY from the dependency-check job result
-          # The dependency-check job result is available as ${{ needs.dependency-check.result }}
-          RUN_DEPENDENCY="${{ needs.dependency-check.result || 'true' }}"
+          echo "CodeQL result: ${{ needs.codeql.result }}"
+          echo "Dependency result: ${{ needs.dependency-check.result }}"
 
+      # ---- Download SARIF artifacts from scanner jobs --------------------
+      - name: Download CodeQL SARIF artifact
+        if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-sarif-python
+          path: .github/workflow-sarif
+
+      - name: Download Dependency SARIF artifact
+        if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-sarif
+          path: .github/workflow-sarif
+
+      # ---- Run Findings Gate (CodeQL) ------------------------------------
       - name: Run Findings Gate (CodeQL)
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
         run: |
-          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "$RUN_CODECL"
+          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "true"
 
+      # ---- Run Findings Gate (Dependency) --------------------------------
       - name: Run Findings Gate (Dependency)
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
         run: |
-          bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "$RUN_DEPENDENCY"
+          bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "true"
 
+      # ---- Handle unselected scanners ------------------------------------
+      - name: Report unselected scanners
+        if: always()
+        run: |
+          if [ "${{ needs.codeql.result }}" = "skipped" ] || [ "${{ needs.codeql.result }}" = "" ]; then
+            echo "::notice::CodeQL not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
+          fi
+          if [ "${{ needs.dependency-check.result }}" = "skipped" ] || [ "${{ needs.dependency-check.result }}" = "" ]; then
+            echo "::notice::Dependency check not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
+          fi
+
+      # ---- Security Gate Summary -----------------------------------------
       - name: Security Gate Summary
         if: always()
         run: |
           echo "Security Gate (MO-GH-SEC-03) completed"
+          echo "CodeQL result: ${{ needs.codeql.result }}"
+          echo "Dependency result: ${{ needs.dependency-check.result }}"
+          {
+            echo "### Security Gate (MO-GH-SEC-03) Summary"
+            echo ""
+            echo "| Scanner | Status |"
+            echo "|---------|--------|"
+            echo "| CodeQL | \`${{ needs.codeql.result }}\` |"
+            echo "| Dependency | \`${{ needs.dependency-check.result }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

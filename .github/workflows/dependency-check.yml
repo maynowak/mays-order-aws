@@ -78,6 +78,13 @@ jobs:
           # alert/category migration plan.
           category: dependency-check
 
+      - name: Upload Dependency SARIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-sarif
+          path: dependency_result.sarif
+          retention-days: 30
+
       - name: Report result
         run: |
           STATUS=$(jq -r .status dependency_result.json)
