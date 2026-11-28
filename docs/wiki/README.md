@@ -3,8 +3,9 @@
 ![Mays-Orders-AWS RC4](../assets/mays-orders-aws-rc4-hero.png)
 
 > **Eine verständliche Karte durch Produkt, Bedienung und Technik.**
-> Stand: 25. November 2026 · dokumentierte Basis: `main` `543ef75` · Wiki ist
-> Teil des Repositorys und wird mit dem Dokumentations-Checkpoint gepflegt.
+> Stand: 28. November 2026 · dokumentierte Basis: `main` `8830da2`;
+> Feature-Branch MO-GH-SEC-02 nicht gemergt · Wiki ist Teil des Repositorys
+> und wird mit dem Dokumentations-Checkpoint gepflegt.
 
 Mays-Orders-AWS ist ein modulares AWS-Projekt: Es enthält einen Order-Service,
 wiederverwendbare Terraform-Bausteine, einen Module Builder und einen Installer
@@ -18,11 +19,15 @@ zusammenspielen und wo der belegte Entwicklungsstand endet.
 | Order-Service | API, Statusmaschine, Persistenz, SQS/Worker | lokal und im isolierten AWS-Development-Zyklus verifiziert |
 | Terraform | 7 Child-Module + Root + Policy Gate | `validate`/Plan-Nachweise; Produktion nicht freigegeben |
 | Module Builder | erzeugt eigenständige Terraform-Projekte | 129/129 Tests; Presets `complete` und `orders-service` |
-| Installer | Kontext-/Plan-/State-/Artefakt-Schutz um Terraform | 674 release-weite Tests, 81 fokussiert; Mutationen nur mit Freigabe |
+| Installer | Kontext-/Plan-/State-/Artefakt-Schutz um Terraform | 691 release-weite Tests, 98 fokussiert; Mutationen nur mit Freigabe |
 | Privacy | Inspect/Export/Erase/Anonymize im Code | interne Funktion; produktive Aktivierung BLOCKED |
 
 ## Neu seit dem RC4-Tag
 
+- **GitHub-Security-CI (MO-GH-SEC-02, Feature-Branch):** CodeQL und
+  Dependency-Scan laufen nur noch über `security.yml`; der frühere echo-only
+  Gate ist ein Orchestrierungs-Gate ohne Findings-Freigabe. Lokal verifiziert,
+  GitHub-Scan-/Alert-Verifikation **PENDING**, kein Main-Merge.
 - **`orderDescription` (F012):** optionales Freitextfeld, in `main` integriert,
   getestet und dokumentiert — **nicht deployed**.
 - **SKU-Empfehlung:** `items[].sku` ist frei/nicht kataloggeprüft; eigene

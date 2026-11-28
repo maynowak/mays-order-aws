@@ -93,6 +93,19 @@ evidence 0fc8972); no deployment
   GitHub-Scan-Verifikation PENDING; AWS-Constraint-Drift (`>=6.0` vs.
   `~>6.0`) bleibt separater Reconcile-Task; keine Dependency-/Workflow-/
   AWS-/Terraform-/Alert-Änderung
+→ CI-Orchestrierung 2026-11-28: MO-GH-SEC-02 lokal verifiziert
+  (`bd5e48c`/`b2ef6be`/`b0011e4`): `security.yml` ist einziger Trigger,
+  `codeql.yml`/`dependency-check.yml` sind `workflow_call`-only; wöchentliches
+  CodeQL (Mo 03:00 UTC) und täglicher Dependency-Scan (06:00 UTC) erhalten;
+  manuelle Scan-Auswahl; stabile Kategorien `/language:python` und
+  `dependency-check`; Concurrency/Timeouts/Least-Privilege; echo-only
+  Security Gate durch Orchestrierungs-Gate ohne Findings-Freigabe ersetzt;
+  `secrets: inherit` entfernt; keine Pfad-Filter; 33 fokussierte + 98
+  Installer-Modul + 691 Installer (2 Skips) + 456 Lambda + 129 Builder +
+  28 Seed + 32 Harness PASS; Lambda-ZIP 47.552 Bytes/SHA-256 `117299c9…`;
+  GitHub-Scan-/Alert-Verifikation (#296/#298, Doppelanalysen) PENDING;
+  kein PR/Main-Merge, keine Alert-/Security-Settings-/AWS-/Terraform-/
+  Order-Modul-Änderung
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen

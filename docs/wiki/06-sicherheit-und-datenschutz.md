@@ -15,6 +15,10 @@
   und Consumer-Kontext wird geprüft.
 - IAM folgt dem Least-Privilege-Prinzip und verwendet enge Ressourcen-ARNs.
 - Installer prüft Kontext, Plan, State, Terraform-Policy und Artefaktintegrität.
+- Die CI orchestriert CodeQL und den Dependency-Scan über `security.yml`;
+  der aktuelle `Security Gate (orchestration only)` prüft nur die Ausführung,
+  **nicht** die Findings. Die vollständige Findings-Auswertung ist
+  MO-GH-SEC-03 und noch nicht implementiert.
 - Es werden keine Zugangsdaten oder Secret-Werte in Git eingecheckt.
 - Ein Release/Modul-Tag aktualisiert kein unabhängiges Consumer-Projekt
   automatisch.

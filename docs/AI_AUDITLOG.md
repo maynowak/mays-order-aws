@@ -382,6 +382,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - CI-CODQL-SARIF-DEPENDENCY-AUDIT-01 → docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md (CodeQL 143/143 + SARIF-Upload complete; Dependency-SARIF complete; Security Gate success; GitHub-Incident behoben; Scanner-Fehlalarm `hashicorp/time ~> 0.11`/Lock 0.14.2 und AWS-Constraint-vs-Lock dokumentiert; Fix offen)
 - MO-GH-SEC-01 → docs/reports/MO-GH-SEC-01-BASELINE-AUDIT.md (GitHub-Security-Baseline: 3 Workflows/Doppelausführung, CodeQL/SARIF-Kategorien, 257 offene Code-Scanning-Alerts/3 high, Security Gate echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags/SHA, keine Branch Protection/Rulesets, 0 Dependabot/Secret-Scanning-Alerts; WPs 02–10; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-GH-SEC-04 → docs/reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md (Dependency-Detector/SARIF: Terraform-`~>`/SemVer/combined Constraints, Lock-basierte Declared-/Locked-/Latest-/Compatible-Auflösung, Drift/Missing/Violation/Registry-Fehler, repository-relative SARIF-URIs, stabile Rule-IDs/Fingerprints, `dependency-check`-Kategorie, keine `CURRENT`-Findings; 33 fokussierte + 691 Installer + 456 Lambda + 129 Builder + 28 Seed + 32 Harness PASS; #296/#298-Auto-Resolution vorbereitet, GitHub-Scan-Verifikation PENDING; keine Dependency-/Workflow-/AWS-/Terraform-/Alert-Änderung)
+- MO-GH-SEC-02 → docs/reports/MO-GH-SEC-02-CI-ORCHESTRATION.md (CI-Orchestrierung: `security.yml` einziger Trigger, `codeql.yml`/`dependency-check.yml` `workflow_call`-only, Wochen-/Tages-Schedules erhalten, manuelle Scan-Auswahl, stabile CodeQL-/Dependency-Kategorien, Concurrency/Timeouts/Least-Privilege, Orchestrierungs-Gate statt echo-only-Freigabe, `secrets: inherit` entfernt, keine Pfad-Filter; 33 fokussierte + 98 Modul + 691 Installer + 456 Lambda + 129 Builder + 28 Seed + 32 Harness PASS; Lambda-ZIP unverändert; GitHub-Scan-/Alert-Verifikation PENDING; kein PR/Main-Merge, keine Alert-/Settings-/AWS-/Terraform-/Order-Änderung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1335,3 +1336,64 @@ Kontroll-/Konfigurationslücken, keine Kompromittierung belegt)
 - **Resume Point:** `docs/reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md`;
   Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
   GitHub-Scan-Verifikation oder WP02 nach Freigabe.
+
+## 2026-11-28 — MO-GH-SEC-02 — CI ORCHESTRATION & CODEQL CONFIGURATION REMEDIATION
+
+**Status:** `CI ORCHESTRATION LOCALLY VERIFIED / GITHUB VERIFICATION PENDING`
+
+- **Datum:** 2026-11-28 · **Branch:** `feature/mo-github-security-cleanup-01`
+  · **Baseline:** `77a92cd` (MO-GH-SEC-04) · **Main:** `8830da2` (unverändert)
+- **Scope:** `.github/workflows/security.yml`,
+  `.github/workflows/codeql.yml`, `.github/workflows/dependency-check.yml`,
+  Report/Auditlog/PROJECT_STATUS/Wiki. Keine Produktcode-, Dependency-,
+  Terraform-, AWS-, Alert- oder Security-Settings-Änderung.
+- **Commits:** `bd5e48c` (Trigger-Konsolidierung), `b2ef6be`
+  (Reliability/Permissions/Gate), `b0011e4` (CodeQL-/SARIF-Vertrag);
+  Doku-Checkpoint ist `git log -1` auf dem Feature-Branch.
+- **Step 1:** `security.yml` ist der einzige Push-/PR-/Schedule-/Dispatch-
+  Trigger. `codeql.yml` und `dependency-check.yml` sind `workflow_call`-only.
+  Wöchentliches CodeQL (`0 3 * * 1`, Mo 03:00 UTC) und täglicher Dependency-
+  Scan (`0 6 * * *`, 06:00 UTC) bleiben erhalten. Manuelle Auswahl über
+  `run_codeql`/`run_dependency`; `secrets: inherit` entfernt; stabile
+  Kategorien `/language:python` und `dependency-check`; keine Pfad-Filter.
+- **Step 2:** Concurrency pro Ref (PR-Cancel, Push/Schedule serialisiert),
+  Timeouts (CodeQL 30 min, Dependency 15 min, Gate 5 min),
+  Least-Privilege-Permissions, unnötiger `pip`-Upgrade-Schritt entfernt.
+  Der echo-only `Security Gate` wurde durch `Security Gate (orchestration
+  only)` ersetzt: ausgewählte Scans müssen `success` sein; `failure`,
+  `cancelled` und `skipped` sind kein Erfolg; keine Auswahl ist ein Fehler.
+  Der Gate gibt ausdrücklich aus, dass Findings-Auswertung **nicht**
+  implementiert und dies **keine** Security-Freigabe ist (MO-GH-SEC-03).
+- **Step 3:** Genau ein CodeQL-Analysepfad pro Event/Ref/Sprache; eine
+  Sprache (`python`), ein `analyze`-Step, Kategorie `/language:python`.
+  Genau ein Dependency-`upload-sarif`, Kategorie `dependency-check`,
+  Automation-ID `dependency-check`. MO-GH-SEC-04-SARIF-Fixes unverändert
+  (`git diff 77a92cd..HEAD -- security/sarif_adapter.py
+  security/dependency_detector.py` leer). Alte Analysen/Check-Runs bleiben;
+  keine Scan-Konfiguration, Analyse oder Alert wird gelöscht.
+- **Step 4:** 33 fokussierte Detector/SARIF-Tests OK; Installer-Modul 98 OK;
+  Installer `discover -s installer/tests` 691 OK (2 skips); Lambda
+  `compileall` PASS + 456 OK; Lambda-ZIP 47.552 Bytes/SHA-256
+  `117299c97c775038fa2ccdedf3ecc2515a3d2c2e6a537bf9ede3fff1a5b425af`;
+  Builder 129 OK; Seed 28 OK; lokale E2E-Harness 32 OK. Workflow-Vertrag
+  (PyYAML, Trigger-Matrix, `workflow_call`, Kategorien, Permissions,
+  Timeouts, `secrets`, `paths`) PASS; `bash -n` 5/5 PASS; Gate-Smoke 5/5 PASS.
+- **Terraform/AWS:** keine Terraform-Kommandos, keine AWS-Operationen; nur
+  Dateien gelesen/validiert.
+- **Git/Checkpoint:** `git diff --check` PASS; Secret-Audit ohne Credentials;
+  Commit und Push im selben Checkpoint. Kein PR, kein Main-Merge.
+- **Offene Fragen:** Freigabe für kontrollierten PR-Lauf; GitHub-Run-IDs und
+  Check-Namen; #296/#298-Auto-Resolution; AWS-Constraint-/Lock-Drift
+  (`main.tf >= 6.0` vs. Lock `~> 6.0`).
+- **Risiken:** Der Orchestrierungs-Gate ist grün bei erfolgreichen Scans,
+  prüft aber keine Findings — MO-GH-SEC-03 bleibt erforderlich. Feature-
+  Branch-Pushes triggern den Workflow nicht; ohne PR/Dispatch bleibt die
+  GitHub-Verifikation aus. Alte Standalone-Analysen bleiben historisch
+  sichtbar; neue Doppelanalysen sind durch Reusable-only-Verträge verhindert.
+- **Bewertung:** GREEN lokal / YELLOW für GitHub-Scan- und Alert-Verifikation.
+- **Nächste Aktionen:** Feature-Branch pushen; nach Freigabe kontrollierten
+  PR-Lauf durchführen; genau eine CodeQL-/Dependency-Analyse und #296/#298
+  prüfen; AWS-Drift separat reconciliieren; danach MO-GH-SEC-03.
+- **Resume Point:** `docs/reports/MO-GH-SEC-02-CI-ORCHESTRATION.md`;
+  Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
+  kontrollierter PR-Lauf oder MO-GH-SEC-03 nach Freigabe.

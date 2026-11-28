@@ -1,6 +1,6 @@
 # MO-GH-SEC-02 — CI Orchestration & CodeQL Configuration Remediation
 
-**Status:** `CONTRACT VERIFIED / LOCAL VERIFICATION PENDING`
+**Status:** `CI ORCHESTRATION LOCALLY VERIFIED / GITHUB VERIFICATION PENDING`
 
 **Datum:** 2026-11-28
 **Branch:** `feature/mo-github-security-cleanup-01`
@@ -8,6 +8,7 @@
 **Main-Basis:** `8830da2` (unverändert)
 **Scope:** `.github/workflows/security.yml`, `.github/workflows/codeql.yml`,
 `.github/workflows/dependency-check.yml`, Dokumentation.
+**Doku-Checkpoint:** `git log -1` auf dem Feature-Branch.
 
 ## Ergebnis
 
@@ -20,7 +21,8 @@ einen CodeQL- und einen Dependency-Pfad statt der bisherigen Doppelausführung.
 |---|---|---|
 | 1 | `bd5e48c` | Trigger-Konsolidierung, Reusable-only-Verträge, manuelle Scan-Auswahl, stabile Kategorien, `secrets: inherit` entfernt |
 | 2 | `b2ef6be` | Concurrency, Timeouts, Least-Privilege-Permissions, Orchestrierungs-Gate statt echo-only-Freigabe |
-| 3 | dieser Report | CodeQL-/SARIF-Vertrag, Kategorie-Migration, Alert-Schutz |
+| 3 | `b0011e4` | CodeQL-/SARIF-Vertrag, Kategorie-Migration, Alert-Schutz |
+| 4 | Doku-Checkpoint | Vollständige lokale Regression, Report/Auditlog/PROJECT_STATUS/Wiki |
 
 ## Trigger-Matrix
 
@@ -105,14 +107,77 @@ Ausgeführt mit PyYAML 6.0.1 (nur lokal, keine neue Projekt-Dependency):
   selected-only manual run→0, no selection→1: PASS
 - Detector-/SARIF-Regression: **33/33 OK**
 
-Die vollständige lokale Regression und die GitHub-Verifikationsvorbereitung
-folgen in Step 4/5.
+## Vollständige lokale Verifikation (Step 4)
+
+Alle Befehle wurden im Checkout auf
+`feature/mo-github-security-cleanup-01` ausgeführt. Es wurden keine neuen
+Dependency-Versionen installiert oder festgeschrieben.
+
+| Prüfung | Ergebnis |
+|---|---|
+| `python3 -m unittest -q installer.tests.test_installer.TestDependencyDetector installer.tests.test_installer.TestSarifAdapter` | **33/33 OK** (0,124 s) |
+| `python3 -m unittest installer.tests.test_installer` | **98/98 OK** (9,399 s) |
+| `python3 -m unittest discover -s installer/tests` | **691 Tests OK, 2 skipped** (10,581 s) |
+| Lambda `python3 -m compileall -q src tests` | **PASS** |
+| Lambda `PYTHONPATH=src python3 -m unittest discover -s tests` | **456/456 OK** (0,523 s) |
+| Lambda `python3 build_zip.py` | **PASS**, `dist/lambda.zip` 47.552 Bytes, SHA-256 `117299c97c775038fa2ccdedf3ecc2515a3d2c2e6a537bf9ede3fff1a5b425af` |
+| `python3 -m unittest discover -s module_builder/tests` | **129/129 OK** (1,357 s) |
+| `cd scripts && python3 -m unittest discover -s tests` | **28/28 OK** (0,181 s) |
+| `python3 -m unittest tests.test_e2e_harness tests.test_privacy_e2e_harness` | **32/32 OK** (0,003 s) |
+| Workflow-Vertrag (PyYAML, Trigger-Matrix, `workflow_call`, Kategorien, Permissions, Timeouts, `secrets`, `paths`) | **PASS** |
+| `bash -n` für alle fünf `run`-Steps | **PASS** |
+| Gate-Fälle: success, failed scan, skipped selected scan, selected-only, no selection | **5/5 PASS** |
+| `git diff 77a92cd..HEAD -- security/sarif_adapter.py security/dependency_detector.py` | **leer** (MO-GH-SEC-04-Fixes unverändert) |
+
+Die lokale E2E-Harness ist kein AWS-Live-Test. Es wurden **keine** Terraform-
+Kommandos und **keine** AWS-Operationen ausgeführt.
+
+## GitHub-Verifikationsplan (Step 5, vorbereitet)
+
+Feature-Branch-Pushes triggern diesen Workflow nicht. Die Verifikation benötigt
+einen freigegebenen PR-Lauf auf `main` oder einen manuellen Dispatch. Es wurde
+**kein PR erstellt** und **kein Main-Merge** durchgeführt.
+
+1. Nach Freigabe einen kontrollierten PR gegen `main` öffnen (nicht mergen).
+2. Im PR genau einen Lauf von `Security & Dependency Analysis` prüfen.
+3. Erwartete Check-Namen:
+   - `CodeQL Analysis / Analyze (python)` (genau einmal),
+   - `Security & Dependency Analysis / Dependency Change Detection`
+     (genau einmal),
+   - `Security Gate (orchestration only)`.
+   Keine neuen Standalone-Checks `Analyze (python)` oder
+   `Dependency Change Detection`.
+4. CodeQL-Kategorie `/language:python` und Dependency-Kategorie
+   `dependency-check` in den Analyse-/SARIF-Metadaten prüfen.
+5. Alerts #296/#298 beobachten: Auto-Resolution durch den korrigierten Scan
+   erwarten; für AWS kann stattdessen der echte `LOCK_CONSTRAINT_DRIFT`-Warning
+   erscheinen. **Kein Dismissal.**
+6. Prüfen, dass der Gate bei fehlgeschlagenen, abgebrochenen oder
+   übersprungenen ausgewählten Scans rot wird und nur bei erfolgreicher
+   Orchestrierung grün ist; der Warning-Text darf keine Findings-Freigabe
+   behaupten.
+7. Run-IDs, Check-Namen und Alert-Status im Report nachtragen.
+
+## Grenzen und nicht geänderte Bereiche
+
+- Kein PR, kein Main-Merge, keine Alert-Dismissals, keine Löschung von
+  Scan-Konfigurationen oder Analysen.
+- Keine Änderung an GitHub-Security-Settings, Branch Protection oder Rulesets.
+- Keine Terraform-/AWS-Operation, keine Änderung am Order-Modul, keine
+  Dependency-Versionen.
+- Der Gate bleibt ein Orchestrierungs-Gate; die vollständige
+  Findings-Auswertung ist **MO-GH-SEC-03**.
+- GitHub-Scan-Verifikation und Alert-Auto-Resolution bleiben **PENDING**.
+- Der AWS-Constraint-/Lock-Drift (`main.tf >= 6.0` vs. Lock `~> 6.0`) bleibt
+  ein separater, freizugebender Reconcile-Task.
 
 ## Nächste Schritte
 
-1. Vollständige lokale Regression ausführen.
-2. Report mit exakten Testergebnissen und Abschlussstatus aktualisieren.
-3. Feature-Branch pushen; keinen PR ohne Freigabe erstellen.
-4. Kontrollierten PR-Lauf vorbereiten und #296/#298/Doppelanalysen prüfen.
+1. Feature-Branch pushen.
+2. Nach Freigabe kontrollierten PR-Lauf durchführen und #296/#298/
+   Doppelanalysen prüfen.
+3. AWS-Constraint-/Lock-Drift in separatem Task reconciliieren.
+4. MO-GH-SEC-03 (Findings-Gate) starten.
+5. Kein Main-Merge ohne ausdrückliche Freigabe.
 
-**Vorläufiger Status:** `CONTRACT VERIFIED / LOCAL VERIFICATION PENDING`
+**Abschlussstatus:** `CI ORCHESTRATION LOCALLY VERIFIED / GITHUB VERIFICATION PENDING`
