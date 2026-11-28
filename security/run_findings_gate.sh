@@ -72,6 +72,13 @@ from findings_gate import evaluate_scan, write_report
 result = evaluate_scan('${SARIF_PATH}', selected=True)
 print(result.summary)
 print('CLASSIFICATION:' + result.classification.name)
+print('DEBUG_NUM_FINDINGS:' + str(len(result.findings)))
+if result.findings:
+    f0 = result.findings[0]
+    print('DEBUG_FIRST_SEVERITY:' + f0.severity.name)
+    print('DEBUG_FIRST_SEVERITY_VAL:' + str(f0.security_severity))
+    print('DEBUG_FIRST_IS_QUALITY:' + str(f0.is_quality_finding))
+    print('DEBUG_FIRST_IS_DEP:' + str(f0.is_dependency_finding))
 if result.classification.name in ('FAIL', 'REPORT'):
     report_path = '${SARIF_PATH}.gate-report.json'
     write_report(result, report_path)
