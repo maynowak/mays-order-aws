@@ -86,7 +86,7 @@ jobs:
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
         uses: actions/download-artifact@v4
         with:
-          name: codeql-sarif-python
+          name: codeql-sarif
           path: .github/workflow-sarif
 
       - name: Download Dependency SARIF artifact
