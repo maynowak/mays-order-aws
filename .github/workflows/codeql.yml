@@ -1,13 +1,7 @@
 name: "CodeQL Analysis"
 
+# Reusable only: security.yml is the single trigger surface.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: '0 3 * * 1'
-  workflow_dispatch:
   workflow_call:
 
 permissions:
@@ -46,4 +40,6 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{matrix.language}}"
+          # Stable CodeQL category.  Do not change without a documented
+          # alert/category migration plan.
+          category: "/language:${{ matrix.language }}"

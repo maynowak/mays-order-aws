@@ -1,13 +1,27 @@
 name: "Security & Dependency Analysis"
 
+# Single trigger surface for all security scans.  codeql.yml and
+# dependency-check.yml are workflow_call-only reusable workflows.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
+    # Weekly CodeQL, preserving the previous Monday 03:00 UTC cadence.
     - cron: '0 3 * * 1'
+    # Daily dependency check, preserving the previous 06:00 UTC cadence.
+    - cron: '0 6 * * *'
   workflow_dispatch:
+    inputs:
+      run_codeql:
+        description: "Run CodeQL analysis"
+        type: boolean
+        default: true
+      run_dependency:
+        description: "Run dependency change detection"
+        type: boolean
+        default: true
 
 permissions:
   actions: read
@@ -17,13 +31,17 @@ permissions:
 jobs:
   codeql:
     name: CodeQL Analysis
+    if: >
+      (github.event_name != 'schedule' || github.event.schedule == '0 3 * * 1') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_codeql)
     uses: ./.github/workflows/codeql.yml
-    secrets: inherit
 
   dependency-check:
     name: Dependency Change Detection
+    if: >
+      (github.event_name != 'schedule' || github.event.schedule == '0 6 * * *') &&
+      (github.event_name != 'workflow_dispatch' || inputs.run_dependency)
     uses: ./.github/workflows/dependency-check.yml
-    secrets: inherit
 
   security-gate:
     name: Security Gate
