@@ -1,9 +1,9 @@
 # MO-PRIVACY-PROVIDER-CONTRACT-REVIEW-01
 
-**Status:** `MO PRIVACY PROVIDER CONTRACT RESPONSE READY` — STOP before implementation.  
-**Review baseline:** `716a16590673cdb649df414c08fc0bf7814caac7` (`origin/main`).  
-**Branch:** `feature/mo-privacy-provider-contract-01`.  
-**Consumer source:** RIS `18f2128d6d60993b2cbe2296ac2a3f190617f289`, `DSGVO-02B-PROVIDER-INTEGRATION-REVIEW.md`.  
+**Status:** `MO PRIVACY PROVIDER CONTRACT RESPONSE READY` — STOP before implementation.
+**Review baseline:** `716a16590673cdb649df414c08fc0bf7814caac7` (`origin/main`).
+**Branch:** `feature/mo-privacy-provider-contract-01`.
+**Consumer source:** RIS `18f2128d6d60993b2cbe2296ac2a3f190617f289`, `DSGVO-02B-PROVIDER-INTEGRATION-REVIEW.md`.
 **Scope:** read-only contract review; this report and auditlog only. No tests run, runtime/provider code changed, AWS/Terraform action, deployment, Main merge or legal approval.
 
 ## Executive decision
