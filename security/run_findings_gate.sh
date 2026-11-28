@@ -71,21 +71,6 @@ EOF
   exit 1
 fi
 
-# ---- Build Python arguments --------------------------------------------
-PYTHON_ARGS="-- $SARIF_PATH"
-if [ -n "$SCANNER_ID" ]; then
-  PYTHON_ARGS="$PYTHON_ARGS --scanner-id \"$SCANNER_ID\""
-fi
-if [ -n "$SHA" ]; then
-  PYTHON_ARGS="$PYTHON_ARGS --sha \"$SHA\""
-fi
-if [ -n "$REF" ]; then
-  PYTHON_ARGS="$PYTHON_ARGS --ref \"$REF\""
-fi
-if [ -n "$ATTEMPT" ]; then
-  PYTHON_ARGS="$PYTHON_ARGS --attempt \"$ATTEMPT\""
-fi
-
 # ---- Run the Python evaluator ------------------------------------------
 # Use relative import from the script's own directory – no hardcoded paths.
 PYTHON_OUTPUT=$(python3 -c "
@@ -97,10 +82,9 @@ with open('${SARIF_PATH}', 'r') as f:
     data = json.load(f)
 verr = _validate_sarif_structure(data)
 print('DEBUG_VAL_ERROR:' + str(verr))
-result = evaluate_scan('${SARIF_PATH}', selected=True)
 # Get scanner ID from SARIF if not provided
 scanner_id = '${SCANNER_ID}' or _get_scanner_identity_from_run(data.get('runs', [{}])[0])
-result = evaluate_scan('${SARIF_PATH}', selected=True, scanner_id=scanner_id)
+result = evaluate_scan('${SARIF_PATH}', selected=True, scanner_id=scanner_id, sha='${SHA}', ref='${REF}', attempt=int('${ATTEMPT:-1}') if '${ATTEMPT}' else 1)
 print(result.summary)
 print('CLASSIFICATION:' + result.classification.name)
 print('DEBUG_NUM_FINDINGS:' + str(len(result.findings)))
@@ -110,10 +94,14 @@ if result.findings:
     print('DEBUG_FIRST_SEVERITY_VAL:' + str(f0.security_severity))
     print('DEBUG_FIRST_IS_QUALITY:' + str(f0.is_quality_finding))
     print('DEBUG_FIRST_IS_DEP:' + str(f0.is_dependency_finding))
-if result.classification.name in ('FAIL', 'REPORT'):
-    report_path = '${SARIF_PATH}.gate-report.json'
-    write_report(result, report_path)
-    print('REPORT_PATH:' + report_path)
+# GENERATE REPORT FOR ALL CLASSIFICATIONS
+report_path = '${SARIF_PATH}.gate-report.json'
+write_report(result, report_path)
+print('REPORT_PATH:' + report_path)
+print('REPORT_SCANNER_ID:' + str(result.scanner_id))
+print('REPORT_SHA:' + str(result.sha))
+print('REPORT_REF:' + str(result.ref))
+print('REPORT_ATTEMPT:' + str(result.attempt))
 " 2>&1) || {
   # If Python fails entirely (import error, crash, etc.), that's BLOCKED
   echo "::error::Findings gate evaluator failed – gate BLOCKED (MO-GH-SEC-03)"
@@ -198,6 +186,10 @@ SARIF validation failed or security-severity is missing/invalid.
 No security approval claimed.
 
 EOF
+    if [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; then
+      _write_summary_line "Machine-readable report: \`$REPORT_PATH\`"
+      _write_summary_line ""
+    fi
     exit 1
     ;;
   NOT_EVALUATED)
@@ -211,6 +203,10 @@ Scanner not selected for this run.
 No security approval claimed.
 
 EOF
+    if [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; then
+      _write_summary_line "Machine-readable report: \`$REPORT_PATH\`"
+      _write_summary_line ""
+    fi
     exit 0
     ;;
   PASS)
@@ -224,6 +220,10 @@ No security findings detected.
 No security approval claimed.
 
 EOF
+    if [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; then
+      _write_summary_line "Machine-readable report: \`$REPORT_PATH\`"
+      _write_summary_line ""
+    fi
     exit 0
     ;;
   *)
@@ -238,6 +238,10 @@ Unknown gate classification: \`$CLASSIFICATION\`
 No security approval claimed.
 
 EOF
+    if [ -n "$REPORT_PATH" ] && [ -f "$REPORT_PATH" ]; then
+      _write_summary_line "Machine-readable report: \`$REPORT_PATH\`"
+      _write_summary_line ""
+    fi
     exit 1
     ;;
 esac

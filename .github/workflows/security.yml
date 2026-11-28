@@ -172,7 +172,7 @@ jobs:
 
       # ---- Handle scanner failures ---------------------------------------
       - name: Fail gate on scanner failure
-        if: steps.scanner-failouts.outputs.codeql_failed == 'true' || steps.scanner-failouts.outputs.dependency_failed == 'true'
+        if: steps.scanner-failures.outputs.codeql_failed == 'true' || steps.scanner-failures.outputs.dependency_failed == 'true'
         run: |
           echo "::error::One or more scanners failed – gate BLOCKED (MO-GH-SEC-03)"
           exit 1
