@@ -1366,11 +1366,98 @@ class TestD8CICD(unittest.TestCase):
 
 
 class TestDependencyDetector(unittest.TestCase):
-    """Test SECURITY-01 Dependency Change Detector."""
+    """Test SECURITY-01 dependency detector offline and deterministically."""
+
+    @staticmethod
+    def _main_tf(aws_constraint: str = "~> 6.0", time_constraint: str = "~> 0.11") -> str:
+        return f"""terraform {{
+  required_providers {{
+    aws = {{
+      source  = "hashicorp/aws"
+      version = "{aws_constraint}"
+    }}
+    time = {{
+      source  = "hashicorp/time"
+      version = "{time_constraint}"
+    }}
+  }}
+}}
+"""
+
+    @staticmethod
+    def _lock(
+        aws_version: str = "6.65.0",
+        aws_constraints: str = "~> 6.0",
+        time_version: str = "0.14.2",
+        time_constraints: str = "~> 0.11",
+        include_time: bool = True,
+    ) -> str:
+        blocks = [
+            'provider "registry.terraform.io/hashicorp/aws" {\n'
+            f'  version     = "{aws_version}"\n'
+            f'  constraints = "{aws_constraints}"\n'
+            '  hashes = [\n'
+            '    "h1:fixture",\n'
+            '  ]\n'
+            '}\n'
+        ]
+        if include_time:
+            blocks.append(
+                'provider "registry.terraform.io/hashicorp/time" {\n'
+                f'  version     = "{time_version}"\n'
+                f'  constraints = "{time_constraints}"\n'
+                '  hashes = [\n'
+                '    "h1:fixture",\n'
+                '  ]\n'
+                '}\n'
+            )
+        return "\n".join(blocks)
+
+    def _make_repo(self, main_tf: str, lock_hcl: Optional[str]) -> Path:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        tf_dir = root / "terraform"
+        tf_dir.mkdir()
+        (tf_dir / "main.tf").write_text(main_tf)
+        if lock_hcl is not None:
+            (tf_dir / ".terraform.lock.hcl").write_text(lock_hcl)
+        return root
+
+    @staticmethod
+    def _fetcher(
+        aws_stable: tuple[str, ...] = ("6.65.0",),
+        time_stable: tuple[str, ...] = ("0.14.2",),
+        aws_prerelease: tuple[str, ...] = (),
+        time_prerelease: tuple[str, ...] = (),
+    ):
+        from security.dependency_detector import RegistryVersions
+
+        def fetch(source: str):
+            if source.endswith("/aws"):
+                return RegistryVersions(list(aws_stable), list(aws_prerelease), "fixture"), "fixture"
+            if source.endswith("/time"):
+                return RegistryVersions(list(time_stable), list(time_prerelease), "fixture"), "fixture"
+            return None, f"unexpected provider: {source}"
+
+        return fetch
+
+    def _check(self, root: Path, fetcher):
+        from security.dependency_detector import check_terraform_providers
+
+        return check_terraform_providers(
+            root / "terraform/main.tf",
+            lock_file=root / "terraform/.terraform.lock.hcl",
+            version_fetcher=fetcher,
+            source_display="terraform/main.tf",
+        )
+
+    @staticmethod
+    def _dep(deps, name: str):
+        return next(dep for dep in deps if dep.name == name)
 
     def test_dependency_detector_exists(self):
         """Test that dependency detector script exists."""
-        from pathlib import Path
         self.assertTrue((REPO_ROOT / "security" / "dependency_detector.py").exists())
 
     def test_version_constraint_parsing(self):
@@ -1476,7 +1563,6 @@ class TestDependencyDetector(unittest.TestCase):
     def test_terraform_provider_parsing(self):
         """Test Terraform provider parsing."""
         from security.dependency_detector import parse_terraform_providers
-        from pathlib import Path
 
         deps = parse_terraform_providers(REPO_ROOT / "terraform/main.tf")
 
@@ -1484,74 +1570,197 @@ class TestDependencyDetector(unittest.TestCase):
         names = {d.name for d in deps}
         self.assertIn("aws", names)
         self.assertIn("time", names)
-
         for dep in deps:
             self.assertEqual(dep.type, "terraform_provider")
             self.assertIn("hashicorp/", dep.current_reference)
 
-    def test_dependency_detector_runs(self):
-        """Test that dependency detection produces valid output offline."""
-        import json
+    def test_parse_terraform_lock(self):
+        """Test parsing provider versions and constraints from the lock file."""
+        from security.dependency_detector import parse_terraform_lock
+
+        root = self._make_repo(self._main_tf(), self._lock())
+        lock = parse_terraform_lock(root / "terraform/.terraform.lock.hcl")
+
+        self.assertEqual(lock["hashicorp/aws"].version, "6.65.0")
+        self.assertEqual(lock["hashicorp/aws"].constraints, "~> 6.0")
+        self.assertEqual(lock["hashicorp/time"].version, "0.14.2")
+        self.assertEqual(lock["hashicorp/time"].constraints, "~> 0.11")
+        self.assertEqual(parse_terraform_lock(root / "terraform/missing.lock.hcl"), {})
+
+    def test_resolution_distinguishes_declared_locked_latest(self):
+        """Declared constraint, locked, latest available and compatible differ."""
         from security.dependency_detector import detect_all_changes
 
-        with patch(
-            "security.dependency_detector.fetch_latest_terraform_provider_version",
-            return_value=("99.0.0", "offline fixture"),
-        ):
-            result = detect_all_changes(REPO_ROOT)
+        root = self._make_repo(self._main_tf(aws_constraint="~> 6.0"), self._lock())
+        fetcher = self._fetcher(
+            aws_stable=("7.0.0", "6.66.0", "6.65.0"),
+            time_stable=("0.15.0", "0.14.2"),
+        )
+        deps = self._check(root, fetcher)
+        aws = self._dep(deps, "aws")
 
+        self.assertEqual(aws.current_version, "~> 6.0")
+        self.assertEqual(aws.locked_version, "6.65.0")
+        self.assertEqual(aws.latest_available, "7.0.0")
+        self.assertEqual(aws.latest_compatible, "6.66.0")
+        self.assertEqual(aws.available_version, "6.66.0")
+        self.assertEqual(aws.status, "UPDATE_AVAILABLE")
+        self.assertEqual(aws.source, "terraform/main.tf")
+
+        result = detect_all_changes(root, version_fetcher=fetcher)
         self.assertEqual(result.status, "DEPENDENCY_CHANGE_DETECTED")
-        output = json.loads(result.to_json())
-        self.assertIn("status", output)
-        self.assertIn("run_id", output)
-        self.assertIn("timestamp", output)
-        self.assertIn("summary", output)
-        self.assertIn("dependencies", output)
-        self.assertIsInstance(output["dependencies"], list)
+        self.assertIn("compatible dependency update", result.summary)
+
+    def test_no_false_update_when_latest_is_outside_constraint(self):
+        """A newer major outside the constraint is not an update recommendation."""
+        from security.dependency_detector import detect_all_changes
+
+        root = self._make_repo(self._main_tf(aws_constraint="~> 6.0"), self._lock())
+        fetcher = self._fetcher(aws_stable=("7.0.0", "6.65.0"), time_stable=("0.14.2",))
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.latest_available, "7.0.0")
+        self.assertEqual(aws.latest_compatible, "6.65.0")
+        self.assertEqual(aws.status, "CURRENT")
+        self.assertIn("outside the declared constraint", aws.details)
+        self.assertEqual(detect_all_changes(root, version_fetcher=fetcher).status, "DEPENDENCIES_CURRENT")
+
+    def test_lock_constraint_drift_suppresses_update(self):
+        """A lock/declaration mismatch is explicit and suppresses updates."""
+        from security.dependency_detector import detect_all_changes
+
+        root = self._make_repo(
+            self._main_tf(aws_constraint=">= 6.0"),
+            self._lock(aws_constraints="~> 6.0"),
+        )
+        fetcher = self._fetcher(
+            aws_stable=("7.0.0", "6.66.0", "6.65.0"),
+            time_stable=("0.14.2",),
+        )
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.status, "LOCK_CONSTRAINT_DRIFT")
+        self.assertIn("suppressed", aws.details)
+        result = detect_all_changes(root, version_fetcher=fetcher)
+        self.assertEqual(result.status, "DEPENDENCY_CHANGE_DETECTED")
+        self.assertIn("warning", result.summary)
+
+    def test_locked_version_violating_constraint(self):
+        """A locked version outside the declared constraint is an error finding."""
+        root = self._make_repo(
+            self._main_tf(aws_constraint=">= 6.0"),
+            self._lock(aws_version="5.0.0", aws_constraints=">= 6.0"),
+        )
+        fetcher = self._fetcher(aws_stable=("6.65.0",), time_stable=("0.14.2",))
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.status, "CONSTRAINT_UNSATISFIED")
+        self.assertIn("does not satisfy", aws.details)
+
+    def test_missing_lock_entry(self):
+        """A provider absent from the lock file is reported, not guessed."""
+        root = self._make_repo(self._main_tf(), self._lock(include_time=False))
+        fetcher = self._fetcher(aws_stable=("6.65.0",), time_stable=("0.14.2",))
+        deps = self._check(root, fetcher)
+        time_dep = self._dep(deps, "time")
+
+        self.assertIsNone(time_dep.locked_version)
+        self.assertEqual(time_dep.status, "LOCK_MISSING")
+        self.assertIn("no .terraform.lock.hcl entry", time_dep.details)
+
+    def test_registry_latest_older_than_lock_is_incomplete(self):
+        """A stale registry response never produces a downgrade recommendation."""
+        root = self._make_repo(self._main_tf(aws_constraint=">= 6.0"), self._lock())
+        fetcher = self._fetcher(aws_stable=("3.24.1",), time_stable=("0.14.2",))
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.latest_available, "3.24.1")
+        self.assertEqual(aws.status, "REGISTRY_INCOMPLETE")
+        self.assertIn("older than locked version", aws.details)
+
+    def test_registry_error_is_explicit(self):
+        """Registry failures are distinguishable from dependency changes."""
+        from security.dependency_detector import detect_all_changes
+
+        root = self._make_repo(self._main_tf(aws_constraint=">= 6.0"), self._lock())
+        fetcher = lambda source: (None, "HTTP error 500 querying registry")
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.status, "LOOKUP_ERROR")
+        result = detect_all_changes(root, version_fetcher=fetcher)
+        self.assertEqual(result.status, "DEPENDENCY_CHECK_ERROR")
+        self.assertIn("failed", result.summary)
+
+    def test_current_dependency_is_current(self):
+        """A locked version at the latest compatible version is CURRENT."""
+        from security.dependency_detector import detect_all_changes
+
+        root = self._make_repo(self._main_tf(aws_constraint="~> 6.0"), self._lock())
+        fetcher = self._fetcher(aws_stable=("6.65.0",), time_stable=("0.14.2",))
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.status, "CURRENT")
+        self.assertEqual(detect_all_changes(root, version_fetcher=fetcher).status, "DEPENDENCIES_CURRENT")
+
+    def test_numeric_latest_version_selection(self):
+        """Latest selection is numeric (6.65 > 6.9), not lexical."""
+        root = self._make_repo(
+            self._main_tf(aws_constraint="~> 6.0"),
+            self._lock(aws_version="6.9.0"),
+        )
+        fetcher = self._fetcher(
+            aws_stable=("6.65.0", "6.10.0", "6.9.0"),
+            time_stable=("0.14.2",),
+        )
+        aws = self._dep(self._check(root, fetcher), "aws")
+
+        self.assertEqual(aws.latest_available, "6.65.0")
+        self.assertEqual(aws.latest_compatible, "6.65.0")
+        self.assertEqual(aws.status, "UPDATE_AVAILABLE")
+
+    def test_relative_artifact_source(self):
+        """Detector output uses repository-relative source paths."""
+        root = self._make_repo(self._main_tf(), self._lock())
+        deps = self._check(root, self._fetcher())
+        for dep in deps:
+            self.assertEqual(dep.source, "terraform/main.tf")
+            self.assertFalse(Path(dep.source).is_absolute())
 
     def test_dependency_output_format(self):
         """Test that dependency output has required fields."""
-        import subprocess
-        import json
+        from security.dependency_detector import detect_all_changes
 
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
+        root = self._make_repo(self._main_tf(), self._lock())
+        output = json.loads(detect_all_changes(root, version_fetcher=self._fetcher()).to_json())
 
-        output = json.loads(result.stdout)
-
+        self.assertIn(output["status"], [
+            "DEPENDENCIES_CURRENT",
+            "DEPENDENCY_CHANGE_DETECTED",
+            "DEPENDENCY_CHECK_ERROR",
+        ])
         for dep in output["dependencies"]:
-            self.assertIn("name", dep)
-            self.assertIn("type", dep)
-            self.assertIn("source", dep)
-            self.assertIn("current_version", dep)
-            self.assertIn("current_reference", dep)
-            self.assertIn("available_version", dep)
-            self.assertIn("available_reference", dep)
-            self.assertIn("status", dep)
-            self.assertIn("details", dep)
-            self.assertIn("detected_at", dep)
-
-            self.assertIn(dep["status"], ["CURRENT", "UPDATE_AVAILABLE", "CONSTRAINT_UNSATISFIED", "LOOKUP_ERROR", "ERROR", "UNKNOWN"])
-            self.assertIn(dep["type"], ["terraform_provider", "github_action", "python_package", "npm_package", "git_submodule"])
+            for field in (
+                "name", "type", "source", "current_version", "current_reference",
+                "available_version", "available_reference", "status", "details",
+                "detected_at", "locked_version", "latest_available", "latest_compatible",
+                "locked_constraints",
+            ):
+                self.assertIn(field, dep)
+            self.assertIn(dep["status"], [
+                "CURRENT", "UPDATE_AVAILABLE", "CONSTRAINT_UNSATISFIED", "LOCK_MISSING",
+                "REGISTRY_INCOMPLETE", "LOCK_CONSTRAINT_DRIFT", "LOOKUP_ERROR", "ERROR", "UNKNOWN",
+            ])
+            self.assertIn(dep["type"], [
+                "terraform_provider", "github_action", "python_package", "npm_package", "git_submodule",
+            ])
 
     def test_no_secret_leakage(self):
         """Test that detector output doesn't contain secrets."""
-        import subprocess
+        from security.dependency_detector import detect_all_changes
 
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
+        root = self._make_repo(self._main_tf(), self._lock())
+        output = detect_all_changes(root, version_fetcher=self._fetcher()).to_json()
 
-        output = result.stdout
-
-        # Should not contain any secrets
         self.assertNotIn("aws_secret_access_key", output)
         self.assertNotIn("aws_access_key_id", output)
         self.assertNotIn("secret_access_key", output)
@@ -1559,46 +1768,29 @@ class TestDependencyDetector(unittest.TestCase):
 
     def test_deterministic_output(self):
         """Test deterministic status/structure with a fixed provider fixture."""
-        import json
         from security.dependency_detector import detect_all_changes
 
-        with patch(
-            "security.dependency_detector.fetch_latest_terraform_provider_version",
-            return_value=("99.0.0", "offline fixture"),
-        ):
-            out1 = json.loads(detect_all_changes(REPO_ROOT).to_json())
-            out2 = json.loads(detect_all_changes(REPO_ROOT).to_json())
+        root = self._make_repo(self._main_tf(), self._lock())
+        fetcher = self._fetcher()
+        out1 = json.loads(detect_all_changes(root, version_fetcher=fetcher).to_json())
+        out2 = json.loads(detect_all_changes(root, version_fetcher=fetcher).to_json())
 
         self.assertEqual(out1["status"], out2["status"])
         self.assertEqual(len(out1["dependencies"]), len(out2["dependencies"]))
         for d1, d2 in zip(out1["dependencies"], out2["dependencies"]):
-            self.assertEqual(d1["name"], d2["name"])
-            self.assertEqual(d1["current_version"], d2["current_version"])
+            for field in ("name", "status", "current_version", "locked_version", "latest_available", "latest_compatible"):
+                self.assertEqual(d1[field], d2[field])
 
     def test_failure_distinguishable(self):
         """Test that failure is distinguishable from 'no changes'."""
-        import subprocess
-        import json
+        from security.dependency_detector import detect_all_changes
 
-        result = subprocess.run(
-            ["python3", "security/dependency_detector.py"],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT)
-        )
+        root = self._make_repo(self._main_tf(), self._lock())
+        result = detect_all_changes(root, version_fetcher=lambda source: (None, "offline failure"))
 
-        output = json.loads(result.stdout)
-
-        # Status should be one of the expected values
-        self.assertIn(output["status"], [
-            "DEPENDENCIES_CURRENT",
-            "DEPENDENCY_CHANGE_DETECTED",
-            "DEPENDENCY_CHECK_ERROR"
-        ])
-
-        # Should not be empty
-        self.assertIsNotNone(output["status"])
-        self.assertNotEqual(output["status"], "")
+        self.assertEqual(result.status, "DEPENDENCY_CHECK_ERROR")
+        self.assertNotEqual(result.status, "DEPENDENCIES_CURRENT")
+        self.assertNotEqual(result.status, "")
 
 
 class TestSarifAdapter(unittest.TestCase):

@@ -22,24 +22,51 @@ from datetime import datetime, timezone
 from functools import total_ordering
 from itertools import zip_longest
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 import urllib.request
 import urllib.error
 
 
 @dataclass
 class Dependency:
-    """Represents a single dependency."""
+    """Represents a single dependency.
+
+    ``current_version`` is the declared Terraform constraint (legacy name).
+    ``locked_version`` is the version from ``.terraform.lock.hcl``.
+    ``latest_available`` is the newest registry version; ``latest_compatible``
+    is the newest version that satisfies the declared constraint.
+    ``available_version`` remains as a compatibility alias for the recommended
+    update target (latest compatible).
+    """
     name: str
     type: str  # "terraform_provider", "github_action", "python_package", "npm_package", "git_submodule"
-    source: str  # file path where dependency is declared
+    source: str  # repo-relative file path where dependency is declared
     current_version: str
     current_reference: Optional[str] = None  # for git refs, commits, etc.
     available_version: Optional[str] = None
     available_reference: Optional[str] = None
-    status: str = "UNKNOWN"  # CURRENT, CHANGED, ERROR, UNKNOWN
+    status: str = "UNKNOWN"  # CURRENT, UPDATE_AVAILABLE, CONSTRAINT_UNSATISFIED, LOCK_MISSING, REGISTRY_INCOMPLETE, LOOKUP_ERROR, ERROR, UNKNOWN
     details: str = ""
     detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    locked_version: Optional[str] = None
+    latest_available: Optional[str] = None
+    latest_compatible: Optional[str] = None
+    locked_constraints: Optional[str] = None
+
+
+@dataclass
+class LockedProvider:
+    """A provider entry parsed from ``.terraform.lock.hcl``."""
+    version: Optional[str] = None
+    constraints: Optional[str] = None
+
+
+@dataclass
+class RegistryVersions:
+    """Sorted registry versions, split into stable and pre-release."""
+    stable: list[str]
+    prerelease: list[str]
+    details: str = ""
 
 
 @dataclass
@@ -316,54 +343,112 @@ def parse_terraform_providers(tf_file: Path) -> list[Dependency]:
     return deps
 
 
-def fetch_latest_terraform_provider_version(provider_source: str, current_version: str) -> tuple[Optional[str], str]:
-    """
-    Fetch latest version from Terraform Registry.
-    Returns (latest_version, details)
-    """
-    # Parse source: "hashicorp/aws" -> namespace="hashicorp", name="aws"
-    parts = provider_source.split("/")
+def _normalize_provider_source(source: str) -> str:
+    """Normalize ``registry.terraform.io/hashicorp/aws`` to ``hashicorp/aws``."""
+    value = source.strip()
+    for prefix in ("registry.terraform.io/", "registry.opentofu.org/"):
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+    return value
+
+
+def parse_terraform_lock(lock_file: Path) -> dict[str, LockedProvider]:
+    """Parse provider versions and constraints from ``.terraform.lock.hcl``."""
+    if not lock_file or not lock_file.exists():
+        return {}
+
+    try:
+        text = lock_file.read_text()
+    except OSError:
+        return {}
+
+    entries: dict[str, LockedProvider] = {}
+    provider_re = re.compile(r'provider\s+"([^"]+)"\s*\{')
+    for match in provider_re.finditer(text):
+        source = _normalize_provider_source(match.group(1))
+        start = match.end() - 1
+        depth = 0
+        body = ""
+        for index in range(start, len(text)):
+            char = text[index]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    body = text[start + 1:index]
+                    break
+        version_match = re.search(r'\bversion\s*=\s*"([^"]+)"', body)
+        constraints_match = re.search(r'\bconstraints\s*=\s*"([^"]+)"', body)
+        entries[source] = LockedProvider(
+            version=version_match.group(1) if version_match else None,
+            constraints=constraints_match.group(1) if constraints_match else None,
+        )
+    return entries
+
+
+def fetch_terraform_provider_versions(provider_source: str) -> tuple[Optional[RegistryVersions], str]:
+    """Fetch and numerically sort all registry versions for a provider."""
+    normalized = _normalize_provider_source(provider_source)
+    parts = normalized.split("/")
     if len(parts) != 2:
         return None, f"Invalid provider source format: {provider_source}"
 
     namespace, name = parts
-
-    # Query Terraform Registry API
     url = f"https://registry.terraform.io/v1/providers/{namespace}/{name}/versions"
 
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "Mays-Orders-AWS-SECURITY-01/1.0"}
+            headers={"User-Agent": "Mays-Orders-AWS-SECURITY-01/2.0"}
         )
         with urllib.request.urlopen(req, timeout=10) as response:
             data = json.loads(response.read().decode())
 
-        versions = data.get("versions", [])
-        if not versions:
+        raw_versions = data.get("versions", [])
+        if not isinstance(raw_versions, list) or not raw_versions:
             return None, "No versions found in registry"
 
-        # Find latest stable version (not beta, alpha, rc)
-        stable_versions = []
-        for v in versions:
-            version = v.get("version", "")
-            if version and not any(x in version.lower() for x in ["alpha", "beta", "rc"]):
-                stable_versions.append(version)
+        versions: list[str] = []
+        for entry in raw_versions:
+            if isinstance(entry, dict):
+                version = entry.get("version", "")
+                if isinstance(version, str) and version.strip():
+                    versions.append(version.strip())
 
-        if not stable_versions:
-            # Fallback: use latest version even if pre-release
-            latest = versions[0].get("version", "")
-            return latest, f"Latest (pre-release): {latest}"
+        if not versions:
+            return None, "No valid versions found in registry"
 
-        latest = stable_versions[0]
-        return latest, f"Latest stable: {latest}"
+        stable = sort_versions([v for v in versions if not is_prerelease(v)])
+        prerelease = sort_versions([v for v in versions if is_prerelease(v)])
+        if not stable and not prerelease:
+            return None, "No parseable versions found in registry"
+
+        details = f"Registry: {len(stable)} stable, {len(prerelease)} pre-release"
+        return RegistryVersions(stable=stable, prerelease=prerelease, details=details), details
 
     except urllib.error.HTTPError as e:
         return None, f"HTTP error {e.code} querying registry"
     except urllib.error.URLError as e:
         return None, f"Network error: {e}"
+    except (ValueError, TypeError) as e:
+        return None, f"Invalid registry response: {e}"
     except Exception as e:
         return None, f"Error: {e}"
+
+
+def fetch_latest_terraform_provider_version(provider_source: str, current_version: str) -> tuple[Optional[str], str]:
+    """Compatibility wrapper returning the newest stable (or pre-release) version."""
+    registry, details = fetch_terraform_provider_versions(provider_source)
+    if registry is None:
+        return None, details
+    if registry.stable:
+        latest = registry.stable[0]
+    elif registry.prerelease:
+        latest = registry.prerelease[0]
+    else:
+        return None, details
+    return latest, f"{details}; latest: {latest}"
 
 
 def compare_versions(v1: str, v2: str) -> int:
@@ -380,77 +465,198 @@ def compare_versions(v1: str, v2: str) -> int:
     return 0
 
 
-def check_terraform_providers(tf_file: Path) -> list[Dependency]:
-    """Check all Terraform providers for updates."""
+def _normalize_constraint_text(constraint: str) -> str:
+    """Normalize whitespace so ``>= 6.0`` and ``>=6.0`` compare equal."""
+    return re.sub(r"\s+", "", constraint.strip())
+
+
+def _latest_compatible_version(registry: RegistryVersions, declared_constraint: str) -> Optional[str]:
+    """Return the newest stable version satisfying the declared constraint."""
+    candidates = list(registry.stable)
+    # Only consider pre-releases when the constraint explicitly asks for one.
+    if "-" in declared_constraint:
+        candidates.extend(registry.prerelease)
+    compatible = [version for version in candidates if version_satisfies_constraint(version, declared_constraint)]
+    sorted_compatible = sort_versions(compatible)
+    return sorted_compatible[0] if sorted_compatible else None
+
+
+def check_terraform_providers(
+    tf_file: Path,
+    lock_file: Optional[Path] = None,
+    version_fetcher: Optional[Callable[[str], tuple[Optional[RegistryVersions], str]]] = None,
+    source_display: Optional[str] = None,
+) -> list[Dependency]:
+    """Resolve declared constraints, locked versions and registry versions.
+
+    Resolution rules:
+    - Lock entry missing -> ``LOCK_MISSING`` (warning, no false update claim).
+    - Locked version violates the declared constraint -> ``CONSTRAINT_UNSATISFIED``.
+    - Registry error -> ``LOOKUP_ERROR`` (or preserves a lock violation).
+    - Registry latest older than the lock -> ``REGISTRY_INCOMPLETE`` (no update).
+    - Lock constraints differ from the declared constraint -> ``LOCK_CONSTRAINT_DRIFT``
+      (warning; update recommendation suppressed until reconciled).
+    - Newer compatible version available -> ``UPDATE_AVAILABLE``.
+    - Otherwise -> ``CURRENT``.
+    """
     deps = parse_terraform_providers(tf_file)
+    locked = parse_terraform_lock(lock_file) if lock_file else {}
+    fetcher = version_fetcher or fetch_terraform_provider_versions
 
     for dep in deps:
-        if dep.type == "terraform_provider":
-            latest, details = fetch_latest_terraform_provider_version(
-                dep.current_reference or "", dep.current_version
-            )
-            dep.available_version = latest
-            dep.details += f"; {details}"
+        if dep.type != "terraform_provider":
+            continue
+        if source_display:
+            dep.source = source_display
 
-            if not latest:
-                dep.status = "LOOKUP_ERROR"
+        details = [dep.details] if dep.details else []
+        provider_source = dep.current_reference or ""
+        locked_entry = locked.get(_normalize_provider_source(provider_source))
+        dep.locked_version = locked_entry.version if locked_entry else None
+        dep.locked_constraints = locked_entry.constraints if locked_entry else None
+
+        details.append(f"declared constraint: {dep.current_version}")
+        details.append(f"locked version: {dep.locked_version or 'missing'}")
+        if dep.locked_constraints:
+            details.append(f"lock constraints: {dep.locked_constraints}")
+        constraint_drift = bool(
+            dep.locked_constraints
+            and _normalize_constraint_text(dep.locked_constraints) != _normalize_constraint_text(dep.current_version)
+        )
+        if constraint_drift:
+            details.append("lock constraints differ from declared constraint")
+
+        try:
+            parse_version_constraints(dep.current_version)
+        except ValueError as exc:
+            dep.status = "ERROR"
+            details.append(f"invalid declared constraint: {exc}")
+            dep.details = "; ".join(details)
+            continue
+
+        if dep.locked_version:
+            try:
+                Version.parse(dep.locked_version)
+            except ValueError:
+                dep.status = "ERROR"
+                details.append(f"invalid locked version: {dep.locked_version!r}")
+                dep.details = "; ".join(details)
                 continue
 
-            # Check if latest version satisfies the current constraint
-            constraint_satisfied = version_satisfies_constraint(latest, dep.current_version)
-
-            if not constraint_satisfied:
-                # Latest version doesn't satisfy the constraint
+        registry, fetch_details = fetcher(provider_source)
+        details.append(fetch_details)
+        if registry is None:
+            if dep.locked_version and not version_satisfies_constraint(dep.locked_version, dep.current_version):
                 dep.status = "CONSTRAINT_UNSATISFIED"
+                details.append("locked version does not satisfy declared constraint")
             else:
-                # Latest satisfies constraint - check if it's actually newer
-                cmp_result = compare_versions(latest, dep.current_version)
-                if cmp_result > 0:
-                    # Latest is newer and satisfies constraint
-                    dep.status = "UPDATE_AVAILABLE"
-                else:
-                    # Latest is same or older
-                    dep.status = "CURRENT"
+                dep.status = "LOOKUP_ERROR"
+            dep.details = "; ".join(details)
+            continue
+
+        dep.latest_available = (
+            registry.stable[0] if registry.stable
+            else (registry.prerelease[0] if registry.prerelease else None)
+        )
+        dep.latest_compatible = _latest_compatible_version(registry, dep.current_version)
+        dep.available_version = dep.latest_compatible or dep.latest_available
+        details.append(f"latest available: {dep.latest_available or 'none'}")
+        details.append(f"latest compatible: {dep.latest_compatible or 'none'}")
+
+        if not dep.locked_version:
+            dep.status = "LOCK_MISSING"
+            details.append("no .terraform.lock.hcl entry for this provider")
+            dep.details = "; ".join(details)
+            continue
+
+        if not version_satisfies_constraint(dep.locked_version, dep.current_version):
+            dep.status = "CONSTRAINT_UNSATISFIED"
+            details.append("locked version does not satisfy declared constraint")
+            dep.details = "; ".join(details)
+            continue
+
+        if dep.latest_available is None:
+            dep.status = "REGISTRY_INCOMPLETE"
+            details.append("registry returned no usable versions")
+            dep.details = "; ".join(details)
+            continue
+
+        if compare_versions(dep.latest_available, dep.locked_version) < 0:
+            dep.status = "REGISTRY_INCOMPLETE"
+            details.append("registry latest is older than locked version; no update recommendation")
+            dep.details = "; ".join(details)
+            continue
+
+        if constraint_drift:
+            dep.status = "LOCK_CONSTRAINT_DRIFT"
+            details.append("update recommendation suppressed until lock constraints are reconciled")
+            dep.details = "; ".join(details)
+            continue
+
+        if dep.latest_compatible and compare_versions(dep.latest_compatible, dep.locked_version) > 0:
+            dep.status = "UPDATE_AVAILABLE"
+            details.append(f"update available: {dep.locked_version} -> {dep.latest_compatible}")
+        else:
+            dep.status = "CURRENT"
+            if dep.latest_available and compare_versions(dep.latest_available, dep.locked_version) > 0:
+                details.append("newer registry version is outside the declared constraint")
+            else:
+                details.append("locked version is current within declared constraint")
+        dep.details = "; ".join(details)
 
     return deps
 
 
-def detect_all_changes(repo_root: Optional[Path] = None) -> DetectionResult:
+def detect_all_changes(
+    repo_root: Optional[Path] = None,
+    version_fetcher: Optional[Callable[[str], tuple[Optional[RegistryVersions], str]]] = None,
+) -> DetectionResult:
     """Run all dependency checks and return consolidated result.
 
     ``repo_root`` removes the former dependency on the caller's working
-    directory.  It defaults to this repository (parent of ``security/``).
+    directory.  ``version_fetcher`` enables deterministic offline tests.
     """
-    root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[1]
+    root = Path(repo_root).resolve() if repo_root is not None else Path(__file__).resolve().parents[1]
     run = run_id()
     timestamp = datetime.now(timezone.utc).isoformat() + "Z"
     all_deps = []
 
-    # Check Terraform providers
     tf_file = root / "terraform/main.tf"
+    lock_file = root / "terraform/.terraform.lock.hcl"
     if tf_file.exists():
-        tf_deps = check_terraform_providers(tf_file)
-        all_deps.extend(tf_deps)
+        try:
+            source_display = tf_file.relative_to(root).as_posix()
+        except ValueError:
+            source_display = str(tf_file)
+        all_deps.extend(check_terraform_providers(
+            tf_file,
+            lock_file=lock_file,
+            version_fetcher=version_fetcher,
+            source_display=source_display,
+        ))
 
     # TODO: Add GitHub Actions workflow detection
     # TODO: Add Python package detection (if requirements.txt/pyproject.toml added)
     # TODO: Add npm package detection (if package.json added)
     # TODO: Add git submodule detection
 
-    # Determine overall status
-    changed = [d for d in all_deps if d.status in ("CHANGED", "UPDATE_AVAILABLE")]
-    constraint_unsatisfied = [d for d in all_deps if d.status == "CONSTRAINT_UNSATISFIED"]
     errors = [d for d in all_deps if d.status in ("ERROR", "LOOKUP_ERROR")]
+    constraint_unsatisfied = [d for d in all_deps if d.status == "CONSTRAINT_UNSATISFIED"]
+    updates = [d for d in all_deps if d.status == "UPDATE_AVAILABLE"]
+    warnings = [d for d in all_deps if d.status in ("LOCK_MISSING", "REGISTRY_INCOMPLETE", "LOCK_CONSTRAINT_DRIFT")]
 
     if errors:
         status = "DEPENDENCY_CHECK_ERROR"
         summary = f"{len(errors)} dependency check(s) failed"
     elif constraint_unsatisfied:
         status = "DEPENDENCY_CHANGE_DETECTED"
-        summary = f"{len(constraint_unsatisfied)} dependency constraint(s) unsatisfied"
-    elif changed:
+        summary = f"{len(constraint_unsatisfied)} locked version(s) violate the declared constraint"
+    elif updates:
         status = "DEPENDENCY_CHANGE_DETECTED"
-        summary = f"{len(changed)} dependency update(s) available"
+        summary = f"{len(updates)} compatible dependency update(s) available"
+    elif warnings:
+        status = "DEPENDENCY_CHANGE_DETECTED"
+        summary = f"{len(warnings)} dependency warning(s) require review"
     else:
         status = "DEPENDENCIES_CURRENT"
         summary = "All dependencies are current"
@@ -458,8 +664,8 @@ def detect_all_changes(repo_root: Optional[Path] = None) -> DetectionResult:
     return DetectionResult(
         status=status,
         dependencies=all_deps,
-        run_id=run_id(),
-        timestamp=datetime.now(timezone.utc).isoformat() + "Z",
+        run_id=run,
+        timestamp=timestamp,
         summary=summary
     )
 
