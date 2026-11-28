@@ -46,6 +46,9 @@ activation, retention decisions and production operations remain separately gate
 Mays-Orders-AWS is deliberately separate from Mays-RIS. Publishing this repository does
 not update or deploy a RIS installation.
 
+RIS synthetic integration acceptance reference (documentation only):
+[integration result and version boundary](docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md).
+
 ## Module Builder
 
 The Module Builder is the primary composition tool. It copies tested Terraform modules,

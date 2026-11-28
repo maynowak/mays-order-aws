@@ -64,8 +64,8 @@ der Chatverlauf ist keine Recovery-Quelle.
 
 ## AUDIT LOG INDEX
 
-Current Branch: main
-Latest HEAD: siehe `git log -1` (RC.3-Basis vor diesem Doku-Commit: `8b61922`)
+Current Branch: docs/mo-ris-integration-reference-01
+Latest HEAD: `173047184d654cc02671c073e524fdedbb367fc7` (documentation branch; PR #3 open).
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -380,6 +380,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-ORDER-DESCRIPTION-05 → docs/reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md (Doku-Empfehlung für eigene SKU-Konventionen als informative Order-Art-Markierung; `orderType` bleibt Routing; Beispiel Consumer A „Benutze Bestellung auf Korb X"/„wartet"; nicht normativ, keine Code-/AWS-/Terraform-/RIS-Änderung)
 - WIKI-CONSISTENCY-01 → docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md (docs/wiki/** gegen Code/Tests/Reports geprüft; 12 Seiten inkl. Dokumentationsportal/FAQ, Glossar, Kurz-Erklärungen, Release-Bilder, Privacy-/CI-Grenzen; 0 fehlende Links; Wiki-Pflege in AGENTS/Playbook; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - CI-CODQL-SARIF-DEPENDENCY-AUDIT-01 → docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md (CodeQL 143/143 + SARIF-Upload complete; Dependency-SARIF complete; Security Gate success; GitHub-Incident behoben; Scanner-Fehlalarm `hashicorp/time ~> 0.11`/Lock 0.14.2 und AWS-Constraint-vs-Lock dokumentiert; Fix offen)
+- RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01 → docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01-EXECUTION_LOG.md (synthetische RIS-Abnahme verlinkt; integrierter Pin von RC4/Kandidat getrennt; keine Mays-Moduländerung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1219,3 +1220,15 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Gate ist kein Nachweis „keine Findings“.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.
+
+## 2026-11-28 — RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01
+
+**Status:** COMPLETE — documentation-only cross-repository reference prepared; no module/source change.
+
+- Mays documentation branch `docs/mo-ris-integration-reference-01` is based on `origin/main` `8830da290e2960c1f319fb0a2b4a6724d00cbafd`.
+- Added `docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md`, a concise pointer to the central RIS dossier and final status. No copy of the 14-chapter dossier was created.
+- Linked the reference from the root README and human-facing wiki README, source index, and documentation portal.
+- Version boundary is explicit: integrated source pin `db4f9e7…` is distinct from RC4 tag `5bc154e…` and upgrade candidate `80a84ca…`.
+- Synthetic RIS acceptance does not grant production or real-PII privacy approval. No Terraform/AWS, build, deployment, runtime, or live-order action.
+- Execution log: `docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01-EXECUTION_LOG.md`.
+- Merge remains unauthorized; prepare a separate documentation PR and stop before merge.

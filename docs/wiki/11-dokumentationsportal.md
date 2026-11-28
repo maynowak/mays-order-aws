@@ -21,6 +21,7 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | Projektstatus | aktueller Stand, Checkpoints, Blocker | [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md) |
 | Roadmap | kanonische Entwicklungsplanung | [`docs/roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) |
 | Auditlog | Prüfungen, Reports, Entscheidungen | [`docs/AI_AUDITLOG.md`](../AI_AUDITLOG.md) |
+| RIS integration reference | synthetic RIS-DEV2 acceptance and source-version boundary; links to central dossier | [`RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md`](../reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md) |
 
 ## Architektur und Produkt
 

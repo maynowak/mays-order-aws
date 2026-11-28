@@ -30,6 +30,9 @@ zusammenspielen und wo der belegte Entwicklungsstand endet.
   **kein** Routing-Ersatz für `orderType` (`api/endpoints.md` §2.1.1).
 - **Dokumentations-Konsistenz:** Status, Test-Ergebnisse, API-Testfälle,
   Roadmap, Schema und Auditlog wurden nachgezogen.
+- **RIS-Integrationsreferenz:** Die separate synthetische RIS-Abnahme ist in
+  einem kurzen Bericht verlinkt; sie ist weder Mays-Orders-Release noch Privacy-
+  Freigabe für echte personenbezogene Daten ([Referenz](../reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md)).
 
 ## Schnell zum passenden Einstieg
 
