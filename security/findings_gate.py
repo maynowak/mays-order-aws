@@ -249,12 +249,6 @@ def _validate_sarif_structure(data: dict) -> Optional[str]:
     for i, run in enumerate(runs):
         if not isinstance(run, dict):
             return f"Run[{i}] is not an object"
-        tool = run.get("tool")
-        if not isinstance(tool, dict):
-            return f"Run[{i}] missing 'tool' object"
-        driver = tool.get("driver")
-        if not isinstance(driver, dict):
-            return f"Run[{i}] missing 'tool.driver' object"
         if "results" not in run:
             return f"Run[{i}] missing 'results' array"
         results = run.get("results")
