@@ -92,9 +92,14 @@ EOF
 }
 
 # ---- Extract classification from Python output -------------------------
-CLASSIFICATION=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*CLASSIFICATION:\(\w*\).*/\1/p' | tail -1)
+# Use sed for portability (grep -oP is not available on all systems)
+CLASSIFICATION=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*CLASSIFICATION:\([A-Za-z]*\).*/\1/p' | tail -n 1)
 CLASSIFICATION="${CLASSIFICATION:-UNKNOWN}"
-REPORT_PATH=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*REPORT_PATH:\(\S*\).*/\1/p' | tail -1)
+REPORT_PATH=$(echo "$PYTHON_OUTPUT" | sed -n 's/.*REPORT_PATH:\([^ ]*\).*/\1/p' | tail -n 1)
+
+# Debug output (visible in job log)
+echo "::debug::Findings gate Python output: ${PYTHON_OUTPUT}"
+echo "::debug::Classification: ${CLASSIFICATION}"
 
 # ---- Fail-closed: unknown classification blocks -----------------------
 case "$CLASSIFICATION" in
