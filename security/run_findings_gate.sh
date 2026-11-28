@@ -68,7 +68,12 @@ fi
 PYTHON_OUTPUT=$(python3 -c "
 import sys
 sys.path.insert(0, '${SCRIPT_DIR}')
-from findings_gate import evaluate_scan, write_report
+from findings_gate import evaluate_scan, write_report, _validate_sarif_structure
+import json
+with open('${SARIF_PATH}', 'r') as f:
+    data = json.load(f)
+verr = _validate_sarif_structure(data)
+print('DEBUG_VAL_ERROR:' + str(verr))
 result = evaluate_scan('${SARIF_PATH}', selected=True)
 print(result.summary)
 print('CLASSIFICATION:' + result.classification.name)
