@@ -86,6 +86,10 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | [`MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md`](../reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md) | SKU-Konventionen als Order-Art-Hinweis |
 | [`WIKI-CONSISTENCY-01-EXECUTION_LOG.md`](../reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md) | Prüfung/Ergänzung dieser Wiki |
 | [`CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`](../reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md) | CodeQL/SARIF-Upload und Dependency-Scanner-Befund |
+| [`MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md`](../reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md) | Dependency-Detector-/SARIF-Remediation und GitHub-Scan-Verifikation |
+| [`MO-GH-SEC-02-CI-ORCHESTRATION.md`](../reports/MO-GH-SEC-02-CI-ORCHESTRATION.md) | CI-Orchestrierung, CodeQL-/SARIF-Vertrag und GitHub-Verifikationsplan |
+
+| [`MO-GH-SEC-03-SECURITY-FINDINGS-GATE.md`](../reports/MO-GH-SEC-03-SECURITY-FINDINGS-GATE.md) | Security Findings Gate Policy und Testfälle |
 
 ## Pflege
 

@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-23)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-28)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -79,6 +79,79 @@ evidence 0fc8972); no deployment
 → CI-Audit 2026-11-25: Re-Runs nach GitHub-Incident grün (CodeQL 143/143 +
   SARIF-Upload complete; Dependency/Security Gate success); separater
   Dependency-Scanner-Fehlalarm `time ~> 0.11`/Lock 0.14.2 dokumentiert (Fix offen)
+→ GitHub-Security-Baseline 2026-11-28: MO-GH-SEC-01 auditiert; 257 offene
+  Code-Scanning-Alerts (3 high), `main` ohne Protection/Rulesets, Security Gate
+  echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags statt
+  SHA; WPs 02–10 definiert; keine Code-/AWS-/Terraform-/RIS-Mutation
+→ Dependency/SARIF-Remediation 2026-11-28: MO-GH-SEC-04 lokal verifiziert
+  (`dd5ff62`/`1534a98`/`e2bfe88`): Terraform-`~>`/SemVer/combined Constraints,
+  Lock-basierte Declared-/Locked-/Latest-/Compatible-Auflösung mit
+  Drift/Missing/Violation/Registry-Fehler, repository-relative SARIF-URIs,
+  stabile Rule-IDs/Fingerprints, `dependency-check`-Kategorie, keine
+  `CURRENT`-Findings; 33 fokussierte + 691 Installer + 456 Lambda + 129
+  Builder + 28 Seed + 32 Harness PASS; #296/#298-Auto-Resolution vorbereitet,
+  GitHub-Scan-Verifikation PENDING; AWS-Constraint-Drift (`>=6.0` vs.
+  `~>6.0`) bleibt separater Reconcile-Task; keine Dependency-/Workflow-/
+  AWS-/Terraform-/Alert-Änderung
+→ CI-Orchestrierung 2026-11-28: MO-GH-SEC-02 lokal verifiziert
+
+→ MO-GH-SEC-02A 2026-11-28: kontrollierter GitHub‑Security‑Verification‑Entwurf
+PR #2 geöffnet (draft) gegen `main`; Verifikation läuft (Run ID
+`46131208709`); erwartete Ergebnisse siehe
+
+→ MO-GH-SEC-03 2026-11-28: Security Gate Policy definiert und
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification (abgeschlossen)
+  sieben Review‑Defekte behoben (FAIL‑Closed, Portabilität, Scan‑Selection, Evidence, Severity, Coverage, Reporting).
+  neue Commits ff1b543, b109410, f467664, 28d12e9.
+  GitHub‑Run‑Verifikation über PR‑Run #2 und Run‑IDs 4613xxxx.
+  Anzahl neue Testfälle: 9 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/AWS‑/Order‑Modul‑Änderung.
+  findings_gate.py + run_findings_gate.sh + security.yml-Änderung.
+  GitHub‑Run 46134692744 (in_progress → completed) bestätigt Gate‑Entscheidung
+  anhand SARIF‑Severity‑Auswertung; neue Commits `28d12e9` und `f467664`.
+  Anzahl neue Findings‑Gate‑Tests: 7 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/
+  AWS‑/Order‑Modul‑Änderung.
+  Dokumentation erstellt (Policy: HIGH/CRITICAL→FAIL, MEDIUM/LOW→REPORT,
+  Fehler→FAIL/BLOCKED, nicht ausgewählte→NOT EVALUiert, keine
+  Security‑Freigabe bei unvollständiger Abdeckung). CodeQL‑Severity aus
+  SARIF, Dependency‑Status aus detector.py; `LOCK_CONSTRAINT_DRIFT` ist
+  kein automatischer Sicherheits‑Auslöser. Testfälle definiert, Lauf
+  `46131208709` als Referenz. Abschluss: `SECURITY GATE VERIFIED /
+  FINDINGS REMEDIATION PENDING`.
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification (abgeschlossen)
+  sieben Review‑Defekte behoben (FAIL‑Closed, Portabilität, Scan‑Selection, Evidence, Severity, Coverage, Reporting).
+  neue Commits ff1b543, b109410, f467664, 28d12e9.
+  GitHub‑Run‑Verifikation über PR‑Run #2 und Run‑IDs 4613xxxx.
+  Anzahl neue Testfälle: 9 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/AWS‑/Order‑Modul‑Änderung.
+  `findings_gate.py` + `run_findings_gate.sh` + `security.yml-Änderung`.
+  GitHub‑Run 46134416214 (in_progress → completed) bestätigt Gate‑Entscheidung
+  anhand SARIF‑Severity‑Auswertung; neue Commits `28d12e9` und
+  `f467664`. Anzahl neue Findings‑Gate‑Tests: 7 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/
+  AWS‑/Order‑Modul‑Änderung.
+`docs/reports/MO‑GH‑SEC‑02A‑GITHUB‑VERIFICATION.md`;
+nach Abschluss: Alert‑#296/#298‑Auflösung und AWS‑Lock‑Drift
+Reconciliation prüfen.
+  (`bd5e48c`/`b2ef6be`/`b0011e4`): `security.yml` ist einziger Trigger,
+  `codeql.yml`/`dependency-check.yml` sind `workflow_call`-only; wöchentliches
+  CodeQL (Mo 03:00 UTC) und täglicher Dependency-Scan (06:00 UTC) erhalten;
+  manuelle Scan-Auswahl; stabile Kategorien `/language:python` und
+  `dependency-check`; Concurrency/Timeouts/Least-Privilege; echo-only
+  Security Gate durch Orchestrierungs-Gate ohne Findings-Freigabe ersetzt;
+  `secrets: inherit` entfernt; keine Pfad-Filter; 33 fokussierte + 98
+  Installer-Modul + 691 Installer (2 Skips) + 456 Lambda + 129 Builder +
+  28 Seed + 32 Harness PASS; Lambda-ZIP 47.552 Bytes/SHA-256 `117299c9…`;
+  GitHub-Scan-/Alert-Verifikation (#296/#298, Doppelanalysen) PENDING;
+  kein PR/Main-Merge, keine Alert-/Security-Settings-/AWS-/Terraform-/
+  Order-Modul-Änderung
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen

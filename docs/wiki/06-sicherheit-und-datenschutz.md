@@ -15,6 +15,10 @@
   und Consumer-Kontext wird geprüft.
 - IAM folgt dem Least-Privilege-Prinzip und verwendet enge Ressourcen-ARNs.
 - Installer prüft Kontext, Plan, State, Terraform-Policy und Artefaktintegrität.
+- Die CI orchestriert CodeQL und den Dependency-Scan über `security.yml`;
+  der aktuelle `Security Gate (orchestration only)` prüft nur die Ausführung,
+  **nicht** die Findings. Die vollständige Findings-Auswertung ist
+  MO-GH-SEC-03 und noch nicht implementiert.
 - Es werden keine Zugangsdaten oder Secret-Werte in Git eingecheckt.
 - Ein Release/Modul-Tag aktualisiert kein unabhängiges Consumer-Projekt
   automatisch.
@@ -96,6 +100,25 @@ F012 in der Zielumgebung tatsächlich deployed wurde.
 6. Menschliche Freigabe für jeden Apply, Destroy oder Produktionsbetrieb
    einholen.
 7. Evidence versioniert sichern und offene Punkte sichtbar lassen.
+
+### Security Gate (MO-GH-SEC-03)
+
+Das Security Gate (Orchestrierungs‑Gate, kein Security‑Approved‑Gate) wertet
+bei erfolgreichem Scan‑Completion die Ergebnisse nach der Policy von
+MO‑GH‑SEC‑03 aus:
+
+- **HIGH / CRITICAL** → Gate schlägt fehl (`FAIL`), Ergebnisse werden im
+  Job‑Summary geführt.
+- **MEDIUM / LOW** → Gate besteht (`PASS`), Ergebnisse werden als Report
+  ausgegeben.
+- **Scanner‑ oder Upload‑Fehler** → Gate schlägt fehl (`FAIL`).
+- **Fehlende / veraltete Ergebnisse** → Gate blockiert (`BLOCKED`).
+- **Bewusst nicht ausgewählte Scans** → Gate besteht, es wird
+  `NOT EVALUATED` vermerkt.
+- **Keine Security‑Freigabe**: Das Gate gibt ausdrücklich aus, dass es sich
+  nicht um eine Security‑Freigabe handelt (siehe MO‑GH‑SEC‑03).
+
+Weitere Details finden sich in `docs/reports/MO‑GH‑SEC‑03‑SECURITY‑FINDINGS‑GATE.md`.
 
 ### Quellen
 

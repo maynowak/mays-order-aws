@@ -24,6 +24,7 @@ maßgeblich sind `PROJECT_STATUS.md`, Release Notes und die aktuellen Reports.*
 | SKU-Leitlinie | Dokumentiert, dass `sku` frei/nicht kataloggeprüft ist und eigene Konventionen als informativer Order-Art-Hinweis möglich sind — ohne `orderType` zu ersetzen. | `api/endpoints.md` §2.1.1, `MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md` |
 | Doku-Konsolidierung | Status, API-Testfälle, Changelog, Roadmap und Schema-Doku auf F012 nachgezogen; zuletzt am 24.11.2026 laut Projektstatus. | `MO-ORDER-DESCRIPTION-04-DOC-SYNC.md`, `docs/roadmap/ROADMAP.md` |
 | Wiki-Konsistenz | Diese Wiki gegen Code, Tests und Reports geprüft; Bilder, Dokumentationsportal, Glossar und Pflege-Regeln ergänzt. | `docs/wiki/`, `WIKI-CONSISTENCY-01-EXECUTION_LOG.md` |
+| GitHub-Security-CI | Doppelte CodeQL-/Dependency-Ausführungen unter einem Orchestrator zusammengeführt, Zeitpläne und Kategorien stabilisiert, echo-only Gate durch einen Orchestrierungs-Gate ohne Findings-Freigabe ersetzt. | `MO-GH-SEC-02-CI-ORCHESTRATION.md`; GitHub-Verifikation PENDING |
 
 ## Warum es mehrere Versionsnummern gibt
 
