@@ -85,12 +85,17 @@ def _extract_description(result: dict) -> str:
 
 
 def _extract_sarif_severity(result: dict) -> Optional[str]:
+    # Prefer rules.severity – this is the CodeQL Security Severity,
+    # not to be equated with SARIF `level` unconditionally.
+    rule = result.get("rule", {})
+    if isinstance(rule, dict):
+        sev = rule.get("severity", "")
+        if sev:
+            return sev
+    # Fallback to SARIF level only if no rule-severity available
     level = result.get("level", "")
     if level:
         return level
-    rule = result.get("rule", {})
-    if isinstance(rule, dict):
-        return rule.get("severity", "")
     return ""
 
 
