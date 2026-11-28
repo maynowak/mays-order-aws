@@ -64,8 +64,8 @@ der Chatverlauf ist keine Recovery-Quelle.
 
 ## AUDIT LOG INDEX
 
-Current Branch: main
-Latest HEAD: siehe `git log -1` (RC.3-Basis vor diesem Doku-Commit: `8b61922`)
+Current Branch: feature/mo-github-security-cleanup-01
+Latest HEAD: siehe `git log -1` (Basis vor MO-GH-SEC-01: `8830da2`)
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
@@ -380,6 +380,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - MO-ORDER-DESCRIPTION-05 → docs/reports/MO-ORDER-DESCRIPTION-05-SKU-GUIDANCE.md (Doku-Empfehlung für eigene SKU-Konventionen als informative Order-Art-Markierung; `orderType` bleibt Routing; Beispiel Consumer A „Benutze Bestellung auf Korb X"/„wartet"; nicht normativ, keine Code-/AWS-/Terraform-/RIS-Änderung)
 - WIKI-CONSISTENCY-01 → docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md (docs/wiki/** gegen Code/Tests/Reports geprüft; 12 Seiten inkl. Dokumentationsportal/FAQ, Glossar, Kurz-Erklärungen, Release-Bilder, Privacy-/CI-Grenzen; 0 fehlende Links; Wiki-Pflege in AGENTS/Playbook; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - CI-CODQL-SARIF-DEPENDENCY-AUDIT-01 → docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md (CodeQL 143/143 + SARIF-Upload complete; Dependency-SARIF complete; Security Gate success; GitHub-Incident behoben; Scanner-Fehlalarm `hashicorp/time ~> 0.11`/Lock 0.14.2 und AWS-Constraint-vs-Lock dokumentiert; Fix offen)
+- MO-GH-SEC-01 → docs/reports/MO-GH-SEC-01-BASELINE-AUDIT.md (GitHub-Security-Baseline: 3 Workflows/Doppelausführung, CodeQL/SARIF-Kategorien, 257 offene Code-Scanning-Alerts/3 high, Security Gate echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags/SHA, keine Branch Protection/Rulesets, 0 Dependabot/Secret-Scanning-Alerts; WPs 02–10; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1219,3 +1220,65 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
   Gate ist kein Nachweis „keine Findings“.
 - Keine Code-, AWS-, Terraform- oder RIS-Änderung; kein Deployment.
 - Report: `docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md`.
+
+## 2026-11-28 — MO-GH-SEC-01 — GITHUB SECURITY BASELINE AUDIT
+
+**Status:** `BASELINE AUDITED / READY FOR REMEDIATION` · **ORANGE** (hohe
+Kontroll-/Konfigurationslücken, keine Kompromittierung belegt)
+
+- **Datum:** 2026-11-28 · **Branch:** `feature/mo-github-security-cleanup-01`
+  · **Basis-HEAD:** `8830da2` (main/origin/main)
+- **Scope:** GitHub Actions/Trigger, CodeQL/SARIF/Kategorien, Code Scanning,
+  Dependabot, Secret Scanning/Push Protection, Dependency Detector,
+  Terraform-/IAM-/Python-/Shell-Coverage, Actions-SHA/Permissions,
+  PRs/Branches/Rulesets/Branch Protection, Security-Dokumentation.
+- **Read-only:** keine Codeänderung, keine Alert-Dismissals, keine
+  Branch-Löschung, keine GitHub-Security-Setting-Änderung, kein Main-Merge,
+  kein AWS-/Terraform-Einsatz.
+- **Baseline:** 3 Workflows; Checks auf `main` 8/8 success; letzte Fehler nur
+  GitHub-Incident 2026-11-25; CodeQL 143/143 Dateien/255 Results;
+  **257 offene Code-Scanning-Alerts** (255 CodeQL + 2 Dependency), 74 closed,
+  0 dismissed, **3 high**; Dependabot 0; Secret Scanning 0; Push Protection
+  enabled, Validity Checks/Non-Provider-Patterns disabled.
+- **Doppelausführung:** `codeql.yml` + `security.yml` erzeugen zwei
+  CodeQL-Analysen pro Commit mit identischer Kategorie `/language:python`
+  (IDs 2249689085/2249688916); `dependency-check.yml` + `security.yml`
+  erzeugen zwei Dependency-Runs. Kein `concurrency`/Timeout.
+- **Security Gate:** `security.yml:35-50` ist echo-only; grün trotz 257
+  Alerts/3 high; keine SARIF-/API-Auswertung.
+- **Dependency Detector:** `~>`-Semantik falsch (`~> 0.11` → `<0.12`);
+  Tests `installer/tests/test_installer.py:1408/1410` zementieren den Fehler;
+  `stable_versions[0]` unsortiert (AWS beobachtet 5.92.0/6.54.0/3.24.1,
+  Lock 6.65.0); Lock-Datei wird ignoriert; SARIF nutzt absolute Pfade,
+  Kategorie `""`, keine `partialFingerprints`, `CURRENT`-Notes; Alerts
+  #296/#298 stale.
+- **High-Alerts:** #1 `py/clear-text-logging-sensitive-data`
+  (`terraform/policy/validate-plan.py:465`), #145/#146
+  `py/overly-permissive-file` (`installer/core/atomic_ops.py:383`,
+  `installer/core/lock_manager.py:122`), alle seit 2026-09-20 offen.
+- **Governance:** `main` ungeschützt (Protection 404), Rulesets `[]`,
+  Environments 0; Actions `allowed_actions=all`,
+  `sha_pinning_required=false`, Tags statt SHA; `SECURITY.md`/`CODEOWNERS`
+  fehlen; 27 Remote-Branches (15 gemergt, 11 unmerged, 7 vom 2026-08-18);
+  0 offene PRs.
+- **Coverage:** CodeQL nur Python; kein Checkov/tfsec/Trivy, kein
+  ShellCheck, kein IAM-Analyzer, kein pip-audit, kein actionlint/zizmor,
+  kein gitleaks/trufflehog; Policy Gate prüft IAM-Wildcards/Secrets-KMS nur
+  lokal im Installer, nicht in CI.
+- **Terraform/AWS:** keine Terraform-Kommandos, keine AWS-Operationen; nur
+  Dateien gelesen.
+- **Git:** Doku-Report + Auditlog + PROJECT_STATUS auf Feature-Branch;
+  Checkpoint folgt (diff --check, Secret-Audit, Commit, Push); kein
+  Main-Merge.
+- **Offene Fragen:** Orchestrator-Wahl; Gate-Fail-Schwelle; CodeQL-Tests/
+  Quality; WP04-vor-WP03; Branch-Protection-Anforderungen; Dependabot-Scope;
+  Secret-Scanning-Härtung; Owner/Triage der 3 High-Alerts.
+- **Risiken:** falsches Sicherheitsgefühl durch grünen Gate; False-Positive-
+  Rauschen; mutable Action-Tags; unprotected `main`; fehlende IaC-Abdeckung;
+  Alert-Fatigue; kein Disclosure-Prozess.
+- **Nächste Aktionen:** MO-GH-SEC-04 (Detector/SARIF) → MO-GH-SEC-02
+  (Orchestrierung) → MO-GH-SEC-03 (Gate) → MO-GH-SEC-07/08 (Supply Chain/
+  Governance) → MO-GH-SEC-06 (Triage) → MO-GH-SEC-05/09/10 (Coverage).
+- **Resume Point:** Report `docs/reports/MO-GH-SEC-01-BASELINE-AUDIT.md`;
+  Feature-Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
+  WP04 oder WP02 nach Freigabe.

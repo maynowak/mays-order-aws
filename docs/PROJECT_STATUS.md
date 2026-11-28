@@ -79,6 +79,10 @@ evidence 0fc8972); no deployment
 → CI-Audit 2026-11-25: Re-Runs nach GitHub-Incident grün (CodeQL 143/143 +
   SARIF-Upload complete; Dependency/Security Gate success); separater
   Dependency-Scanner-Fehlalarm `time ~> 0.11`/Lock 0.14.2 dokumentiert (Fix offen)
+→ GitHub-Security-Baseline 2026-11-28: MO-GH-SEC-01 auditiert; 257 offene
+  Code-Scanning-Alerts (3 high), `main` ohne Protection/Rulesets, Security Gate
+  echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags statt
+  SHA; WPs 02–10 definiert; keine Code-/AWS-/Terraform-/RIS-Mutation
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen
