@@ -29,6 +29,7 @@ Wiki-Nachweise.
 | Welche Tests/Evidence existieren? | `docs/reports/`, `tests/`, `docs/release/` |
 | Was ist Datenschutz-/Security-Status? | `docs/security/`, `docs/reports/MAYS-ORDERS-DSGVO-*`, `docs/reports/MO-RC4-P00-*` |
 | Was wurde wann geprüft? | `docs/AI_AUDITLOG.md` |
+| Was belegt die RIS-Orders-Integration? | [`docs/reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md`](../reports/RIS-MAYS-ORDERS-INTEGRATION-REFERENCE-01.md); zentraler RIS-Nachweis und Status sind dort verlinkt |
 
 ## Leseregeln
 
