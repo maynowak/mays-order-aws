@@ -65,7 +65,7 @@ der Chatverlauf ist keine Recovery-Quelle.
 ## AUDIT LOG INDEX
 
 Current Branch: docs/mo-ris-integration-reference-01
-Latest HEAD: base `8830da290e2960c1f319fb0a2b4a6724d00cbafd`; documentation changes in progress.
+Latest HEAD: `173047184d654cc02671c073e524fdedbb367fc7` (documentation branch; PR #3 open).
 
 The following tasks have been completed with reports in docs/reports/:
 - B8.6 FINAL-CONSISTENCY-RECOVERY-AUDIT-AND-DOCUMENTATION-01 → docs/reports/BACKUP-08.6-FINAL-REMOTE-STATE-RECOVERY-AUDIT.md
