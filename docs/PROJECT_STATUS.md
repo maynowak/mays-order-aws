@@ -94,6 +94,13 @@ evidence 0fc8972); no deployment
   `~>6.0`) bleibt separater Reconcile-Task; keine Dependency-/Workflow-/
   AWS-/Terraform-/Alert-Änderung
 → CI-Orchestrierung 2026-11-28: MO-GH-SEC-02 lokal verifiziert
+
+→ MO-GH-SEC-02A 2026-11-28: kontrollierter GitHub‑Security‑Verification‑Entwurf
+PR #2 geöffnet (draft) gegen `main`; Verifikation läuft (Run ID
+`46131208709`); erwartete Ergebnisse siehe
+`docs/reports/MO‑GH‑SEC‑02A‑GITHUB‑VERIFICATION.md`;
+nach Abschluss: Alert‑#296/#298‑Auflösung und AWS‑Lock‑Drift
+Reconciliation prüfen.
   (`bd5e48c`/`b2ef6be`/`b0011e4`): `security.yml` ist einziger Trigger,
   `codeql.yml`/`dependency-check.yml` sind `workflow_call`-only; wöchentliches
   CodeQL (Mo 03:00 UTC) und täglicher Dependency-Scan (06:00 UTC) erhalten;
