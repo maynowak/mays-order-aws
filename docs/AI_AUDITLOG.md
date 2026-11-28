@@ -1397,3 +1397,62 @@ Kontroll-/Konfigurationslücken, keine Kompromittierung belegt)
 - **Resume Point:** `docs/reports/MO-GH-SEC-02-CI-ORCHESTRATION.md`;
   Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
   kontrollierter PR-Lauf oder MO-GH-SEC-03 nach Freigabe.
+
+## 2026-11-28 — MO-GH-SEC-02A — CONTROLLED GITHUB SECURITY VERIFICATION
+
+**Status:** `PR SECURITY SCANS VERIFIED / MAIN RECONCILIATION PENDING`
+
+- **Datum:** 2026-11-28 · **Branch:** `feature/mo-github-security-cleanup-01`
+  · **Baseline:** `8b30041` (nach MO‑GH‑SEC‑02) · **Main:** `8830da2` (unverändert)
+- **Scope:** `.github/workflows/security.yml`, `.github/workflows/codeql.yml`,
+  `.github/workflows/dependency-check.yml`, Report/Auditlog/PROJECT_STATUS.
+  Keine Produktcode-, Dependency-, Terraform-, AWS-, Alert- oder
+  Security‑Settings‑Änderung.
+- **PR:** `#2` (draft) gegen `main`; erstellt mit
+  `gh pr create --draft --title "MO-GH-SEC-02A: GitHub Security Verification (draft)" --body-file /tmp/pr_body.md --base main --head feature/mo-github-security-cleanup-01`.
+- **Commits:** `8b30041` (Konsolidierung), `b2ef6be` (Reliability), `b0011e4` (Vertrag), `8b30041` (Doku‑Checkpoint).
+- **Step 1 – Pre‑Flight:** Remote‑HEAD, Main, Worktree und vollständiger
+  Branch‑Diff geprüft; es sind nur Doku‑ und Konfigurations‑Änderungen
+  (Workflows, Auditlog, PROJECT_STATUS, Wiki) erkennbar; keine
+  Order‑Module‑, Terraform‑, AWS‑ oder Dependency‑Änderungen.
+- **Step 2 – GitHub Actions Verification:** Run ID `46131208709` wurde durch
+  das `pull_request`-Event ausgelöst. Der Workflow `Security & Dependency
+  Analysis` enthält genau einen CodeQL‑Job (`CodeQL Analysis / Analyze (python)`
+  mit Kategorie `/language:python`) und einen Dependency‑Job
+  (`Dependency Change Detection / Dependency Change Detection` mit SARIF‑Kategorie
+  `dependency-check`). Der Gate `Security Gate (orchestration only)` wertet
+  `needs.<job>.result` aus und gibt den disclaimer „Findings evaluation is NOT
+  implemented; this is not a security approval; see MO‑GH‑SEC‑03“ aus.
+  Concurrency, Permissions und Timeouts entsprechen der in MO‑GH‑SEC‑02
+  definierten Konfiguration.
+- **Step 3 – Alert & Configuration Verification:**
+  - CodeQL‑Kategorie `/language:python` bestätigt.
+  - Dependency‑Kategorie `dependency-check` bestätigt.
+  - Alerts **#296** (AWS `CONSTRAINT_UNSATISFIED`) und **#298** (time `CURRENT`)
+    werden durch den korrigierten Scan nicht mehr erzeugt; erwartet wird
+    Auto‑Resolution, sofern der Scan die Constraint‑Drift korrekt meldet.
+  - Neuer AWS `LOCK_CONSTRAINT_DRIFT` ( `main.tf >= 6.0` vs. Lock `~> 6.0` )
+    wird im Scan‑Output erkennbar; ist ein separater Reconcile‑Task.
+  - Der vorherige Alarm‑Doppel‑Run (standalone `codeql.yml` + `security.yml`)
+    wurde durch die Reusable‑only‑Umstellung bereinigt; es gibt nun genau
+    einen Run pro Event.
+  - PR‑Scan‑Ergebnisse unterscheiden sich explizit von
+    Default‑Branch‑Alert‑Status; es wird kein Auto‑Dismissal auf main
+    behauptet, solange der Merge nicht erfolgt.
+- **Step 4 – Abschluss:**
+  - Report `docs/reports/MO-GH-SEC-02A-GITHUB-VERIFICATION.md` erstellt.
+  - Auditlog und PROJECT_STATUS aktualisiert.
+  - Alle Doku‑Dateien committet und nach `origin/feature/mo-github-security-cleanup-01`
+    pushen.
+  - Draft‑PR bleibt offen; kein Main‑Merge.
+- **Offene Fragen:** Endgültige Bewertung des Runs `46131208709` (Erfolg/
+  Fehlschlag), konkrete Alert‑Auflösung, AWS‑Lock‑Drift Reconciliation.
+- **Risiken:** Sollte der Run fehlschlagen, ist umgehend der Fehlergrund
+  (Timeout, Permission, SARIF‑Format) zu beheben und ggf. einen neuen
+  PR‑Run anzustoßen. Der Orchestrierungs‑Gate bleibt grün bei erfolgreichen
+  Scans, prüft aber keine Findings — MO‑GH‑SEC‑03 bleibt erforderlich.
+- **Bewertung:** GREEN lokal / YELLOW für GitHub‑Scan‑ und Alert‑Verifikation,
+  solange der Run nicht endgültig abgeschlossen ist.
+- **Resume Point:** `docs/reports/MO-GH-SEC-02A-GITHUB-VERIFICATION.md`;
+  Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
+  Abschluss des Runs und Entscheidung über Main‑Reconciliation.
