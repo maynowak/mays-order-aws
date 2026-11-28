@@ -19,6 +19,8 @@ import subprocess
 import sys
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
+from functools import total_ordering
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Optional
 import urllib.request
@@ -59,65 +61,201 @@ class DetectionResult:
         }, indent=2)
 
 
-def parse_version_constraint(version: str) -> tuple[str, str]:
+@total_ordering
+class Version:
+    """SemVer-like version with numeric core and SemVer pre-release ordering.
+
+    Terraform provider versions are normally ``MAJOR.MINOR.PATCH``.  Missing
+    core components compare as zero (``1.2`` == ``1.2.0``).  Build metadata is
+    ignored; pre-release identifiers use SemVer precedence.
     """
-    Parse version constraint like ">= 6.0", "~> 0.11", "= 1.0.0".
-    Returns (operator, version).
-    """
-    version = version.strip()
-    operators = [">=", "<=", "~>", ">", "<", "=", "!="]
+
+    __slots__ = ("core", "prerelease", "original")
+
+    def __init__(self, core: tuple[int, ...], prerelease: tuple[tuple[int, Any], ...] = (), original: str = ""):
+        if not core:
+            raise ValueError("version core must not be empty")
+        self.core = tuple(core)
+        self.prerelease = tuple(prerelease)
+        self.original = original
+
+    @classmethod
+    def parse(cls, value: str) -> "Version":
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"invalid version: {value!r}")
+        raw = value.strip()
+        normalized = raw[1:] if raw[:1] in ("v", "V") else raw
+        normalized = normalized.split("+", 1)[0]
+        if "-" in normalized:
+            core_part, prerelease_part = normalized.split("-", 1)
+        else:
+            core_part, prerelease_part = normalized, ""
+
+        core_parts = core_part.split(".")
+        if not core_parts or any(not part.isdigit() for part in core_parts):
+            raise ValueError(f"invalid version core: {value!r}")
+
+        prerelease: list[tuple[int, Any]] = []
+        if prerelease_part:
+            for identifier in prerelease_part.split("."):
+                if not identifier:
+                    raise ValueError(f"invalid pre-release: {value!r}")
+                if identifier.isdigit():
+                    prerelease.append((0, int(identifier)))
+                else:
+                    prerelease.append((1, identifier))
+
+        return cls(tuple(int(part) for part in core_parts), tuple(prerelease), raw)
+
+    def _compare(self, other: "Version") -> int:
+        if not isinstance(other, Version):
+            return NotImplemented
+
+        max_len = max(len(self.core), len(other.core))
+        self_core = self.core + (0,) * (max_len - len(self.core))
+        other_core = other.core + (0,) * (max_len - len(other.core))
+        if self_core != other_core:
+            return -1 if self_core < other_core else 1
+
+        if not self.prerelease and not other.prerelease:
+            return 0
+        if not self.prerelease:
+            return 1
+        if not other.prerelease:
+            return -1
+
+        for left, right in zip_longest(self.prerelease, other.prerelease):
+            if left is None:
+                return -1
+            if right is None:
+                return 1
+            if left == right:
+                continue
+            # Numeric identifiers have lower precedence than alphanumeric ones.
+            if left[0] != right[0]:
+                return -1 if left[0] < right[0] else 1
+            return -1 if left[1] < right[1] else 1
+        return 0
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Version):
+            return NotImplemented
+        return self._compare(other) == 0
+
+    def __lt__(self, other: "Version") -> bool:
+        if not isinstance(other, Version):
+            return NotImplemented
+        return self._compare(other) < 0
+
+    def __hash__(self) -> int:
+        return hash((self.core, self.prerelease))
+
+    def __repr__(self) -> str:
+        return f"Version({self.original or '.'.join(map(str, self.core))!r})"
+
+
+def _parse_single_constraint(constraint: str) -> tuple[str, str]:
+    """Parse one constraint such as ``>= 6.0`` or ``~> 0.11``."""
+    value = constraint.strip()
+    if not value:
+        raise ValueError("empty version constraint")
+    operators = ("!=", ">=", "<=", "~>", ">", "<", "=")
     for op in operators:
-        if version.startswith(op):
-            return op, version[len(op):].strip()
-    # No operator found, assume exact match
-    return "=", version
+        if value.startswith(op):
+            version = value[len(op):].strip()
+            if not version:
+                raise ValueError(f"missing version in constraint: {constraint!r}")
+            return op, version
+    # No operator found, assume exact match.
+    return "=", value
+
+
+def parse_version_constraint(version: str) -> tuple[str, str]:
+    """Parse a single constraint; raises ``ValueError`` for combined input."""
+    constraints = parse_version_constraints(version)
+    if len(constraints) != 1:
+        raise ValueError(f"expected one constraint, got {len(constraints)}: {version!r}")
+    return constraints[0]
+
+
+def parse_version_constraints(constraint: str) -> list[tuple[str, str]]:
+    """Parse comma-separated Terraform constraints (all must match)."""
+    if not isinstance(constraint, str) or not constraint.strip():
+        raise ValueError("empty version constraint")
+    parts = [part.strip() for part in constraint.split(",") if part.strip()]
+    if not parts:
+        raise ValueError("empty version constraint")
+    return [_parse_single_constraint(part) for part in parts]
+
+
+def _pessimistic_upper_bound(constraint_version: Version) -> Version:
+    """Return the exclusive upper bound for Terraform's ``~>`` operator.
+
+    HashiCorp semantics (the second-to-last specified component may increment):
+
+    * ``~> 1``      -> ``>= 1.0.0, < 2.0.0``
+    * ``~> 1.2``    -> ``>= 1.2.0, < 2.0.0``
+    * ``~> 1.2.3``  -> ``>= 1.2.3, < 1.3.0``
+    * ``~> 0.11``   -> ``>= 0.11.0, < 1.0.0``
+    * ``~> 0.11.0`` -> ``>= 0.11.0, < 0.12.0``
+    """
+    core = list(constraint_version.core)
+    if len(core) == 1:
+        upper = (core[0] + 1, 0, 0)
+    else:
+        upper = tuple(core[:-2] + [core[-2] + 1, 0])
+    return Version(upper)
+
+
+def _version_satisfies_single(version: Version, op: str, constraint_version: Version) -> bool:
+    if op == "=":
+        return version == constraint_version
+    if op == "!=":
+        return version != constraint_version
+    if op == ">":
+        return version > constraint_version
+    if op == "<":
+        return version < constraint_version
+    if op == ">=":
+        return version >= constraint_version
+    if op == "<=":
+        return version <= constraint_version
+    if op == "~>":
+        return version >= constraint_version and version < _pessimistic_upper_bound(constraint_version)
+    raise ValueError(f"unsupported version operator: {op!r}")
 
 
 def version_satisfies_constraint(version: str, constraint: str) -> bool:
-    """
-    Check if a version satisfies a constraint.
-    Simplified implementation for common Terraform constraints.
-    """
-    op, constraint_version = parse_version_constraint(constraint)
-
-    def parse_ver(v: str) -> tuple:
-        # Parse semantic version, handle pre-release suffixes
-        parts = v.split("-")[0].split(".")
-        return tuple(int(p) for p in parts)
-
+    """Check a version against one or more comma-separated Terraform constraints."""
     try:
-        v = parse_ver(version)
-        cv = parse_ver(constraint_version)
-    except ValueError:
+        parsed_version = Version.parse(version)
+        constraints = parse_version_constraints(constraint)
+        return all(
+            _version_satisfies_single(parsed_version, op, Version.parse(cv))
+            for op, cv in constraints
+        )
+    except (TypeError, ValueError):
         return False
 
-    if op == "=":
-        return v == cv
-    elif op == "!=":
-        return v != cv
-    elif op == ">":
-        return v > cv
-    elif op == "<":
-        return v < cv
-    elif op == ">=":
-        return v >= cv
-    elif op == "<=":
-        return v <= cv
-    elif op == "~>":
-        # Pessimistic constraint: ~> 1.2 means >= 1.2 and < 1.3
-        # ~> 1.2.3 means >= 1.2.3 and < 1.2.4
-        parts = constraint_version.split(".")
-        if len(parts) >= 2:
-            major = int(parts[0])
-            minor = int(parts[1])
-            if len(parts) == 2:
-                return v >= (major, minor) and v < (major, minor + 1)
-            elif len(parts) >= 3:
-                patch = int(parts[2])
-                return v >= (major, minor, patch) and v < (major, minor, patch + 1)
-        return False
 
-    return False
+def sort_versions(versions: list[str], reverse: bool = True) -> list[str]:
+    """Sort versions numerically; invalid entries are dropped."""
+    parsed: list[tuple[Version, str]] = []
+    for version in versions:
+        try:
+            parsed.append((Version.parse(version), version))
+        except (TypeError, ValueError):
+            continue
+    parsed.sort(key=lambda item: item[0], reverse=reverse)
+    return [version for _, version in parsed]
+
+
+def is_prerelease(version: str) -> bool:
+    """Return True for SemVer pre-release versions (e.g. ``1.0.0-rc.1``)."""
+    try:
+        return bool(Version.parse(version).prerelease)
+    except (TypeError, ValueError):
+        return False
 
 
 def run_id() -> str:
@@ -229,23 +367,15 @@ def fetch_latest_terraform_provider_version(provider_source: str, current_versio
 
 
 def compare_versions(v1: str, v2: str) -> int:
-    """
-    Compare two semantic versions.
-    Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
-    """
-    def parse_ver(v: str) -> tuple:
-        parts = v.split("-")[0].split(".")
-        return tuple(int(p) for p in parts)
-
+    """Compare two versions numerically, including pre-release precedence."""
     try:
-        v1_parts = parse_ver(v1)
-        v2_parts = parse_ver(v2)
-    except ValueError:
+        left = Version.parse(v1)
+        right = Version.parse(v2)
+    except (TypeError, ValueError):
         return 0
-
-    if v1_parts < v2_parts:
+    if left < right:
         return -1
-    elif v1_parts > v2_parts:
+    if left > right:
         return 1
     return 0
 

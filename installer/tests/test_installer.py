@@ -1374,40 +1374,104 @@ class TestDependencyDetector(unittest.TestCase):
         self.assertTrue((REPO_ROOT / "security" / "dependency_detector.py").exists())
 
     def test_version_constraint_parsing(self):
-        """Test version constraint parsing."""
-        from security.dependency_detector import parse_version_constraint
+        """Test version constraint parsing, including combined constraints."""
+        from security.dependency_detector import (
+            parse_version_constraint,
+            parse_version_constraints,
+        )
 
-        # Test various constraint formats
+        # Single constraints
         self.assertEqual(parse_version_constraint(">= 6.0"), (">=", "6.0"))
         self.assertEqual(parse_version_constraint("~> 0.11"), ("~>", "0.11"))
         self.assertEqual(parse_version_constraint("= 1.0.0"), ("=", "1.0.0"))
         self.assertEqual(parse_version_constraint("1.0.0"), ("=", "1.0.0"))
         self.assertEqual(parse_version_constraint("<= 2.0.0"), ("<=", "2.0.0"))
         self.assertEqual(parse_version_constraint("> 1.0"), (">", "1.0"))
+        self.assertEqual(parse_version_constraint("!= 1.2.3"), ("!=", "1.2.3"))
+
+        # Combined constraints are ANDed.
+        self.assertEqual(
+            parse_version_constraints(">= 6.0, < 7.0"),
+            [(">=", "6.0"), ("<", "7.0")],
+        )
+        self.assertEqual(
+            parse_version_constraints("~> 1.2, != 1.2.3"),
+            [("~>", "1.2"), ("!=", "1.2.3")],
+        )
+        with self.assertRaises(ValueError):
+            parse_version_constraint(">= 6.0, < 7.0")
+        with self.assertRaises(ValueError):
+            parse_version_constraints("")
 
     def test_version_satisfies_constraint(self):
-        """Test version constraint satisfaction."""
+        """Test Terraform constraint satisfaction and edge cases."""
         from security.dependency_detector import version_satisfies_constraint
 
-        # Exact match
+        # Exact match (missing core components compare as zero; build ignored)
         self.assertTrue(version_satisfies_constraint("1.0.0", "= 1.0.0"))
         self.assertFalse(version_satisfies_constraint("1.0.1", "= 1.0.0"))
+        self.assertTrue(version_satisfies_constraint("1.0", "= 1.0.0"))
+        self.assertTrue(version_satisfies_constraint("1.0.0+build.7", "= 1.0.0"))
+        self.assertTrue(version_satisfies_constraint("v1.0.0", "= 1.0.0"))
 
-        # Greater than or equal
+        # Greater than or equal / less than or equal
         self.assertTrue(version_satisfies_constraint("6.0.0", ">= 6.0"))
         self.assertTrue(version_satisfies_constraint("6.1.0", ">= 6.0"))
         self.assertFalse(version_satisfies_constraint("5.41.0", ">= 6.0"))
-
-        # Less than or equal
         self.assertTrue(version_satisfies_constraint("5.0.0", "<= 6.0"))
         self.assertFalse(version_satisfies_constraint("7.0.0", "<= 6.0"))
 
-        # Pessimistic constraint
+        # Terraform pessimistic constraints:
+        # ~> 1.2 allows 1.x (not 2.0); ~> 1.2.3 allows 1.2.x (not 1.3).
         self.assertTrue(version_satisfies_constraint("1.2.0", "~> 1.2"))
         self.assertTrue(version_satisfies_constraint("1.2.3", "~> 1.2"))
-        self.assertFalse(version_satisfies_constraint("1.3.0", "~> 1.2"))
+        self.assertTrue(version_satisfies_constraint("1.3.0", "~> 1.2"))
+        self.assertTrue(version_satisfies_constraint("1.10.0", "~> 1.2"))
+        self.assertFalse(version_satisfies_constraint("2.0.0", "~> 1.2"))
         self.assertTrue(version_satisfies_constraint("1.2.3", "~> 1.2.3"))
-        self.assertFalse(version_satisfies_constraint("1.2.4", "~> 1.2.3"))
+        self.assertTrue(version_satisfies_constraint("1.2.4", "~> 1.2.3"))
+        self.assertTrue(version_satisfies_constraint("1.2.99", "~> 1.2.3"))
+        self.assertFalse(version_satisfies_constraint("1.3.0", "~> 1.2.3"))
+
+        # The two regression cases from MO-GH-SEC-01.
+        self.assertTrue(version_satisfies_constraint("0.14.2", "~> 0.11"))
+        self.assertFalse(version_satisfies_constraint("1.0.0", "~> 0.11"))
+        self.assertTrue(version_satisfies_constraint("0.11.9", "~> 0.11.0"))
+        self.assertFalse(version_satisfies_constraint("0.14.2", "~> 0.11.0"))
+        self.assertTrue(version_satisfies_constraint("6.65.0", "~> 6.0"))
+        self.assertFalse(version_satisfies_constraint("7.0.0", "~> 6.0"))
+
+        # Combined constraints.
+        self.assertTrue(version_satisfies_constraint("6.65.0", ">= 6.0, < 7.0"))
+        self.assertFalse(version_satisfies_constraint("7.0.0", ">= 6.0, < 7.0"))
+        self.assertTrue(version_satisfies_constraint("1.2.4", "~> 1.2, != 1.2.3"))
+        self.assertFalse(version_satisfies_constraint("1.2.3", "~> 1.2, != 1.2.3"))
+
+        # Pre-release precedence (SemVer): 1.2.3-alpha < 1.2.3.
+        self.assertFalse(version_satisfies_constraint("1.2.3-alpha", ">= 1.2.3"))
+        self.assertTrue(version_satisfies_constraint("1.2.3-alpha", ">= 1.2.3-alpha"))
+        self.assertTrue(version_satisfies_constraint("1.2.3", "> 1.2.3-alpha"))
+        self.assertTrue(version_satisfies_constraint("1.2.3-alpha.2", "> 1.2.3-alpha.1"))
+        self.assertTrue(version_satisfies_constraint("1.2.3-beta", "< 1.2.3-rc.1"))
+
+        # Invalid input is rejected, not treated as satisfied.
+        self.assertFalse(version_satisfies_constraint("1.2.x", "~> 1.2"))
+        self.assertFalse(version_satisfies_constraint("1.2.3", "~> nope"))
+
+    def test_version_sorting_and_comparison(self):
+        """Test numeric sorting, not lexical sorting, including pre-releases."""
+        from security.dependency_detector import compare_versions, is_prerelease, sort_versions
+
+        versions = ["1.2.0", "1.10.0", "1.2.0-rc.1", "2.0.0", "1.2.0-alpha.2"]
+        self.assertEqual(
+            sort_versions(versions),
+            ["2.0.0", "1.10.0", "1.2.0", "1.2.0-rc.1", "1.2.0-alpha.2"],
+        )
+        self.assertGreater(compare_versions("1.10.0", "1.2.0"), 0)
+        self.assertLess(compare_versions("1.2.0-rc.1", "1.2.0"), 0)
+        self.assertEqual(compare_versions("1.2", "1.2.0"), 0)
+        self.assertTrue(is_prerelease("1.2.0-rc.1"))
+        self.assertFalse(is_prerelease("1.2.0"))
 
     def test_terraform_provider_parsing(self):
         """Test Terraform provider parsing."""
