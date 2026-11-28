@@ -56,10 +56,12 @@ python3 -m compileall -q src tests
 PYTHONPATH=src python3 -m unittest discover -s tests
 python3 build_zip.py
 
-# Installer: release-weite Suite (aktuell 674 Tests)
+# Installer: release-weite Suite (aktuell 691 Tests, 2 Skips)
 python3 -m unittest discover -s installer/tests
-# Fokussiertes Installer-Modul (aktuell 81 Tests)
+# Fokussiertes Installer-Modul (aktuell 98 Tests)
 python3 -m unittest installer.tests.test_installer
+# Dependency Detector + SARIF Adapter (offline, 33 Tests)
+python3 -m unittest installer.tests.test_installer.TestDependencyDetector installer.tests.test_installer.TestSarifAdapter
 # Policy Gate (aktuell 23 Tests)
 python3 -m unittest installer.tests.test_policy_gate
 
@@ -73,7 +75,7 @@ terraform validate
 ```
 
 > **Für Einsteiger:** Die Zahlen sind keine Note, sondern eine Landkarte:
-> 674 Installer-Tests bedeuten „viele Schutzfälle geprüft“, 81 fokussierte Tests
+> 691 Installer-Tests bedeuten „viele Schutzfälle geprüft“, 98 fokussierte Tests
 > bedeuten „das gerade geänderte Installer-Modul geprüft“. Keine dieser Zahlen
 > ist ein AWS-Live- oder Produktionsnachweis.
 

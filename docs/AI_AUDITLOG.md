@@ -381,6 +381,7 @@ Rein registrativ (Dateiname → Pfad); inhaltliche Quelle bleibt die jeweilige D
 - WIKI-CONSISTENCY-01 → docs/reports/WIKI-CONSISTENCY-01-EXECUTION_LOG.md (docs/wiki/** gegen Code/Tests/Reports geprüft; 12 Seiten inkl. Dokumentationsportal/FAQ, Glossar, Kurz-Erklärungen, Release-Bilder, Privacy-/CI-Grenzen; 0 fehlende Links; Wiki-Pflege in AGENTS/Playbook; keine Code-/AWS-/Terraform-/RIS-Änderung)
 - CI-CODQL-SARIF-DEPENDENCY-AUDIT-01 → docs/reports/CI-CODQL-SARIF-DEPENDENCY-AUDIT-01.md (CodeQL 143/143 + SARIF-Upload complete; Dependency-SARIF complete; Security Gate success; GitHub-Incident behoben; Scanner-Fehlalarm `hashicorp/time ~> 0.11`/Lock 0.14.2 und AWS-Constraint-vs-Lock dokumentiert; Fix offen)
 - MO-GH-SEC-01 → docs/reports/MO-GH-SEC-01-BASELINE-AUDIT.md (GitHub-Security-Baseline: 3 Workflows/Doppelausführung, CodeQL/SARIF-Kategorien, 257 offene Code-Scanning-Alerts/3 high, Security Gate echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags/SHA, keine Branch Protection/Rulesets, 0 Dependabot/Secret-Scanning-Alerts; WPs 02–10; keine Code-/AWS-/Terraform-/RIS-Änderung)
+- MO-GH-SEC-04 → docs/reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md (Dependency-Detector/SARIF: Terraform-`~>`/SemVer/combined Constraints, Lock-basierte Declared-/Locked-/Latest-/Compatible-Auflösung, Drift/Missing/Violation/Registry-Fehler, repository-relative SARIF-URIs, stabile Rule-IDs/Fingerprints, `dependency-check`-Kategorie, keine `CURRENT`-Findings; 33 fokussierte + 691 Installer + 456 Lambda + 129 Builder + 28 Seed + 32 Harness PASS; #296/#298-Auto-Resolution vorbereitet, GitHub-Scan-Verifikation PENDING; keine Dependency-/Workflow-/AWS-/Terraform-/Alert-Änderung)
 - MO-RC4-G1-EVIDENCE-SCOPE → docs/reports/MO-RC4-G1-EVIDENCE-SCOPE.md (Evidence-Discovery: P00/P02/P02I, Builder P2, AWS Apply 07/Funktional 08, 10D/10E/11A/13A; 1.150 PASS + 28 Seed, 4 Live BLOCKED; P00 KMS/Secrets/Retention nicht implementiert, P02/P02I Order-Schwerpunkt; Evidence-Gültigkeit/Drift, RC4-Zielmatrix, G2/G3-Voraussetzungen; keine Produkt-/AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G2-TEST-COMPLETION → docs/reports/MO-RC3-RC4-G2-TEST-COMPLETION.md (3 Tests ergänzt: RC3-Legacy-Body→generic, RC4-Unknown-Type fail-closed, Privacy-RETAIN ohne Mutation; 669/128/340/16 = 1.153 PASS, 28 Seed, 4 Live BLOCKED; Lambda-Coverage 90,34 %/82,56 %; keine neuen Produktdefekte, P00-Scope/Live-Cleanup/DLQ/GSI3/Processing/API-Idempotenz bleiben offen; Test-Commit `be77bf4`; keine AWS-/Terraform-Mutation, kein Push)
 - MO-RC3-RC4-G3-LIVE-E2E → docs/reports/MO-RC3-RC4-G3-LIVE-E2E.md (G3-A read-only: Teststack ACTIVE/0 Items/3 GSIs ACTIVE, Queues/DLQ 0, 7 Alarme OK, API/4 Routen, Lambda CodeSha; nach Freigabe Testbenutzer + Token über vorhandenes Verfahren, 4/4 Live-E2E PASS in 13,776 s, Ownership-Cleanup verifiziert: Tabelle 0, Queues/DLQ 0, Cognito-User 0; eigener DLQ-Cleanup-Rest per Receive/Delete entfernt; absichtlicher DLQ/Recovery/Privacy-Test bleibt offen; keine Terraform-/Produktionsmutation, kein Push)
@@ -1282,3 +1283,55 @@ Kontroll-/Konfigurationslücken, keine Kompromittierung belegt)
 - **Resume Point:** Report `docs/reports/MO-GH-SEC-01-BASELINE-AUDIT.md`;
   Feature-Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
   WP04 oder WP02 nach Freigabe.
+
+## 2026-11-28 — MO-GH-SEC-04 — DEPENDENCY DETECTOR & SARIF REMEDIATION
+
+**Status:** `LOCAL REMEDIATION VERIFIED / GITHUB SCAN VERIFICATION PENDING`
+
+- **Datum:** 2026-11-28 · **Branch:** `feature/mo-github-security-cleanup-01`
+  · **Baseline:** `37aba96` (MO-GH-SEC-01) · **Main:** `8830da2` (unverändert)
+- **Scope:** `security/dependency_detector.py`, `security/sarif_adapter.py`,
+  `installer/tests/test_installer.py`, Report/Auditlog/PROJECT_STATUS/Wiki.
+- **Commits:** `dd5ff62` (Version-Constraint-Engine), `1534a98`
+  (Lock-basierte Dependency-Auflösung), `e2bfe88` (SARIF-Remediation);
+  finaler Doku-Checkpoint ist `git log -1` auf dem Feature-Branch.
+- **Step 1:** Terraform-korrekte `~>`-Semantik (`~> 0.11` → `<1.0.0`,
+  `~> 0.11.0` → `<0.12.0`, `~> 6.0` → `<7.0.0`, `~> 1.2.3` → `<1.3.0`),
+  kombinierte Constraints, SemVer-Pre-Releases, numerische Sortierung;
+  falsche Testerwartungen fachlich korrigiert.
+- **Step 2:** `.terraform.lock.hcl` wird gelesen; Declared Constraint, Locked
+  Version, Latest Available und Latest Compatible werden unterschieden.
+  Status: `CURRENT`, `UPDATE_AVAILABLE`, `CONSTRAINT_UNSATISFIED`,
+  `LOCK_MISSING`, `LOCK_CONSTRAINT_DRIFT`, `REGISTRY_INCOMPLETE`,
+  `LOOKUP_ERROR`, `ERROR`. Registry-Fehler, ältere Registry-Daten und
+  Lock-/Constraint-Drift werden explizit behandelt; keine falsche
+  Downgrade-/Major-Empfehlung.
+- **Step 3:** SARIF nutzt repository-relative URIs, stabile Rule-IDs und
+  SHA-256-`partialFingerprints`, Tool-Version `2.0.0`,
+  `automationDetails.id = "dependency-check"` und emittiert keine
+  `CURRENT`-Findings. Actionable Findings bleiben erhalten.
+- **Alerts #296/#298:** #296 (AWS `CONSTRAINT_UNSATISFIED`) und #298
+  (time `CURRENT`) werden durch den korrigierten Scan nicht mehr als alte
+  Results erzeugt; Auto-Resolution wird erwartet. Für AWS erscheint wegen
+  `main.tf >= 6.0` vs. Lock `~> 6.0` stattdessen ein echter
+  `LOCK_CONSTRAINT_DRIFT`-Warning. Kein manuelles Dismissal.
+- **Verifikation:** 33 fokussierte Detector/SARIF-Tests OK; Installer
+  `discover -s installer/tests` 691 OK (2 skips); Lambda 456 OK +
+  compileall PASS; Lambda-ZIP 47.552 Bytes/SHA-256 `117299c9…`; Builder 129
+  OK; Seed 28 OK; lokale E2E-Harness 32 OK; `git diff --check` PASS;
+  Secret-Audit ohne Credentials.
+- **Vorher/Nachher:** Fixture mit AWS `>=6.0`/Lock `6.65.0` (`~>6.0`) und
+  time `~>0.11`/Lock `0.14.2`; Baseline-Simulation `37aba96` erzeugt 2×
+  `CONSTRAINT_UNSATISFIED` (AWS `3.24.1`, time `0.14.2`), korrigiert
+  `e2bfe88` erzeugt AWS `LOCK_CONSTRAINT_DRIFT` + time `CURRENT`.
+- **Nicht geändert:** keine Dependency-Versionen, keine Workflows, keine
+  Order-Modul-Dateien, keine AWS-/Terraform-Operation, keine
+  Security-Settings, kein Alert-Dismissal, kein Main-Merge.
+- **Restrisiko:** GitHub-Scan-Verifikation ausstehend; AWS-Constraint-Drift
+  (`>=6.0` vs. `~>6.0`) benötigt separaten freigegebenen Reconcile-Task;
+  Registry-Daten bleiben zeitabhängig.
+- **Nächste Aktionen:** Feature-Branch pushen; korrigierten Scan auf
+  `main`/PR verifizieren; Drift reconciliieren; danach `MO-GH-SEC-02`.
+- **Resume Point:** `docs/reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md`;
+  Branch `feature/mo-github-security-cleanup-01`; nächster Schritt
+  GitHub-Scan-Verifikation oder WP02 nach Freigabe.

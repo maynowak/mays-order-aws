@@ -4,7 +4,7 @@
 > Nach jedem Checkpoint aktualisieren. Fachliche Entscheidungen liegen in den
 > jeweiligen Bereichs-Dokumenten (`requirements/`, `architecture/`, `api/`, …).
 
-## Aktueller Stand (zuletzt aktualisiert: 2026-11-23)
+## Aktueller Stand (zuletzt aktualisiert: 2026-11-28)
 
 ```text
 May's Orders — AWS Serverless Order Management System
@@ -83,6 +83,16 @@ evidence 0fc8972); no deployment
   Code-Scanning-Alerts (3 high), `main` ohne Protection/Rulesets, Security Gate
   echo-only, Dependency-Detector-`~>`/Latest-/Lock-Defekte, Actions-Tags statt
   SHA; WPs 02–10 definiert; keine Code-/AWS-/Terraform-/RIS-Mutation
+→ Dependency/SARIF-Remediation 2026-11-28: MO-GH-SEC-04 lokal verifiziert
+  (`dd5ff62`/`1534a98`/`e2bfe88`): Terraform-`~>`/SemVer/combined Constraints,
+  Lock-basierte Declared-/Locked-/Latest-/Compatible-Auflösung mit
+  Drift/Missing/Violation/Registry-Fehler, repository-relative SARIF-URIs,
+  stabile Rule-IDs/Fingerprints, `dependency-check`-Kategorie, keine
+  `CURRENT`-Findings; 33 fokussierte + 691 Installer + 456 Lambda + 129
+  Builder + 28 Seed + 32 Harness PASS; #296/#298-Auto-Resolution vorbereitet,
+  GitHub-Scan-Verifikation PENDING; AWS-Constraint-Drift (`>=6.0` vs.
+  `~>6.0`) bleibt separater Reconcile-Task; keine Dependency-/Workflow-/
+  AWS-/Terraform-/Alert-Änderung
 → Q-12 APPROVED: v0.6.0-rc.1; Tag v0.6.0-rc.1 → Release-Commit 5bc154e
 → GitHub Release-Paket: README, Release Notes, Hero-Bild und PDF veröffentlicht
 → Main-Merge: 82f7ae1 (Eltern f597d14 + 76f7b3b); Main-Push abgeschlossen
