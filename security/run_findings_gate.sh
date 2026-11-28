@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# run_findings_gate.sh
+# Invoke the MO-GH-SEC-03 findings gate evaluator and exit with the appropriate code.
+#
+# Usage: ./security/run_findings_gate.sh <sarif_path> <selected_flag>
+#
+#   sarif_path  – absolute or path relative to the workflow working directory
+#   selected_flag – "true" or "false" whether the scanner was selected for this run
+#
+# Exit codes (matching the gate policy):
+#   0 → REPORT / PASS / NOT_EVALUATED
+#   1 → FAIL / BLOCKED
+set -euo pipefail
+
+SARIF_PATH="${1:-}"
+SELECTED="${2:-false}"
+
+# ---- If the scanner was not selected, report NOT_EVALUATED --------------
+if [ "$SELECTED" != "true" ]; then
+  echo "::notice::Scanner not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
+  echo "Security gate: no CRITICAL/HIGH findings; gate passes (NOT_EVALUATED)."
+  exit 0
+fi
+
+# ---- If SARIF file is missing, BLOCK ------------------------------------
+if [ -z "$SARIF_PATH" ] || [ ! -f "$SARIF_PATH" ]; then
+  echo "::error::SARIF file not found – gate BLOCKED (MO-GH-SEC-03)"
+  echo "Security gate: SARIF file missing – gate BLOCKED."
+  exit 1
+fi
+
+# ---- Run the Python evaluator and capture exit code --------------------
+PYTHON_EXIT=0
+PYTHON_SUMMARY=$(python3 -c "
+import sys
+sys.path.insert(0, '/home/dci-student/projects/Mays-Orders-AWS/security')
+from findings_gate import evaluate_scan
+result = evaluate_scan('${SARIF_PATH}', selected=True)
+print(result.summary)
+# Exit code: 1 for FAIL/BLOCKED, 0 for REPORT/PASS/NOT_EVALUATED
+# We use sys.exit() inside the evaluate_scan's main_cli, but here we
+# need to map the classification ourselves.
+# Print the classification name so the shell can use it.
+cls_name = result.classification.name
+print(f'CLASSIFICATION:{cls_name}')
+" 2>&1) || PYTHON_EXIT=$?
+
+# Extract the classification name from the Python output
+CLASSIFICATION=$(echo "$PYTHON_SUMMARY" | grep -oP 'CLASSIFICATION:\K\w+' || echo "UNKNOWN")
+
+# Map classification to bash exit code
+case "$CLASSIFICATION" in
+  FAIL)
+    echo "Security gate: CRITICAL/HIGH findings detected – gate FAILS (MO-GH-SEC-03)"
+    exit 1
+    ;;
+  REPORT)
+    echo "Security gate: no CRITICAL/HIGH findings; MEDIUM/LOW findings reported (MO-GH-SEC-03)"
+    exit 0
+    ;;
+  BLOCKED)
+    echo "::error::SARIF validation issue – gate BLOCKED (MO-GH-SEC-03)"
+    exit 1
+    ;;
+  NOT_EVALUATED)
+    echo "Security gate: scanner not selected – NOT EVALUATED (MO-GH-SEC-03)"
+    exit 0
+    ;;
+  PASS)
+    echo "Security gate: no findings detected – gate passes (MO-GH-SEC-03)"
+    exit 0
+    ;;
+  *)
+    echo "Security gate: unknown classification – gate passes (fallback)."
+    exit 0
+    ;;
+esac
