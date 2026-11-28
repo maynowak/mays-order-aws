@@ -160,7 +160,7 @@ jobs:
       # ---- Download CodeQL SARIF artifact --------------------------------
       - name: Download CodeQL SARIF artifact
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: codeql-sarif
           path: .github/workflow-sarif
@@ -174,7 +174,7 @@ jobs:
       # ---- Download Dependency SARIF artifact ----------------------------
       - name: Download Dependency SARIF artifact
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dependency-sarif
           path: .github/workflow-sarif
