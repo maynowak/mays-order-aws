@@ -89,6 +89,8 @@ gelten `docs/PROJECT_STATUS.md` und `docs/roadmap/ROADMAP.md`.
 | [`MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md`](../reports/MO-GH-SEC-04-DEPENDENCY-SARIF-REMEDIATION.md) | Dependency-Detector-/SARIF-Remediation und GitHub-Scan-Verifikation |
 | [`MO-GH-SEC-02-CI-ORCHESTRATION.md`](../reports/MO-GH-SEC-02-CI-ORCHESTRATION.md) | CI-Orchestrierung, CodeQL-/SARIF-Vertrag und GitHub-Verifikationsplan |
 
+| [`MO-GH-SEC-03-SECURITY-FINDINGS-GATE.md`](../reports/MO-GH-SEC-03-SECURITY-FINDINGS-GATE.md) | Security Findings Gate Policy und Testfälle |
+
 ## Pflege
 
 - Neue Feature-/API-/Release-Änderungen zuerst in den kanonischen Dokumenten

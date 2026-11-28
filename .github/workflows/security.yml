@@ -78,6 +78,33 @@ jobs:
           echo "CodeQL result: ${{ needs.codeql.result }}"
           echo "Dependency result: ${{ needs.dependency-check.result }}"
 
+      # ---- Handle scanner failures ---------------------------------------
+      # FAIL: Scanner ran but found critical/high findings
+      # FAILED: Scanner itself failed (infrastructure/tooling error)
+      # CANCELLED: Scanner was cancelled (timeout, concurrency, etc.)
+      - name: Check for scanner failures
+        if: always()
+        id: scanner-failures
+        run: |
+          # Check if any selected scanner failed
+          CODEQL_SELECTED=${{ needs.codeql.result != 'skipped' && needs.codeql.result != '' }}
+          DEP_SELECTED=${{ needs.dependency-check.result != 'skipped' && needs.dependency-check.result != '' }}
+
+          echo "codeql_selected=$CODEQL_SELECTED" >> $GITHUB_OUTPUT
+          echo "dependency_selected=$DEP_SELECTED" >> $GITHUB_OUTPUT
+
+          if [ "$CODEQL_SELECTED" = "true" ] && [ "${{ needs.codeql.result }}" = "failure" ]; then
+            echo "codeql_failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "codeql_failed=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [ "$DEP_SELECTED" = "true" ] && [ "${{ needs.dependency-check.result }}" = "failure" ]; then
+            echo "dependency_failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "dependency_failed=false" >> $GITHUB_OUTPUT
+          fi
+
       # ---- Download CodeQL SARIF artifact --------------------------------
       - name: Download CodeQL SARIF artifact
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
@@ -109,7 +136,17 @@ jobs:
       - name: Run Findings Gate (CodeQL)
         if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
         run: |
-          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "true" || {
+          # Determine if CodeQL is selected (not skipped, not empty)
+          CODEQL_SELECTED="${{ needs.codeql.result != 'skipped' && needs.codeql.result != '' }}"
+
+          # Run the findings gate with scanner metadata
+          bash security/run_findings_gate.sh \
+            ".github/workflow-sarif/codeql-results.sarif" \
+            "$CODEQL_SELECTED" \
+            "codeql" \
+            "${{ github.sha }}" \
+            "${{ github.ref }}" \
+            "${{ github.run_attempt }}" || {
             echo "::error::CodeQL findings gate FAILED – blocking security gate"
             exit 1
           }
@@ -118,20 +155,49 @@ jobs:
       - name: Run Findings Gate (Dependency)
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
         run: |
-          bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "true" || {
+          # Determine if Dependency check is selected
+          DEP_SELECTED="${{ needs.dependency-check.result != 'skipped' && needs.dependency-check.result != '' }}"
+
+          # Run the findings gate with scanner metadata
+          bash security/run_findings_gate.sh \
+            ".github/workflow-sarif/dependency-results.sarif" \
+            "$DEP_SELECTED" \
+            "dependency" \
+            "${{ github.sha }}" \
+            "${{ github.ref }}" \
+            "${{ github.run_attempt }}" || {
             echo "::error::Dependency findings gate FAILED – blocking security gate"
             exit 1
           }
 
-      # ---- Handle unselected scanners ------------------------------------
-      - name: Report unselected scanners
+      # ---- Handle scanner failures ---------------------------------------
+      - name: Fail gate on scanner failure
+        if: steps.scanner-failouts.outputs.codeql_failed == 'true' || steps.scanner-failouts.outputs.dependency_failed == 'true'
+        run: |
+          echo "::error::One or more scanners failed – gate BLOCKED (MO-GH-SEC-03)"
+          exit 1
+
+      # ---- Handle unselected / failed scanners ---------------------------
+      - name: Report scanner status
         if: always()
         run: |
-          if [ "${{ needs.codeql.result }}" = "skipped" ] || [ "${{ needs.codeql.result }}" = "" ]; then
+          CODEQL_STATUS="${{ needs.codeql.result }}"
+          DEP_STATUS="${{ needs.dependency-check.result }}"
+
+          if [ "$CODEQL_STATUS" = "skipped" ] || [ "$CODEQL_STATUS" = "" ]; then
             echo "::notice::CodeQL not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
           fi
-          if [ "${{ needs.dependency-check.result }}" = "skipped" ] || [ "${{ needs.dependency-check.result }}" = "" ]; then
+
+          if [ "$DEP_STATUS" = "skipped" ] || [ "$DEP_STATUS" = "" ]; then
             echo "::notice::Dependency check not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
+          fi
+
+          if [ "$CODEQL_STATUS" = "failure" ]; then
+            echo "::error::CodeQL scanner failed – gate BLOCKED (MO-GH-SEC-03)"
+          fi
+
+          if [ "$DEP_STATUS" = "failure" ]; then
+            echo "::error::Dependency scanner failed – gate BLOCKED (MO-GH-SEC-03)"
           fi
 
       # ---- Upload combined Findings Report -------------------------------
@@ -140,9 +206,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: findings-report
-          path: "*.gate-report.json"
+          path: ".github/workflow-sarif/*.gate-report.json"
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error
 
       # ---- Security Gate Summary -----------------------------------------
       - name: Security Gate Summary
@@ -161,4 +227,10 @@ jobs:
             echo ""
             echo "Findings Gate evaluation executed against downloaded SARIF artifacts."
             echo "Machine-readable report uploaded as 'findings-report' artifact."
+            echo ""
+            echo "**Metadata:**"
+            echo "- SHA: ${{ github.sha }}"
+            echo "- Ref: ${{ github.ref }}"
+            echo "- Run ID: ${{ github.run_id }}"
+            echo "- Attempt: ${{ github.run_attempt }}"
           } >> "$GITHUB_STEP_SUMMARY"

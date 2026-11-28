@@ -109,6 +109,29 @@ und die bestehende Regression (33 fokussierte, 98 Modul-, 691 Installer-,
 Lauf, die Doppelanalyse-Prüfung und die Auto-Resolution von #296/#298 sind
 noch **PENDING**; es gab keinen PR und keinen Main-Merge.
 
+## Security Findings Gate (MO-GH-SEC-03)
+
+Das Security Gate (Orchestrierungs‑Gate, kein Security‑Approved‑Gate) soll
+nach Implementierung der Policy (siehe `docs/reports/MO‑GH‑SEC‑03‑SECURITY‑FINDINGS‑GATE.md`)
+folgende Entscheidungen treffen:
+
+- **HIGH / CRITICAL** → Gate schlägt fehl (`FAIL`), gefundene Ergebnisse im
+  Job‑Summary führen.
+- **MEDIUM / LOW** → Gate besteht (`PASS`), Ergebnisse werden als Report
+  ausgegeben.
+- **Scanner‑ oder Upload‑Fehler** → Gate schlägt fehl (`FAIL`).
+- **Fehlende / veraltete Ergebnisse** → Gate blockiert (`BLOCKED`).
+- **Bewusst nicht ausgewählte Scans** → Gate besteht, es wird
+  `NOT EVALUATED` vermerkt.
+- **Keine Security‑Freigabe**: Gate gibt ausdrücklich aus, dass es sich nicht
+  um eine Security‑Freigabe handelt; die vollständigen Findings‑Entscheidungen
+  liegen in der Nachfolge (MO‑GH‑SEC‑03‑Nachfolge‑task).
+
+Lokal geprüfte Szenarien (ohne echte SARIF‑Daten im Run): Gate‑Skript
+bestätigt das Vorhandensein/Fehlen von SARIF‑Dateien und die korrekte
+Policy‑Rahmen‑Bedingung; die finale Schweregrad‑Klassifikation erfolgt,
+wenn SARIF‑Daten im GitHub‑Actions‑Run vorliegen.
+
 ## Dokumentations- und Git-Checkpoint
 
 Das Projekt verlangt nachvollziehbare Evidenz: Report, tatsächlich gelaufene

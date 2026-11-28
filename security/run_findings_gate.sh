@@ -2,10 +2,14 @@
 # run_findings_gate.sh
 # Invoke the MO-GH-SEC-03 findings gate evaluator and exit with the appropriate code.
 #
-# Usage: ./security/run_findings_gate.sh <sarif_path> <selected_flag>
+# Usage: ./security/run_findings_gate.sh <sarif_path> <selected_flag> [scanner_id] [sha] [ref] [attempt]
 #
 #   sarif_path   – path relative to the workflow working directory
 #   selected_flag – "true" or "false" whether the scanner was selected for this run
+#   scanner_id   – optional scanner identity (e.g. "codeql", "dependency")
+#   sha          – optional commit SHA
+#   ref          – optional git ref
+#   attempt      – optional workflow attempt number
 #
 # Exit codes (matching the gate policy):
 #   0 → REPORT / PASS / NOT_EVALUATED
@@ -14,6 +18,10 @@ set -euo pipefail
 
 SARIF_PATH="${1:-}"
 SELECTED="${2:-false}"
+SCANNER_ID="${3:-}"
+SHA="${4:-}"
+REF="${5:-}"
+ATTEMPT="${6:-}"
 
 # ---- Determine the security directory relative to this script -------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,7 +44,7 @@ _write_summary_line() {
 # ---- If the scanner was not selected, report NOT_EVALUATED --------------
 if [ "$SELECTED" != "true" ]; then
   echo "::notice::Scanner not selected for this run – NOT EVALUATED (MO-GH-SEC-03)"
-  echo "Security gate: no CRITICAL/HIGH findings; gate passes (NOT_EVALUATED)."
+  echo "Security gate: scanner not selected – NOT EVALUATED."
   _append_summary << 'EOF'
 
 ### Security Gate (MO-GH-SEC-03) – NOT_EVALUATED
@@ -63,18 +71,36 @@ EOF
   exit 1
 fi
 
+# ---- Build Python arguments --------------------------------------------
+PYTHON_ARGS="-- $SARIF_PATH"
+if [ -n "$SCANNER_ID" ]; then
+  PYTHON_ARGS="$PYTHON_ARGS --scanner-id \"$SCANNER_ID\""
+fi
+if [ -n "$SHA" ]; then
+  PYTHON_ARGS="$PYTHON_ARGS --sha \"$SHA\""
+fi
+if [ -n "$REF" ]; then
+  PYTHON_ARGS="$PYTHON_ARGS --ref \"$REF\""
+fi
+if [ -n "$ATTEMPT" ]; then
+  PYTHON_ARGS="$PYTHON_ARGS --attempt \"$ATTEMPT\""
+fi
+
 # ---- Run the Python evaluator ------------------------------------------
 # Use relative import from the script's own directory – no hardcoded paths.
 PYTHON_OUTPUT=$(python3 -c "
 import sys
 sys.path.insert(0, '${SCRIPT_DIR}')
-from findings_gate import evaluate_scan, write_report, _validate_sarif_structure
+from findings_gate import evaluate_scan, write_report, _validate_sarif_structure, _get_scanner_identity_from_run
 import json
 with open('${SARIF_PATH}', 'r') as f:
     data = json.load(f)
 verr = _validate_sarif_structure(data)
 print('DEBUG_VAL_ERROR:' + str(verr))
 result = evaluate_scan('${SARIF_PATH}', selected=True)
+# Get scanner ID from SARIF if not provided
+scanner_id = '${SCANNER_ID}' or _get_scanner_identity_from_run(data.get('runs', [{}])[0])
+result = evaluate_scan('${SARIF_PATH}', selected=True, scanner_id=scanner_id)
 print(result.summary)
 print('CLASSIFICATION:' + result.classification.name)
 print('DEBUG_NUM_FINDINGS:' + str(len(result.findings)))

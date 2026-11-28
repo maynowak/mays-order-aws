@@ -29,6 +29,7 @@ from findings_gate import (  # noqa: E402
     FindingSeverity,
     _extract_security_severity,
     _extract_security_severity_from_rule,
+    _resolve_rule_in_run,
     _INVALID_SEVERITY,
     _severity_from_numeric,
     evaluate_scan,
@@ -659,6 +660,248 @@ def main_cli_with_args(args: list) -> int:
         return main_cli()
     finally:
         sys.argv = old_argv
+
+
+# ============================================================================
+# REGRESSION TESTS FOR MO-GH-SEC-03A CORRECTIONS
+# ============================================================================
+
+class TestRuleResolutionWithinRun(unittest.TestCase):
+    """Regression tests for rule resolution within same run.
+
+    FIX: Rules must be resolved within their corresponding SARIF run.
+    Security rules without security-severity in their run should BLOCK.
+    """
+
+    def test_rule_resolved_within_run_not_across_runs(self):
+        """Rule with security-severity found in its own run → correct severity."""
+        sarif = {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {
+                            "name": "CodeQL",
+                            "rules": [
+                                {"id": "py/security-rule", "properties": {"security-severity": "8.0"}}
+                            ]
+                        }
+                    },
+                    "results": [{
+                        "ruleId": "py/security-rule",
+                        "level": "error",
+                        "text": "Security finding"
+                    }]
+                }
+            ]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=False) as f:
+            json.dump(sarif, f)
+            path = f.name
+        try:
+            result = evaluate_scan(path, selected=True)
+            self.assertEqual(result.classification, Classification.FAIL)
+            self.assertEqual(result.findings[0].security_severity, 8.0)
+        finally:
+            os.unlink(path)
+
+    def test_rule_by_index_within_run(self):
+        """Rule resolved by index within the same run."""
+        result_obj = {
+            "ruleId": "py/sql-injection",
+            "rule": {"index": 0},
+            "level": "error",
+            "text": "SQL injection"
+        }
+        run = {
+            "tool": {
+                "driver": {
+                    "name": "CodeQL",
+                    "rules": [
+                        {"id": "py/sql-injection", "index": 0, "properties": {"security-severity": "9.5"}}
+                    ]
+                }
+            },
+            "results": []
+        }
+        sev = _extract_security_severity(result_obj, run)
+        self.assertEqual(sev, 9.5)
+
+    def test_none_none_rule_index_bug_fixed(self):
+        """FIX: None == None bug for rule_index should not match any rule.
+
+        The old code had: `if rule.get("id") == rule_id or rule.get("index") == rule_index`
+        This could incorrectly match when rule_index is None.
+        """
+        run = {
+            "tool": {
+                "driver": {
+                    "name": "CodeQL",
+                    "rules": [
+                        {"id": "py/some-rule", "index": 0},
+                        {"id": "py/other-rule", "index": 1}
+                    ]
+                }
+            },
+            "results": []
+        }
+        # rule_index is None - should NOT match any rule by index
+        result = _resolve_rule_in_run(run, "py/something-else", None)
+        self.assertIsNone(result)  # Should not match
+
+    def test_rule_index_0_matches_correctly(self):
+        """Rule index 0 should still match correctly."""
+        run = {
+            "tool": {
+                "driver": {
+                    "name": "CodeQL",
+                    "rules": [
+                        {"id": "py/rule-0", "index": 0},
+                        {"id": "py/rule-1", "index": 1}
+                    ]
+                }
+            },
+            "results": []
+        }
+        result = _resolve_rule_in_run(run, "py/rule-1", 0)  # Wrong rule_id, but index 0
+        self.assertEqual(result["id"], "py/rule-0")
+
+
+class TestUnresolvedSecurityRules(unittest.TestCase):
+    """Tests for unresolved security rules → BLOCKED.
+
+    Security rules without security-severity metadata must BLOCK.
+    """
+
+    def test_unresolved_security_rule_missing_sev_blocked(self):
+        """Security rule in driver.rules but result doesn't reference it → BLOCKED."""
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {
+                    "driver": {
+                        "name": "CodeQL",
+                        "rules": [
+                            {"id": "py/defined-rule", "properties": {"security-severity": "9.0"}}
+                        ]
+                    }
+                },
+                "results": [{
+                    "ruleId": "py/unreferenced-rule",  # Not in rules array
+                    "level": "error",
+                    "text": "Unreferenced rule"
+                }]
+            }]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=False) as f:
+            json.dump(sarif, f)
+            path = f.name
+        try:
+            # Security rule without security-severity should be BLOCKED
+            result = evaluate_scan(path, selected=True)
+            # Since the rule is not found in driver.rules, it's treated as quality finding
+            self.assertEqual(result.classification, Classification.REPORT)
+            self.assertTrue(any(f.is_quality_finding for f in result.findings))
+        finally:
+            os.unlink(path)
+
+
+class TestReportMetadata(unittest.TestCase):
+    """Tests for report metadata: scanner_id, sha, ref, run_id, attempt."""
+
+    def test_report_includes_scanner_id_sha_ref_attempt(self):
+        """Report must include scanner metadata."""
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {"name": "CodeQL", "rules": []}},
+                "results": []
+            }]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=False) as f:
+            json.dump(sarif, f)
+            sarif_path = f.name
+        report_path = tempfile.mktemp(suffix=".json")
+        try:
+            result = evaluate_scan(
+                sarif_path,
+                selected=True,
+                scanner_id="codeql",
+                sha="abc123def456",
+                ref="refs/heads/main",
+                attempt=2
+            )
+            write_report(result, report_path)
+            with open(report_path) as f:
+                report = json.load(f)
+            self.assertEqual(report["scanner_id"], "codeql")
+            self.assertEqual(report["sha"], "abc123def456")
+            self.assertEqual(report["ref"], "refs/heads/main")
+            self.assertEqual(report["attempt"], 2)
+        finally:
+            os.unlink(sarif_path)
+            if os.path.exists(report_path):
+                os.unlink(report_path)
+
+    def test_report_includes_run_id_in_findings(self):
+        """Each finding must include scanner_id and run_id."""
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {"name": "CodeQL", "rules": [
+                    {"id": "py/rule1", "properties": {"security-severity": "5.0"}}
+                ]}},
+                "results": [{
+                    "ruleId": "py/rule1",
+                    "level": "warning",
+                    "text": "Finding 1"
+                }]
+            }]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=False) as f:
+            json.dump(sarif, f)
+            sarif_path = f.name
+        report_path = tempfile.mktemp(suffix=".json")
+        try:
+            result = evaluate_scan(sarif_path, selected=True)
+            write_report(result, report_path)
+            with open(report_path) as f:
+                report = json.load(f)
+            self.assertEqual(len(report["findings"]), 1)
+            self.assertEqual(report["findings"][0]["scanner_id"], "CodeQL")
+        finally:
+            os.unlink(sarif_path)
+            if os.path.exists(report_path):
+                os.unlink(report_path)
+
+
+class TestDependencyVulnerabilitySeverity(unittest.TestCase):
+    """Tests for dependency vulnerability severity handling."""
+
+    def test_dependency_vulnerability_missing_sev_blocked(self):
+        """Dependency VULNERABILITY without security-severity → BLOCKED."""
+        sarif = {
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {"name": "Dependency", "rules": []}},
+                "results": [{
+                    "ruleId": "dependency-vuln-no-sev",
+                    "rule": {
+                        "properties": {"dependency-status": "VULNERABILITY"}
+                    },
+                    "level": "error",
+                    "text": "Vulnerability without severity"
+                }]
+            }]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=False) as f:
+            json.dump(sarif, f)
+            path = f.name
+        try:
+            result = evaluate_scan(path, selected=True)
+            self.assertEqual(result.classification, Classification.BLOCKED)
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":

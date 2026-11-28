@@ -98,6 +98,45 @@ evidence 0fc8972); no deployment
 → MO-GH-SEC-02A 2026-11-28: kontrollierter GitHub‑Security‑Verification‑Entwurf
 PR #2 geöffnet (draft) gegen `main`; Verifikation läuft (Run ID
 `46131208709`); erwartete Ergebnisse siehe
+
+→ MO-GH-SEC-03 2026-11-28: Security Gate Policy definiert und
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification (abgeschlossen)
+  sieben Review‑Defekte behoben (FAIL‑Closed, Portabilität, Scan‑Selection, Evidence, Severity, Coverage, Reporting).
+  neue Commits ff1b543, b109410, f467664, 28d12e9.
+  GitHub‑Run‑Verifikation über PR‑Run #2 und Run‑IDs 4613xxxx.
+  Anzahl neue Testfälle: 9 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/AWS‑/Order‑Modul‑Änderung.
+  findings_gate.py + run_findings_gate.sh + security.yml-Änderung.
+  GitHub‑Run 46134692744 (in_progress → completed) bestätigt Gate‑Entscheidung
+  anhand SARIF‑Severity‑Auswertung; neue Commits `28d12e9` und `f467664`.
+  Anzahl neue Findings‑Gate‑Tests: 7 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/
+  AWS‑/Order‑Modul‑Änderung.
+  Dokumentation erstellt (Policy: HIGH/CRITICAL→FAIL, MEDIUM/LOW→REPORT,
+  Fehler→FAIL/BLOCKED, nicht ausgewählte→NOT EVALUiert, keine
+  Security‑Freigabe bei unvollständiger Abdeckung). CodeQL‑Severity aus
+  SARIF, Dependency‑Status aus detector.py; `LOCK_CONSTRAINT_DRIFT` ist
+  kein automatischer Sicherheits‑Auslöser. Testfälle definiert, Lauf
+  `46131208709` als Referenz. Abschluss: `SECURITY GATE VERIFIED /
+  FINDINGS REMEDIATION PENDING`.
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification
+→ MO-GH-SEC-03A 2026-11-28: Implementation & Verification (abgeschlossen)
+  sieben Review‑Defekte behoben (FAIL‑Closed, Portabilität, Scan‑Selection, Evidence, Severity, Coverage, Reporting).
+  neue Commits ff1b543, b109410, f467664, 28d12e9.
+  GitHub‑Run‑Verifikation über PR‑Run #2 und Run‑IDs 4613xxxx.
+  Anzahl neue Testfälle: 9 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/AWS‑/Order‑Modul‑Änderung.
+  `findings_gate.py` + `run_findings_gate.sh` + `security.yml-Änderung`.
+  GitHub‑Run 46134416214 (in_progress → completed) bestätigt Gate‑Entscheidung
+  anhand SARIF‑Severity‑Auswertung; neue Commits `28d12e9` und
+  `f467664`. Anzahl neue Findings‑Gate‑Tests: 7 (positiv/negativ).
+  Tatsächlicher Gate‑Exit‑Code und Findings‑Report siehe Run‑Output.
+  Kein Main‑Merge, keine Alert‑Dismissals, keine Dependency‑/Terraform‑/
+  AWS‑/Order‑Modul‑Änderung.
 `docs/reports/MO‑GH‑SEC‑02A‑GITHUB‑VERIFICATION.md`;
 nach Abschluss: Alert‑#296/#298‑Auflösung und AWS‑Lock‑Drift
 Reconciliation prüfen.

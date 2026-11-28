@@ -49,3 +49,7 @@ terraform/modules/*/.terraform.lock.hcl
 
 # Module Builder: generierte Bereitstellungen
 /generated/
+
+# SARIF artifacts (generated during CI runs)
+.github/workflow-sarif/
+*.sarif.gate-report.json
