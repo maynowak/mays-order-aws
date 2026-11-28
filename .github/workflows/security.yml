@@ -167,6 +167,13 @@ jobs:
           name: codeql-sarif
           path: .github/workflow-sarif
 
+      - name: Rename CodeQL SARIF file
+        if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
+        run: |
+          ls -la .github/workflow-sarif/
+          # CodeQL SARIF may be named results/<language>.sarif; rename for gate
+          find .github/workflow-sarif -name "*.sarif" -exec mv {} .github/workflow-sarif/codeql-results.sarif \;
+
       - name: Download Dependency SARIF artifact
         if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
         uses: actions/download-artifact@v4

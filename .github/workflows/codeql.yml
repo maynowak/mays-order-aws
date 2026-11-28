@@ -43,11 +43,10 @@ jobs:
           # Stable CodeQL category.  Do not change without a documented
           # alert/category migration plan.
           category: "/language:${{ matrix.language }}"
-          sarif-file: "codeql-results.sarif"
 
       - name: Upload CodeQL SARIF artifact
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif
-          path: codeql-results.sarif
+          path: results/*.sarif
           retention-days: 30
