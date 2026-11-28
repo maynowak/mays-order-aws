@@ -25,7 +25,6 @@ jobs:
         language: [python]
         include:
           - language: python
-            build-mode: autobuild
 
     steps:
       - name: Checkout repository
