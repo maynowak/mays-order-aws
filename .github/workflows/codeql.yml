@@ -51,3 +51,4 @@ jobs:
           name: codeql-sarif
           path: codeql-results.sarif
           retention-days: 30
+# Force workflow refresh - Sa 28. Nov 12:08:12 CET 2026
