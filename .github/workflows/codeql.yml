@@ -40,10 +40,19 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          # Stable CodeQL category.  Do not change without a documented
-          # alert/category migration plan.
           category: "/language:${{ matrix.language }}"
-          post-processed-sarif-path: "codeql-results.sarif"
+
+      - name: Locate CodeQL SARIF file
+        run: |
+          # CodeQL writes SARIF to results/*.sarif outside the workspace.
+          # Copy it to a known in-workspace location for artifact upload.
+          if [ -d "../results" ]; then
+            cp ../results/*.sarif ./codeql-results.sarif 2>/dev/null || true
+          fi
+          if [ -d "results" ]; then
+            cp results/*.sarif ./codeql-results.sarif 2>/dev/null || true
+          fi
+          ls -la codeql-results.sarif 2>/dev/null || echo "No SARIF file found"
 
       - name: Upload CodeQL SARIF artifact
         uses: actions/upload-artifact@v4
@@ -51,4 +60,5 @@ jobs:
           name: codeql-sarif
           path: codeql-results.sarif
           retention-days: 30
+          if-no-files-found: warn
 # Force workflow refresh - Sa 28. Nov 12:08:12 CET 2026
