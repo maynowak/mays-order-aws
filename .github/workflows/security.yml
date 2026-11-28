@@ -75,13 +75,23 @@ jobs:
       - name: Install dependencies (none needed – pure Python)
         run: |
 
-      - name: Run Findings Gate (CodeQL)
-        if: always() && github.event_name != 'schedule'
+      - name: Set scan selection variables
         run: |
-          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "$RUN_CODEQL"
+          # Set RUN_CODECL based on codeql job result
+          # The codeql job result is available as ${{ needs.codeql.result }}
+          RUN_CODECL="${{ needs.codeql.result || 'true' }}"
+          
+          # Set RUN_DEPENDENCY from the dependency-check job result
+          # The dependency-check job result is available as ${{ needs.dependency-check.result }}
+          RUN_DEPENDENCY="${{ needs.dependency-check.result || 'true' }}"
+
+      - name: Run Findings Gate (CodeQL)
+        if: ${{ needs.codeql.result == 'success' || needs.codeql.result == 'neutral' }}
+        run: |
+          bash security/run_findings_gate.sh ".github/workflow-sarif/codeql-results.sarif" "$RUN_CODECL"
 
       - name: Run Findings Gate (Dependency)
-        if: always() && github.event_name != 'schedule'
+        if: ${{ needs.dependency-check.result == 'success' || needs.dependency-check.result == 'neutral' }}
         run: |
           bash security/run_findings_gate.sh ".github/workflow-sarif/dependency-results.sarif" "$RUN_DEPENDENCY"
 
