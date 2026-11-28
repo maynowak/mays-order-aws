@@ -1,7 +1,8 @@
 name: "Security & Dependency Analysis"
 
 # Single trigger surface for all security scans.  codeql.yml and
-# dependency-check.yml are workflow_call-only reusable workflows.
+# dependency-check.yml are workflow_call-only reusable workflows; do not add
+# push/pull_request/schedule/dispatch triggers to them again.
 on:
   push:
     branches: [main]
@@ -23,10 +24,14 @@ on:
         type: boolean
         default: true
 
+concurrency:
+  # One security run per ref.  Pull-request updates cancel older runs; push
+  # and scheduled runs are serialized instead of running in parallel.
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
-  actions: read
   contents: read
-  security-events: write
 
 jobs:
   codeql:
@@ -34,6 +39,10 @@ jobs:
     if: >
       (github.event_name != 'schedule' || github.event.schedule == '0 3 * * 1') &&
       (github.event_name != 'workflow_dispatch' || inputs.run_codeql)
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     uses: ./.github/workflows/codeql.yml
 
   dependency-check:
@@ -41,28 +50,69 @@ jobs:
     if: >
       (github.event_name != 'schedule' || github.event.schedule == '0 6 * * *') &&
       (github.event_name != 'workflow_dispatch' || inputs.run_dependency)
+    permissions:
+      contents: read
+      security-events: write
     uses: ./.github/workflows/dependency-check.yml
 
   security-gate:
-    name: Security Gate
+    name: Security Gate (orchestration only)
     needs: [codeql, dependency-check]
+    if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
-      security-events: read
+      contents: read
     steps:
-      - name: Check CodeQL results
+      - name: Verify selected scans completed
+        env:
+          CODEQL_RESULT: ${{ needs.codeql.result }}
+          DEPENDENCY_RESULT: ${{ needs.dependency-check.result }}
+          RUN_CODEQL: ${{ (github.event_name != 'schedule' || github.event.schedule == '0 3 * * 1') && (github.event_name != 'workflow_dispatch' || inputs.run_codeql) }}
+          RUN_DEPENDENCY: ${{ (github.event_name != 'schedule' || github.event.schedule == '0 6 * * *') && (github.event_name != 'workflow_dispatch' || inputs.run_dependency) }}
         run: |
-          echo "Checking CodeQL results..."
-          # CodeQL results are uploaded as SARIF - check if any critical findings
-          echo "CodeQL completed"
+          set -euo pipefail
+          failed=0
+          selected=0
+          run_codeql="$(printf '%s' "${RUN_CODEQL:-false}" | tr '[:upper:]' '[:lower:]')"
+          run_dependency="$(printf '%s' "${RUN_DEPENDENCY:-false}" | tr '[:upper:]' '[:lower:]')"
 
-      - name: Check dependency results
-        run: |
-          echo "Checking dependency results..."
-          # Dependency check runs separately and uploads SARIF
-          echo "Dependency check completed"
+          if [ "$run_codeql" = "true" ]; then
+            selected=$((selected + 1))
+            echo "CodeQL result: $CODEQL_RESULT"
+            if [ "$CODEQL_RESULT" != "success" ]; then
+              echo "::error::CodeQL did not complete successfully (result: $CODEQL_RESULT)"
+              failed=1
+            fi
+          else
+            echo "CodeQL not selected for this run."
+          fi
 
-      - name: Security Gate Decision
-        run: |
-          echo "Security gate evaluation complete"
-          echo "All security checks passed - ready for deployment"
+          if [ "$run_dependency" = "true" ]; then
+            selected=$((selected + 1))
+            echo "Dependency result: $DEPENDENCY_RESULT"
+            if [ "$DEPENDENCY_RESULT" != "success" ]; then
+              echo "::error::Dependency check did not complete successfully (result: $DEPENDENCY_RESULT)"
+              failed=1
+            fi
+          else
+            echo "Dependency check not selected for this run."
+          fi
+
+          if [ "$selected" -eq 0 ]; then
+            echo "::error::No security scan was selected."
+            failed=1
+          fi
+
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "::warning::Scan orchestration completed. Findings evaluation is NOT implemented in this gate; see MO-GH-SEC-03. This is not a security approval."
+          {
+            echo "### Security scan orchestration"
+            echo ""
+            echo "Selected scans completed successfully."
+            echo ""
+            echo "**Not a security approval:** findings evaluation is pending MO-GH-SEC-03."
+          } >> "$GITHUB_STEP_SUMMARY"

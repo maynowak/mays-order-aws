@@ -1,18 +1,18 @@
 name: "CodeQL Analysis"
 
-# Reusable only: security.yml is the single trigger surface.
+# Reusable only: security.yml is the single trigger surface.  Adding direct
+# triggers here would duplicate analyses for the same commit/ref/language.
 on:
   workflow_call:
 
 permissions:
-  actions: read
   contents: read
-  security-events: write
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
